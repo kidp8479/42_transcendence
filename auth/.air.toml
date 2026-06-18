@@ -1,0 +1,18 @@
+root = "/app"
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/auth-service ./cmd/auth"
+  bin = "./tmp/auth-service"
+  full_bin = "./tmp/auth-service"
+  include_ext = ["go"]
+  exclude_dir = ["tmp", "vendor"]
+  delay = 1000
+  kill_delay = "0.5s"
+  rerun = false
+
+[log]
+  time = false
+
+[color]
+  app = ""
