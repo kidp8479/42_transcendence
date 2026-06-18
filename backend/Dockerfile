@@ -1,3 +1,19 @@
+#################################################################
+# Creates a Backend (NestJS) image based on Node Alpine
+#                    ##        .
+#              ## ## ##       ==
+#           ## ## ## ##      ===
+#       /""""""""""""""""\___/ ===
+#  ~~~ {~~ ~~~~ ~~~ ~~~~ ~~ ~ /  ===- ~~~
+#       \______ o          __/
+#         \    \        __/
+#          \____\______/
+# Author:		abelov <abelov@student.42london.com>
+# Contributor:	abelov <abelov@student.42london.com>
+# License:
+# Version:		v0.1.0
+#################################################################
+
 FROM node:22-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
