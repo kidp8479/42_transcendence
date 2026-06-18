@@ -1,0 +1,127 @@
+# ============================================================
+# OS / WSL
+# ============================================================
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+desktop.ini
+
+# ============================================================
+# Editors & IDEs
+# ============================================================
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+
+# ============================================================
+# Documentation & subject
+# ============================================================
+*.pdf
+*.md
+!README.md
+
+# ============================================================
+# Environment & secrets
+# ============================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+
+# ============================================================
+# Go
+# ============================================================
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test output
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Build artifacts
+/bin/
+/dist/
+vendor/
+
+# Go workspace
+go.work.sum
+
+# ============================================================
+# Node / React / NestJS
+# ============================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.npm/
+
+# Build output
+build/
+dist/
+.next/
+out/
+.nuxt/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+tsconfig.tsbuildinfo
+
+# ============================================================
+# Prisma
+# ============================================================
+prisma/migrations/dev/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# ============================================================
+# Docker
+# ============================================================
+.dockerignore
+
+# ============================================================
+# Logs & temp
+# ============================================================
+logs/
+*.log
+tmp/
+temp/
+.tmp/
+
+# ============================================================
+# Test coverage
+# ============================================================
+coverage/
+.nyc_output/
+lcov.info
