@@ -4,7 +4,7 @@
 
 - The canonical local stack is Docker Compose through the root Makefile.
 - Start the application with `make up` from the repository root.
-- Open the full local app at `http://localhost`; nginx is the published entrypoint on port `80`.
+- Open the full local app at `http://localhost`; nginx is the published entrypoint on port `8080`.
 - Use `make up-build` or the service-specific rebuild targets only when dependencies, Dockerfiles, or container setup changed.
 - Do not use `make re` for routine checks. It removes Docker volumes and local database data.
 - Do not run `npm run dev` from the repository root; there is no root `package.json`.

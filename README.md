@@ -31,7 +31,7 @@ On the first run, the Makefile copies `.env.example` to `.env` automatically if 
 
 When the containers are running, open the website in your browser at [http://localhost](http://localhost).
 
-You do not need to open the frontend container port directly. Docker Compose only publishes nginx on local port `80`, and nginx forwards requests to the right service inside Docker.
+You do not need to open the frontend container port directly. Docker Compose only publishes nginx on local port `8080`, and nginx forwards requests to the right service inside Docker.
 
 Local routes:
 
@@ -47,7 +47,7 @@ make ps
 make logs
 ```
 
-If nginx cannot start because port `80` is already in use, stop the other local service using that port, then run `make up` again.
+If nginx cannot start because port `8080` is already in use, stop the other local service using that port, then run `make up` again.
 
 #### Daily development flow
 
