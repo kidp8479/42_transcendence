@@ -13,7 +13,7 @@
 
 The project is designed to run locally in Docker. The development stack starts:
 
-- `nginx` as the local entrypoint on [http://localhost](http://localhost)
+- `nginx` as the local entrypoint on [http://localhost:8080](http://localhost:8080)
 - `frontend` as a React/Vite dev server
 - `backend` as a NestJS dev server
 - `auth` as a Go service with hot reload via Air
@@ -29,18 +29,18 @@ make up
 
 On the first run, the Makefile copies `.env.example` to `.env` automatically if `.env` does not already exist. If the Docker images do not exist yet, Docker Compose builds them. After that, `make up` starts the existing development containers without forcing a rebuild.
 
-When the containers are running, open the website in your browser at [http://localhost](http://localhost).
+When the containers are running, open the website in your browser at [http://localhost:8080](http://localhost:8080).
 
 You do not need to open the frontend container port directly. Docker Compose only publishes nginx on local port `8080`, and nginx forwards requests to the right service inside Docker.
 
 Local routes:
 
-- Frontend: [http://localhost/](http://localhost/)
-- Backend API: [http://localhost/api](http://localhost/api)
-- Backend WebSocket: [ws://localhost/ws](ws://localhost/ws)
-- Auth service: [http://localhost/auth](http://localhost/auth)
+- Frontend: [http://localhost:8080/](http://localhost:8080/)
+- Backend API: [http://localhost:8080/api](http://localhost:8080/api)
+- Backend WebSocket: [ws://localhost:8080/ws](ws://localhost:8080/ws)
+- Auth service: [http://localhost:8080/auth](http://localhost:8080/auth)
 
-If [http://localhost](http://localhost) does not load, check that the stack is running:
+If [http://localhost:8080](http://localhost:8080) does not load, check that the stack is running:
 
 ```sh
 make ps
@@ -90,7 +90,7 @@ npm run dev -- --host 127.0.0.1
 
 Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/).
 
-This is only a frontend convenience loop. The canonical full application still runs through `make up` and [http://localhost](http://localhost). If the frontend needs the API or WebSocket routes, keep the Docker stack running as well so `VITE_API_URL=http://localhost/api` and `VITE_WS_URL=ws://localhost/ws` have services to reach.
+This is only a frontend convenience loop. The canonical full application still runs through `make up` and [http://localhost:8080](http://localhost:8080). If the frontend needs the API or WebSocket routes, keep the Docker stack running as well so `VITE_API_URL=http://localhost:8080/api` and `VITE_WS_URL=ws://localhost:8080/ws` have services to reach.
 
 #### Environment variables
 
