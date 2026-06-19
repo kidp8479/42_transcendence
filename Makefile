@@ -17,14 +17,13 @@ ENV_FILE = .env
 # default                                                                      #
 # ---------------------------------------------------------------------------- #
 
-## all
+## start the default local development stack
 all: up
 
 
 # ---------------------------------------------------------------------------- #
 # env guard                                                                    #
 # ---------------------------------------------------------------------------- #
-
 
 $(ENV_FILE):
 	@echo "No .env found. Copying .env.example.."
@@ -35,19 +34,23 @@ $(ENV_FILE):
 # lifecycle                                                                    #
 # ---------------------------------------------------------------------------- #
 
-## up
+## start the local development stack without forcing a rebuild
 up: $(ENV_FILE)
+	$(COMPOSE) up -d
+
+## rebuild images and start the local development stack
+up-build: $(ENV_FILE)
 	$(COMPOSE) up --build -d
 
-## down
+## stop the local development stack
 down:
 	$(COMPOSE) down
 
-## restart
+## restart running containers
 restart:
 	$(COMPOSE) restart
 
-## build
+## rebuild all service images
 build:
 	$(COMPOSE) build
 
@@ -56,33 +59,52 @@ build:
 # individual services                                                          #
 # ---------------------------------------------------------------------------- #
 
-up-db:     $(ENV_FILE) ; $(COMPOSE) up -d db
-up-frontend: $(ENV_FILE) ; $(COMPOSE) up --build -d frontend
-up-backend:  $(ENV_FILE) ; $(COMPOSE) up --build -d backend
-up-auth:     $(ENV_FILE) ; $(COMPOSE) up --build -d auth
+## start only the database service
+up-db:       $(ENV_FILE) ; $(COMPOSE) up -d db
+
+## start only the frontend service without forcing a rebuild
+up-frontend: $(ENV_FILE) ; $(COMPOSE) up -d frontend
+
+## start only the backend service without forcing a rebuild
+up-backend:  $(ENV_FILE) ; $(COMPOSE) up -d backend
+
+## start only the auth service without forcing a rebuild
+up-auth:     $(ENV_FILE) ; $(COMPOSE) up -d auth
+
+## rebuild and start only the frontend service
+rebuild-frontend: $(ENV_FILE)
+	$(COMPOSE) up --build -d frontend
+
+## rebuild and start only the backend service
+rebuild-backend: $(ENV_FILE)
+	$(COMPOSE) up --build -d backend
+
+## rebuild and start only the auth service
+rebuild-auth: $(ENV_FILE)
+	$(COMPOSE) up --build -d auth
 
 
 # ---------------------------------------------------------------------------- #
 # logs                                                                         #
 # ---------------------------------------------------------------------------- #
 
-## logs
+## follow logs for all services
 logs:
 	$(COMPOSE) logs -f
 
-## logs-frontend
+## follow frontend logs
 logs-frontend:
 	$(COMPOSE) logs -f frontend
 
-## logs-backend
+## follow backend logs
 logs-backend:
 	$(COMPOSE) logs -f backend
 
-## logs-auth
+## follow auth service logs
 logs-auth:
 	$(COMPOSE) logs -f auth
 
-## logs-db
+## follow database logs
 logs-db:
 	$(COMPOSE) logs -f db
 
@@ -91,19 +113,19 @@ logs-db:
 # shells                                                                       #
 # ---------------------------------------------------------------------------- #
 
-## shell-frontend
+## open a shell in the frontend container
 shell-frontend:
 	$(COMPOSE) exec frontend sh
 
-## shell-backend
+## open a shell in the backend container
 shell-backend:
 	$(COMPOSE) exec backend sh
 
-## shell-auth
+## open a shell in the auth container
 shell-auth:
 	$(COMPOSE) exec auth sh
 
-## shell-db
+## open psql in the database container
 shell-db:
 	$(COMPOSE) exec db psql -U $${POSTGRES_USER} $${POSTGRES_DB}
 
@@ -112,11 +134,11 @@ shell-db:
 # database                                                                     #
 # ---------------------------------------------------------------------------- #
 
-## migrate
+## run Prisma migrations in the backend container
 migrate:
 	$(COMPOSE) exec backend npx prisma migrate dev
 
-## prisma-studio
+## start Prisma Studio from the backend container
 prisma-studio:
 	$(COMPOSE) exec backend npx prisma studio --browser none
 
@@ -125,27 +147,29 @@ prisma-studio:
 # status                                                                       #
 # ---------------------------------------------------------------------------- #
 
-## ps
+## show container status
 ps:
 	$(COMPOSE) ps
 
 
 # ---------------------------------------------------------------------------- #
-# cleanup                                                                       #
+# cleanup                                                                      #
 # ---------------------------------------------------------------------------- #
 
-## clean
+## stop containers and remove orphans
 clean:
 	$(COMPOSE) down --remove-orphans
 
-## fclean
+## remove containers, volumes, orphans, and local images
 fclean:
 	$(COMPOSE) down --volumes --remove-orphans --rmi local
 
-## re
+## fully reset and start the local development stack
 re: fclean
 	+$(MAKE) up
 
+## rebuild images and start the local development stack
+rebuild: up-build
 
 # Magic help adapted: from https://gitlab.com/depressiveRobot/make-help/blob/master/help.mk (MIT License)
 help:
@@ -161,8 +185,9 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST) | sort -u
 	@printf "\n"
 
-.PHONY: all up down restart build logs ps clean fclean re \
+.PHONY: all up up-build down restart build logs ps clean fclean re rebuild \
         up-db up-frontend up-backend up-auth \
+        rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
         migrate prisma-studio
