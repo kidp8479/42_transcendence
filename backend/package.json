@@ -1,0 +1,28 @@
+{
+  "name": "task-rabbit-backend",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.1.27",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/platform-socket.io": "^11.1.27",
+    "@nestjs/swagger": "^11.4.4",
+    "@nestjs/websockets": "^11.1.27",
+    "@prisma/client": "^6.0.0",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@types/node": "^22.0.0",
+    "prisma": "^6.0.0",
+    "typescript": "^5.8.3"
+  }
+}

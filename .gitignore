@@ -30,6 +30,7 @@ desktop.ini
 *.pdf
 *.md
 !README.md
+!AGENTS.md
 
 # ============================================================
 # Environment & secrets
@@ -94,7 +95,9 @@ out/
 .parcel-cache/
 .eslintcache
 .stylelintcache
-tsconfig.tsbuildinfo
+*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
 
 # ============================================================
 # Prisma
