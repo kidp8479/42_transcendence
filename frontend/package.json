@@ -10,10 +10,12 @@
   },
   "dependencies": {
     "@tanstack/react-router": "^1.170.16",
+    "@tanstack/react-router-devtools": "^1.167.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@tanstack/router-plugin": "^1.168.18",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.2",
