@@ -1,0 +1,1 @@
+//copy paste tanstack code here for generating the routes
