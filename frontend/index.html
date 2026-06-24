@@ -1,12 +1,19 @@
+<!-- Static HTML skeleton served by the browser. Contains almost nothing
+     React takes over from here and builds the entire UI dynamically inside #root.
+     You should rarely need to touch this file. -->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Transcendence Planner</title>
+    <title>42 Projects Planner</title>
   </head>
   <body>
+    <!-- React mounts the entire app here. This div starts empty
+         main.tsx finds it via document.getElementById('root') and injects everything inside. -->
     <div id="root"></div>
+
+    <!-- Entry point: Vite loads main.tsx which boots React and the router. -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
