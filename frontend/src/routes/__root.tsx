@@ -1,6 +1,10 @@
-// TEMPORARY - quick setup for testing routes during development.
-// Nav links will live in HeaderPublic.tsx and HeaderAuthenticated.tsx.
-// Final version will look like this:
+// The root route, the one component that is always rendered, for every URL.
+// Think of it as the outermost box that contains the entire app.
+// Every other route (_public, _app, and their pages) renders inside its <Outlet />.
+//
+// TEMPORARY - the nav links below are only here to test that routes work during development.
+// Nav links will eventually live in HeaderPublic.tsx and HeaderAuthenticated.tsx.
+// Final version will look minimalistic like this:
 //
 // export const Route = createRootRoute({
 //   component: () => (
