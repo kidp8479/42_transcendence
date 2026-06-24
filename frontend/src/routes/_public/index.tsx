@@ -1,8 +1,8 @@
-//index.tsx
+//index.tsx this is where the landing page will live !
 
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute('/_public/')({
 	component: Index,
 });
 

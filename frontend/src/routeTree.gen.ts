@@ -9,7 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as PublicIndexRouteImport } from './routes/_public/index'
 import { Route as PublicTermsRouteImport } from './routes/_public/terms'
 import { Route as PublicPrivacyRouteImport } from './routes/_public/privacy'
 import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
@@ -17,8 +17,8 @@ import { Route as PublicContactRouteImport } from './routes/_public/contact'
 import { Route as PublicAboutRouteImport } from './routes/_public/about'
 import { Route as AppAppRouteImport } from './routes/_app/app'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
+const PublicIndexRoute = PublicIndexRouteImport.update({
+  id: '/_public/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
@@ -54,80 +54,80 @@ const AppAppRoute = AppAppRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
   '/app': typeof AppAppRoute
   '/about': typeof PublicAboutRoute
   '/contact': typeof PublicContactRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/privacy': typeof PublicPrivacyRoute
   '/terms': typeof PublicTermsRoute
+  '/': typeof PublicIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/app': typeof AppAppRoute
   '/about': typeof PublicAboutRoute
   '/contact': typeof PublicContactRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/privacy': typeof PublicPrivacyRoute
   '/terms': typeof PublicTermsRoute
+  '/': typeof PublicIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
   '/_app/app': typeof AppAppRoute
   '/_public/about': typeof PublicAboutRoute
   '/_public/contact': typeof PublicContactRoute
   '/_public/forgot-password': typeof PublicForgotPasswordRoute
   '/_public/privacy': typeof PublicPrivacyRoute
   '/_public/terms': typeof PublicTermsRoute
+  '/_public/': typeof PublicIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
     | '/app'
     | '/about'
     | '/contact'
     | '/forgot-password'
     | '/privacy'
     | '/terms'
+    | '/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
     | '/app'
     | '/about'
     | '/contact'
     | '/forgot-password'
     | '/privacy'
     | '/terms'
+    | '/'
   id:
     | '__root__'
-    | '/'
     | '/_app/app'
     | '/_public/about'
     | '/_public/contact'
     | '/_public/forgot-password'
     | '/_public/privacy'
     | '/_public/terms'
+    | '/_public/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
   AppAppRoute: typeof AppAppRoute
   PublicAboutRoute: typeof PublicAboutRoute
   PublicContactRoute: typeof PublicContactRoute
   PublicForgotPasswordRoute: typeof PublicForgotPasswordRoute
   PublicPrivacyRoute: typeof PublicPrivacyRoute
   PublicTermsRoute: typeof PublicTermsRoute
+  PublicIndexRoute: typeof PublicIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_public/': {
+      id: '/_public/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof PublicIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_public/terms': {
@@ -176,13 +176,13 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
   AppAppRoute: AppAppRoute,
   PublicAboutRoute: PublicAboutRoute,
   PublicContactRoute: PublicContactRoute,
   PublicForgotPasswordRoute: PublicForgotPasswordRoute,
   PublicPrivacyRoute: PublicPrivacyRoute,
   PublicTermsRoute: PublicTermsRoute,
+  PublicIndexRoute: PublicIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
