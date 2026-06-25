@@ -17,6 +17,8 @@ import { Route as PublicPrivacyRouteImport } from './routes/_public/privacy'
 import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
 import { Route as PublicContactRouteImport } from './routes/_public/contact'
 import { Route as PublicAboutRouteImport } from './routes/_public/about'
+import { Route as AppProjectRouteImport } from './routes/_app/project'
+import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppAppRouteImport } from './routes/_app/app'
 
 const PublicRouteRoute = PublicRouteRouteImport.update({
@@ -57,6 +59,16 @@ const PublicAboutRoute = PublicAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => PublicRouteRoute,
 } as any)
+const AppProjectRoute = AppProjectRouteImport.update({
+  id: '/project',
+  path: '/project',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppAppRoute = AppAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -66,6 +78,8 @@ const AppAppRoute = AppAppRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
   '/app': typeof AppAppRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/project': typeof AppProjectRoute
   '/about': typeof PublicAboutRoute
   '/contact': typeof PublicContactRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
@@ -75,6 +89,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof PublicIndexRoute
   '/app': typeof AppAppRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/project': typeof AppProjectRoute
   '/about': typeof PublicAboutRoute
   '/contact': typeof PublicContactRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
@@ -86,6 +102,8 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteRouteWithChildren
   '/_public': typeof PublicRouteRouteWithChildren
   '/_app/app': typeof AppAppRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/project': typeof AppProjectRoute
   '/_public/about': typeof PublicAboutRoute
   '/_public/contact': typeof PublicContactRoute
   '/_public/forgot-password': typeof PublicForgotPasswordRoute
@@ -98,6 +116,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/dashboard'
+    | '/project'
     | '/about'
     | '/contact'
     | '/forgot-password'
@@ -107,6 +127,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app'
+    | '/dashboard'
+    | '/project'
     | '/about'
     | '/contact'
     | '/forgot-password'
@@ -117,6 +139,8 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_public'
     | '/_app/app'
+    | '/_app/dashboard'
+    | '/_app/project'
     | '/_public/about'
     | '/_public/contact'
     | '/_public/forgot-password'
@@ -188,6 +212,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicAboutRouteImport
       parentRoute: typeof PublicRouteRoute
     }
+    '/_app/project': {
+      id: '/_app/project'
+      path: '/project'
+      fullPath: '/project'
+      preLoaderRoute: typeof AppProjectRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/app': {
       id: '/_app/app'
       path: '/app'
@@ -200,10 +238,14 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppAppRoute: typeof AppAppRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppProjectRoute: typeof AppProjectRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAppRoute: AppAppRoute,
+  AppDashboardRoute: AppDashboardRoute,
+  AppProjectRoute: AppProjectRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
