@@ -6,5 +6,14 @@ export const Route = createFileRoute('/_public/terms')({
 })
 
 function TermsPage() {
-  return <div>Hello from Terms!</div>
+  return (
+	<main>
+		<h1>Terms of Service</h1>
+		<p>Last Updated : June 2026</p>
+		<section>
+			<h2>1. Acceptance of Terms</h2>
+			<p>By using this service...</p>
+		</section>
+	</main>
+  )
 }
