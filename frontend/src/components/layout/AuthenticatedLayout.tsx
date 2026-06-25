@@ -34,4 +34,4 @@ export function authGuard() {
   if (!localStorage.getItem('token')) {
     throw redirect({ to: '/' })
   }
-}
+} // auth team can decide if they want to keep this
