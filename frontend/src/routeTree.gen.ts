@@ -15,7 +15,6 @@ import { Route as PublicIndexRouteImport } from './routes/_public/index'
 import { Route as PublicTermsRouteImport } from './routes/_public/terms'
 import { Route as PublicResetPasswordRouteImport } from './routes/_public/reset-password'
 import { Route as PublicPrivacyRouteImport } from './routes/_public/privacy'
-import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
 import { Route as PublicDontPanicRouteImport } from './routes/_public/dont-panic'
 import { Route as PublicContactRouteImport } from './routes/_public/contact'
 import { Route as PublicAuthCallbackRouteImport } from './routes/_public/auth-callback'
@@ -60,11 +59,6 @@ const PublicResetPasswordRoute = PublicResetPasswordRouteImport.update({
 const PublicPrivacyRoute = PublicPrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
-  getParentRoute: () => PublicRouteRoute,
-} as any)
-const PublicForgotPasswordRoute = PublicForgotPasswordRouteImport.update({
-  id: '/forgot-password',
-  path: '/forgot-password',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicDontPanicRoute = PublicDontPanicRouteImport.update({
@@ -174,7 +168,6 @@ export interface FileRoutesByFullPath {
   '/auth-callback': typeof PublicAuthCallbackRoute
   '/contact': typeof PublicContactRoute
   '/dont-panic': typeof PublicDontPanicRoute
-  '/forgot-password': typeof PublicForgotPasswordRoute
   '/privacy': typeof PublicPrivacyRoute
   '/reset-password': typeof PublicResetPasswordRoute
   '/terms': typeof PublicTermsRoute
@@ -198,7 +191,6 @@ export interface FileRoutesByTo {
   '/auth-callback': typeof PublicAuthCallbackRoute
   '/contact': typeof PublicContactRoute
   '/dont-panic': typeof PublicDontPanicRoute
-  '/forgot-password': typeof PublicForgotPasswordRoute
   '/privacy': typeof PublicPrivacyRoute
   '/reset-password': typeof PublicResetPasswordRoute
   '/terms': typeof PublicTermsRoute
@@ -224,7 +216,6 @@ export interface FileRoutesById {
   '/_public/auth-callback': typeof PublicAuthCallbackRoute
   '/_public/contact': typeof PublicContactRoute
   '/_public/dont-panic': typeof PublicDontPanicRoute
-  '/_public/forgot-password': typeof PublicForgotPasswordRoute
   '/_public/privacy': typeof PublicPrivacyRoute
   '/_public/reset-password': typeof PublicResetPasswordRoute
   '/_public/terms': typeof PublicTermsRoute
@@ -251,7 +242,6 @@ export interface FileRouteTypes {
     | '/auth-callback'
     | '/contact'
     | '/dont-panic'
-    | '/forgot-password'
     | '/privacy'
     | '/reset-password'
     | '/terms'
@@ -275,7 +265,6 @@ export interface FileRouteTypes {
     | '/auth-callback'
     | '/contact'
     | '/dont-panic'
-    | '/forgot-password'
     | '/privacy'
     | '/reset-password'
     | '/terms'
@@ -300,7 +289,6 @@ export interface FileRouteTypes {
     | '/_public/auth-callback'
     | '/_public/contact'
     | '/_public/dont-panic'
-    | '/_public/forgot-password'
     | '/_public/privacy'
     | '/_public/reset-password'
     | '/_public/terms'
@@ -362,13 +350,6 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PublicPrivacyRouteImport
-      parentRoute: typeof PublicRouteRoute
-    }
-    '/_public/forgot-password': {
-      id: '/_public/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof PublicForgotPasswordRouteImport
       parentRoute: typeof PublicRouteRoute
     }
     '/_public/dont-panic': {
@@ -548,7 +529,6 @@ interface PublicRouteRouteChildren {
   PublicAuthCallbackRoute: typeof PublicAuthCallbackRoute
   PublicContactRoute: typeof PublicContactRoute
   PublicDontPanicRoute: typeof PublicDontPanicRoute
-  PublicForgotPasswordRoute: typeof PublicForgotPasswordRoute
   PublicPrivacyRoute: typeof PublicPrivacyRoute
   PublicResetPasswordRoute: typeof PublicResetPasswordRoute
   PublicTermsRoute: typeof PublicTermsRoute
@@ -560,7 +540,6 @@ const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicAuthCallbackRoute: PublicAuthCallbackRoute,
   PublicContactRoute: PublicContactRoute,
   PublicDontPanicRoute: PublicDontPanicRoute,
-  PublicForgotPasswordRoute: PublicForgotPasswordRoute,
   PublicPrivacyRoute: PublicPrivacyRoute,
   PublicResetPasswordRoute: PublicResetPasswordRoute,
   PublicTermsRoute: PublicTermsRoute,
