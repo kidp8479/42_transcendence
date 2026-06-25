@@ -1,4 +1,4 @@
-// OAuth callback page (/auth/callback).
+// OAuth callback page (/auth-callback).
 // Landing point after 42 OAuth redirects the user back to the app with ?code=... in the URL.
 // This page extracts the code, sends it to the Go auth service to exchange for a token, then redirects to /dashboard.
 // The user sees this page for a fraction of a second - it has no visible UI beyond a loading state.

@@ -15,7 +15,7 @@
  *
  * NOTE:
  * This component should be mounted once at the root level of the app
- * (typically inside AppLayout or AuthenticatedLayout depending on scope).
+ * (typically inside AuthenticatedLayout or at root level depending on scope).
  *
  * It does NOT define specific modals itself.
  * It only provides the rendering surface for them.
