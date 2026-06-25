@@ -96,6 +96,7 @@ out/
 .eslintcache
 .stylelintcache
 *.tsbuildinfo
+.vite/
 frontend/vite.config.d.ts
 frontend/vite.config.js
 
