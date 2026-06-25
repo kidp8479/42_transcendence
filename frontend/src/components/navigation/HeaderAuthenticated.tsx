@@ -1,7 +1,7 @@
 // Top bar for authenticated pages.
 // Contains: search bar + notification bell + user avatar dropdown.
 // SCAFFOLD ONLY - links have no labels yet, not wired to any UI. Placeholder to establish navigation structure.
-import { Link } from '@tanstack/react-router'
+import { Link } from "@tanstack/react-router";
 
 export function HeaderAuthenticated() {
   return (
@@ -11,5 +11,5 @@ export function HeaderAuthenticated() {
       <Link to="/search">Search</Link>
       <Link to="/user-settings">Settings</Link>
     </header>
-  )
+  );
 }

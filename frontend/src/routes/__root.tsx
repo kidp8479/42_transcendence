@@ -11,7 +11,7 @@
  * </ModalProvider>
  *
  * once the modal system is implemented.
- * 
+ *
  *   Why in __root.tsx?
  * - Modals are a global UI system, not a page or layout feature.
  * - Both _public and _authenticated routes need access to modals.
@@ -22,8 +22,8 @@
  *   to appear anywhere in the app.
  */
 
-import { createRootRoute, Outlet } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 export const Route = createRootRoute({
   component: () => (
@@ -32,4 +32,4 @@ export const Route = createRootRoute({
       <TanStackRouterDevtools />
     </>
   ),
-})
+});
