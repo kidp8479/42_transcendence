@@ -2,9 +2,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_public/contact')({
-  component: ContactComponent,
+  component: ContactPage,
 })
 
-function ContactComponent() {
+function ContactPage() {
   return <div>Hello from Contact</div>
 }

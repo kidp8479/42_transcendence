@@ -8,6 +8,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import { AppLayout, authGuard } from '../../components/layout/AppLayout'
 
 export const Route = createFileRoute('/_app')({
-  beforeLoad: authGuard,
+  beforeLoad: authGuard, // the auth team can decide if they want to use this or not
   component: AppLayout,
 })
