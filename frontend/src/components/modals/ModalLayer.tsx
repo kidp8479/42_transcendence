@@ -14,8 +14,8 @@
  * - Preventing UI interaction with underlying pages
  *
  * NOTE:
- * This component should be mounted once at the root level of the app
- * (typically inside AuthenticatedLayout or at root level depending on scope).
+ * This component is mounted in __root.tsx alongside ModalProvider, so modals
+ * are accessible from both public and authenticated routes.
  *
  * It does NOT define specific modals itself.
  * It only provides the rendering surface for them.
