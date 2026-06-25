@@ -1,6 +1,6 @@
 // The root route, the one component that is always rendered, for every URL.
 // Think of it as the outermost box that contains the entire app.
-// Every other route (_public, _app, and their pages) renders inside its <Outlet />.
+// Every other route (_public, _authenticated, and their pages) renders inside its <Outlet />.
 //
 // TEMPORARY - the nav links below are only here to test that routes work during development.
 // Nav links will eventually live in HeaderPublic.tsx and HeaderAuthenticated.tsx.
@@ -32,8 +32,8 @@ export const Route = createRootRoute({
         <Link to="/privacy">Privacy</Link>{'|'}
         <Link to="/forgot-password">Forgot Password</Link>{'|'}
 
-		{/* ./routes/_app/app.tsx */}
-        <Link to="/app">App</Link>
+		{/* ./routes/_authenticated/*.tsx */}
+        <Link to="/dashboard">Dashboard</Link>
 
       </div>
       <hr />

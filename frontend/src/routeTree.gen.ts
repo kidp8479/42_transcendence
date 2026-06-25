@@ -10,23 +10,28 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PublicRouteRouteImport } from './routes/_public/route'
-import { Route as AppRouteRouteImport } from './routes/_app/route'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as PublicIndexRouteImport } from './routes/_public/index'
 import { Route as PublicTermsRouteImport } from './routes/_public/terms'
 import { Route as PublicPrivacyRouteImport } from './routes/_public/privacy'
 import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
 import { Route as PublicContactRouteImport } from './routes/_public/contact'
 import { Route as PublicAboutRouteImport } from './routes/_public/about'
-import { Route as AppProjectRouteImport } from './routes/_app/project'
-import { Route as AppDiscoveryRouteImport } from './routes/_app/discovery'
-import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedProjectIdRouteRouteImport } from './routes/_authenticated/$projectId/route'
+import { Route as AuthenticatedProjectIdSummaryRouteImport } from './routes/_authenticated/$projectId/summary'
+import { Route as AuthenticatedProjectIdListRouteImport } from './routes/_authenticated/$projectId/list'
+import { Route as AuthenticatedProjectIdKanbanRouteImport } from './routes/_authenticated/$projectId/kanban'
+import { Route as AuthenticatedProjectIdEvaluationChecklistRouteImport } from './routes/_authenticated/$projectId/evaluation-checklist'
+import { Route as AuthenticatedProjectIdDiscoveryRouteImport } from './routes/_authenticated/$projectId/discovery'
+import { Route as AuthenticatedProjectIdCalendarRouteImport } from './routes/_authenticated/$projectId/calendar'
 
 const PublicRouteRoute = PublicRouteRouteImport.update({
   id: '/_public',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppRouteRoute = AppRouteRouteImport.update({
-  id: '/_app',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PublicIndexRoute = PublicIndexRouteImport.update({
@@ -59,98 +64,160 @@ const PublicAboutRoute = PublicAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => PublicRouteRoute,
 } as any)
-const AppProjectRoute = AppProjectRouteImport.update({
-  id: '/project',
-  path: '/project',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppDiscoveryRoute = AppDiscoveryRouteImport.update({
-  id: '/discovery',
-  path: '/discovery',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppDashboardRoute = AppDashboardRouteImport.update({
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
-  getParentRoute: () => AppRouteRoute,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedProjectIdRouteRoute =
+  AuthenticatedProjectIdRouteRouteImport.update({
+    id: '/$projectId',
+    path: '/$projectId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedProjectIdSummaryRoute =
+  AuthenticatedProjectIdSummaryRouteImport.update({
+    id: '/summary',
+    path: '/summary',
+    getParentRoute: () => AuthenticatedProjectIdRouteRoute,
+  } as any)
+const AuthenticatedProjectIdListRoute =
+  AuthenticatedProjectIdListRouteImport.update({
+    id: '/list',
+    path: '/list',
+    getParentRoute: () => AuthenticatedProjectIdRouteRoute,
+  } as any)
+const AuthenticatedProjectIdKanbanRoute =
+  AuthenticatedProjectIdKanbanRouteImport.update({
+    id: '/kanban',
+    path: '/kanban',
+    getParentRoute: () => AuthenticatedProjectIdRouteRoute,
+  } as any)
+const AuthenticatedProjectIdEvaluationChecklistRoute =
+  AuthenticatedProjectIdEvaluationChecklistRouteImport.update({
+    id: '/evaluation-checklist',
+    path: '/evaluation-checklist',
+    getParentRoute: () => AuthenticatedProjectIdRouteRoute,
+  } as any)
+const AuthenticatedProjectIdDiscoveryRoute =
+  AuthenticatedProjectIdDiscoveryRouteImport.update({
+    id: '/discovery',
+    path: '/discovery',
+    getParentRoute: () => AuthenticatedProjectIdRouteRoute,
+  } as any)
+const AuthenticatedProjectIdCalendarRoute =
+  AuthenticatedProjectIdCalendarRouteImport.update({
+    id: '/calendar',
+    path: '/calendar',
+    getParentRoute: () => AuthenticatedProjectIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
-  '/dashboard': typeof AppDashboardRoute
-  '/discovery': typeof AppDiscoveryRoute
-  '/project': typeof AppProjectRoute
+  '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/about': typeof PublicAboutRoute
   '/contact': typeof PublicContactRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/privacy': typeof PublicPrivacyRoute
   '/terms': typeof PublicTermsRoute
+  '/$projectId/calendar': typeof AuthenticatedProjectIdCalendarRoute
+  '/$projectId/discovery': typeof AuthenticatedProjectIdDiscoveryRoute
+  '/$projectId/evaluation-checklist': typeof AuthenticatedProjectIdEvaluationChecklistRoute
+  '/$projectId/kanban': typeof AuthenticatedProjectIdKanbanRoute
+  '/$projectId/list': typeof AuthenticatedProjectIdListRoute
+  '/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof PublicIndexRoute
-  '/dashboard': typeof AppDashboardRoute
-  '/discovery': typeof AppDiscoveryRoute
-  '/project': typeof AppProjectRoute
+  '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/about': typeof PublicAboutRoute
   '/contact': typeof PublicContactRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/privacy': typeof PublicPrivacyRoute
   '/terms': typeof PublicTermsRoute
+  '/$projectId/calendar': typeof AuthenticatedProjectIdCalendarRoute
+  '/$projectId/discovery': typeof AuthenticatedProjectIdDiscoveryRoute
+  '/$projectId/evaluation-checklist': typeof AuthenticatedProjectIdEvaluationChecklistRoute
+  '/$projectId/kanban': typeof AuthenticatedProjectIdKanbanRoute
+  '/$projectId/list': typeof AuthenticatedProjectIdListRoute
+  '/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/_app': typeof AppRouteRouteWithChildren
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_public': typeof PublicRouteRouteWithChildren
-  '/_app/dashboard': typeof AppDashboardRoute
-  '/_app/discovery': typeof AppDiscoveryRoute
-  '/_app/project': typeof AppProjectRoute
+  '/_authenticated/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_public/about': typeof PublicAboutRoute
   '/_public/contact': typeof PublicContactRoute
   '/_public/forgot-password': typeof PublicForgotPasswordRoute
   '/_public/privacy': typeof PublicPrivacyRoute
   '/_public/terms': typeof PublicTermsRoute
   '/_public/': typeof PublicIndexRoute
+  '/_authenticated/$projectId/calendar': typeof AuthenticatedProjectIdCalendarRoute
+  '/_authenticated/$projectId/discovery': typeof AuthenticatedProjectIdDiscoveryRoute
+  '/_authenticated/$projectId/evaluation-checklist': typeof AuthenticatedProjectIdEvaluationChecklistRoute
+  '/_authenticated/$projectId/kanban': typeof AuthenticatedProjectIdKanbanRoute
+  '/_authenticated/$projectId/list': typeof AuthenticatedProjectIdListRoute
+  '/_authenticated/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$projectId'
     | '/dashboard'
-    | '/discovery'
-    | '/project'
     | '/about'
     | '/contact'
     | '/forgot-password'
     | '/privacy'
     | '/terms'
+    | '/$projectId/calendar'
+    | '/$projectId/discovery'
+    | '/$projectId/evaluation-checklist'
+    | '/$projectId/kanban'
+    | '/$projectId/list'
+    | '/$projectId/summary'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$projectId'
     | '/dashboard'
-    | '/discovery'
-    | '/project'
     | '/about'
     | '/contact'
     | '/forgot-password'
     | '/privacy'
     | '/terms'
+    | '/$projectId/calendar'
+    | '/$projectId/discovery'
+    | '/$projectId/evaluation-checklist'
+    | '/$projectId/kanban'
+    | '/$projectId/list'
+    | '/$projectId/summary'
   id:
     | '__root__'
-    | '/_app'
+    | '/_authenticated'
     | '/_public'
-    | '/_app/dashboard'
-    | '/_app/discovery'
-    | '/_app/project'
+    | '/_authenticated/$projectId'
+    | '/_authenticated/dashboard'
     | '/_public/about'
     | '/_public/contact'
     | '/_public/forgot-password'
     | '/_public/privacy'
     | '/_public/terms'
     | '/_public/'
+    | '/_authenticated/$projectId/calendar'
+    | '/_authenticated/$projectId/discovery'
+    | '/_authenticated/$projectId/evaluation-checklist'
+    | '/_authenticated/$projectId/kanban'
+    | '/_authenticated/$projectId/list'
+    | '/_authenticated/$projectId/summary'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AppRouteRoute: typeof AppRouteRouteWithChildren
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   PublicRouteRoute: typeof PublicRouteRouteWithChildren
 }
 
@@ -163,11 +230,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app': {
-      id: '/_app'
+    '/_authenticated': {
+      id: '/_authenticated'
       path: ''
       fullPath: '/'
-      preLoaderRoute: typeof AppRouteRouteImport
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_public/': {
@@ -212,45 +279,103 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicAboutRouteImport
       parentRoute: typeof PublicRouteRoute
     }
-    '/_app/project': {
-      id: '/_app/project'
-      path: '/project'
-      fullPath: '/project'
-      preLoaderRoute: typeof AppProjectRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/discovery': {
-      id: '/_app/discovery'
-      path: '/discovery'
-      fullPath: '/discovery'
-      preLoaderRoute: typeof AppDiscoveryRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/dashboard': {
-      id: '/_app/dashboard'
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
-      preLoaderRoute: typeof AppDashboardRouteImport
-      parentRoute: typeof AppRouteRoute
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/$projectId': {
+      id: '/_authenticated/$projectId'
+      path: '/$projectId'
+      fullPath: '/$projectId'
+      preLoaderRoute: typeof AuthenticatedProjectIdRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/$projectId/summary': {
+      id: '/_authenticated/$projectId/summary'
+      path: '/summary'
+      fullPath: '/$projectId/summary'
+      preLoaderRoute: typeof AuthenticatedProjectIdSummaryRouteImport
+      parentRoute: typeof AuthenticatedProjectIdRouteRoute
+    }
+    '/_authenticated/$projectId/list': {
+      id: '/_authenticated/$projectId/list'
+      path: '/list'
+      fullPath: '/$projectId/list'
+      preLoaderRoute: typeof AuthenticatedProjectIdListRouteImport
+      parentRoute: typeof AuthenticatedProjectIdRouteRoute
+    }
+    '/_authenticated/$projectId/kanban': {
+      id: '/_authenticated/$projectId/kanban'
+      path: '/kanban'
+      fullPath: '/$projectId/kanban'
+      preLoaderRoute: typeof AuthenticatedProjectIdKanbanRouteImport
+      parentRoute: typeof AuthenticatedProjectIdRouteRoute
+    }
+    '/_authenticated/$projectId/evaluation-checklist': {
+      id: '/_authenticated/$projectId/evaluation-checklist'
+      path: '/evaluation-checklist'
+      fullPath: '/$projectId/evaluation-checklist'
+      preLoaderRoute: typeof AuthenticatedProjectIdEvaluationChecklistRouteImport
+      parentRoute: typeof AuthenticatedProjectIdRouteRoute
+    }
+    '/_authenticated/$projectId/discovery': {
+      id: '/_authenticated/$projectId/discovery'
+      path: '/discovery'
+      fullPath: '/$projectId/discovery'
+      preLoaderRoute: typeof AuthenticatedProjectIdDiscoveryRouteImport
+      parentRoute: typeof AuthenticatedProjectIdRouteRoute
+    }
+    '/_authenticated/$projectId/calendar': {
+      id: '/_authenticated/$projectId/calendar'
+      path: '/calendar'
+      fullPath: '/$projectId/calendar'
+      preLoaderRoute: typeof AuthenticatedProjectIdCalendarRouteImport
+      parentRoute: typeof AuthenticatedProjectIdRouteRoute
     }
   }
 }
 
-interface AppRouteRouteChildren {
-  AppDashboardRoute: typeof AppDashboardRoute
-  AppDiscoveryRoute: typeof AppDiscoveryRoute
-  AppProjectRoute: typeof AppProjectRoute
+interface AuthenticatedProjectIdRouteRouteChildren {
+  AuthenticatedProjectIdCalendarRoute: typeof AuthenticatedProjectIdCalendarRoute
+  AuthenticatedProjectIdDiscoveryRoute: typeof AuthenticatedProjectIdDiscoveryRoute
+  AuthenticatedProjectIdEvaluationChecklistRoute: typeof AuthenticatedProjectIdEvaluationChecklistRoute
+  AuthenticatedProjectIdKanbanRoute: typeof AuthenticatedProjectIdKanbanRoute
+  AuthenticatedProjectIdListRoute: typeof AuthenticatedProjectIdListRoute
+  AuthenticatedProjectIdSummaryRoute: typeof AuthenticatedProjectIdSummaryRoute
 }
 
-const AppRouteRouteChildren: AppRouteRouteChildren = {
-  AppDashboardRoute: AppDashboardRoute,
-  AppDiscoveryRoute: AppDiscoveryRoute,
-  AppProjectRoute: AppProjectRoute,
+const AuthenticatedProjectIdRouteRouteChildren: AuthenticatedProjectIdRouteRouteChildren =
+  {
+    AuthenticatedProjectIdCalendarRoute: AuthenticatedProjectIdCalendarRoute,
+    AuthenticatedProjectIdDiscoveryRoute: AuthenticatedProjectIdDiscoveryRoute,
+    AuthenticatedProjectIdEvaluationChecklistRoute:
+      AuthenticatedProjectIdEvaluationChecklistRoute,
+    AuthenticatedProjectIdKanbanRoute: AuthenticatedProjectIdKanbanRoute,
+    AuthenticatedProjectIdListRoute: AuthenticatedProjectIdListRoute,
+    AuthenticatedProjectIdSummaryRoute: AuthenticatedProjectIdSummaryRoute,
+  }
+
+const AuthenticatedProjectIdRouteRouteWithChildren =
+  AuthenticatedProjectIdRouteRoute._addFileChildren(
+    AuthenticatedProjectIdRouteRouteChildren,
+  )
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedProjectIdRouteRoute: typeof AuthenticatedProjectIdRouteRouteWithChildren
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
 }
 
-const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
-  AppRouteRouteChildren,
-)
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedProjectIdRouteRoute:
+    AuthenticatedProjectIdRouteRouteWithChildren,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface PublicRouteRouteChildren {
   PublicAboutRoute: typeof PublicAboutRoute
@@ -275,7 +400,7 @@ const PublicRouteRouteWithChildren = PublicRouteRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
-  AppRouteRoute: AppRouteRouteWithChildren,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   PublicRouteRoute: PublicRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport

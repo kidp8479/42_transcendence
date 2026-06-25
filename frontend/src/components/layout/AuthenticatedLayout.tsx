@@ -6,7 +6,7 @@ import { HeaderAuthenticated } from '../navigation/HeaderAuthenticated'
 import { Sidebar } from '../navigation/Sidebar'
 import { Footer } from '../navigation/Footer'
 
-export function AppLayout() {
+export function AuthenticatedLayout() {
   return (
     <>
       {/* Top navigation bar - search, notifications, user avatar */}
@@ -27,9 +27,9 @@ export function AppLayout() {
   )
 }
 
-// Auth guard - called by _app/route.tsx before rendering any authenticated page.
+// Auth guard - called by _authenticated/route.tsx before rendering any authenticated page.
 // If no token is found in localStorage, redirects to the landing page (/).
-// This function runs for every route under _app/, no need to repeat it per page.
+// This function runs for every route under _authenticated/, no need to repeat it per page.
 export function authGuard() {
   if (!localStorage.getItem('token')) {
     throw redirect({ to: '/' })

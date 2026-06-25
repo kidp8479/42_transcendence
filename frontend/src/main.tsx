@@ -7,7 +7,7 @@
 //   └── RouterProvider (intercepts the URL, no page reload)
 //         └── __root.tsx (wrapper always rendered regardless of the URL)
 //               └── _public/route.tsx  if the route requires no login  (header + footer)
-//               └── _app/route.tsx     if the route requires login      (navbar + sidebar + footer)
+//               └── _authenticated/route.tsx  if the route requires login  (navbar + sidebar + footer)
 //                     └── the matching page component
 
 import React from 'react'
