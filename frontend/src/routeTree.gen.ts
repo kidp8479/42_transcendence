@@ -18,8 +18,8 @@ import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgo
 import { Route as PublicContactRouteImport } from './routes/_public/contact'
 import { Route as PublicAboutRouteImport } from './routes/_public/about'
 import { Route as AppProjectRouteImport } from './routes/_app/project'
+import { Route as AppDiscoveryRouteImport } from './routes/_app/discovery'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
-import { Route as AppAppRouteImport } from './routes/_app/app'
 
 const PublicRouteRoute = PublicRouteRouteImport.update({
   id: '/_public',
@@ -64,21 +64,21 @@ const AppProjectRoute = AppProjectRouteImport.update({
   path: '/project',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppDiscoveryRoute = AppDiscoveryRouteImport.update({
+  id: '/discovery',
+  path: '/discovery',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppAppRoute = AppAppRouteImport.update({
-  id: '/app',
-  path: '/app',
-  getParentRoute: () => AppRouteRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
-  '/app': typeof AppAppRoute
   '/dashboard': typeof AppDashboardRoute
+  '/discovery': typeof AppDiscoveryRoute
   '/project': typeof AppProjectRoute
   '/about': typeof PublicAboutRoute
   '/contact': typeof PublicContactRoute
@@ -88,8 +88,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof PublicIndexRoute
-  '/app': typeof AppAppRoute
   '/dashboard': typeof AppDashboardRoute
+  '/discovery': typeof AppDiscoveryRoute
   '/project': typeof AppProjectRoute
   '/about': typeof PublicAboutRoute
   '/contact': typeof PublicContactRoute
@@ -101,8 +101,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteRouteWithChildren
   '/_public': typeof PublicRouteRouteWithChildren
-  '/_app/app': typeof AppAppRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/discovery': typeof AppDiscoveryRoute
   '/_app/project': typeof AppProjectRoute
   '/_public/about': typeof PublicAboutRoute
   '/_public/contact': typeof PublicContactRoute
@@ -115,8 +115,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/app'
     | '/dashboard'
+    | '/discovery'
     | '/project'
     | '/about'
     | '/contact'
@@ -126,8 +126,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/app'
     | '/dashboard'
+    | '/discovery'
     | '/project'
     | '/about'
     | '/contact'
@@ -138,8 +138,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/_public'
-    | '/_app/app'
     | '/_app/dashboard'
+    | '/_app/discovery'
     | '/_app/project'
     | '/_public/about'
     | '/_public/contact'
@@ -219,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/discovery': {
+      id: '/_app/discovery'
+      path: '/discovery'
+      fullPath: '/discovery'
+      preLoaderRoute: typeof AppDiscoveryRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -226,25 +233,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/app': {
-      id: '/_app/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AppAppRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
   }
 }
 
 interface AppRouteRouteChildren {
-  AppAppRoute: typeof AppAppRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDiscoveryRoute: typeof AppDiscoveryRoute
   AppProjectRoute: typeof AppProjectRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
-  AppAppRoute: AppAppRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppDiscoveryRoute: AppDiscoveryRoute,
   AppProjectRoute: AppProjectRoute,
 }
 
