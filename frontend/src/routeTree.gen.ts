@@ -13,13 +13,21 @@ import { Route as PublicRouteRouteImport } from './routes/_public/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as PublicIndexRouteImport } from './routes/_public/index'
 import { Route as PublicTermsRouteImport } from './routes/_public/terms'
+import { Route as PublicResetPasswordRouteImport } from './routes/_public/reset-password'
 import { Route as PublicPrivacyRouteImport } from './routes/_public/privacy'
 import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
+import { Route as PublicDontPanicRouteImport } from './routes/_public/dont-panic'
 import { Route as PublicContactRouteImport } from './routes/_public/contact'
+import { Route as PublicAuthCallbackRouteImport } from './routes/_public/auth-callback'
 import { Route as PublicAboutRouteImport } from './routes/_public/about'
+import { Route as AuthenticatedUserSettingsRouteImport } from './routes/_authenticated/user-settings'
+import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
+import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedProjectIdRouteRouteImport } from './routes/_authenticated/$projectId/route'
+import { Route as AuthenticatedUsersUsernameRouteImport } from './routes/_authenticated/users/$username'
 import { Route as AuthenticatedProjectIdSummaryRouteImport } from './routes/_authenticated/$projectId/summary'
+import { Route as AuthenticatedProjectIdProjectSettingsRouteImport } from './routes/_authenticated/$projectId/project-settings'
 import { Route as AuthenticatedProjectIdListRouteImport } from './routes/_authenticated/$projectId/list'
 import { Route as AuthenticatedProjectIdKanbanRouteImport } from './routes/_authenticated/$projectId/kanban'
 import { Route as AuthenticatedProjectIdEvaluationChecklistRouteImport } from './routes/_authenticated/$projectId/evaluation-checklist'
@@ -44,6 +52,11 @@ const PublicTermsRoute = PublicTermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => PublicRouteRoute,
 } as any)
+const PublicResetPasswordRoute = PublicResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
 const PublicPrivacyRoute = PublicPrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
@@ -54,15 +67,41 @@ const PublicForgotPasswordRoute = PublicForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => PublicRouteRoute,
 } as any)
+const PublicDontPanicRoute = PublicDontPanicRouteImport.update({
+  id: '/dont-panic',
+  path: '/dont-panic',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
 const PublicContactRoute = PublicContactRouteImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicAuthCallbackRoute = PublicAuthCallbackRouteImport.update({
+  id: '/auth-callback',
+  path: '/auth-callback',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicAboutRoute = PublicAboutRouteImport.update({
   id: '/about',
   path: '/about',
   getParentRoute: () => PublicRouteRoute,
+} as any)
+const AuthenticatedUserSettingsRoute =
+  AuthenticatedUserSettingsRouteImport.update({
+    id: '/user-settings',
+    path: '/user-settings',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedSearchRoute = AuthenticatedSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
@@ -75,10 +114,22 @@ const AuthenticatedProjectIdRouteRoute =
     path: '/$projectId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedUsersUsernameRoute =
+  AuthenticatedUsersUsernameRouteImport.update({
+    id: '/users/$username',
+    path: '/users/$username',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProjectIdSummaryRoute =
   AuthenticatedProjectIdSummaryRouteImport.update({
     id: '/summary',
     path: '/summary',
+    getParentRoute: () => AuthenticatedProjectIdRouteRoute,
+  } as any)
+const AuthenticatedProjectIdProjectSettingsRoute =
+  AuthenticatedProjectIdProjectSettingsRouteImport.update({
+    id: '/project-settings',
+    path: '/project-settings',
     getParentRoute: () => AuthenticatedProjectIdRouteRoute,
   } as any)
 const AuthenticatedProjectIdListRoute =
@@ -116,33 +167,49 @@ export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
   '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/projects': typeof AuthenticatedProjectsRoute
+  '/search': typeof AuthenticatedSearchRoute
+  '/user-settings': typeof AuthenticatedUserSettingsRoute
   '/about': typeof PublicAboutRoute
+  '/auth-callback': typeof PublicAuthCallbackRoute
   '/contact': typeof PublicContactRoute
+  '/dont-panic': typeof PublicDontPanicRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/privacy': typeof PublicPrivacyRoute
+  '/reset-password': typeof PublicResetPasswordRoute
   '/terms': typeof PublicTermsRoute
   '/$projectId/calendar': typeof AuthenticatedProjectIdCalendarRoute
   '/$projectId/discovery': typeof AuthenticatedProjectIdDiscoveryRoute
   '/$projectId/evaluation-checklist': typeof AuthenticatedProjectIdEvaluationChecklistRoute
   '/$projectId/kanban': typeof AuthenticatedProjectIdKanbanRoute
   '/$projectId/list': typeof AuthenticatedProjectIdListRoute
+  '/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
+  '/users/$username': typeof AuthenticatedUsersUsernameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof PublicIndexRoute
   '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/projects': typeof AuthenticatedProjectsRoute
+  '/search': typeof AuthenticatedSearchRoute
+  '/user-settings': typeof AuthenticatedUserSettingsRoute
   '/about': typeof PublicAboutRoute
+  '/auth-callback': typeof PublicAuthCallbackRoute
   '/contact': typeof PublicContactRoute
+  '/dont-panic': typeof PublicDontPanicRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/privacy': typeof PublicPrivacyRoute
+  '/reset-password': typeof PublicResetPasswordRoute
   '/terms': typeof PublicTermsRoute
   '/$projectId/calendar': typeof AuthenticatedProjectIdCalendarRoute
   '/$projectId/discovery': typeof AuthenticatedProjectIdDiscoveryRoute
   '/$projectId/evaluation-checklist': typeof AuthenticatedProjectIdEvaluationChecklistRoute
   '/$projectId/kanban': typeof AuthenticatedProjectIdKanbanRoute
   '/$projectId/list': typeof AuthenticatedProjectIdListRoute
+  '/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
+  '/users/$username': typeof AuthenticatedUsersUsernameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -150,10 +217,16 @@ export interface FileRoutesById {
   '/_public': typeof PublicRouteRouteWithChildren
   '/_authenticated/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/projects': typeof AuthenticatedProjectsRoute
+  '/_authenticated/search': typeof AuthenticatedSearchRoute
+  '/_authenticated/user-settings': typeof AuthenticatedUserSettingsRoute
   '/_public/about': typeof PublicAboutRoute
+  '/_public/auth-callback': typeof PublicAuthCallbackRoute
   '/_public/contact': typeof PublicContactRoute
+  '/_public/dont-panic': typeof PublicDontPanicRoute
   '/_public/forgot-password': typeof PublicForgotPasswordRoute
   '/_public/privacy': typeof PublicPrivacyRoute
+  '/_public/reset-password': typeof PublicResetPasswordRoute
   '/_public/terms': typeof PublicTermsRoute
   '/_public/': typeof PublicIndexRoute
   '/_authenticated/$projectId/calendar': typeof AuthenticatedProjectIdCalendarRoute
@@ -161,7 +234,9 @@ export interface FileRoutesById {
   '/_authenticated/$projectId/evaluation-checklist': typeof AuthenticatedProjectIdEvaluationChecklistRoute
   '/_authenticated/$projectId/kanban': typeof AuthenticatedProjectIdKanbanRoute
   '/_authenticated/$projectId/list': typeof AuthenticatedProjectIdListRoute
+  '/_authenticated/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/_authenticated/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
+  '/_authenticated/users/$username': typeof AuthenticatedUsersUsernameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -169,43 +244,65 @@ export interface FileRouteTypes {
     | '/'
     | '/$projectId'
     | '/dashboard'
+    | '/projects'
+    | '/search'
+    | '/user-settings'
     | '/about'
+    | '/auth-callback'
     | '/contact'
+    | '/dont-panic'
     | '/forgot-password'
     | '/privacy'
+    | '/reset-password'
     | '/terms'
     | '/$projectId/calendar'
     | '/$projectId/discovery'
     | '/$projectId/evaluation-checklist'
     | '/$projectId/kanban'
     | '/$projectId/list'
+    | '/$projectId/project-settings'
     | '/$projectId/summary'
+    | '/users/$username'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$projectId'
     | '/dashboard'
+    | '/projects'
+    | '/search'
+    | '/user-settings'
     | '/about'
+    | '/auth-callback'
     | '/contact'
+    | '/dont-panic'
     | '/forgot-password'
     | '/privacy'
+    | '/reset-password'
     | '/terms'
     | '/$projectId/calendar'
     | '/$projectId/discovery'
     | '/$projectId/evaluation-checklist'
     | '/$projectId/kanban'
     | '/$projectId/list'
+    | '/$projectId/project-settings'
     | '/$projectId/summary'
+    | '/users/$username'
   id:
     | '__root__'
     | '/_authenticated'
     | '/_public'
     | '/_authenticated/$projectId'
     | '/_authenticated/dashboard'
+    | '/_authenticated/projects'
+    | '/_authenticated/search'
+    | '/_authenticated/user-settings'
     | '/_public/about'
+    | '/_public/auth-callback'
     | '/_public/contact'
+    | '/_public/dont-panic'
     | '/_public/forgot-password'
     | '/_public/privacy'
+    | '/_public/reset-password'
     | '/_public/terms'
     | '/_public/'
     | '/_authenticated/$projectId/calendar'
@@ -213,7 +310,9 @@ export interface FileRouteTypes {
     | '/_authenticated/$projectId/evaluation-checklist'
     | '/_authenticated/$projectId/kanban'
     | '/_authenticated/$projectId/list'
+    | '/_authenticated/$projectId/project-settings'
     | '/_authenticated/$projectId/summary'
+    | '/_authenticated/users/$username'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -251,6 +350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicTermsRouteImport
       parentRoute: typeof PublicRouteRoute
     }
+    '/_public/reset-password': {
+      id: '/_public/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof PublicResetPasswordRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
     '/_public/privacy': {
       id: '/_public/privacy'
       path: '/privacy'
@@ -265,11 +371,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicForgotPasswordRouteImport
       parentRoute: typeof PublicRouteRoute
     }
+    '/_public/dont-panic': {
+      id: '/_public/dont-panic'
+      path: '/dont-panic'
+      fullPath: '/dont-panic'
+      preLoaderRoute: typeof PublicDontPanicRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
     '/_public/contact': {
       id: '/_public/contact'
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof PublicContactRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/auth-callback': {
+      id: '/_public/auth-callback'
+      path: '/auth-callback'
+      fullPath: '/auth-callback'
+      preLoaderRoute: typeof PublicAuthCallbackRouteImport
       parentRoute: typeof PublicRouteRoute
     }
     '/_public/about': {
@@ -278,6 +398,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/about'
       preLoaderRoute: typeof PublicAboutRouteImport
       parentRoute: typeof PublicRouteRoute
+    }
+    '/_authenticated/user-settings': {
+      id: '/_authenticated/user-settings'
+      path: '/user-settings'
+      fullPath: '/user-settings'
+      preLoaderRoute: typeof AuthenticatedUserSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/search': {
+      id: '/_authenticated/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof AuthenticatedSearchRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/projects': {
+      id: '/_authenticated/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof AuthenticatedProjectsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
@@ -293,11 +434,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectIdRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/users/$username': {
+      id: '/_authenticated/users/$username'
+      path: '/users/$username'
+      fullPath: '/users/$username'
+      preLoaderRoute: typeof AuthenticatedUsersUsernameRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/$projectId/summary': {
       id: '/_authenticated/$projectId/summary'
       path: '/summary'
       fullPath: '/$projectId/summary'
       preLoaderRoute: typeof AuthenticatedProjectIdSummaryRouteImport
+      parentRoute: typeof AuthenticatedProjectIdRouteRoute
+    }
+    '/_authenticated/$projectId/project-settings': {
+      id: '/_authenticated/$projectId/project-settings'
+      path: '/project-settings'
+      fullPath: '/$projectId/project-settings'
+      preLoaderRoute: typeof AuthenticatedProjectIdProjectSettingsRouteImport
       parentRoute: typeof AuthenticatedProjectIdRouteRoute
     }
     '/_authenticated/$projectId/list': {
@@ -344,6 +499,7 @@ interface AuthenticatedProjectIdRouteRouteChildren {
   AuthenticatedProjectIdEvaluationChecklistRoute: typeof AuthenticatedProjectIdEvaluationChecklistRoute
   AuthenticatedProjectIdKanbanRoute: typeof AuthenticatedProjectIdKanbanRoute
   AuthenticatedProjectIdListRoute: typeof AuthenticatedProjectIdListRoute
+  AuthenticatedProjectIdProjectSettingsRoute: typeof AuthenticatedProjectIdProjectSettingsRoute
   AuthenticatedProjectIdSummaryRoute: typeof AuthenticatedProjectIdSummaryRoute
 }
 
@@ -355,6 +511,8 @@ const AuthenticatedProjectIdRouteRouteChildren: AuthenticatedProjectIdRouteRoute
       AuthenticatedProjectIdEvaluationChecklistRoute,
     AuthenticatedProjectIdKanbanRoute: AuthenticatedProjectIdKanbanRoute,
     AuthenticatedProjectIdListRoute: AuthenticatedProjectIdListRoute,
+    AuthenticatedProjectIdProjectSettingsRoute:
+      AuthenticatedProjectIdProjectSettingsRoute,
     AuthenticatedProjectIdSummaryRoute: AuthenticatedProjectIdSummaryRoute,
   }
 
@@ -366,12 +524,20 @@ const AuthenticatedProjectIdRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectIdRouteRoute: typeof AuthenticatedProjectIdRouteRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
+  AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
+  AuthenticatedUserSettingsRoute: typeof AuthenticatedUserSettingsRoute
+  AuthenticatedUsersUsernameRoute: typeof AuthenticatedUsersUsernameRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProjectIdRouteRoute:
     AuthenticatedProjectIdRouteRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
+  AuthenticatedSearchRoute: AuthenticatedSearchRoute,
+  AuthenticatedUserSettingsRoute: AuthenticatedUserSettingsRoute,
+  AuthenticatedUsersUsernameRoute: AuthenticatedUsersUsernameRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -379,18 +545,24 @@ const AuthenticatedRouteRouteWithChildren =
 
 interface PublicRouteRouteChildren {
   PublicAboutRoute: typeof PublicAboutRoute
+  PublicAuthCallbackRoute: typeof PublicAuthCallbackRoute
   PublicContactRoute: typeof PublicContactRoute
+  PublicDontPanicRoute: typeof PublicDontPanicRoute
   PublicForgotPasswordRoute: typeof PublicForgotPasswordRoute
   PublicPrivacyRoute: typeof PublicPrivacyRoute
+  PublicResetPasswordRoute: typeof PublicResetPasswordRoute
   PublicTermsRoute: typeof PublicTermsRoute
   PublicIndexRoute: typeof PublicIndexRoute
 }
 
 const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicAboutRoute: PublicAboutRoute,
+  PublicAuthCallbackRoute: PublicAuthCallbackRoute,
   PublicContactRoute: PublicContactRoute,
+  PublicDontPanicRoute: PublicDontPanicRoute,
   PublicForgotPasswordRoute: PublicForgotPasswordRoute,
   PublicPrivacyRoute: PublicPrivacyRoute,
+  PublicResetPasswordRoute: PublicResetPasswordRoute,
   PublicTermsRoute: PublicTermsRoute,
   PublicIndexRoute: PublicIndexRoute,
 }
