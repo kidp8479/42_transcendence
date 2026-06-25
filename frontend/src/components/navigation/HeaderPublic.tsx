@@ -13,7 +13,7 @@
 // Temporary behavior:
 // Both buttons currently redirect to /dashboard as placeholders.
 
-import { Link } from '@tanstack/react-router'
+import { Link } from "@tanstack/react-router";
 
 export function HeaderPublic() {
   return (
@@ -22,5 +22,5 @@ export function HeaderPublic() {
       <Link to="/dashboard">Sign in</Link>
       <Link to="/dashboard">Sign up</Link>
     </header>
-  )
+  );
 }

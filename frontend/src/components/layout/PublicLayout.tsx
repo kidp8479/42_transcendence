@@ -1,8 +1,8 @@
 // Wrapper for all public pages (no login required).
 // Renders: HeaderPublic + <Outlet /> + Footer
-import { Outlet } from '@tanstack/react-router'
-import { HeaderPublic } from '../navigation/HeaderPublic'
-import { Footer } from '../navigation/Footer'
+import { Outlet } from "@tanstack/react-router";
+import { HeaderPublic } from "../navigation/HeaderPublic";
+import { Footer } from "../navigation/Footer";
 
 export function PublicLayout() {
   return (
@@ -18,5 +18,5 @@ export function PublicLayout() {
       {/* Footer with Privacy, Contact, About, Terms links - required on all pages */}
       <Footer />
     </>
-  )
+  );
 }
