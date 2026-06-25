@@ -1,5 +1,9 @@
-//index.tsx this is where the landing page will live !
-
+/**
+ * Root route ("/").
+ * This file must remain named `index.tsx` so the file-based router
+ * can resolve the application's entry point.
+ * Renders the LandingPage component.
+ */
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute('/_public/')({
