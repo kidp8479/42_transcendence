@@ -82,7 +82,7 @@ make rebuild-auth      # rebuild only the auth service
 
 The frontend uses ESLint and Prettier. Three layers are in place:
 
-**On demand** - run from the repository root at any time:
+**On demand** - requires the stack to be running (`make up` first):
 
 ```sh
 make lint    # check for ESLint errors
@@ -95,7 +95,7 @@ make format  # auto-format all files with Prettier
 make hooks
 ```
 
-After that, every `git commit` formats your files automatically and blocks the commit if ESLint finds errors.
+After that, every `git commit` formats your files automatically and blocks the commit if ESLint finds errors. Note: the hook requires the frontend container to be running - if the stack is stopped, commits will be blocked until you run `make up`.
 
 **CI** - GitHub Actions runs ESLint and Prettier on every push. Pull requests cannot be merged if either check fails.
 

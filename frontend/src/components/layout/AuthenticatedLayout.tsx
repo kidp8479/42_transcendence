@@ -30,8 +30,14 @@ export function AuthenticatedLayout() {
 // Auth guard - called by _authenticated/route.tsx before rendering any authenticated page.
 // If no token is found in localStorage, redirects to the landing page (/).
 // This function runs for every route under _authenticated/, no need to repeat it per page.
+//
+// UX gate only - not a security boundary.
+// A forged token passes this check but every backend API call will fail without a valid JWT.
+// The real authorization authority is the backend.
+// TODO (auth team): replace localStorage.getItem("token") with the real session source
+// once the auth system is implemented.
 export function authGuard() {
   if (!localStorage.getItem("token")) {
     throw redirect({ to: "/" });
   }
-} // auth team can decide if they want to keep this
+}
