@@ -14,8 +14,9 @@ export const Route = createFileRoute("/_public/")({
 
 function LandingPage() {
   return (
-    <div className="p-2">
-      <h3>Welcome Home!</h3>
+    <div className="flex flex-col items-center justify-center bg-gray-950 py-32 text-white">
+      <h1 className="text-4xl font-bold tracking-tight">Transcendence</h1>
+      <p className="mt-4 text-gray-400">Tailwind is working.</p>
     </div>
   );
 }
