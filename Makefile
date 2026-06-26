@@ -144,6 +144,25 @@ prisma-studio:
 
 
 # ---------------------------------------------------------------------------- #
+# code quality                                                                 #
+# ---------------------------------------------------------------------------- #
+
+## format all frontend files with Prettier
+format:
+	$(COMPOSE) exec frontend npm run format
+
+## run ESLint on all frontend files
+lint:
+	$(COMPOSE) exec frontend npm run lint
+
+## install git pre-commit hook (run once after cloning)
+hooks:
+	cp hooks/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+	@echo "pre-commit hook installed"
+
+
+# ---------------------------------------------------------------------------- #
 # status                                                                       #
 # ---------------------------------------------------------------------------- #
 
@@ -190,4 +209,5 @@ help:
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate prisma-studio
+        migrate prisma-studio \
+        format lint hooks
