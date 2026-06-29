@@ -1,0 +1,11 @@
+This folder contains shared application-level utilities used across modules.
+
+It includes:
+
+- guards: request authorization logic
+- pipes: validation/transformation of inputs
+- decorators: custom NestJS decorators
+- and whatever else we want to add, also if we find we dont need any of 
+these items we can modify accordingly.
+
+These are framework-level building blocks and are not tied to a specific domain module.
