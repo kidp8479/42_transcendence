@@ -8,4 +8,4 @@ It includes:
 - and whatever else we want to add, also if we find we dont need any of 
 these items we can modify accordingly.
 
-These are framework-level building blocks and are not tied to a specific domain module.
+These are framework-level building blocks and are not tied to a specific domain module.chore: add common directory structure for shared utilities
