@@ -1,5 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
+// any "?" next to a field means it's optionnel
 
 generator client {
   provider = "prisma-client-js"
@@ -10,20 +11,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// One User can be a member of many projects (via ProjectMember)
+// One User has many ProjectMember rows - one per project they belong to
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  username  String   @unique
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String          @id @default(uuid())
+  email          String          @unique // filled by the auth team via OAuth
+  username       String          @unique
+  avatarUrl      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  projectMembers ProjectMember[] // one User => many ProjectMember rows
 }
 
+// ProjectMember is the link between a User and a Project
+// One row = one user belonging to one project
+// One User can appear many times here (once per project)
+// One Project can appear many times here (once per member)
+model ProjectMember {
+  id        String  @id @default(uuid())
+  userId    String  // foreign key: which user
+  projectId String  // foreign key: which project
+  user      User    @relation(fields: [userId], references: [id])    // userId in this table = id in User
+  project   Project @relation(fields: [projectId], references: [id]) // projectId in this table = id in Project
+}
+
+// One Project can have many members (via ProjectMember)
+// One Project has many ProjectMember rows - one per member
 model Project {
-  id String @id @default(cuid())
-  name String
+  id          String          @id @default(uuid())
+  name        String
   description String?
-  iscompleted Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isCompleted Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  members     ProjectMember[] // one Project => many ProjectMember rows
 }
