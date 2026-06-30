@@ -35,14 +35,35 @@ model ProjectMember {
   project   Project @relation(fields: [projectId], references: [id]) // projectId in this table = id in Project
 }
 
-// One Project can have many members (via ProjectMember)
-// One Project has many ProjectMember rows - one per member
+// One Project can have many members, tasks, events, blocks, and checklist items
 model Project {
-  id          String          @id @default(uuid())
-  name        String
-  description String?
-  isCompleted Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  members     ProjectMember[] // one Project => many ProjectMember rows
+  id                       String                    @id @default(uuid())
+  name                     String
+  description              String?
+  isCompleted              Boolean                   @default(false)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  members                  ProjectMember[]           // one Project => many ProjectMember rows
+  tasks                    Task[]                    // one Project => many Task rows
+  calendarEvents           CalendarEvent[]           // one Project => many CalendarEvent rows
+  discoveryBlocks          DiscoveryBlock[]          // one Project => many DiscoveryBlock rows
+  evaluationChecklistItems EvaluationChecklistItem[] // one Project => many EvaluationChecklistItem rows
+}
+
+//TODO
+
+model Task {
+
+}
+
+model CalendarEvent {
+
+}
+
+model DiscoveryBlock {
+
+}
+
+model EvaluationChecklistItem {
+	
 }
