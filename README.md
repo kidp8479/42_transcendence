@@ -193,6 +193,12 @@ Open Prisma Studio without launching a browser in the container:
 make prisma-studio
 ```
 
+Inject demo data into the database (run once after `make migrate`, requires `prisma/seed.ts` to be implemented first):
+
+```sh
+make seed
+```
+
 #### Cleanup
 
 ```sh

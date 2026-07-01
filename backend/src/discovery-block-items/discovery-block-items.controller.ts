@@ -10,7 +10,7 @@ export class DiscoveryBlockItemsController {
   // ENDPOINTS:
   // POST   /api/discovery-block-items
   //        => create a new item inside a discovery block
-  //        => expects a request body matching CreateDiscoveryBlockItemDto (discoveryBlockId, label)
+  //        => expects a request body matching CreateDiscoveryBlockItemDto (discoveryBlockId, label, order)
   // GET    /api/discovery-block-items
   //        => get all items belonging to a discovery block
   //        => expects ?discoveryBlockId=... as a URL query param (no request body, no DTO)

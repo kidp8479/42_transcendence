@@ -6,8 +6,8 @@ import { EvaluationChecklistItemsService } from "./evaluation-checklist-items.se
 import { EvaluationChecklistItemsController } from "./evaluation-checklist-items.controller";
 
 @Module({
-  controllers: [EvaluationChecklistItemsController],
-  providers: [EvaluationChecklistItemsService],
-  exports: [EvaluationChecklistItemsService],
+  controllers: [EvaluationChecklistItemsController], // handles HTTP requests
+  providers: [EvaluationChecklistItemsService], // handles database operations
+  exports: [EvaluationChecklistItemsService], // expose EvaluationChecklistItemsService to other modules that may need it
 })
 export class EvaluationChecklistItemsModule {}

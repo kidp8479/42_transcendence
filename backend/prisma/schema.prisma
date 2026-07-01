@@ -23,8 +23,19 @@ model User {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   projectMembers   ProjectMember[] // one User => many ProjectMember rows
+  notifications    Notification[] // one User => many Notifications rows
   taskAssigned     TaskAssignee[]
   calAssigned      CalendarAssignee[]
+}
+
+// no updatedAt: the only modification is marking as read (isRead), we don't need to track when that happened
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id]) // userId in this table = id in User
 }
 
 // ProjectMember is the link between a User and a Project

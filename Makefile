@@ -142,6 +142,10 @@ migrate:
 prisma-studio:
 	$(COMPOSE) exec backend npx prisma studio --browser none
 
+## inject demo data into the database (run once after migrate, requires seed.ts to be implemented)
+seed:
+	$(COMPOSE) exec backend npx prisma db seed
+
 
 # ---------------------------------------------------------------------------- #
 # code quality                                                                 #
