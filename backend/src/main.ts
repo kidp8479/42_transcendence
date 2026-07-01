@@ -7,6 +7,19 @@ import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Global validation pipe:
+  // -validates incoming request bodies against dto decorators
+  app.useGlobalPipes(
+    new ValidationPipe({
+      // only properties defined in the dto are allowed
+      whitelist: true,
+      // returns 400 Bad Request if client sends extra properties
+      forbidNonWhitelisted: true,
+      // converts request payloads into instances of dto classes and enables type transformation
+      transform: true,
+    })
+  );
+
   // prefix all routes with /api (ex: /projects becomes /api/projects)
   app.setGlobalPrefix("api");
 
