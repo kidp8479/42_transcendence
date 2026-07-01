@@ -21,6 +21,9 @@ model User {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   projectMembers ProjectMember[] // one User => many ProjectMember rows
+
+  taskAssigned   TaskAssignee[]
+  calAssigned    CalendarAssignee[]
 }
 
 // ProjectMember is the link between a User and a Project
@@ -50,18 +53,185 @@ model Project {
   evaluationChecklistItems EvaluationChecklistItem[] // one Project => many EvaluationChecklistItem rows
 }
 
-//TODO
+// Task
+//
+//
+
+model TaskCategory {
+  id                 String  @id @default(uuid())
+  name               String
+  color              Int
+  projectId          String
+  project            Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
+
+enum Status {
+  TODO,
+  IN_PROGRESS,
+  REVIEW,
+  COMPLETED
+}
+
+enum Priority {
+  LOW,
+  MEDIUM,
+  HIGH
+}
 
 model Task {
+  id                 String                    @id @default(uuid())
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  projectId          String
+  title              String
+  status             Status
+  category           TaskCategory[]
+  priority           Priority
+  startAt            DateTime?
+  endAt              DateTime?
+  tag                String?
+  description        String?
+  notes              String?
+  assignees          TaskAssignee[]
+}
 
+model TaskAssignee {
+  id         String      @id @default(uuid())
+  userId     String
+  taskId     String
+  user       User        @relation(fields: [userId], references: [id])
+  task       Task        @relation(fields: [taskId], references: [id])
+}
+
+// Calendar 
+//
+//
+
+model CalendarLabel {
+  id                 String  @id @default(uuid())
+  name               String
+  color              Int
+  projectId          String
+  project            Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
 }
 
 model CalendarEvent {
-
+  id                 String
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  projectId          String
+  title              String
+  startAt            DateTime
+  endAt              DateTime
+  label              CalendarLabel[]
+  description        String?
+  notes              String?
+  assignees          CalendarAssignee[]
 }
 
-model DiscoveryBlock {
+model CalendarAssignee {
+  id         String         @id @default(uuid())  userId     String
+  calId      String
+  user       User           @relation(fields: [userId], references: [id])
+  task       Task           @relation(fields: [calId], references: [id])
+}
 
+
+// Task
+//
+//
+
+enum Status {
+  TODO,
+  IN_PROGRESS,
+  REVIEW,
+  COMPLETED
+}
+
+enum Priority {
+  LOW,
+  MEDIUM,
+  HIGH
+}
+
+model TaskCategory {
+  id                 String  @id @default(uuid())
+  name               String
+  color              Int
+  projectId          String
+  project            Project @relation(fields: [projectId], references: [id])
+  tasks              Task[]
+
+  @@index([projectId])
+}
+
+model Task {
+  id                 String                    @id @default(uuid())
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  projectId          String
+  title              String
+  status             Status
+  categoryId         String
+  category           TaskCategory              @relation(fields: [categoryId], references: [id])
+  rank               Int
+  priority           Priority
+  startAt            DateTime?
+  endAt              DateTime?
+  tag                String?
+  description        String?
+  notes              String?
+  assignees          TaskAssignee[]
+}
+
+model TaskAssignee {
+  id         String      @id @default(uuid())
+  userId     String
+  taskId     String
+  user       User        @relation(fields: [userId], references: [id])
+  task       Task        @relation(fields: [taskId], references: [id])
+}
+
+// Calendar 
+//
+//
+
+model CalendarLabel {
+  id                 String  @id @default(uuid())
+  name               String
+  color              Int
+  projectId          String
+  project            Project @relation(fields: [projectId], references: [id])
+  events             CalendarEvent[]
+
+  @@index([projectId])
+}
+
+model CalendarEvent {
+  id                 String                    @id @default(uuid())
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  projectId          String
+  title              String
+  startAt            DateTime
+  endAt              DateTime
+  labelId            String
+  label              CalendarLabel @relation(fields: [labelId], references: [id])
+  description        String?
+  notes              String?
+  assignees          CalendarAssignee[]
+}
+
+model CalendarAssignee {
+  id            String               @id @default(uuid())
+  userId        String
+  calId         String
+  user          User                 @relation(fields: [userId], references: [id])
+  calendarEvent CalendarEvent        @relation(fields: [calId], references: [id])
 }
 
 model EvaluationChecklistItem {
