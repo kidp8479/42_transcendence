@@ -6,6 +6,7 @@ import { Module } from "@nestjs/common";
 // import each feature module so NestJS knows it exists
 import { PrismaModule } from "./prisma/prisma.module";
 import { UsersModule } from "./users/users.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 import { ProjectMembersModule } from "./project-members/project-members.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { DiscoveryBlocksModule } from "./discovery-blocks/discovery-blocks.module";
@@ -16,6 +17,7 @@ import { EvaluationChecklistItemsModule } from "./evaluation-checklist-items/eva
   imports: [
     PrismaModule, // registers all modules, NestJS starts them in order at boot
     UsersModule,
+    NotificationsModule,
     ProjectMembersModule,
     ProjectsModule,
     DiscoveryBlocksModule,
