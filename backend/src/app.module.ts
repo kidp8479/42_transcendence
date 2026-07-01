@@ -15,7 +15,6 @@ import { EvaluationChecklistItemsModule } from "./evaluation-checklist-items/eva
 import { TasksModule } from "./tasks/tasks.module";
 import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
 
-
 @Module({
   imports: [
     PrismaModule, // registers all modules, NestJS starts them in order at boot
@@ -27,7 +26,7 @@ import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
     DiscoveryBlockItemsModule,
     EvaluationChecklistItemsModule,
     TasksModule,
-    CalendarEventsModule
+    CalendarEventsModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [], // top-level services (same as above)
