@@ -12,7 +12,6 @@ import { DiscoveryBlocksModule } from "./discovery-blocks/discovery-blocks.modul
 import { DiscoveryBlockItemsModule } from "./discovery-block-items/discovery-block-items.module";
 import { EvaluationChecklistItemsModule } from "./evaluation-checklist-items/evaluation-checklist-items.module";
 
-
 @Module({
   imports: [
     PrismaModule, // registers all modules, NestJS starts them in order at boot
