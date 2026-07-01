@@ -12,7 +12,8 @@ import { ProjectsModule } from "./projects/projects.module";
 import { DiscoveryBlocksModule } from "./discovery-blocks/discovery-blocks.module";
 import { DiscoveryBlockItemsModule } from "./discovery-block-items/discovery-block-items.module";
 import { EvaluationChecklistItemsModule } from "./evaluation-checklist-items/evaluation-checklist-items.module";
-
+import { TasksModule } from "./tasks/tasks.module";
+import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
 
 @Module({
   imports: [
@@ -24,6 +25,8 @@ import { EvaluationChecklistItemsModule } from "./evaluation-checklist-items/eva
     DiscoveryBlocksModule,
     DiscoveryBlockItemsModule,
     EvaluationChecklistItemsModule,
+	TasksModule,
+	CalendarEventsModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [], // top-level services (same as above)
