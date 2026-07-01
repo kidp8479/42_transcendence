@@ -52,12 +52,20 @@ model ProjectMember {
   project   Project  @relation(fields: [projectId], references: [id]) // projectId in this table = id in Project
 }
 
+enum ProjectStatus {
+	IN_PROGRESS
+	REVIEW
+	COMPLETED
+}
+
 // One Project can have many members, tasks, events, blocks, and checklist items
 model Project {
   id                       String                    @id @default(uuid())
   name                     String
   description              String?
-  isCompleted              Boolean                   @default(false)
+  status                   ProjectStatus             @default(IN_PROGRESS)
+  deadline                 DateTime?
+  isArchived               Boolean                   @default(false)
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
   members                  ProjectMember[]           // one Project => many ProjectMember rows
@@ -67,7 +75,7 @@ model Project {
   evaluationChecklistItems EvaluationChecklistItem[] // one Project => many EvaluationChecklistItem rows
 }
 
-// TASK 
+// TASK
 //    This configures the Task related tables: Task, TaskCategory, TaskAssignee
 //
 enum Status {
