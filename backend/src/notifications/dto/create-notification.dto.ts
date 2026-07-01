@@ -2,8 +2,9 @@
 // GET and DELETE don't need one, they only use URL params, nothing in the body.
 
 // isRead is not here: it is always false at creation, handled by @default(false) in the database schema.
-
+// link is optional: only set when the notification refers to a specific resource (ex: a task, a project)
 export class CreateNotificationDto {
   userId: string;
   message: string;
+  link?: string;
 }
