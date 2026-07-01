@@ -14,16 +14,17 @@ datasource db {
 // One User can be a member of many projects (via ProjectMember)
 // One User has many ProjectMember rows - one per project they belong to
 model User {
-  id             String          @id @default(uuid())
-  email          String          @unique // filled by the auth team via OAuth
-  username       String          @unique
-  avatarUrl      String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  projectMembers ProjectMember[] // one User => many ProjectMember rows
-
-  taskAssigned   TaskAssignee[]
-  calAssigned    CalendarAssignee[]
+  id               String          @id @default(uuid())
+  email            String          @unique // filled by the auth team via OAuth
+  username         String          @unique
+  avatarUrl        String?  // if null, the frontend generates an avatar from username initials (CSS only, no DB)
+  campus           String?  // ex: "42 Paris" - filled via OAuth, can be updated in settings
+  twoFactorEnabled Boolean         @default(false) // toggled from the Security section in Settings
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  projectMembers   ProjectMember[] // one User => many ProjectMember rows
+  taskAssigned     TaskAssignee[]
+  calAssigned      CalendarAssignee[]
 }
 
 // ProjectMember is the link between a User and a Project
@@ -31,11 +32,13 @@ model User {
 // One User can appear many times here (once per project)
 // One Project can appear many times here (once per member)
 model ProjectMember {
-  id        String  @id @default(uuid())
-  userId    String  // foreign key: which user
-  projectId String  // foreign key: which project
-  user      User    @relation(fields: [userId], references: [id])    // userId in this table = id in User
-  project   Project @relation(fields: [projectId], references: [id]) // projectId in this table = id in Project
+  id        String   @id @default(uuid())
+  userId    String   // foreign key: which user
+  projectId String   // foreign key: which project
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])    // userId in this table = id in User
+  project   Project  @relation(fields: [projectId], references: [id]) // projectId in this table = id in Project
 }
 
 // One Project can have many members, tasks, events, blocks, and checklist items
@@ -53,20 +56,9 @@ model Project {
   evaluationChecklistItems EvaluationChecklistItem[] // one Project => many EvaluationChecklistItem rows
 }
 
-// Task
+// TASK 
+//    This configures the Task related tables: Task, TaskCategory, TaskAssignee
 //
-//
-
-model TaskCategory {
-  id                 String  @id @default(uuid())
-  name               String
-  color              Int
-  projectId          String
-  project            Project @relation(fields: [projectId], references: [id])
-
-  @@index([projectId])
-}
-
 enum Status {
   TODO,
   IN_PROGRESS,
@@ -80,84 +72,8 @@ enum Priority {
   HIGH
 }
 
-model Task {
-  id                 String                    @id @default(uuid())
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
-  projectId          String
-  title              String
-  status             Status
-  category           TaskCategory[]
-  priority           Priority
-  startAt            DateTime?
-  endAt              DateTime?
-  tag                String?
-  description        String?
-  notes              String?
-  assignees          TaskAssignee[]
-}
-
-model TaskAssignee {
-  id         String      @id @default(uuid())
-  userId     String
-  taskId     String
-  user       User        @relation(fields: [userId], references: [id])
-  task       Task        @relation(fields: [taskId], references: [id])
-}
-
-// Calendar 
-//
-//
-
-model CalendarLabel {
-  id                 String  @id @default(uuid())
-  name               String
-  color              Int
-  projectId          String
-  project            Project @relation(fields: [projectId], references: [id])
-
-  @@index([projectId])
-}
-
-model CalendarEvent {
-  id                 String
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
-  projectId          String
-  title              String
-  startAt            DateTime
-  endAt              DateTime
-  label              CalendarLabel[]
-  description        String?
-  notes              String?
-  assignees          CalendarAssignee[]
-}
-
-model CalendarAssignee {
-  id         String         @id @default(uuid())  userId     String
-  calId      String
-  user       User           @relation(fields: [userId], references: [id])
-  task       Task           @relation(fields: [calId], references: [id])
-}
-
-
-// Task
-//
-//
-
-enum Status {
-  TODO,
-  IN_PROGRESS,
-  REVIEW,
-  COMPLETED
-}
-
-enum Priority {
-  LOW,
-  MEDIUM,
-  HIGH
-}
-
+// Every category of every task registered in the whole website.
+// Linked by a single projectID value
 model TaskCategory {
   id                 String  @id @default(uuid())
   name               String
@@ -169,6 +85,18 @@ model TaskCategory {
   @@index([projectId])
 }
 
+// Every assignment Card/Member.
+// Linked by userId and taskId (which contains a unique projectId value)
+model TaskAssignee {
+  id         String      @id @default(uuid())
+  userId     String
+  taskId     String
+  user       User        @relation(fields: [userId], references: [id])
+  task       Task        @relation(fields: [taskId], references: [id])
+}
+
+// Every Task of every project
+// Linked by a unique projectId value
 model Task {
   id                 String                    @id @default(uuid())
   createdAt          DateTime                  @default(now())
@@ -188,18 +116,12 @@ model Task {
   assignees          TaskAssignee[]
 }
 
-model TaskAssignee {
-  id         String      @id @default(uuid())
-  userId     String
-  taskId     String
-  user       User        @relation(fields: [userId], references: [id])
-  task       Task        @relation(fields: [taskId], references: [id])
-}
-
-// Calendar 
-//
+// CALENDAR 
+//    This configures the Calendar related tables: CalendarEvent, CalendarLabel, CalendarAssignee
 //
 
+// Every label of every calendar entry registered in the whole website.
+// Linked by a single projectID value
 model CalendarLabel {
   id                 String  @id @default(uuid())
   name               String
@@ -211,6 +133,18 @@ model CalendarLabel {
   @@index([projectId])
 }
 
+// Every assignment Calendar entry/Member.
+// Linked by userId and calendarEvent (which contains a unique projectId value)
+model CalendarAssignee {
+  id            String               @id @default(uuid())
+  userId        String
+  calId         String
+  user          User                 @relation(fields: [userId], references: [id])
+  calendarEvent CalendarEvent        @relation(fields: [calId], references: [id])
+}
+
+// Every Calendar entry of every project
+// Linked by a unique projectId value
 model CalendarEvent {
   id                 String                    @id @default(uuid())
   createdAt          DateTime                  @default(now())
@@ -226,14 +160,47 @@ model CalendarEvent {
   assignees          CalendarAssignee[]
 }
 
-model CalendarAssignee {
-  id            String               @id @default(uuid())
-  userId        String
-  calId         String
-  user          User                 @relation(fields: [userId], references: [id])
-  calendarEvent CalendarEvent        @relation(fields: [calId], references: [id])
+// use an enum when you want to give the choice amongst a fixed set of values
+enum DiscoveryBlockStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model DiscoveryBlock {
+  id                  String               @id @default(uuid())
+  projectId           String
+  title               String
+  description         String?
+  icon                String? // at new section creation, you can pick an icon
+  color               String? // at new section creation, you can pick a card color
+  status              DiscoveryBlockStatus @default(NOT_STARTED)
+  notes               String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  project             Project              @relation(fields: [projectId], references: [id])
+  discoveryBlockItems DiscoveryBlockItem[] // one DiscoveryBlock => many DiscoveryBlockItem
+}
+
+model DiscoveryBlockItem {
+  id               String          @id @default(uuid())
+  discoveryBlockId String
+  label            String
+  isChecked        Boolean         @default(false)
+  order            Int             // position of the item in the list, updated when user reorders
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  discoveryBlock   DiscoveryBlock  @relation(fields: [discoveryBlockId], references: [id])
 }
 
 model EvaluationChecklistItem {
-	
+  id        String   @id @default(uuid())
+  projectId String
+  label     String
+  isChecked Boolean  @default(false)
+  order     Int      // position of the item in the list, updated when user reorders
+  section   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id])
 }
