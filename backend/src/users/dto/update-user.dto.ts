@@ -10,4 +10,6 @@ export class UpdateUserDto {
   email?: string;
   username?: string;
   avatarUrl?: string;
+  campus?: string;
+  // twoFactorEnabled is not here - managed by the auth team, not this service
 }

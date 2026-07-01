@@ -14,13 +14,15 @@ datasource db {
 // One User can be a member of many projects (via ProjectMember)
 // One User has many ProjectMember rows - one per project they belong to
 model User {
-  id             String          @id @default(uuid())
-  email          String          @unique // filled by the auth team via OAuth
-  username       String          @unique
-  avatarUrl      String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  projectMembers ProjectMember[] // one User => many ProjectMember rows
+  id               String          @id @default(uuid())
+  email            String          @unique // filled by the auth team via OAuth
+  username         String          @unique
+  avatarUrl        String?  // if null, the frontend generates an avatar from username initials (CSS only, no DB)
+  campus           String?  // ex: "42 Paris" - filled via OAuth, can be updated in settings
+  twoFactorEnabled Boolean         @default(false) // toggled from the Security section in Settings
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  projectMembers   ProjectMember[] // one User => many ProjectMember rows
 }
 
 // ProjectMember is the link between a User and a Project
@@ -74,6 +76,8 @@ model DiscoveryBlock {
   projectId          String
   title              String
   description        String?
+  icon               String? // at new section creation, you can pick an icon
+  color              String? // at new section creation, you can pick a card color
   status             DiscoveryBlockStatus @default(NOT_STARTED)
   notes              String?
   createdAt          DateTime             @default(now())
@@ -87,6 +91,7 @@ model DiscoveryBlockItem {
   discoveryBlockId String
   label            String
   isChecked        Boolean         @default(false)
+  order            Int             // position of the item in the list, updated when user reorders
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   discoveryBlock   DiscoveryBlock  @relation(fields: [discoveryBlockId], references: [id])
@@ -97,6 +102,7 @@ model EvaluationChecklistItem {
   projectId String
   label     String
   isChecked Boolean  @default(false)
+  order     Int      // position of the item in the list, updated when user reorders
   section   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -8,5 +8,7 @@ export class CreateDiscoveryBlockDto {
   projectId: string;
   title: string;
   description?: string;
+  icon?: string;
+  color?: string;
   notes?: string;
 }

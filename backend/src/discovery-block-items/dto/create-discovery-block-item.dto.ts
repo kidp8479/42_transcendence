@@ -2,8 +2,10 @@
 // GET and DELETE don't need one, they only use URL params, nothing in the body.
 
 // isChecked is not here: it is always false at creation, handled by @default(false) in the database schema.
+// order: the frontend sends the initial position of the item in the list (0-based index).
 
 export class CreateDiscoveryBlockItemDto {
   discoveryBlockId: string;
   label: string;
+  order: number;
 }
