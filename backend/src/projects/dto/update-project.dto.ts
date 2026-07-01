@@ -1,15 +1,9 @@
-import { ProjectStatus } from "@prisma/client";
+import { PartialType } from "@nestjs/mapped-types";
+import { CreateProjectDto } from "./create-project.dto";
 
-// TODO: Decide validation stratgey for dto's (same as CreateProjectDto)
-// class validator or something else
-// possible refactor to replace manual dto with:
-//  UpdateProjectDto extends PartialType(CreateProjectDto)
-//  (requies npm install @nestjs/mapped-types)
-// Current state: simple scaffolding dto (no validation, no inheritance)
-export class UpdateProjectDto {
-  name?: string;
-  description?: string;
-  status?: ProjectStatus;
-  deadline?: string;
-  isArchived?: boolean;
-}
+// Update DTO:
+// Reuses CreateProjectDto but makes every field optional for PATCH requests.
+// CreateProjectDto defines the fields and validation rules.
+// UpdateProjectDto inherits all of those rules and automatically makes every field optional,
+// so you don't have to duplicate them.
+export class UpdateProjectDto extends PartialType(CreateProjectDto) {}
