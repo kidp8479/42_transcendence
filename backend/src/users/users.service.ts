@@ -6,10 +6,17 @@ import { Injectable } from "@nestjs/common";
 // without it, NestJS cannot inject this service into the constructor of another class
 @Injectable()
 export class UsersService {
-  // exemple of actions to code here in the service.ts file of a module
+  // code your logic here
+  // all methods below will use PrismaService to query the database
+  // none of these are called directly by the frontend - always via the controller
   // TODO: inject PrismaService here via constructor
-  // TODO: create(dto: CreateUserDto) insert a new user in the database (called by auth team)
-  // TODO: findById(id: string) fetch one user by id
-  // TODO: update(id: string, dto: UpdateUserDto) update username, email, or avatarUrl
-  // TODO: remove(id: string) permanently delete a user account
+  // the constructor is called automatically by NestJS at startup - never called manually
+  // TODO: create(dto: CreateUserDto)
+  //       => insert a new user in the database (called by the auth team, not the frontend)
+  // TODO: findById(id: string)
+  //       => fetch one user by their id
+  // TODO: update(id: string, dto: UpdateUserDto)
+  //       => update username, email, or avatarUrl
+  // TODO: remove(id: string)
+  //       => permanently delete a user account
 }

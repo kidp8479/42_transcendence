@@ -7,12 +7,14 @@ import { Module } from "@nestjs/common";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { UsersModule } from "./users/users.module";
+import { EvaluationChecklistItemsModule } from "./evaluation-checklist-items/evaluation-checklist-items.module";
 
 @Module({
   imports: [
     PrismaModule, // registers all modules, NestJS starts them in order at boot
     ProjectsModule,
     UsersModule,
+    EvaluationChecklistItemsModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [], // top-level services (same as above)
