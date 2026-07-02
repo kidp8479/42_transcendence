@@ -71,7 +71,9 @@ model Project {
   updatedAt                DateTime                  @updatedAt
   members                  ProjectMember[]           // one Project => many ProjectMember rows
   tasks                    Task[]                    // one Project => many Task rows
+  taskCategories           TaskCategory[]            // one Project => many TaskCategory rows
   calendarEvents           CalendarEvent[]           // one Project => many CalendarEvent rows
+  calendarLabels           CalendarLabel[]           // one Project => many CalendarLabel rows
   discoveryBlocks          DiscoveryBlock[]          // one Project => many DiscoveryBlock rows
   evaluationChecklistItems EvaluationChecklistItem[] // one Project => many EvaluationChecklistItem rows
 }
@@ -80,15 +82,15 @@ model Project {
 //    This configures the Task related tables: Task, TaskCategory, TaskAssignee
 //
 enum Status {
-  TODO,
-  IN_PROGRESS,
-  REVIEW,
+  TODO
+  IN_PROGRESS
+  REVIEW
   COMPLETED
 }
 
 enum Priority {
-  LOW,
-  MEDIUM,
+  LOW
+  MEDIUM
   HIGH
 }
 
@@ -122,6 +124,7 @@ model Task {
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
   projectId          String
+  project            Project                   @relation(fields: [projectId], references: [id])
   title              String
   status             Status
   categoryId         String
@@ -170,6 +173,7 @@ model CalendarEvent {
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
   projectId          String
+  project            Project       @relation(fields: [projectId], references: [id])
   title              String
   startAt            DateTime
   endAt              DateTime
