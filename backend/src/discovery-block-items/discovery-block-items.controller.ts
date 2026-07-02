@@ -1,6 +1,8 @@
 // DiscoveryBlockItemsController: handles all HTTP requests under /api/discovery-blocks/:discoveryBlockId/items
 // one method per route - delegates all database work to DiscoveryBlockItemsService
 // note: discoveryBlockId always comes from the URL, never from the request body
+// note: when implementing, validate :discoveryBlockId and :id with @Param(name, ParseUUIDPipe)
+// so a malformed id gets rejected with a 400 before hitting the database
 
 import { Controller } from "@nestjs/common";
 

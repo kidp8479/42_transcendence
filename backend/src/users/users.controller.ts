@@ -1,5 +1,7 @@
 // UsersController: handles all HTTP requests under /api/users
 // one method per route - delegates all database work to UsersService
+// note: when implementing, validate :id with @Param('id', ParseUUIDPipe)
+// so a malformed id gets rejected with a 400 before hitting the database
 
 import { Controller } from "@nestjs/common";
 

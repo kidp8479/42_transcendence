@@ -3,6 +3,8 @@
 // note: there is no POST route here - notifications are created internally by other
 // services (ex: TasksService, ProjectMembersService) calling NotificationsService.create()
 // directly in code, never by the frontend sending a request body.
+// note: when implementing, validate :id with @Param('id', ParseUUIDPipe)
+// so a malformed id gets rejected with a 400 before hitting the database
 
 import { Controller } from "@nestjs/common";
 

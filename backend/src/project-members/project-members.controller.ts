@@ -4,6 +4,8 @@
 // a join table has no standalone existence - it only makes sense inside a project context
 // that is why routes go through /projects/:projectId/members and not /project-members
 // note: projectId always comes from the URL, never from the request body
+// note: when implementing, validate :projectId and :userId with @Param(name, ParseUUIDPipe)
+// so a malformed id gets rejected with a 400 before hitting the database
 
 import { Controller } from "@nestjs/common";
 
