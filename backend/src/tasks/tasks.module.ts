@@ -3,10 +3,14 @@
 import { Module } from "@nestjs/common";
 import { TasksService } from "./tasks.service";
 import { TasksController } from "./tasks.controller";
+import { TaskAssigneeService } from "./task-assignees.service";
 
 @Module({
   controllers: [TasksController], // handles HTTP requests
-  providers: [TasksService], // handles database operations
+  // TaskAssigneeService has no controller/module of its own - it's a plain internal
+  // helper injected into TasksService to manage the TaskAssignee join-table rows
+  // (assigneeIds array) when creating or updating a task. See its file for details.
+  providers: [TasksService, TaskAssigneeService], // handles database operations
   exports: [TasksService], // expose TasksService to other modules that may need it
 })
 export class TasksModule {}

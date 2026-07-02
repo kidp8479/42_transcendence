@@ -1,18 +1,13 @@
-import { TaskStatus } from "@prisma/client";
-import { TaskPriority } from "@prisma/client";
-
 import {
   ArrayUnique,
   IsArray,
-  IsBoolean,
   IsDateString,
-  IsEnum,
   IsOptional,
   IsString,
   IsUUID,
 } from "class-validator";
 
-export class CreateTaskDto {
+export class CreateCalendarEventDto {
   @IsString()
   title: string;
 

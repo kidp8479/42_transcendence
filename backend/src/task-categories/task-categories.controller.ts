@@ -1,6 +1,4 @@
 import { Controller } from "@nestjs/common";
 
-@Controller("task-category")
-export class TaskCategoryController {
-
-}
+@Controller("task-categories")
+export class TaskCategoryController {}

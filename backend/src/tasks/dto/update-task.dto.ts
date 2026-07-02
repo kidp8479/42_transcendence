@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsEnum,
 } from "class-validator";
 
 export class UpdateTaskDto {
@@ -45,7 +46,7 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsNumber()
   rank?: number;
-  
+
   @IsOptional()
   @IsBoolean()
   onCalendar?: boolean;
