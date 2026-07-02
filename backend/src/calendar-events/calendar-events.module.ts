@@ -1,6 +1,3 @@
-// EvaluationChecklistItemsModule: registers the controller and service for the EvaluationChecklistItems feature
-// NestJS will not know they exist until they are declared here
-
 import { Module } from "@nestjs/common";
 import { CalendarEventsService } from "./calendar-events.service";
 import { CalendarEventsController } from "./calendar-events.controller";

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
 @Injectable()
-export class CalendarEventsService {
+export class TaskAssigneeService {
 
 }

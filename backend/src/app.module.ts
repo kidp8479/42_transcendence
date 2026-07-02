@@ -13,6 +13,8 @@ import { DiscoveryBlocksModule } from "./discovery-blocks/discovery-blocks.modul
 import { DiscoveryBlockItemsModule } from "./discovery-block-items/discovery-block-items.module";
 import { EvaluationChecklistItemsModule } from "./evaluation-checklist-items/evaluation-checklist-items.module";
 import { TasksModule } from "./tasks/tasks.module";
+import { TaskAssigneeModule } from "./task-assignees/task-assignees.module";
+import { TaskCategoryModule } from "./task-categories/task-categories.module";
 import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
 
 @Module({
@@ -26,6 +28,8 @@ import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
     DiscoveryBlockItemsModule,
     EvaluationChecklistItemsModule,
     TasksModule,
+    TaskAssigneeModule,
+    TaskCategoryModule,
     CalendarEventsModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)

@@ -86,14 +86,14 @@ model Project {
 // TASK
 //    This configures the Task related tables: Task, TaskCategory, TaskAssignee
 //
-enum Status {
+enum TaskStatus {
   TODO
   IN_PROGRESS
   REVIEW
   COMPLETED
 }
 
-enum Priority {
+enum TaskPriority {
   LOW
   MEDIUM
   HIGH
@@ -134,17 +134,18 @@ model Task {
   projectId          String
   project            Project                   @relation(fields: [projectId], references: [id])
   title              String
-  status             Status
+  status             TaskStatus
   categoryId         String
   category           TaskCategory              @relation(fields: [categoryId], references: [id])
   rank               Int
-  priority           Priority
+  priority           TaskPriority
   startAt            DateTime?
   endAt              DateTime?
   tag                String?
   description        String?
   notes              String?
   assignees          TaskAssignee[]
+  onCalendar         Boolean
 
   @@index([projectId])
   @@index([categoryId])
