@@ -25,8 +25,8 @@ import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
     DiscoveryBlocksModule,
     DiscoveryBlockItemsModule,
     EvaluationChecklistItemsModule,
-	TasksModule,
-	CalendarEventsModule,
+    TasksModule,
+    CalendarEventsModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [], // top-level services (same as above)
