@@ -22,5 +22,6 @@ import { ProjectsService } from "./projects.service";
 @Module({
   controllers: [ProjectsController],
   providers: [ProjectsService],
+  exports: [ProjectsService], // expose ProjectsService to other modules that may need it
 })
 export class ProjectsModule {}

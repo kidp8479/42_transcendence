@@ -1,6 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
-// any "?" next to a field means it's optionnel
+// any "?" next to a field means it's optional
 
 generator client {
   provider = "prisma-client-js"
@@ -37,6 +37,8 @@ model Notification {
   link      String?  // optional: URL to the resource the notification refers to (ex: "/projects/abc/tasks")
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id]) // userId in this table = id in User
+
+  @@index([userId])
 }
 
 // ProjectMember is the link between a User and a Project
@@ -51,12 +53,15 @@ model ProjectMember {
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id])    // userId in this table = id in User
   project   Project  @relation(fields: [projectId], references: [id]) // projectId in this table = id in Project
+
+  @@index([userId])
+  @@index([projectId])
 }
 
 enum ProjectStatus {
-	IN_PROGRESS
-	REVIEW
-	COMPLETED
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
 }
 
 // One Project can have many members, tasks, events, blocks, and checklist items
@@ -115,6 +120,9 @@ model TaskAssignee {
   taskId     String
   user       User        @relation(fields: [userId], references: [id])
   task       Task        @relation(fields: [taskId], references: [id])
+
+  @@index([userId])
+  @@index([taskId])
 }
 
 // Every Task of every project
@@ -137,6 +145,9 @@ model Task {
   description        String?
   notes              String?
   assignees          TaskAssignee[]
+
+  @@index([projectId])
+  @@index([categoryId])
 }
 
 // CALENDAR 
@@ -164,6 +175,9 @@ model CalendarAssignee {
   calId         String
   user          User                 @relation(fields: [userId], references: [id])
   calendarEvent CalendarEvent        @relation(fields: [calId], references: [id])
+
+  @@index([userId])
+  @@index([calId])
 }
 
 // Every Calendar entry of every project
@@ -182,6 +196,9 @@ model CalendarEvent {
   description        String?
   notes              String?
   assignees          CalendarAssignee[]
+
+  @@index([projectId])
+  @@index([labelId])
 }
 
 // use an enum when you want to give the choice amongst a fixed set of values
@@ -204,6 +221,8 @@ model DiscoveryBlock {
   updatedAt           DateTime             @updatedAt
   project             Project              @relation(fields: [projectId], references: [id])
   discoveryBlockItems DiscoveryBlockItem[] // one DiscoveryBlock => many DiscoveryBlockItem
+
+  @@index([projectId])
 }
 
 model DiscoveryBlockItem {
@@ -215,6 +234,8 @@ model DiscoveryBlockItem {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   discoveryBlock   DiscoveryBlock  @relation(fields: [discoveryBlockId], references: [id])
+
+  @@index([discoveryBlockId])
 }
 
 model EvaluationChecklistItem {
@@ -227,4 +248,6 @@ model EvaluationChecklistItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
 }
