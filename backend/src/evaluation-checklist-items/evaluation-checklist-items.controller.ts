@@ -1,26 +1,28 @@
-// EvaluationChecklistItemsController: handles all HTTP requests under /api/evaluation-checklist-items
+// EvaluationChecklistItemsController: handles all HTTP requests under /api/projects/:projectId/evaluation-checklist-items
 // one method per route - delegates all database work to EvaluationChecklistItemsService
+// note: projectId always comes from the URL, never from the request body
 
 import { Controller } from "@nestjs/common";
 
-@Controller("evaluation-checklist-items")
+@Controller("projects/:projectId/evaluation-checklist-items")
 export class EvaluationChecklistItemsController {
   // TODO: inject EvaluationChecklistItemsService here via constructor
   // the constructor is called automatically by NestJS at startup - never called manually
   // ENDPOINTS:
-  // POST   /api/evaluation-checklist-items
+  // POST   /api/projects/:projectId/evaluation-checklist-items
   //        => create a new checklist item
-  //        => expects a request body matching CreateEvaluationChecklistItemDto (projectId, label, section)
-  // GET    /api/evaluation-checklist-items
+  //        => expects a request body matching CreateEvaluationChecklistItemDto (label, section, order)
+  //        => projectId comes from the URL, not the body
+  // GET    /api/projects/:projectId/evaluation-checklist-items
   //        => get all items for a project
-  //        => expects ?projectId=... as a URL query param (no request body, no DTO)
-  // GET    /api/evaluation-checklist-items/:id
+  //        => :projectId is a placeholder filled by the frontend (no request body, no DTO)
+  // GET    /api/projects/:projectId/evaluation-checklist-items/:id
   //        => get one item by its id
   //        => :id is a placeholder filled by the frontend (no request body, no DTO)
-  // PATCH  /api/evaluation-checklist-items/:id
+  // PATCH  /api/projects/:projectId/evaluation-checklist-items/:id
   //        => update an existing item (main use case: checking or unchecking)
   //        => expects a request body matching UpdateEvaluationChecklistItemDto (all fields optional)
-  // DELETE /api/evaluation-checklist-items/:id
+  // DELETE /api/projects/:projectId/evaluation-checklist-items/:id
   //        => delete an item by its id
-  //        => no request body needed, the id in the URL is enough (no DTO)
+  //        => no request body needed, the ids in the URL are enough (no DTO)
 }

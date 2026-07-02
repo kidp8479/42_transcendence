@@ -5,6 +5,9 @@
 // projectId is not here: it comes from the URL (/projects/:projectId/members), not the request body.
 // there is no update DTO: you never edit a membership, you only add or remove it.
 
+import { IsString } from "class-validator";
+
 export class AddMemberDto {
+  @IsString()
   userId: string;
 }

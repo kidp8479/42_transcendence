@@ -10,8 +10,8 @@ export class EvaluationChecklistItemsService {
   // none of these are called directly by the frontend - always via the controller
   // TODO: inject PrismaService here via constructor
   // the constructor is called automatically by NestJS at startup - never called manually
-  // TODO: create(dto: CreateEvaluationChecklistItemDto)
-  //       => insert a new checklist item in the database
+  // TODO: create(projectId: string, dto: CreateEvaluationChecklistItemDto)
+  //       => insert a new checklist item in the database, linked to projectId from the URL
   // TODO: findAll(projectId: string)
   //       => fetch all checklist items belonging to a given project
   // TODO: findById(id: string)

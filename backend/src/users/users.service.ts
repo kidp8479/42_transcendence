@@ -16,7 +16,7 @@ export class UsersService {
   // TODO: findById(id: string)
   //       => fetch one user by their id
   // TODO: update(id: string, dto: UpdateUserDto)
-  //       => update username, email, or avatarUrl
+  //       => update username, email, avatarUrl, or campus
   // TODO: remove(id: string)
   //       => permanently delete a user account
 }

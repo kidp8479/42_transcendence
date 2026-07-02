@@ -10,8 +10,11 @@ export class NotificationsService {
   // none of these are called directly by the frontend - always via the controller
   // TODO: inject PrismaService here via constructor
   // the constructor is called automatically by NestJS at startup - never called manually
-  // TODO: create(dto: CreateNotificationDto)
+  // TODO: create(userId: string, message: string, link?: string)
   //       => insert a new notification in the database
+  //       => called internally by other services (ex: TasksService, ProjectMembersService)
+  //          when something happens that the user should be told about - never called from
+  //          the controller, since there is no public POST route for notifications
   // TODO: findAllByUser(userId: string)
   //       => fetch all notifications belonging to a given user
   // TODO: markAsRead(id: string)

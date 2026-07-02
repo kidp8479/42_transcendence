@@ -9,8 +9,8 @@ export class DiscoveryBlockItemsService {
   // none of these are called directly by the frontend - always via the controller
   // TODO: inject PrismaService here via constructor
   // the constructor is called automatically by NestJS at startup - never called manually
-  // TODO: create(dto: CreateDiscoveryBlockItemDto)
-  //       => insert a new item in the database
+  // TODO: create(discoveryBlockId: string, dto: CreateDiscoveryBlockItemDto)
+  //       => insert a new item in the database, linked to discoveryBlockId from the URL
   // TODO: findAll(discoveryBlockId: string)
   //       => fetch all items belonging to a given discovery block
   // TODO: findById(id: string)
