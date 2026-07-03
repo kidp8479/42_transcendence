@@ -12,7 +12,7 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
-    flowbiteReact(),
+    flowbiteReact({ path: "src" }),
   ],
   server: {
     port: 5173,
