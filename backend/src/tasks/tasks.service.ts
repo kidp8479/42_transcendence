@@ -13,8 +13,8 @@ export class TasksService {
   // TODO: create(dto: CreateTaskDto)
   //       => insert a new task in the database
   //       => if dto.assigneeIds is provided, call taskAssigneeService.replaceAssignees(task.id, dto.assigneeIds)
-  // TODO: findAll(categoryId: string)
-  //       => fetch all tasks belonging to a given category
+  // TODO: findAll(projectId: string)
+  //       => fetch all tasks belonging to a given project
   // TODO: findById(id: string)
   //       => fetch one task by its id
   // TODO: update(id: string, dto: UpdateTaskDto)

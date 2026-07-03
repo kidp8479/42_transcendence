@@ -1,3 +1,9 @@
+// DTOs only exist for routes that receive data in their body (POST, PATCH).
+// GET and DELETE don't need one, they only use URL params, nothing in the body.
+
+// projectId is not here: it comes from the URL (/projects/:projectId/calendar-events), not the request body.
+// assigneeIds are handled internally by CalendarAssigneeService when provided.
+
 import {
   ArrayUnique,
   IsArray,
@@ -11,7 +17,7 @@ export class CreateCalendarEventDto {
   @IsString()
   title: string;
 
-  @IsString()
+  @IsUUID("4")
   labelId: string;
 
   @IsDateString()

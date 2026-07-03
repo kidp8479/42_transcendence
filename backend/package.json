@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
+    "postinstall": "prisma generate",
     "build": "nest build",
     "start": "node dist/main",
     "start:dev": "nest start --watch",

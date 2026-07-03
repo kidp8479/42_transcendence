@@ -1,10 +1,12 @@
+// TaskCategoriesModule: registers the controller and service for the TaskCategories feature
+// NestJS will not know they exist until they are declared here
 import { Module } from "@nestjs/common";
-import { TaskCategoryService } from "./task-categories.service";
-import { TaskCategoryController } from "./task-categories.controller";
+import { TaskCategoriesService } from "./task-categories.service";
+import { TaskCategoriesController } from "./task-categories.controller";
 
 @Module({
-  controllers: [TaskCategoryController],
-  providers: [TaskCategoryService],
-  exports: [TaskCategoryService],
+  controllers: [TaskCategoriesController],
+  providers: [TaskCategoriesService],
+  exports: [TaskCategoriesService],
 })
-export class TaskCategoryModule {}
+export class TaskCategoriesModule {}

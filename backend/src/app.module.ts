@@ -13,7 +13,7 @@ import { DiscoveryBlocksModule } from "./discovery-blocks/discovery-blocks.modul
 import { DiscoveryBlockItemsModule } from "./discovery-block-items/discovery-block-items.module";
 import { EvaluationChecklistItemsModule } from "./evaluation-checklist-items/evaluation-checklist-items.module";
 import { TasksModule } from "./tasks/tasks.module";
-import { TaskCategoryModule } from "./task-categories/task-categories.module";
+import { TaskCategoriesModule } from "./task-categories/task-categories.module";
 import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
 import { CalendarLabelsModule } from "./calendar-labels/calendar-labels.module";
 
@@ -28,7 +28,7 @@ import { CalendarLabelsModule } from "./calendar-labels/calendar-labels.module";
     DiscoveryBlockItemsModule,
     EvaluationChecklistItemsModule,
     TasksModule,
-    TaskCategoryModule,
+    TaskCategoriesModule,
     CalendarEventsModule,
     CalendarLabelsModule,
   ],

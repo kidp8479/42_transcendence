@@ -39,8 +39,15 @@ up: $(ENV_FILE)
 	$(COMPOSE) up -d
 
 ## rebuild images and start the local development stack
+## run this after pulling changes that add or remove npm dependencies
 up-build: $(ENV_FILE)
 	$(COMPOSE) up --build -d
+
+## reinstall npm dependencies in running containers without rebuilding images
+## use after pulling changes that add or remove npm dependencies (faster than up-build)
+install:
+	$(COMPOSE) exec frontend npm install
+	$(COMPOSE) exec backend npm install
 
 ## stop the local development stack
 down:

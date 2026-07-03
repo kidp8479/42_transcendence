@@ -1,31 +1,34 @@
-// CalendarEventsController: handles all HTTP requests under /api/calendar-events
+// CalendarEventsController: handles all HTTP requests under /api/projects/:projectId/calendar-events
 // one method per route - delegates all database work to CalendarEventsService
-// note: there is currently no projectId in the URL nor in CreateCalendarEventDto - how an
-// event gets scoped to a project (via labelId, which does have a projectId, or via the URL)
-// is not decided yet, flag this with the team before implementing the real routes
+// note: projectId always comes from the URL, never from the request body
+// note: labelId and assigneeIds stay in the body (they are relations, not the parent scope)
+// note: when implementing, validate :projectId and :id with @Param(name, ParseUUIDPipe)
+// so a malformed id gets rejected with a 400 before hitting the database
 
 import { Controller } from "@nestjs/common";
 
-@Controller("calendar-events")
+@Controller("projects/:projectId/calendar-events")
 export class CalendarEventsController {
   // TODO: inject CalendarEventsService here via constructor
   // the constructor is called automatically by NestJS at startup - never called manually
   // ENDPOINTS:
-  // POST   /api/calendar-events
+  // POST   /api/projects/:projectId/calendar-events
   //        => create a new calendar event
   //        => expects a request body matching CreateCalendarEventDto (title, labelId, startAt,
   //           endAt, description?, notes?, assigneeIds?)
+  //        => projectId comes from the URL, not the body
+  //        => labelId stays in the body (it's a relation, not the parent scope)
   //        => assigneeIds, if provided, are handled internally via CalendarAssigneeService
-  // GET    /api/calendar-events
+  // GET    /api/projects/:projectId/calendar-events
   //        => get all events for a project
-  //        => expects ?labelId=... or ?projectId=... as a URL query param (TBD which - see note above)
-  // GET    /api/calendar-events/:id
+  //        => :projectId is a placeholder filled by the frontend (no request body, no DTO)
+  // GET    /api/projects/:projectId/calendar-events/:id
   //        => get one event by its id
   //        => :id is a placeholder filled by the frontend (no request body, no DTO)
-  // PATCH  /api/calendar-events/:id
+  // PATCH  /api/projects/:projectId/calendar-events/:id
   //        => update an existing event (any field, all optional)
   //        => expects a request body matching UpdateCalendarEventDto
-  // DELETE /api/calendar-events/:id
+  // DELETE /api/projects/:projectId/calendar-events/:id
   //        => delete an event by its id
-  //        => no request body needed, the id in the URL is enough (no DTO)
+  //        => no request body needed, the ids in the URL are enough (no DTO)
 }

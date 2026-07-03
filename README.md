@@ -49,6 +49,18 @@ make logs
 
 If nginx cannot start because port `8080` is already in use, stop the other local service using that port, then run `make up` again.
 
+#### After pulling changes
+
+If the pull includes changes to `package.json` (new or removed npm dependencies), reinstall packages in the running containers:
+
+```sh
+make install
+```
+
+This is faster than a full rebuild. If the containers are not running, use `make up-build` instead — it rebuilds the images and runs `npm install` automatically.
+
+If the pull includes changes to `prisma/schema.prisma`, the Prisma client is regenerated automatically the next time `npm install` runs (via the `postinstall` script), so `make install` or `make up-build` is enough. No manual `prisma generate` needed.
+
 #### Daily development flow
 
 Use Docker Compose as the canonical local stack:
@@ -140,6 +152,7 @@ Keep these values private and do not commit `.env`.
 ```sh
 make up              # start the full development stack
 make up-build        # rebuild and start the full development stack
+make install         # reinstall npm packages in running containers (use after pulling package.json changes)
 make down            # stop the stack
 make restart         # restart running containers
 make build           # rebuild images

@@ -141,7 +141,6 @@ model Task {
   priority           TaskPriority
   startAt            DateTime?
   endAt              DateTime?
-  tag                String?
   description        String?
   notes              String?
   assignees          TaskAssignee[]

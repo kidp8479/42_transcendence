@@ -13,8 +13,8 @@ export class CalendarEventsService {
   // TODO: create(dto: CreateCalendarEventDto)
   //       => insert a new calendar event in the database
   //       => if dto.assigneeIds is provided, call calendarAssigneeService.replaceAssignees(event.id, dto.assigneeIds)
-  // TODO: findAll(labelId: string)
-  //       => fetch all events belonging to a given label
+  // TODO: findAll(projectId: string)
+  //       => fetch all events belonging to a given project
   // TODO: findById(id: string)
   //       => fetch one event by its id
   // TODO: update(id: string, dto: UpdateCalendarEventDto)
