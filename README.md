@@ -114,10 +114,10 @@ Both the frontend and backend use ESLint and Prettier. Three layers are in place
 make lint          # lint frontend and backend
 make format        # format frontend and backend
 
-make lint-front    # frontend only
-make lint-back     # backend only
-make format-front  # frontend only
-make format-back   # backend only
+make lint-frontend    # frontend only
+make lint-backend     # backend only
+make format-frontend  # frontend only
+make format-backend   # backend only
 ```
 
 **Pre-commit hook** - auto-formats and lints both services before every commit. Run once after cloning:
@@ -178,10 +178,10 @@ make logs-auth       # follow auth service logs
 make logs-db         # follow database logs
 make lint            # lint frontend and backend
 make format          # format frontend and backend
-make lint-front      # lint frontend only
-make lint-back       # lint backend only
-make format-front    # format frontend only
-make format-back     # format backend only
+make lint-frontend   # lint frontend only
+make lint-backend    # lint backend only
+make format-frontend # format frontend only
+make format-backend  # format backend only
 make hooks           # install the pre-commit hook (run once after cloning)
 ```
 
