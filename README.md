@@ -51,15 +51,29 @@ If nginx cannot start because port `8080` is already in use, stop the other loca
 
 #### After pulling changes
 
-If the pull includes changes to `package.json` (new or removed npm dependencies), reinstall packages in the running containers:
+**If the pull upgrades a major dependency** (e.g. Tailwind v3 to v4, a new bundler plugin), the existing `node_modules` volume inside Docker will be stale and must be rebuilt from scratch:
+
+```sh
+make up-build
+```
+
+This is the safe default after any significant dependency change. It rebuilds the Docker images and reinstalls all packages cleanly.
+
+**If the pull only adds or removes packages** without a major version change, a faster reinstall is enough:
 
 ```sh
 make install
 ```
 
-This is faster than a full rebuild. If the containers are not running, use `make up-build` instead — it rebuilds the images and runs `npm install` automatically.
+This runs `npm install` inside the running containers without rebuilding the images.
+
+If you are unsure which one to use, `make up-build` is always safe.
 
 If the pull includes changes to `prisma/schema.prisma`, the Prisma client is regenerated automatically the next time `npm install` runs (via the `postinstall` script), so `make install` or `make up-build` is enough. No manual `prisma generate` needed.
+
+#### UI components
+
+The frontend uses [Flowbite React](https://flowbite-react.com/docs/getting-started/introduction) as the component library and Tailwind CSS v4 for layout and spacing. Before building any new screen, check the style guide at [http://localhost:8080/dont-panic](http://localhost:8080/dont-panic). It shows the color palette, available components, and the conventions the team follows. These are temporary conventions to get everyone started with a shared base. The team can update the palette and style at any time in `frontend/src/index.css`.
 
 #### Daily development flow
 

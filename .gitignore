@@ -99,6 +99,7 @@ out/
 .vite/
 frontend/vite.config.d.ts
 frontend/vite.config.js
+frontend/.flowbite-react/
 
 # ============================================================
 # Prisma
