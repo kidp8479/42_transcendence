@@ -25,3 +25,19 @@
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #52525b;
 }
+
+/*
+ * flowbite-react's ScrollContainer (used internally by Carousel) hardcodes
+ * hideScrollbars: true, which applies a "!overflow-x-hidden" class to hide
+ * the native scrollbar. This exact class (important-prefix + bracket syntax)
+ * is never picked up by our Tailwind v4 class-list.json generation, so it's
+ * never compiled - meanwhile twMerge drops the theme's own overflow-x-scroll
+ * class in favor of it. Net result: the scroll container ends up with no
+ * overflow-x rule at all (defaults to "visible"), so scrollLeft has no
+ * visual effect and the Carousel never moves. This raw CSS rule forces the
+ * correct behaviour regardless of Tailwind's class detection.
+ * See: https://github.com/themesberg/flowbite-react/issues/1564
+ */
+[data-testid="carousel"] .snap-mandatory {
+  overflow-x: auto !important;
+}
