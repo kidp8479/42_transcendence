@@ -37,6 +37,11 @@
  * visual effect and the Carousel never moves. This raw CSS rule forces the
  * correct behaviour regardless of Tailwind's class detection.
  * See: https://github.com/themesberg/flowbite-react/issues/1564
+ *
+ * Note: data-testid is normally a test-only hook, not meant for styling -
+ * used here because it's the only stable selector Flowbite exposes on this
+ * element. If a future flowbite-react version renames/removes it, this rule
+ * silently stops applying.
  */
 [data-testid="carousel"] .snap-mandatory {
   overflow-x: auto !important;
