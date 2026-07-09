@@ -10,7 +10,13 @@
 #                                                                              #
 # **************************************************************************** #
 
-COMPOSE = docker compose
+# Auto-detect the compose CLI: prefer the Docker Compose v2 plugin, fall back to
+# podman-compose on machines that only have that (e.g. podman + the podman-docker
+# shim, which provides a `docker` command but no `docker compose` subcommand).
+# Override explicitly if needed, e.g. `make COMPOSE=podman-compose up`.
+ifndef COMPOSE
+COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "podman-compose")
+endif
 ENV_FILE = .env
 
 # ---------------------------------------------------------------------------- #
@@ -39,8 +45,15 @@ up: $(ENV_FILE)
 	$(COMPOSE) up -d
 
 ## rebuild images and start the local development stack
+## run this after pulling changes that add or remove npm dependencies
 up-build: $(ENV_FILE)
 	$(COMPOSE) up --build -d
+
+## reinstall npm dependencies in running containers without rebuilding images
+## use after pulling changes that add or remove npm dependencies (faster than up-build)
+install:
+	$(COMPOSE) exec frontend npm install
+	$(COMPOSE) exec backend npm install
 
 ## stop the local development stack
 down:
@@ -142,18 +155,36 @@ migrate:
 prisma-studio:
 	$(COMPOSE) exec backend npx prisma studio --browser none
 
+## inject demo data into the database (run once after migrate, requires seed.ts to be implemented)
+seed:
+	$(COMPOSE) exec backend npx prisma db seed
+
 
 # ---------------------------------------------------------------------------- #
 # code quality                                                                 #
 # ---------------------------------------------------------------------------- #
 
+## format frontend and backend
+format: format-frontend format-backend
+
+## lint frontend and backend
+lint: lint-frontend lint-backend
+
 ## format all frontend files with Prettier
-format:
+format-frontend:
 	$(COMPOSE) exec frontend npm run format
 
 ## run ESLint on all frontend files
-lint:
+lint-frontend:
 	$(COMPOSE) exec frontend npm run lint
+
+## format all backend files with Prettier
+format-backend:
+	$(COMPOSE) exec backend npm run format
+
+## run ESLint on all backend files
+lint-backend:
+	$(COMPOSE) exec backend npm run lint
 
 ## install git pre-commit hook (run once after cloning)
 hooks:
@@ -187,6 +218,27 @@ fclean:
 re: fclean
 	+$(MAKE) up
 
+## remove the named frontend/backend node_modules volumes and local build caches
+ffclean:
+	$(COMPOSE) stop nginx frontend backend auth
+	for svc in nginx backend auth frontend; do \
+	  ids=$$(docker ps -aq --filter label=com.docker.compose.service=$$svc); \
+	  if [ -n "$$ids" ]; then echo $$ids | xargs -r docker rm -f; fi; \
+	done
+	docker volume ls -q | grep -E '_frontend_node_modules$$' | xargs -r docker volume rm -f
+	docker volume ls -q | grep -E '_backend_node_modules$$' | xargs -r docker volume rm -f
+	# dev containers run as root, so some generated files (e.g. dist/,
+	# .flowbite-react/) can be root-owned on the host - clean them via a
+	# throwaway root container instead of a plain host-side rm to avoid
+	# "Permission denied"
+	docker run --rm -v $(CURDIR)/frontend:/target -w /target alpine \
+		sh -c "rm -rf node_modules dist build .vite .tanstack .flowbite-react .cache .eslintcache .stylelintcache coverage *.tsbuildinfo"
+	docker run --rm -v $(CURDIR)/backend:/target -w /target alpine \
+		sh -c "rm -rf node_modules dist build .cache .eslintcache .stylelintcache coverage *.tsbuildinfo"
+	docker run --rm -v $(CURDIR)/auth:/target -w /target alpine \
+		sh -c "rm -rf tmp .cache coverage.out"
+	@echo "Local caches and node_modules volumes cleaned. Run 'make up-build' next."
+
 ## rebuild images and start the local development stack
 rebuild: up-build
 
@@ -204,10 +256,10 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST) | sort -u
 	@printf "\n"
 
-.PHONY: all up up-build down restart build logs ps clean fclean re rebuild \
+.PHONY: all up up-build down restart build logs ps clean fclean re ffclean rebuild \
         up-db up-frontend up-backend up-auth \
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate prisma-studio \
-        format lint hooks
+        migrate prisma-studio install seed \
+        format lint format-frontend lint-frontend format-backend lint-backend hooks

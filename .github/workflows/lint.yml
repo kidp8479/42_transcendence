@@ -1,20 +1,53 @@
-name: Lint & Format
+name: Lint & Format # name shown in the GitHub Actions tab
 
 on:
-  push:
-  pull_request:
+  push: # runs on every push to any branch
+  pull_request: # runs on every pull request
 
 permissions:
-  contents: read
+  contents: read # security: this workflow can only read the repo, not write to it
 
 jobs:
   frontend:
     name: ESLint + Prettier (frontend)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # GitHub spins up a fresh Ubuntu virtual machine for this job
 
     defaults:
       run:
-        working-directory: frontend
+        working-directory: frontend # all "run:" commands below execute from the frontend/ folder
+
+    steps:
+      - uses: actions/checkout@v4 # downloads the repo code onto the virtual machine
+        with:
+          persist-credentials: false # security: don't keep GitHub tokens in memory after checkout
+
+      - uses: actions/setup-node@v4 # installs Node.js on the virtual machine
+        with:
+          node-version: 22
+          cache: npm # caches node_modules between runs to speed things up
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+        # "ci" is stricter than "install" - respects package-lock.json exactly
+        # "--ignore-scripts" security: prevents npm scripts from running during install
+
+      - name: ESLint
+        run: npm run lint # fails the job if ESLint finds any errors
+
+      - name: Prettier
+        run: npm run format:check # fails the job if any file is not formatted (read-only check)
+
+      - name: Build
+        run: npm run build # catches TS/Vite build errors that lint alone would miss
+
+  backend:
+    name: ESLint + Prettier (backend)
+    runs-on: ubuntu-latest # separate virtual machine, runs in parallel with the frontend job
+
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
       - uses: actions/checkout@v4
@@ -25,13 +58,23 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
+        # "--ignore-scripts" skips postinstall (which normally runs "prisma generate"),
+        # so the Prisma Client types must be generated explicitly below before ESLint
+        # runs - ESLint's parser is type-aware (parserOptions.project) and would
+        # otherwise fail to resolve @prisma/client's generated types.
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
       - name: ESLint
         run: npm run lint
 
       - name: Prettier
         run: npm run format:check
+
+      - name: Build
+        run: npm run build # catches TS build errors that lint alone would miss

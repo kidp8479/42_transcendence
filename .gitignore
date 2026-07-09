@@ -97,8 +97,10 @@ out/
 .stylelintcache
 *.tsbuildinfo
 .vite/
+.tanstack/
 frontend/vite.config.d.ts
 frontend/vite.config.js
+frontend/.flowbite-react/
 
 # ============================================================
 # Prisma
@@ -108,11 +110,9 @@ prisma/migrations/dev/
 *.db-journal
 *.sqlite
 *.sqlite3
-
-# ============================================================
-# Docker
-# ============================================================
-.dockerignore
+backend/prisma/seed.js
+backend/prisma/seed.js.map
+backend/prisma/seed.d.ts
 
 # ============================================================
 # Logs & temp

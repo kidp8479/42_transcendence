@@ -1,0 +1,21 @@
+// A DTO (Data Transfer Object) is just a description of the shape of the data you expect to receive.
+// It's a simple object that says "when someone sends me data, it must look like this."
+// DTOs only exist for routes that receive data in their body (POST, PATCH).
+// GET and DELETE don't need one, they only use URL params, nothing in the body.
+
+// projectId is not here: it comes from the URL (/projects/:projectId/evaluation-checklist-items), not the request body.
+// isChecked is not here: it is always false at creation, handled by @default(false) in the database schema.
+// order: the frontend sends the initial position of the item in the list (0-based index).
+
+import { IsInt, IsString } from "class-validator";
+
+export class CreateEvaluationChecklistItemDto {
+  @IsString()
+  label: string;
+
+  @IsString()
+  section: string;
+
+  @IsInt()
+  order: number;
+}
