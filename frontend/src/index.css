@@ -44,5 +44,5 @@
  * silently stops applying.
  */
 [data-testid="carousel"] .snap-mandatory {
-  overflow-x: auto !important;
+  overflow-x: hidden !important;
 }
