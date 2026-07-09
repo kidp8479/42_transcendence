@@ -220,10 +220,11 @@ re: fclean
 
 ## remove the named frontend/backend node_modules volumes and local build caches
 ffclean:
-	$(COMPOSE) stop frontend backend auth
-	{ docker ps -aq --filter label=com.docker.compose.service=frontend; \
-	  docker ps -aq --filter label=com.docker.compose.service=backend; \
-	  docker ps -aq --filter label=com.docker.compose.service=auth; } | xargs -r docker rm -f
+	$(COMPOSE) stop nginx frontend backend auth
+	for svc in nginx backend auth frontend; do \
+	  ids=$$(docker ps -aq --filter label=com.docker.compose.service=$$svc); \
+	  if [ -n "$$ids" ]; then echo $$ids | xargs -r docker rm -f; fi; \
+	done
 	docker volume ls -q | grep -E '_frontend_node_modules$$' | xargs -r docker volume rm -f
 	docker volume ls -q | grep -E '_backend_node_modules$$' | xargs -r docker volume rm -f
 	rm -rf frontend/node_modules frontend/dist frontend/build frontend/.vite \
