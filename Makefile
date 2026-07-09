@@ -219,19 +219,13 @@ re: fclean
 	+$(MAKE) up
 
 ## remove the named frontend/backend node_modules volumes and local build caches
-## (dist, .vite, .flowbite-react, *.tsbuildinfo, Go build cache in auth/tmp, etc.)
-## use when local dependency/build state drifts from package.json - e.g. after
-## a major dependency migration - and `make up-build` alone did not fix it.
-## does NOT touch the db_data volume, unlike fclean/re (`down --volumes` cannot be
-## scoped to only some services, so individual volumes are removed here instead
-## via `docker volume rm`). Run `make up-build` after.
-## volumes are matched by the com.docker.compose.volume label (not by guessing the
-## project-name prefix), so this also works from a differently-named clone.
 ffclean:
 	$(COMPOSE) stop frontend backend auth
-	$(COMPOSE) rm -f frontend backend auth
-	docker volume ls -q --filter label=com.docker.compose.volume=frontend_node_modules | xargs -r docker volume rm -f
-	docker volume ls -q --filter label=com.docker.compose.volume=backend_node_modules | xargs -r docker volume rm -f
+	{ docker ps -aq --filter label=com.docker.compose.service=frontend; \
+	  docker ps -aq --filter label=com.docker.compose.service=backend; \
+	  docker ps -aq --filter label=com.docker.compose.service=auth; } | xargs -r docker rm -f
+	docker volume ls -q | grep -E '_frontend_node_modules$$' | xargs -r docker volume rm -f
+	docker volume ls -q | grep -E '_backend_node_modules$$' | xargs -r docker volume rm -f
 	rm -rf frontend/node_modules frontend/dist frontend/build frontend/.vite \
 	       frontend/.tanstack frontend/.flowbite-react frontend/.cache \
 	       frontend/.eslintcache frontend/.stylelintcache frontend/coverage \
