@@ -16,22 +16,18 @@
 
 FROM node:22-alpine AS dev
 WORKDIR /app
-# run as the pre-existing non-root "node" user instead of root,
-# so files generated at runtime (dist/, .vite/, .flowbite-react/, etc.)
-# on the bind mount are host-user-owned instead of root-owned and can be
-# cleaned with a plain host-side rm
-RUN chown node:node /app
+# build everything as root: rootless Podman's build phase (buildah under the
+# hood) doesn't reliably persist a chown across a later USER switch within
+# the same build (a known rootless-overlay-storage limitation), so trying to
+# become non-root mid-build is fragile across engines. Instead, run the
+# entrypoint (which starts as root) to chown things and drop to "node" via
+# su-exec at container *runtime* instead - see docker-entrypoint.sh.
 RUN apk add --no-cache su-exec
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-USER node
-COPY --chown=node:node package*.json ./
+COPY package*.json ./
 RUN npm install
-COPY --chown=node:node . .
-# switch back to root so the container starts as root: the entrypoint fixes
-# up ownership of the named node_modules volume (see docker-entrypoint.sh for
-# why that's needed) before dropping back down to "node" to run the app
-USER root
+COPY . .
 EXPOSE 5173
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["npm", "run", "dev", "--", "--host"]

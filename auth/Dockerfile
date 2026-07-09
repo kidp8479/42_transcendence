@@ -24,18 +24,15 @@ RUN apk add --no-cache su-exec
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # create a non-root user (uid/gid 1000, matching common host dev-machine uids)
-# so files generated at runtime (tmp/ build output) on the bind mount are
-# host-user-owned instead of root-owned and can be cleaned with a plain host-side rm
+# for the entrypoint to drop privileges to at runtime via su-exec. Build
+# everything else as root: rootless Podman's build phase (buildah under the
+# hood) doesn't reliably persist a chown across a later USER switch within
+# the same build (a known rootless-overlay-storage limitation), so trying to
+# become non-root mid-build is fragile across engines.
 RUN addgroup -g 1000 app && adduser -D -u 1000 -G app app
-RUN chown app:app /app
-USER app
-COPY --chown=app:app go.mod go.sum* ./
+COPY go.mod go.sum* ./
 RUN go mod download
-COPY --chown=app:app . .
-# switch back to root so the container starts as root: the entrypoint fixes
-# up ownership of /home/app (see docker-entrypoint.sh for why that's needed)
-# before dropping back down to "app" to run the app
-USER root
+COPY . .
 EXPOSE 3001
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["air"]
