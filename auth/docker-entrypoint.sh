@@ -10,4 +10,4 @@
 # the container is actually running under its real runtime namespace.
 set -e
 chown -R app:app /home/app 2>/dev/null || true
-exec su-exec app "$@"
+exec su-exec app:app "$@"

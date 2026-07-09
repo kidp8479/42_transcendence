@@ -10,4 +10,4 @@
 # once the container is actually running under its real runtime namespace.
 set -e
 chown -R node:node /app/node_modules 2>/dev/null || true
-exec su-exec node "$@"
+exec su-exec node:node "$@"
