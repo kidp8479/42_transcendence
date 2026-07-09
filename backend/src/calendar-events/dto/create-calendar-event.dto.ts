@@ -18,7 +18,7 @@ export class CreateCalendarEventDto {
   title: string;
 
   @IsUUID("4")
-  labelId: string;
+  categoryId: string;
 
   @IsDateString()
   startAt: string;

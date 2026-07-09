@@ -17,8 +17,12 @@ export class NotificationsService {
   //          the controller, since there is no public POST route for notifications
   // TODO: findAllByUser(userId: string)
   //       => fetch all notifications belonging to a given user
-  // TODO: markAsRead(id: string)
+  // TODO: markAsRead(id: string, userId: string)
   //       => set isRead to true on a notification
-  // TODO: remove(id: string)
+  //       => must throw (ex: NotFoundException) if the notification's userId !== userId,
+  //          so ownership is enforced here, not just trusted from the controller
+  // TODO: remove(id: string, userId: string)
   //       => permanently delete a notification
+  //       => must throw (ex: NotFoundException) if the notification's userId !== userId,
+  //          same ownership check as markAsRead
 }

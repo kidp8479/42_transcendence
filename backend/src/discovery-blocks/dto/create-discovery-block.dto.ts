@@ -5,7 +5,7 @@
 // status is not here: it is never set manually - the backend calculates it automatically
 // based on checklist progress or note completion TBD (NOT_STARTED => IN_PROGRESS => COMPLETED)
 
-import { IsOptional, IsString } from "class-validator";
+import { IsInt, IsOptional, IsString } from "class-validator";
 
 export class CreateDiscoveryBlockDto {
   @IsString()
@@ -19,9 +19,12 @@ export class CreateDiscoveryBlockDto {
   @IsString() // no fixed icon set yet - revisit with @IsIn([...]) if an icon library gets chosen
   icon?: string;
 
+  // same representation as TaskCategory.color/CalendarCategory.color: an index into
+  // a fixed palette defined on the frontend (not decided yet - revisit with
+  // @IsIn([...]) once the palette's size is fixed)
   @IsOptional()
-  @IsString() // no fixed color palette yet - revisit with @IsHexColor() or @IsIn([...]) once decided
-  color?: string;
+  @IsInt()
+  color?: number;
 
   @IsOptional()
   @IsString()

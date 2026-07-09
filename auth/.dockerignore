@@ -1,3 +1,6 @@
-node_modules
-dist
+auth-service
 tmp
+*.exe
+.env
+.git
+coverage.out

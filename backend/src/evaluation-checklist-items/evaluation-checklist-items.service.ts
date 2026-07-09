@@ -10,14 +10,19 @@ export class EvaluationChecklistItemsService {
   // none of these are called directly by the frontend - always via the controller
   // TODO: inject PrismaService here via constructor
   // the constructor is called automatically by NestJS at startup - never called manually
-  // TODO: create(projectId: string, dto: CreateEvaluationChecklistItemDto)
+  // TODO: create(projectId: string, dto: CreateEvaluationChecklistItemDto, userId: string)
+  //       => must throw (ex: NotFoundException) if userId is not a ProjectMember of projectId
   //       => insert a new checklist item in the database, linked to projectId from the URL
-  // TODO: findAll(projectId: string)
+  // TODO: findAll(projectId: string, userId: string)
+  //       => must throw if userId is not a ProjectMember of projectId
   //       => fetch all checklist items belonging to a given project
-  // TODO: findById(id: string)
+  // TODO: findById(id: string, userId: string)
+  //       => must throw if userId is not a ProjectMember of this item's project
   //       => fetch one checklist item by its id
-  // TODO: update(id: string, dto: UpdateEvaluationChecklistItemDto)
+  // TODO: update(id: string, dto: UpdateEvaluationChecklistItemDto, userId: string)
+  //       => same membership check as findById
   //       => update an existing item (label, section, or isChecked)
-  // TODO: remove(id: string)
+  // TODO: remove(id: string, userId: string)
+  //       => same membership check as findById
   //       => permanently delete a checklist item
 }

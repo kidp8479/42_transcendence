@@ -11,10 +11,13 @@ export class ProjectMembersService {
   // none of these are called directly by the frontend - always via the controller
   // TODO: inject PrismaService here via constructor
   // the constructor is called automatically by NestJS at startup - never called manually
-  // TODO: addMember(projectId: string, dto: AddMemberDto)
+  // TODO: addMember(projectId: string, dto: AddMemberDto, requestingUserId: string)
+  //       => must throw (ex: NotFoundException) if requestingUserId is not a ProjectMember of projectId
   //       => insert a new row in the ProjectMember table (link a user to a project)
-  // TODO: findAll(projectId: string)
+  // TODO: findAll(projectId: string, requestingUserId: string)
+  //       => must throw if requestingUserId is not a ProjectMember of projectId
   //       => fetch all members belonging to a given project
-  // TODO: removeMember(projectId: string, userId: string)
+  // TODO: removeMember(projectId: string, userId: string, requestingUserId: string)
+  //       => must throw if requestingUserId is not a ProjectMember of projectId
   //       => delete the ProjectMember row that links this user to this project
 }

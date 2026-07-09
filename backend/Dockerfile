@@ -17,8 +17,12 @@
 FROM node:22-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
-COPY prisma/ ./prisma/
-RUN npm install
+# only schema.prisma is needed for "npm install" (its postinstall runs "prisma
+# generate", which just reads the schema) - copying the whole prisma/ dir here
+# would bust this layer's cache on every new migration file, forcing an
+# unnecessary reinstall. prisma/migrations/ still gets included below via "COPY . ."
+COPY prisma/schema.prisma ./prisma/schema.prisma
+RUN npm ci
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "start:dev"]

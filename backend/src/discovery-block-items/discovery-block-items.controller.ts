@@ -3,6 +3,11 @@
 // note: projectId and discoveryBlockId always come from the URL, never from the request body
 // note: when implementing, validate :projectId, :discoveryBlockId and :id with @Param(name, ParseUUIDPipe)
 // so a malformed id gets rejected with a 400 before hitting the database
+// note: :projectId alone does not prove access - every route must also confirm
+// req.user.id is a member of that project (ProjectMember), AND that :discoveryBlockId
+// actually belongs to :projectId, before returning/changing anything. Otherwise any
+// authenticated user could read or modify another project's items just by changing
+// the ids in the URL (IDOR).
 
 import { Controller } from "@nestjs/common";
 
