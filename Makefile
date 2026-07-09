@@ -17,18 +17,6 @@
 ifndef COMPOSE
 COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "podman-compose")
 endif
-
-# Layer in docker-compose.podman.yml (sets userns_mode: keep-id, needed for
-# correct bind-mount permissions under rootless Podman - see that file for why)
-# whenever Podman is present, regardless of which compose command got picked
-# above. This can't be inferred from the `docker compose version` check alone:
-# some Podman setups install a "docker" shim (podman-docker) whose `docker
-# compose` subcommand transparently forwards to podman-compose, so that check
-# succeeds and reports "docker compose" even though Podman is what's actually
-# running underneath.
-ifeq ($(shell command -v podman >/dev/null 2>&1 && echo yes),yes)
-COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.podman.yml
-endif
 ENV_FILE = .env
 
 # ---------------------------------------------------------------------------- #
@@ -239,14 +227,16 @@ ffclean:
 	done
 	docker volume ls -q | grep -E '_frontend_node_modules$$' | xargs -r docker volume rm -f
 	docker volume ls -q | grep -E '_backend_node_modules$$' | xargs -r docker volume rm -f
-	rm -rf frontend/node_modules frontend/dist frontend/build frontend/.vite \
-	       frontend/.tanstack frontend/.flowbite-react frontend/.cache \
-	       frontend/.eslintcache frontend/.stylelintcache frontend/coverage \
-	       frontend/*.tsbuildinfo
-	rm -rf backend/node_modules backend/dist backend/build backend/.cache \
-	       backend/.eslintcache backend/.stylelintcache backend/coverage \
-	       backend/*.tsbuildinfo
-	rm -rf auth/tmp auth/.cache auth/coverage.out
+	# dev containers run as root, so some generated files (e.g. dist/,
+	# .flowbite-react/) can be root-owned on the host - clean them via a
+	# throwaway root container instead of a plain host-side rm to avoid
+	# "Permission denied"
+	docker run --rm -v $(CURDIR)/frontend:/target -w /target alpine \
+		sh -c "rm -rf node_modules dist build .vite .tanstack .flowbite-react .cache .eslintcache .stylelintcache coverage *.tsbuildinfo"
+	docker run --rm -v $(CURDIR)/backend:/target -w /target alpine \
+		sh -c "rm -rf node_modules dist build .cache .eslintcache .stylelintcache coverage *.tsbuildinfo"
+	docker run --rm -v $(CURDIR)/auth:/target -w /target alpine \
+		sh -c "rm -rf tmp .cache coverage.out"
 	@echo "Local caches and node_modules volumes cleaned. Run 'make up-build' next."
 
 ## rebuild images and start the local development stack
