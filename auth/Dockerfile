@@ -20,6 +20,9 @@ WORKDIR /app
 # by any user, since "go install" here defaults to root's GOPATH ($HOME/go/bin)
 RUN go install github.com/air-verse/air@v1.61.7 \
     && mv /go/bin/air /usr/local/bin/air
+RUN apk add --no-cache su-exec
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # create a non-root user (uid/gid 1000, matching common host dev-machine uids)
 # so files generated at runtime (tmp/ build output) on the bind mount are
 # host-user-owned instead of root-owned and can be cleaned with a plain host-side rm
@@ -29,7 +32,12 @@ USER app
 COPY --chown=app:app go.mod go.sum* ./
 RUN go mod download
 COPY --chown=app:app . .
+# switch back to root so the container starts as root: the entrypoint fixes
+# up ownership of /home/app (see docker-entrypoint.sh for why that's needed)
+# before dropping back down to "app" to run the app
+USER root
 EXPOSE 3001
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["air"]
 
 FROM golang:1.24-alpine AS build

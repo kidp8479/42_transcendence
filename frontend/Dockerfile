@@ -21,11 +21,19 @@ WORKDIR /app
 # on the bind mount are host-user-owned instead of root-owned and can be
 # cleaned with a plain host-side rm
 RUN chown node:node /app
+RUN apk add --no-cache su-exec
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 USER node
 COPY --chown=node:node package*.json ./
 RUN npm install
 COPY --chown=node:node . .
+# switch back to root so the container starts as root: the entrypoint fixes
+# up ownership of the named node_modules volume (see docker-entrypoint.sh for
+# why that's needed) before dropping back down to "node" to run the app
+USER root
 EXPOSE 5173
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["npm", "run", "dev", "--", "--host"]
 
 FROM dev AS build

@@ -21,6 +21,9 @@ WORKDIR /app
 # *.tsbuildinfo, etc.) on the bind mount are host-user-owned instead of
 # root-owned and can be cleaned with a plain host-side rm
 RUN chown node:node /app
+RUN apk add --no-cache su-exec
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 USER node
 COPY --chown=node:node package*.json ./
 # only schema.prisma is needed for "npm install" (its postinstall runs "prisma
@@ -30,7 +33,12 @@ COPY --chown=node:node package*.json ./
 COPY --chown=node:node prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
 COPY --chown=node:node . .
+# switch back to root so the container starts as root: the entrypoint fixes
+# up ownership of the named node_modules volume (see docker-entrypoint.sh for
+# why that's needed) before dropping back down to "node" to run the app
+USER root
 EXPOSE 3000
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["npm", "run", "start:dev"]
 
 FROM dev AS build
