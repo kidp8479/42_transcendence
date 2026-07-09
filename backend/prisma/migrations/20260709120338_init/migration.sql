@@ -88,7 +88,7 @@ CREATE TABLE "Task" (
     "projectId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "status" "TaskStatus" NOT NULL,
-    "categoryId" TEXT NOT NULL,
+    "categoryId" TEXT,
     "rank" INTEGER NOT NULL,
     "priority" "TaskPriority" NOT NULL,
     "startAt" TIMESTAMP(3),
@@ -101,13 +101,13 @@ CREATE TABLE "Task" (
 );
 
 -- CreateTable
-CREATE TABLE "CalendarLabel" (
+CREATE TABLE "CalendarCategory" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "color" INTEGER NOT NULL,
     "projectId" TEXT NOT NULL,
 
-    CONSTRAINT "CalendarLabel_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "CalendarCategory_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -128,7 +128,7 @@ CREATE TABLE "CalendarEvent" (
     "title" TEXT NOT NULL,
     "startAt" TIMESTAMP(3) NOT NULL,
     "endAt" TIMESTAMP(3) NOT NULL,
-    "labelId" TEXT NOT NULL,
+    "categoryId" TEXT,
     "description" TEXT,
     "notes" TEXT,
 
@@ -142,7 +142,7 @@ CREATE TABLE "DiscoveryBlock" (
     "title" TEXT NOT NULL,
     "description" TEXT,
     "icon" TEXT,
-    "color" TEXT,
+    "color" INTEGER,
     "status" "DiscoveryBlockStatus" NOT NULL DEFAULT 'NOT_STARTED',
     "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -203,13 +203,16 @@ CREATE INDEX "TaskAssignee_userId_idx" ON "TaskAssignee"("userId");
 CREATE INDEX "TaskAssignee_taskId_idx" ON "TaskAssignee"("taskId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "TaskAssignee_userId_taskId_key" ON "TaskAssignee"("userId", "taskId");
+
+-- CreateIndex
 CREATE INDEX "Task_projectId_idx" ON "Task"("projectId");
 
 -- CreateIndex
 CREATE INDEX "Task_categoryId_idx" ON "Task"("categoryId");
 
 -- CreateIndex
-CREATE INDEX "CalendarLabel_projectId_idx" ON "CalendarLabel"("projectId");
+CREATE INDEX "CalendarCategory_projectId_idx" ON "CalendarCategory"("projectId");
 
 -- CreateIndex
 CREATE INDEX "CalendarAssignee_userId_idx" ON "CalendarAssignee"("userId");
@@ -218,10 +221,13 @@ CREATE INDEX "CalendarAssignee_userId_idx" ON "CalendarAssignee"("userId");
 CREATE INDEX "CalendarAssignee_calId_idx" ON "CalendarAssignee"("calId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "CalendarAssignee_userId_calId_key" ON "CalendarAssignee"("userId", "calId");
+
+-- CreateIndex
 CREATE INDEX "CalendarEvent_projectId_idx" ON "CalendarEvent"("projectId");
 
 -- CreateIndex
-CREATE INDEX "CalendarEvent_labelId_idx" ON "CalendarEvent"("labelId");
+CREATE INDEX "CalendarEvent_categoryId_idx" ON "CalendarEvent"("categoryId");
 
 -- CreateIndex
 CREATE INDEX "DiscoveryBlock_projectId_idx" ON "DiscoveryBlock"("projectId");
@@ -233,49 +239,49 @@ CREATE INDEX "DiscoveryBlockItem_discoveryBlockId_idx" ON "DiscoveryBlockItem"("
 CREATE INDEX "EvaluationChecklistItem_projectId_idx" ON "EvaluationChecklistItem"("projectId");
 
 -- AddForeignKey
-ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ProjectMember" ADD CONSTRAINT "ProjectMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ProjectMember" ADD CONSTRAINT "ProjectMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ProjectMember" ADD CONSTRAINT "ProjectMember_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ProjectMember" ADD CONSTRAINT "ProjectMember_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TaskCategory" ADD CONSTRAINT "TaskCategory_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TaskCategory" ADD CONSTRAINT "TaskCategory_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TaskAssignee" ADD CONSTRAINT "TaskAssignee_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TaskAssignee" ADD CONSTRAINT "TaskAssignee_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TaskAssignee" ADD CONSTRAINT "TaskAssignee_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TaskAssignee" ADD CONSTRAINT "TaskAssignee_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Task" ADD CONSTRAINT "Task_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Task" ADD CONSTRAINT "Task_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Task" ADD CONSTRAINT "Task_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "TaskCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Task" ADD CONSTRAINT "Task_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "TaskCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarLabel" ADD CONSTRAINT "CalendarLabel_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CalendarCategory" ADD CONSTRAINT "CalendarCategory_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarAssignee" ADD CONSTRAINT "CalendarAssignee_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CalendarAssignee" ADD CONSTRAINT "CalendarAssignee_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarAssignee" ADD CONSTRAINT "CalendarAssignee_calId_fkey" FOREIGN KEY ("calId") REFERENCES "CalendarEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CalendarAssignee" ADD CONSTRAINT "CalendarAssignee_calId_fkey" FOREIGN KEY ("calId") REFERENCES "CalendarEvent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_labelId_fkey" FOREIGN KEY ("labelId") REFERENCES "CalendarLabel"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CalendarEvent" ADD CONSTRAINT "CalendarEvent_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "CalendarCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "DiscoveryBlock" ADD CONSTRAINT "DiscoveryBlock_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "DiscoveryBlock" ADD CONSTRAINT "DiscoveryBlock_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "DiscoveryBlockItem" ADD CONSTRAINT "DiscoveryBlockItem_discoveryBlockId_fkey" FOREIGN KEY ("discoveryBlockId") REFERENCES "DiscoveryBlock"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "DiscoveryBlockItem" ADD CONSTRAINT "DiscoveryBlockItem_discoveryBlockId_fkey" FOREIGN KEY ("discoveryBlockId") REFERENCES "DiscoveryBlock"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EvaluationChecklistItem" ADD CONSTRAINT "EvaluationChecklistItem_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "EvaluationChecklistItem" ADD CONSTRAINT "EvaluationChecklistItem_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;

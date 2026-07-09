@@ -2,10 +2,11 @@
 // every module that needs to run must be registered here in "imports"
 
 import { Module } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { ConfigModule } from "@nestjs/config";
 import { envValidationSchema } from "./config/env.validation";
+import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter";
 
 // import each feature module so NestJS knows it exists
 import { PrismaModule } from "./prisma/prisma.module";
@@ -63,6 +64,14 @@ import { CalendarCategoriesModule } from "./calendar-categories/calendar-categor
     // team's guard here too, ex: { provide: APP_GUARD, useClass: AuthGuard } - see
     // src/auth/auth.guard.ts. Multiple APP_GUARD entries all run, in order, so this
     // can be added alongside ThrottlerGuard without replacing it.
+
+    // translates raw Prisma errors (ex: unique constraint violation, record not
+    // found) into clean HTTP responses (409, 404, ...) globally, instead of every
+    // service catching and mapping the same Prisma error codes by hand
+    {
+      provide: APP_FILTER,
+      useClass: PrismaExceptionFilter,
+    },
   ],
 })
 export class AppModule {}
