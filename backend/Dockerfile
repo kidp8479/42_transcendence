@@ -32,7 +32,16 @@ RUN npm run build
 
 FROM node:22-alpine AS prod
 WORKDIR /app
+
+# Only production deps, install fresh instead of inheriting devDependencies from the build stage
+COPY package*.json ./
+COPY prisma/ ./prisma/
+RUN npm ci --omit=dev
+
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
+
+# node:22-alpine already ships a non-root "node" user - just switch to it
+USER node
+
 EXPOSE 3000
 CMD ["node", "dist/main"]

@@ -234,5 +234,5 @@ help:
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate prisma-studio \
+        install migrate prisma-studio seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks
