@@ -13,9 +13,13 @@
 # Auto-detect the compose CLI: prefer the Docker Compose v2 plugin, fall back to
 # podman-compose on machines that only have that (e.g. podman + the podman-docker
 # shim, which provides a `docker` command but no `docker compose` subcommand).
+# When falling back to podman-compose, also layer in docker-compose.podman.yml,
+# which sets userns_mode: keep-id (needed for correct bind-mount permissions
+# under rootless Podman - see that file for why). Docker Compose never sees
+# this file, since it only applies to the podman-compose fallback branch.
 # Override explicitly if needed, e.g. `make COMPOSE=podman-compose up`.
 ifndef COMPOSE
-COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "podman-compose")
+COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "podman-compose -f docker-compose.yml -f docker-compose.podman.yml")
 endif
 ENV_FILE = .env
 

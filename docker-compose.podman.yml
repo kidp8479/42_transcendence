@@ -1,0 +1,25 @@
+# Podman-only override, layered on top of docker-compose.yml automatically by
+# the Makefile when podman-compose is detected (see COMPOSE in Makefile).
+#
+# Rootless Podman remaps container UIDs through user namespaces: UID 0 (root)
+# is auto-mapped to the invoking host user, but non-root UIDs (e.g. the "node"/
+# "app" users the frontend/backend/auth Dockerfiles run as) get mapped to an
+# arbitrary subordinate UID range from /etc/subuid instead - unrelated to who
+# owns the bind-mounted project directory on the host. That causes permission
+# denied errors (e.g. "mkdir /app/tmp: permission denied") even though the
+# same non-root setup works fine on Docker.
+#
+# userns_mode: keep-id tells Podman to map the container's UID to the same UID
+# as the invoking host user, so files created on the bind mount are correctly
+# host-user-owned. This is a Podman-specific value that plain Docker Compose
+# does not understand, which is why it lives in this separate override file
+# instead of docker-compose.yml.
+services:
+  frontend:
+    userns_mode: keep-id
+
+  backend:
+    userns_mode: keep-id
+
+  auth:
+    userns_mode: keep-id
