@@ -8,7 +8,9 @@
 
 #### Prerequisites
 
-- Docker with Docker Compose v2
+- Docker with Docker Compose v2 (or Podman with `podman-compose` - the Makefile
+  auto-detects which one is available; override with `make COMPOSE=podman-compose ...`
+  if detection picks the wrong one)
 - `make`
 
 The project is designed to run locally in Docker. The development stack starts:

@@ -10,7 +10,13 @@
 #                                                                              #
 # **************************************************************************** #
 
-COMPOSE = docker compose
+# Auto-detect the compose CLI: prefer the Docker Compose v2 plugin, fall back to
+# podman-compose on machines that only have that (e.g. podman + the podman-docker
+# shim, which provides a `docker` command but no `docker compose` subcommand).
+# Override explicitly if needed, e.g. `make COMPOSE=podman-compose up`.
+ifndef COMPOSE
+COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "podman-compose")
+endif
 ENV_FILE = .env
 
 # ---------------------------------------------------------------------------- #
