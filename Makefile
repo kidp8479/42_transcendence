@@ -212,6 +212,30 @@ fclean:
 re: fclean
 	+$(MAKE) up
 
+## remove the named frontend/backend node_modules volumes and local build caches
+## (dist, .vite, .flowbite-react, *.tsbuildinfo, Go build cache in auth/tmp, etc.)
+## use when local dependency/build state drifts from package.json - e.g. after
+## a major dependency migration - and `make up-build` alone did not fix it.
+## does NOT touch the db_data volume, unlike fclean/re (`down --volumes` cannot be
+## scoped to only some services, so individual volumes are removed here instead
+## via `docker volume rm`). Run `make up-build` after.
+## volumes are matched by the com.docker.compose.volume label (not by guessing the
+## project-name prefix), so this also works from a differently-named clone.
+ffclean:
+	$(COMPOSE) stop frontend backend auth
+	$(COMPOSE) rm -f frontend backend auth
+	docker volume ls -q --filter label=com.docker.compose.volume=frontend_node_modules | xargs -r docker volume rm -f
+	docker volume ls -q --filter label=com.docker.compose.volume=backend_node_modules | xargs -r docker volume rm -f
+	rm -rf frontend/node_modules frontend/dist frontend/build frontend/.vite \
+	       frontend/.tanstack frontend/.flowbite-react frontend/.cache \
+	       frontend/.eslintcache frontend/.stylelintcache frontend/coverage \
+	       frontend/*.tsbuildinfo
+	rm -rf backend/node_modules backend/dist backend/build backend/.cache \
+	       backend/.eslintcache backend/.stylelintcache backend/coverage \
+	       backend/*.tsbuildinfo
+	rm -rf auth/tmp auth/.cache auth/coverage.out
+	@echo "Local caches and node_modules volumes cleaned. Run 'make up-build' next."
+
 ## rebuild images and start the local development stack
 rebuild: up-build
 
@@ -229,10 +253,10 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST) | sort -u
 	@printf "\n"
 
-.PHONY: all up up-build down restart build logs ps clean fclean re rebuild \
+.PHONY: all up up-build down restart build logs ps clean fclean re ffclean rebuild \
         up-db up-frontend up-backend up-auth \
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
-        install migrate prisma-studio seed \
+        migrate prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks

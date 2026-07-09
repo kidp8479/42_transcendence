@@ -16,9 +16,15 @@
 
 FROM node:22-alpine AS dev
 WORKDIR /app
-COPY package*.json ./
+# run as the pre-existing non-root "node" user instead of root,
+# so files generated at runtime (dist/, .vite/, .flowbite-react/, etc.)
+# on the bind mount are host-user-owned instead of root-owned and can be
+# cleaned with a plain host-side rm
+RUN chown node:node /app
+USER node
+COPY --chown=node:node package*.json ./
 RUN npm install
-COPY . .
+COPY --chown=node:node . .
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host"]
 
