@@ -15,7 +15,7 @@
   --color-brand-700: #15803d;
 
   /* Surfaces */
-  --color-surface-base: #0a0a0a;
+  --color-surface-base: #0f0f0f;
   --color-surface-raised: #141414;
   --color-surface-overlay: #1c1c1c;
   --color-surface-border: #2a2a2a;
@@ -24,6 +24,10 @@
   --color-text-primary: #f4f4f5;
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #52525b;
+}
+
+body {
+  background-color: var(--color-surface-base);
 }
 
 /*

@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_public/")({
   component: LandingPage,
 });
 
-// TEMP placeholder screenshots - replace with final production screenshots later
+// TEMP placeholder screenshots - replace with final production screenshots and texts later
 const CAROUSEL_SLIDES = [
   {
     image: "/images/landing-carousel-1.png",
@@ -39,13 +39,15 @@ function LandingPage() {
   return (
     <>
       <div className="flex flex-col items-center justify-center bg-surface-base py-32 text-text-primary">
-        <h1 className="text-4xl font-bold tracking-tight">Transcendence</h1>
+        <h1 className="text-4xl font-bold tracking-tight">
+          42 Project Planner
+        </h1>
         <p className="mt-4 text-text-secondary">Tailwind is working.</p>
       </div>
 
       {/* Fixed height (not h-full) - Flowbite's internal Carousel wrapper has no
           height of its own, so a percentage height here would never resolve. */}
-      <div className="mx-auto h-80 max-w-5xl overflow-hidden rounded-2xl sm:h-96 xl:h-[28rem]">
+      <div className="mx-auto h-80 max-w-5xl overflow-hidden rounded-2xl sm:h-96 xl:h-112">
         <Carousel
           theme={{
             item: {
@@ -56,7 +58,7 @@ function LandingPage() {
           {CAROUSEL_SLIDES.map((slide) => (
             <div
               key={slide.image}
-              className="flex h-80 flex-col items-center bg-surface-raised sm:h-96 md:flex-row xl:h-[28rem]"
+              className="flex h-80 flex-col items-center bg-surface-raised sm:h-96 md:flex-row xl:h-112"
             >
               <img
                 src={slide.image}
