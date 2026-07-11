@@ -158,6 +158,24 @@ function StyleGuidePage() {
           </span>
           .
         </p>
+        <p className="text-text-muted text-xs border-l-2 border-surface-border pl-4 max-w-2xl">
+          These names aren't classes on their own - they're the{" "}
+          <span className="font-mono text-text-secondary">*</span> in a Tailwind
+          utility, so you always attach them to what property you want colored:{" "}
+          <span className="font-mono text-text-secondary">bg-surface-base</span>{" "}
+          for a background,{" "}
+          <span className="font-mono text-text-secondary">text-brand-500</span>{" "}
+          for text color,{" "}
+          <span className="font-mono text-text-secondary">
+            border-surface-border
+          </span>{" "}
+          for a border. Writing just{" "}
+          <span className="font-mono text-text-secondary">
+            className="surface-base"
+          </span>{" "}
+          does nothing - Tailwind won't generate a class for a color name with
+          no prefix telling it what to color.
+        </p>
         <div className="flex flex-wrap gap-6">
           {PALETTE_COLORS.map(({ bg, label, note, border }) => (
             <div key={label} className="flex flex-col gap-1">
@@ -202,6 +220,30 @@ function StyleGuidePage() {
           <span className="font-mono text-text-secondary">
             {"import { Button } from 'flowbite-react'"}
           </span>
+        </p>
+        <p className="text-text-muted text-xs border-l-2 border-surface-border pl-4 max-w-2xl">
+          Heads up:{" "}
+          <span className="font-mono text-text-secondary">color="green"</span>{" "}
+          below is Flowbite's own built-in green (Tailwind's{" "}
+          <span className="font-mono text-text-secondary">green-700</span>), not
+          our <span className="font-mono text-text-secondary">brand-*</span>{" "}
+          tokens from{" "}
+          <span className="font-mono text-text-secondary">index.css</span>. They
+          match today because our{" "}
+          <span className="font-mono text-text-secondary">brand-*</span> scale
+          was deliberately picked to line up with Tailwind's green, but it's
+          still not a real link - if the palette in{" "}
+          <span className="font-mono text-text-secondary">index.css</span>{" "}
+          changes, this button won't follow. That's the difference between our
+          own elements (a{" "}
+          <span className="font-mono text-text-secondary">
+            {'<div className="bg-brand-500">'}
+          </span>{" "}
+          always follows the theme automatically) and Flowbite components (their{" "}
+          <span className="font-mono text-text-secondary">color</span> prop uses
+          a fixed internal palette that has to be explicitly wired up to our
+          theme - not done yet, we'll do it if/ when we need to change the
+          visual style and want Flowbite components to follow along).
         </p>
         <div className="flex flex-wrap gap-3">
           <Button color="green">Primary</Button>
