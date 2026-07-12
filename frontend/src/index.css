@@ -15,7 +15,7 @@
   --color-brand-700: #15803d;
 
   /* Surfaces */
-  --color-surface-base: #0a0a0a;
+  --color-surface-base: #0f0f0f;
   --color-surface-raised: #141414;
   --color-surface-overlay: #1c1c1c;
   --color-surface-border: #2a2a2a;
@@ -24,4 +24,29 @@
   --color-text-primary: #f4f4f5;
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #52525b;
+}
+
+body {
+  background-color: var(--color-surface-base);
+}
+
+/*
+ * flowbite-react's ScrollContainer (used internally by Carousel) hardcodes
+ * hideScrollbars: true, which applies a "!overflow-x-hidden" class to hide
+ * the native scrollbar. This exact class (important-prefix + bracket syntax)
+ * is never picked up by our Tailwind v4 class-list.json generation, so it's
+ * never compiled - meanwhile twMerge drops the theme's own overflow-x-scroll
+ * class in favor of it. Net result: the scroll container ends up with no
+ * overflow-x rule at all (defaults to "visible"), so scrollLeft has no
+ * visual effect and the Carousel never moves. This raw CSS rule forces the
+ * correct behaviour regardless of Tailwind's class detection.
+ * See: https://github.com/themesberg/flowbite-react/issues/1564
+ *
+ * Note: data-testid is normally a test-only hook, not meant for styling -
+ * used here because it's the only stable selector Flowbite exposes on this
+ * element. If a future flowbite-react version renames/removes it, this rule
+ * silently stops applying.
+ */
+[data-testid="carousel"] .snap-mandatory {
+  overflow-x: hidden !important;
 }
