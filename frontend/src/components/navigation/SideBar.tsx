@@ -32,7 +32,8 @@ export function SideBar() {
           className="h-full w-64"
           theme={{
             root: {
-              inner: "h-full overflow-y-auto overflow-x-hidden rounded bg-surface-base px-3 py-4",
+              inner:
+                "h-full overflow-y-auto overflow-x-hidden rounded bg-surface-base px-3 py-4",
             },
             item: {
               base: "flex items-center justify-center rounded-lg p-2 text-base font-normal text-text-secondary hover:bg-surface-overlay hover:text-text-primary",
@@ -46,12 +47,27 @@ export function SideBar() {
         >
           <SidebarItems>
             <SidebarItemGroup>
-              <SidebarItem className="font-mono text-brand-500 tracking-tight text-sm lg:text-base" as={Link} to="/dashboard" icon={MdOutlineDashboard}>
+              <SidebarItem
+                className="font-mono text-brand-500 tracking-tight text-sm lg:text-base"
+                as={Link}
+                to="/dashboard"
+                icon={MdOutlineDashboard}
+              >
                 Dashboard
               </SidebarItem>
-              <SidebarItem className="font-mono text-brand-500 tracking-tight text-sm lg:text-base" as={Link} to="/projects" icon={GoFileDirectory}>
+              <SidebarItem
+                className="font-mono text-brand-500 tracking-tight text-sm lg:text-base"
+                as={Link}
+                to="/projects"
+                icon={GoFileDirectory}
+              >
                 Projects
               </SidebarItem>
+            </SidebarItemGroup>
+            <SidebarItemGroup>
+              <li className="px-3 pb-2 font-mono text-xs tracking-wider text-text-muted uppercase">
+                Current projects
+              </li>
             </SidebarItemGroup>
           </SidebarItems>
         </Sidebar>
@@ -63,7 +79,11 @@ export function SideBar() {
         aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         className="absolute top-1/2 right-0 flex h-10 w-4 translate-x-full -translate-y-full items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary"
       >
-        {isCollapsed ? <HiChevronRight size={14} /> : <HiChevronLeft size={14} />}
+        {isCollapsed ? (
+          <HiChevronRight size={14} />
+        ) : (
+          <HiChevronLeft size={14} />
+        )}
       </button>
     </div>
   );
