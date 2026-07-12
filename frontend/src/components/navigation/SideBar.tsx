@@ -1,38 +1,35 @@
-
 "use client";
 
-import { Sidebar, SidebarItem, SidebarItemGroup, SidebarItems } from "flowbite-react";
+import {
+  Sidebar,
+  SidebarItem,
+  SidebarItemGroup,
+  SidebarItems,
+} from "flowbite-react";
 import { BiBuoy } from "react-icons/bi";
-import { HiArrowSmRight, HiChartPie, HiInbox, HiShoppingBag, HiTable, HiUser, HiViewBoards } from "react-icons/hi";
+import { Link } from "@tanstack/react-router";
+import { MdOutlineDashboard } from "react-icons/md";
+// import { GoFileDirectory } from "react-icons/go";
+// import { HiArrowSmRight, HiChartPie, HiInbox, HiShoppingBag, HiTable, HiUser, HiViewBoards } from "react-icons/hi";
+
+// <SidebarItem as={Link} to="/location" ...> is used to load only the "workinng space" area, rather than the whole page
+
+// If VSCode is unhappy with `to` (red squiggly line), it seems to be because of Flowbite's implementation of Typescript types.
+// Other than that, the Javascript is properly compiled at runtime.
 
 export function SideBar() {
   return (
-    <Sidebar aria-label="Sidebar with content separator example">
+    <Sidebar>
       <SidebarItems>
         <SidebarItemGroup>
-          <SidebarItem href="#" icon={HiChartPie}>
+          <SidebarItem as={Link} to="/dashboard" icon={MdOutlineDashboard}>
             Dashboard
           </SidebarItem>
-          <SidebarItem href="#" icon={HiViewBoards}>
-            Kanban
-          </SidebarItem>
-          <SidebarItem href="#" icon={HiInbox}>
-            Inbox
-          </SidebarItem>
-          <SidebarItem href="#" icon={HiUser}>
-            Users
-          </SidebarItem>
-          <SidebarItem href="#" icon={HiShoppingBag}>
-            Products
-          </SidebarItem>
-          <SidebarItem href="#" icon={HiArrowSmRight}>
-            Sign In
-          </SidebarItem>
-          <SidebarItem href="#" icon={HiTable}>
-            Sign Up
+          <SidebarItem as={Link} to="/projects" icon={MdOutlineDashboard}>
+            Projects
           </SidebarItem>
         </SidebarItemGroup>
-        <SidebarItemGroup>
+        {/* <SidebarItemGroup>
           <SidebarItem href="#" icon={HiChartPie}>
             Upgrade to Pro
           </SidebarItem>
@@ -42,10 +39,8 @@ export function SideBar() {
           <SidebarItem href="#" icon={BiBuoy}>
             Help
           </SidebarItem>
-        </SidebarItemGroup>
+        </SidebarItemGroup> */}
       </SidebarItems>
     </Sidebar>
   );
 }
-
-

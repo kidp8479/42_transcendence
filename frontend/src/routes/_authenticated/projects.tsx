@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_authenticated/projects")({
 });
 
 function ProjectsPage() {
-  return <div>Hello "/_authenticated/projects"!</div>;
+  return <div className="text-brand-700">Hello "/_authenticated/projects"!</div>;	// random color, don't pay attention
 }
