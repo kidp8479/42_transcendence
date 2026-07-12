@@ -74,19 +74,19 @@ function LandingPage() {
         </p>
       </section>
 
-      <p className="text-center font-mono text-xs uppercase tracking-widest text-brand-500">
+      <h2 className="text-center font-mono text-xs uppercase tracking-widest text-brand-500">
         A look inside
-      </p>
+      </h2>
 
       {/* Fixed height (not h-full) - Flowbite's internal Carousel wrapper has no
           height of its own, so a percentage height here would never resolve.
-          Mobile height is taller than sm+ because the image and text stack
-          vertically (flex-col) below md, and the longest slide's text needs
-          the extra room - text and image are also scaled down on mobile so
-          the tallest slide still fits without being clipped by overflow-hidden. */}
+          Values are arbitrary (not h-104/h-112 - not part of Tailwind's default
+          scale and this repo has no custom spacing theme) and sized to fit the
+          tallest slide's content at each breakpoint without being clipped by
+          overflow-hidden. */}
       <section
         aria-label="Product tour"
-        className="mx-auto mt-3 h-[26rem] max-w-5xl overflow-hidden rounded-2xl border border-brand-500 shadow-lg sm:h-96 lg:h-104 xl:h-112"
+        className="mx-auto mt-3 h-[31rem] max-w-5xl overflow-hidden rounded-2xl border border-brand-500 shadow-lg sm:h-96 md:h-[26rem] lg:h-[28rem]"
       >
         <Carousel
           slideInterval={6000}
@@ -99,23 +99,21 @@ function LandingPage() {
           {CAROUSEL_SLIDES.map((slide) => (
             <div
               key={slide.image}
-              className="flex h-[26rem] flex-col items-center bg-surface-raised sm:h-96 md:flex-row lg:h-104 xl:h-112"
+              className="flex h-[31rem] flex-col items-center bg-surface-raised sm:h-96 md:h-[26rem] md:flex-row lg:h-[28rem]"
             >
               <img
                 src={slide.image}
                 alt={slide.alt}
-                className="h-28 w-full object-cover object-top sm:h-40 md:h-full md:w-1/2"
+                className="h-40 w-full object-cover object-top md:h-full md:w-1/2"
               />
-              <div className="w-full px-6 py-4 sm:px-8 sm:py-6 md:w-1/2 md:px-16">
+              <div className="w-full px-8 py-6 md:w-1/2 md:px-16">
                 <span className="font-mono text-xs uppercase tracking-widest text-brand-500">
                   {slide.tag}
                 </span>
-                <h2 className="mt-1 text-xl font-bold text-text-primary sm:text-2xl md:text-3xl">
+                <h3 className="mt-1 text-2xl font-bold text-text-primary md:text-3xl">
                   {slide.title}
-                </h2>
-                <p className="mt-3 text-sm text-text-secondary sm:mt-4 sm:text-base">
-                  {slide.text}
-                </p>
+                </h3>
+                <p className="mt-4 text-text-secondary">{slide.text}</p>
               </div>
             </div>
           ))}
@@ -127,11 +125,19 @@ function LandingPage() {
           calls as the header once that's wired up. */}
       <p className="px-4 py-16 text-center text-text-secondary sm:py-20 lg:py-28">
         Ready to jump in?{" "}
-        <a href="#" className="font-semibold text-brand-500 hover:underline">
+        <a
+          href="#"
+          onClick={(e) => e.preventDefault()}
+          className="font-semibold text-brand-500 hover:underline"
+        >
           Create an account
         </a>{" "}
         or{" "}
-        <a href="#" className="font-semibold text-brand-500 hover:underline">
+        <a
+          href="#"
+          onClick={(e) => e.preventDefault()}
+          className="font-semibold text-brand-500 hover:underline"
+        >
           log in
         </a>
         .
