@@ -26,14 +26,30 @@ export function SideBar() {
         isCollapsed ? "w-0" : "w-64"
       }`}
     >
-      <div className="h-full overflow-hidden">
-        <Sidebar aria-label="Sidebar" className="h-full w-64">
+      <div className="font-mono h-full overflow-hidden">
+        <Sidebar
+          aria-label="Sidebar"
+          className="h-full w-64"
+          theme={{
+            root: {
+              inner: "h-full overflow-y-auto overflow-x-hidden rounded bg-surface-base px-3 py-4",
+            },
+            item: {
+              base: "flex items-center justify-center rounded-lg p-2 text-base font-normal text-text-secondary hover:bg-surface-overlay hover:text-text-primary",
+              active: "bg-brand-500/10 text-brand-500",
+              icon: {
+                base: "h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary",
+                active: "text-brand-500",
+              },
+            },
+          }}
+        >
           <SidebarItems>
             <SidebarItemGroup>
-              <SidebarItem as={Link} to="/dashboard" icon={MdOutlineDashboard}>
+              <SidebarItem className="font-mono text-brand-500 tracking-tight text-sm lg:text-base" as={Link} to="/dashboard" icon={MdOutlineDashboard}>
                 Dashboard
               </SidebarItem>
-              <SidebarItem as={Link} to="/projects" icon={GoFileDirectory}>
+              <SidebarItem className="font-mono text-brand-500 tracking-tight text-sm lg:text-base" as={Link} to="/projects" icon={GoFileDirectory}>
                 Projects
               </SidebarItem>
             </SidebarItemGroup>
@@ -45,13 +61,9 @@ export function SideBar() {
         type="button"
         onClick={() => setIsCollapsed((prev) => !prev)}
         aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="absolute top-1/2 right-0 flex h-10 w-4 translate-x-full -translate-y-full items-center justify-center rounded-r-md border border-l-0 border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+        className="absolute top-1/2 right-0 flex h-10 w-4 translate-x-full -translate-y-full items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary"
       >
-        {isCollapsed ? (
-          <HiChevronRight size={14} />
-        ) : (
-          <HiChevronLeft size={14} />
-        )}
+        {isCollapsed ? <HiChevronRight size={14} /> : <HiChevronLeft size={14} />}
       </button>
     </div>
   );
