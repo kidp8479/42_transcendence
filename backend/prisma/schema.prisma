@@ -16,6 +16,7 @@ datasource db {
 model User {
   id               String             @id @default(uuid())
   email            String             @unique // filled by the auth team via OAuth
+  emailVerified    Boolean            @default(false)
   username         String             @unique
   avatarUrl        String? // if null, the frontend generates an avatar from username initials (CSS only, no DB)
   campus           String? // ex: "42 Paris" - filled via OAuth, can be updated in settings
@@ -26,6 +27,117 @@ model User {
   taskAssigned     TaskAssignee[]
   calAssigned      CalendarAssignee[]
   notifications    Notification[] // one User => many Notifications rows
+  authIdentities   AuthIdentity[]
+  authSessions     AuthSession[]
+  authTokens       AuthToken[]
+  authEvents       AuthEvent[]
+}
+
+enum AuthProvider {
+  LOCAL
+  FORTY_TWO
+  GOOGLE
+}
+
+enum AuthTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model AuthIdentity {
+  id              String              @id @default(uuid())
+  userId          String
+  provider        AuthProvider
+  providerSubject String
+  email           String?
+  emailVerified   Boolean             @default(false)
+  displayName     String?
+  profile         Json?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  password        PasswordCredential?
+
+  @@unique([provider, providerSubject])
+  @@index([userId])
+  @@index([email])
+}
+
+model PasswordCredential {
+  id                String       @id @default(uuid())
+  identityId        String       @unique
+  passwordHash      String
+  passwordChangedAt DateTime     @default(now())
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  identity          AuthIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+}
+
+model AuthSession {
+  id                   String       @id @default(uuid())
+  userId               String
+  tokenHash            String       @unique
+  csrfTokenHash        String
+  authenticationMethod AuthProvider
+  assuranceLevel       Int          @default(1)
+  authenticatedAt      DateTime     @default(now())
+  lastSeenAt           DateTime     @default(now())
+  idleExpiresAt        DateTime
+  absoluteExpiresAt    DateTime
+  revokedAt            DateTime?
+  ipHash               String?
+  userAgentHash        String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([idleExpiresAt])
+  @@index([absoluteExpiresAt])
+}
+
+model OAuthTransaction {
+  id                     String       @id @default(uuid())
+  provider               AuthProvider
+  stateHash              String       @unique
+  codeVerifierCiphertext String?
+  nonceHash              String?
+  redirectUri            String
+  returnTo               String
+  createdAt              DateTime     @default(now())
+  expiresAt              DateTime
+
+  @@index([expiresAt])
+}
+
+model AuthToken {
+  id         String        @id @default(uuid())
+  userId     String
+  type       AuthTokenType
+  tokenHash  String        @unique
+  createdAt  DateTime      @default(now())
+  expiresAt  DateTime
+  consumedAt DateTime?
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+model AuthEvent {
+  id        String        @id @default(uuid())
+  userId    String?
+  eventType String
+  provider  AuthProvider?
+  sessionId String?
+  ipHash    String?
+  metadata  Json?
+  createdAt DateTime      @default(now())
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
 }
 
 // no updatedAt: the only modification is marking as read (isRead), we don't need to track when that happened
