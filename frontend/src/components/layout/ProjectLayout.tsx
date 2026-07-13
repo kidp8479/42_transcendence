@@ -19,7 +19,9 @@ export function ProjectLayout() {
         )}
       </div>
       <ProjectTabs />
-      <Outlet />
+      <div className="p-6">
+        <Outlet />
+      </div>
     </>
   );
 }
