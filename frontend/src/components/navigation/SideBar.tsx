@@ -17,6 +17,46 @@ import { GoFileDirectory } from "react-icons/go";
 // If VSCode is unhappy with `to` (red squiggly line), it seems to be because of Flowbite's implementation of Typescript types.
 // Other than that, the Javascript is properly compiled at runtime.
 
+interface Project {
+  slug: string;
+  name: string;
+  statusColor: string;
+}
+
+const projects: Project[] = [
+  {
+    slug: "ft_transcendence",
+    name: "ft_transcendence",
+    statusColor: "bg-emerald-400",
+  },
+  {
+    slug: "minishell",
+    name: "minishell",
+    statusColor: "bg-gray-500",
+  },
+];
+
+function ProjectRow({ project }: { project: Project }) {
+  return (
+    <SidebarItem
+      as={Link}
+      to={`/projects`}
+      theme={{
+        base: "flex items-center rounded-lg pl-1 pr-2 py-2",
+        content: { base: "flex-1 whitespace-nowrap px-1" },
+      }}
+    >
+      <span className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${project.statusColor}`}
+        />
+        <span className="truncate">{project.name}</span>{" "}
+        <HiChevronRight className="h-4 w-4 text-gray-400" />{" "}
+      </span>
+    </SidebarItem>
+  );
+}
+
 export function SideBar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -33,7 +73,7 @@ export function SideBar() {
           theme={{
             root: {
               inner:
-                "h-full overflow-y-auto overflow-x-hidden rounded bg-surface-base px-3 py-4",
+                "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 !bg-surface-raised !dark:bg-surface-raised",
             },
             item: {
               base: "flex items-center justify-center rounded-lg p-2 text-base font-normal text-text-secondary hover:bg-surface-overlay hover:text-text-primary",
@@ -46,21 +86,11 @@ export function SideBar() {
           }}
         >
           <SidebarItems>
-            <SidebarItemGroup>
-              <SidebarItem
-                className="font-mono text-brand-500 tracking-tight text-sm lg:text-base"
-                as={Link}
-                to="/dashboard"
-                icon={MdOutlineDashboard}
-              >
+            <SidebarItemGroup className="font-mono tracking-tight text-sm lg:text-base">
+              <SidebarItem as={Link} to="/dashboard" icon={MdOutlineDashboard}>
                 Dashboard
               </SidebarItem>
-              <SidebarItem
-                className="font-mono text-brand-500 tracking-tight text-sm lg:text-base"
-                as={Link}
-                to="/projects"
-                icon={GoFileDirectory}
-              >
+              <SidebarItem as={Link} to="/projects" icon={GoFileDirectory}>
                 Projects
               </SidebarItem>
             </SidebarItemGroup>
@@ -68,6 +98,10 @@ export function SideBar() {
               <li className="px-3 pb-2 font-mono text-xs tracking-wider text-text-muted uppercase">
                 Current projects
               </li>
+
+              {projects.map((project) => (
+                <ProjectRow key={project.slug} project={project} />
+              ))}
             </SidebarItemGroup>
           </SidebarItems>
         </Sidebar>
