@@ -61,7 +61,8 @@ down:
 
 ## restart running containers
 restart:
-	$(COMPOSE) restart
+	$(COMPOSE) stop
+	$(COMPOSE) up -d
 
 ## rebuild all service images
 build:
@@ -186,6 +187,29 @@ format-backend:
 lint-backend:
 	$(COMPOSE) exec backend npm run lint
 
+## build the frontend application inside its Compose service
+check-frontend:
+	$(COMPOSE) exec frontend npm run build
+
+## build the backend application inside its Compose service
+check-backend:
+	$(COMPOSE) exec backend npm run build
+
+## run Go tests and static analysis inside the auth Compose service
+check-auth:
+	$(COMPOSE) exec auth sh -c "go test ./... && go vet ./..."
+
+## validate the Prisma schema inside the backend Compose service
+check-prisma:
+	$(COMPOSE) exec backend npx prisma validate
+
+## format Go authentication service sources
+format-auth:
+	$(COMPOSE) exec auth gofmt -w cmd internal
+
+## validate the authentication integration services
+check-auth-stack: check-auth check-prisma check-backend check-frontend
+
 ## install git pre-commit hook (run once after cloning)
 hooks:
 	cp hooks/pre-commit .git/hooks/pre-commit
@@ -262,4 +286,5 @@ help:
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
         migrate prisma-studio install seed \
-        format lint format-frontend lint-frontend format-backend lint-backend hooks
+        format lint format-frontend lint-frontend format-backend lint-backend hooks \
+        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack
