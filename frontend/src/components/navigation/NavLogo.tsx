@@ -13,7 +13,7 @@ export function NavLogo({ to }: NavLogoProps) {
     <Link to={to} className="flex items-center gap-3">
       <FcMindMap className="h-8 w-8" />
 
-      <span className="text-x1 font-semibold text-text-primary">
+      <span className="text-xl font-semibold text-text-primary">
         42 Project Planner
       </span>
     </Link>

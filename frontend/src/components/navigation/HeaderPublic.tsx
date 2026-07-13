@@ -13,13 +13,16 @@
 import { Button } from "flowbite-react";
 import { NavLogo } from "./NavLogo";
 //import { useModal } from "../../hooks/useModal"
+import { useLocation } from "@tanstack/react-router";
 
 export function HeaderPublic() {
   //const {openModal } = useModal();
+  const { pathname } = useLocation();
+  const logoTo = pathname === "/" ? "/dont-panic" : "/";
 
   return (
     <header className="flex items-center justify-between px-6 py-4">
-      <NavLogo href="/" />
+      <NavLogo to={logoTo} />
 
       <div className="flex items-center gap-4">
         <Button
@@ -38,7 +41,7 @@ export function HeaderPublic() {
 
         <Button
           className="
-		    border boarder-brand-600
+		    border border-brand-600
 			bg-transparent
 			text-brand-600
 			hover:bg-brand-600
