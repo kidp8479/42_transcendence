@@ -1,22 +1,28 @@
-// UsersService: handles all database operations for users
-// called by the controller, never called directly by the frontend
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
-// @Injectable(): tells NestJS this class can be shared with other classes (like the controller)
-// without it, NestJS cannot inject this service into the constructor of another class
 @Injectable()
 export class UsersService {
-  // code your logic here
-  // all methods below will use PrismaService to query the database
-  // none of these are called directly by the frontend - always via the controller
-  // TODO: inject PrismaService here via constructor
-  // the constructor is called automatically by NestJS at startup - never called manually
-  // TODO: create(dto: CreateUserDto)
-  //       => insert a new user in the database (called by the auth team, not the frontend)
-  // TODO: findById(id: string)
-  //       => fetch one user by their id
-  // TODO: update(id: string, dto: UpdateUserDto)
-  //       => update username, email, avatarUrl, or campus
-  // TODO: remove(id: string)
-  //       => permanently delete a user account
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findById(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        emailVerified: true,
+        username: true,
+        avatarUrl: true,
+        campus: true,
+        twoFactorEnabled: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+    return user;
+  }
 }
