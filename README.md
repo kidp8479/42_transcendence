@@ -157,11 +157,22 @@ If you need OAuth login during development, fill in the provider credentials in 
 ```sh
 OAUTH_42_CLIENT_ID=
 OAUTH_42_CLIENT_SECRET=
+OAUTH_GOOGLE_CLIENT_ID=
+OAUTH_GOOGLE_CLIENT_SECRET=
 OAUTH_GITHUB_CLIENT_ID=
 OAUTH_GITHUB_CLIENT_SECRET=
 ```
 
 Keep these values private and do not commit `.env`.
+
+The current auth foundation supports local email/password registration and
+login. The 42 and Google provider callbacks are designed but not implemented
+yet; GitHub variables remain reserved for a possible future provider.
+
+Architecture and service contracts live in:
+
+- `docs/architecture/authentication-authorization.yaml`
+- `docs/contracts/auth-service.openapi.yaml`
 
 #### Useful commands
 
@@ -184,6 +195,7 @@ make lint-frontend   # lint frontend only
 make lint-backend    # lint backend only
 make format-frontend # format frontend only
 make format-backend  # format backend only
+make check-auth-stack # test Go auth and build backend/frontend in Compose
 make hooks           # install the pre-commit hook (run once after cloning)
 ```
 

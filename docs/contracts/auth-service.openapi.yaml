@@ -1,0 +1,515 @@
+openapi: 3.1.0
+info:
+  title: 42 Projects Planner Auth Service
+  version: 0.1.0
+  description: Contract owned by the Go authentication service.
+  x-implementation-status-values:
+    implemented: Available in the current foundation.
+    planned: Contract reserved for a later implementation phase.
+servers:
+  - url: /auth
+paths:
+  /health:
+    get:
+      operationId: authHealth
+      security: []
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    const: ok
+  /register:
+    post:
+      operationId: registerLocalAccount
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/SessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /login:
+    post:
+      operationId: loginLocalAccount
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /logout:
+    post:
+      operationId: logout
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      responses:
+        "204":
+          description: Session revoked and cookie cleared.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /session:
+    get:
+      operationId: getSession
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          $ref: "#/components/responses/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /oauth/42/start:
+    get:
+      x-implementation-status: planned
+      operationId: start42Login
+      security: []
+      responses:
+        "302":
+          description: Redirect to the 42 OAuth authorization endpoint.
+  /oauth/42/callback:
+    get:
+      x-implementation-status: planned
+      operationId: complete42Login
+      description: Completes either login or an authenticated explicit-link transaction, as recorded by OAuthTransaction.
+      security: []
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: state
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Session created and browser redirected to the application.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /oauth/google/start:
+    get:
+      x-implementation-status: planned
+      operationId: startGoogleLogin
+      security: []
+      responses:
+        "302":
+          description: Redirect to Google with state, PKCE, and nonce.
+  /oauth/google/callback:
+    get:
+      x-implementation-status: planned
+      operationId: completeGoogleLogin
+      description: Completes either login or an authenticated explicit-link transaction, as recorded by OAuthTransaction.
+      security: []
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: state
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Session created and browser redirected to the application.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /email-verification/request:
+    post:
+      x-implementation-status: planned
+      operationId: requestEmailVerification
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      responses:
+        "202":
+          description: Verification delivery accepted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /email-verification/confirm:
+    post:
+      x-implementation-status: planned
+      operationId: confirmEmailVerification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OneTimeTokenRequest"
+      responses:
+        "204":
+          description: Email verified.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /password-reset/request:
+    post:
+      x-implementation-status: planned
+      operationId: requestPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetRequest"
+      responses:
+        "202":
+          description: Reset delivery accepted without disclosing account existence.
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /password-reset/confirm:
+    post:
+      x-implementation-status: planned
+      operationId: confirmPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetConfirmRequest"
+      responses:
+        "204":
+          description: Password replaced and existing sessions revoked.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /account/link/{provider}:
+    post:
+      x-implementation-status: planned
+      operationId: startAccountLink
+      description: The normal provider callback completes the link using the OAuthTransaction purpose.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+        - in: path
+          name: provider
+          required: true
+          schema:
+            enum: [FORTY_TWO, GOOGLE]
+      responses:
+        "200":
+          description: Returns the provider authorization URL for explicit linking.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /internal/introspect:
+    post:
+      operationId: introspectSession
+      description: >
+        Internal endpoint. nginx must not expose this path publicly. Invalid,
+        expired, and revoked sessions all return the same generic 401; active=false
+        is not used. NestJS also calls this during WebSocket handshakes and maps
+        auth-service connection failures or 5xx responses to 503.
+      security:
+        - internalBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntrospectionRequest"
+      responses:
+        "200":
+          description: Active authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntrospectionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: tr_session
+    internalBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-internal-secret
+  parameters:
+    CsrfHeader:
+      in: header
+      name: X-CSRF-Token
+      required: true
+      schema:
+        type: string
+  schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, username, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_-]+$"
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+    SessionResponseBody:
+      type: object
+      required: [user, csrfToken, idleExpiresAt, absoluteExpiresAt]
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthenticatedUser"
+        csrfToken:
+          type: string
+        idleExpiresAt:
+          type: string
+          format: date-time
+        absoluteExpiresAt:
+          type: string
+          format: date-time
+    AuthenticatedUser:
+      type: object
+      required: [id, email, emailVerified, username]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        emailVerified:
+          type: boolean
+        username:
+          type: string
+        avatarUrl:
+          type: [string, "null"]
+          format: uri
+        campus:
+          type: [string, "null"]
+    IntrospectionRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionToken, requestMethod]
+      properties:
+        sessionToken:
+          type: string
+        requestMethod:
+          type: string
+          enum: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]
+          description: origin and csrfToken are required unless this is GET, HEAD, or OPTIONS.
+        origin:
+          type: [string, "null"]
+        csrfToken:
+          type: [string, "null"]
+      allOf:
+        - if:
+            properties:
+              requestMethod:
+                enum: [POST, PUT, PATCH, DELETE]
+            required: [requestMethod]
+          then:
+            required: [origin, csrfToken]
+            properties:
+              origin:
+                type: string
+                minLength: 1
+              csrfToken:
+                type: string
+                minLength: 1
+    IntrospectionResponse:
+      type: object
+      required:
+        - active
+        - sessionId
+        - userId
+        - authenticationMethod
+        - assuranceLevel
+        - authenticatedAt
+        - idleExpiresAt
+        - absoluteExpiresAt
+      properties:
+        active:
+          const: true
+        sessionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        authenticationMethod:
+          enum: [LOCAL, FORTY_TWO, GOOGLE]
+          description: LOCAL maps to local-password, FORTY_TWO to 42-oauth2, and GOOGLE to google-oidc.
+        assuranceLevel:
+          type: integer
+          minimum: 1
+          maximum: 2
+          description: 1 is single-factor; 2 is multi-factor step-up.
+        authenticatedAt:
+          type: string
+          format: date-time
+        idleExpiresAt:
+          type: string
+          format: date-time
+        absoluteExpiresAt:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [statusCode, error, message]
+      properties:
+        statusCode:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+          enum:
+            - INVALID_INTERNAL_CREDENTIALS
+            - SESSION_INACTIVE
+            - CSRF_VALIDATION_FAILED
+          description: Present when callers must distinguish an internal introspection failure.
+    OneTimeTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 32
+    PasswordResetRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+    PasswordResetConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [token, password]
+      properties:
+        token:
+          type: string
+          minLength: 32
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+  responses:
+    SessionResponse:
+      description: Authenticated session.
+      headers:
+        Set-Cookie:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SessionResponseBody"
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Authentication failed or the session is inactive.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Origin or CSRF validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Email, username, or identity already exists.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Too many requests.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalServerError:
+      description: Authentication storage or processing failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

@@ -1,0 +1,306 @@
+schema_version: "1.0"
+status: accepted
+last_updated: "2026-07-13"
+title: Authentication and authorization architecture
+
+decisions:
+  identity_authority:
+    owner: go-auth
+    keycloak: excluded
+    providers:
+      - local-password
+      - 42-oauth2
+      - google-oidc
+    reserved_provider_configuration:
+      - github
+  browser_session:
+    type: opaque-cookie
+    cookie_name: tr_session
+    http_only: true
+    secure_in_production: true
+    same_site: Lax
+    idle_timeout: 30m
+    absolute_lifetime: 168h
+    rotate_on:
+      - login
+      - privilege-change
+      - account-link
+  initial_session_store:
+    type: postgresql
+    database: application-database
+    schema: public
+    future_target: redis
+  request_routing:
+    frontend: nginx-to-react
+    api: nginx-direct-to-nestjs
+    websocket: nginx-direct-to-nestjs
+    auth: nginx-to-go-auth
+  authorization:
+    authentication_and_sessions: go-auth
+    global_roles: nestjs
+    project_and_resource_permissions: nestjs
+    source_of_domain_permissions: application-database
+  account_linking:
+    automatic: true
+    condition: both-identities-assert-the-same-verified-email
+    fallback: require-explicit-linking
+  local_credentials:
+    enabled: true
+    password_hash: argon2id
+    email_verification: required-before-automatic-provider-linking
+  totp:
+    initial_milestone: deferred
+    design_requirement: reserve-schema-and-assurance-level
+  assurance_levels:
+    1: single-factor
+    2: multi-factor
+  provider_wire_values:
+    local-password: LOCAL
+    42-oauth2: FORTY_TWO
+    google-oidc: GOOGLE
+
+components:
+  browser:
+    responsibilities:
+      - render authentication UI
+      - send the opaque session cookie automatically
+      - send the CSRF token in X-CSRF-Token on state-changing requests
+    prohibited:
+      - store access tokens in localStorage
+      - receive provider refresh tokens
+  nginx:
+    public_entrypoint: true
+    routes:
+      "/": frontend
+      "/api": backend
+      "/ws": backend
+      "/auth": go-auth
+    requirements:
+      - deny public access to /auth/internal
+      - preserve cookies and forwarded headers
+      - terminate TLS in production
+  go-auth:
+    responsibilities:
+      - register and authenticate local accounts
+      - execute the 42 OAuth2 authorization-code flow
+      - fetch the authoritative 42 profile from /v2/me
+      - execute the Google OIDC authorization-code flow with PKCE and nonce
+      - normalize and link external identities
+      - create, rotate, introspect, and revoke browser sessions
+      - issue and validate CSRF tokens
+      - hash local passwords and one-time tokens
+      - emit authentication audit events
+    prohibited:
+      - decide project membership
+      - proxy application API traffic
+      - expose provider tokens to the browser or NestJS
+  backend:
+    responsibilities:
+      - call the internal Go session-introspection endpoint from a global guard
+      - populate req.user with the canonical application user ID
+      - fail closed when authentication cannot be established
+      - enforce global roles and project/resource authorization
+      - authenticate WebSocket handshakes through Go
+    prohibited:
+      - validate provider tokens
+      - read password hashes
+      - trust browser-supplied user identifiers
+  websocket:
+    handshake:
+      session_source: tr_session-cookie
+      validation: call-the-same-go-introspection-endpoint
+      introspection_request_method: GET
+      csrf_required: false
+      origin_required: true
+      origin_enforcement: nestjs-validates-before-introspection
+    authorization:
+      - verify-project-membership-before-joining-each-room
+      - disconnect-when-session-expires-or-revalidation-fails
+    revalidation:
+      initial: on-handshake
+      future: periodic-and-on-sensitive-subscription
+  database:
+    initial_ownership:
+      migrations: prisma
+      access:
+        - go-auth
+        - backend
+    auth_records:
+      - AuthIdentity
+      - PasswordCredential
+      - AuthSession
+      - OAuthTransaction
+      - AuthToken
+      - AuthEvent
+
+trust_boundaries:
+  - name: public-browser
+    controls:
+      - tls
+      - secure-http-only-cookie
+      - same-site-cookie
+      - csrf-validation
+      - origin-validation
+  - name: backend-to-auth
+    transport: docker-private-network
+    authentication: static-internal-bearer-initially
+    future_authentication: mutual-tls
+    controls:
+      - nginx-blocks-public-internal-path
+      - strict-timeout
+      - fail-closed
+    operational_notes:
+      secret_env: AUTH_INTERNAL_TOKEN
+      minimum_length: 32
+      local_generation: cryptographically-random
+      rotation: recreate-backend-and-auth-with-the-same-new-value
+  - name: auth-to-idp
+    controls:
+      - fixed-provider-endpoints
+      - tls-certificate-validation
+      - state-validation
+      - exact-redirect-uri
+      - minimum-scopes
+
+provider_flows:
+  local:
+    registration:
+      - normalize-email
+      - validate-password-policy
+      - create-User-and-LOCAL-AuthIdentity-transactionally
+      - hash-password-with-argon2id
+      - create-session
+    login:
+      - rate-limit-by-ip-and-account
+      - verify-argon2id-hash
+      - create-rotated-session
+  42:
+    protocol: oauth2
+    authorize_url: https://api.intra.42.fr/oauth/authorize
+    token_url: https://api.intra.42.fr/oauth/token
+    profile_url: https://api.intra.42.fr/v2/me
+    token_info_url: https://api.intra.42.fr/oauth/token/info
+    identity_subject: numeric-user-id
+    required_controls:
+      - state
+      - server-side-code-exchange
+      - exact-redirect-uri
+    notes:
+      - 42 does not document OIDC ID tokens
+      - PKCE support is not assumed until verified
+      - provider access tokens are discarded after profile retrieval in v1
+  google:
+    protocol: oidc
+    discovery_url: https://accounts.google.com/.well-known/openid-configuration
+    identity_subject: issuer-and-subject
+    required_controls:
+      - state
+      - pkce-s256
+      - nonce
+      - issuer-validation
+      - audience-validation
+      - email_verified-validation
+    notes:
+      - provider access and refresh tokens are discarded after profile retrieval in v1
+
+session_introspection:
+  endpoint: POST /auth/internal/introspect
+  caller: backend
+  request:
+    fields:
+      - sessionToken
+      - requestMethod
+      - origin
+      - csrfToken
+    csrf_rule: csrfToken-and-origin-are-required-unless-requestMethod-is-GET-HEAD-or-OPTIONS
+    websocket_exception: NestJS separately requires an allowed Origin on WebSocket GET upgrades
+  active_response:
+    fields:
+      - active
+      - sessionId
+      - userId
+      - authenticationMethod
+      - assuranceLevel
+      - authenticatedAt
+      - idleExpiresAt
+      - absoluteExpiresAt
+  backend_cache:
+    initial: disabled
+    allowed_future_ttl: 15s
+    warning: caching delays revocation
+  auth_endpoint_responses:
+    invalid_expired_or_revoked_session: 401
+    invalid_internal_credentials: 401-with-code-INVALID_INTERNAL_CREDENTIALS
+    invalid_csrf_or_origin: 403
+    note: inactive sessions use a generic 401 and never return active=false
+  backend_public_mapping:
+    inactive_session: 401
+    invalid_csrf_or_origin: 403
+    auth_service_unavailable_or_invalid_internal_credentials: 503
+
+security_requirements:
+  - never-log-passwords-codes-session-tokens-or-provider-tokens
+  - store-only-sha256-hashes-of-session-and-one-time-tokens
+  - use-constant-time-secret-comparisons
+  - revoke-all-sessions-after-password-reset
+  - rotate-session-after-account-link-or-assurance-change
+  - reject-unverified-email-for-automatic-linking
+  - apply-object-level-authorization-to-every-project-resource
+  - authenticate-and-authorize-websocket-room-subscriptions
+  - use-separate-rate-limits-for-login-register-callback-and-reset
+  - retain-security-audit-events-without-sensitive-token-material
+
+implementation_phases:
+  - id: 1
+    name: foundation
+    includes:
+      - persistence-model
+      - local-register-login-logout
+      - per-ip-and-per-account-rate-limits
+      - bounded-password-hash-concurrency
+      - timing-resistant-unknown-account-login
+      - opaque-session-cookie
+      - internal-introspection
+      - nestjs-global-auth-guard
+  - id: 2
+    name: 42-provider
+    includes:
+      - authorization-start
+      - callback
+      - token-exchange
+      - v2-me-profile
+      - verified-email-linking
+  - id: 3
+    name: google-provider
+    includes:
+      - oidc-discovery
+      - authorization-start
+      - callback
+      - pkce-and-nonce
+      - verified-email-linking
+  - id: 4
+    name: recovery-and-verification
+    includes:
+      - email-verification
+      - password-reset
+      - session-revocation
+  - id: 5
+    name: hardening
+    includes:
+      - redis-session-store
+      - totp-step-up
+      - recovery-codes
+      - websocket-revalidation
+      - internal-mtls
+
+profile_fields:
+  campus:
+    source: 42-/v2/me-campus-name
+    non_42_value: null
+    ownership: application-profile-after-provisioning
+
+references:
+  - https://api.intra.42.fr/apidoc/guides/getting_started
+  - https://api.intra.42.fr/apidoc/guides/web_application_flow
+  - https://api.intra.42.fr/apidoc/guides/specification
+  - https://developers.google.com/identity/openid-connect/openid-connect
