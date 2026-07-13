@@ -10,11 +10,12 @@
 // - Create Account button will call useModal().openModal('auth')
 // - AuthModal will determine whether to display the Sign In
 //   or Create Account form.
+import { NavLogo } from "./NavLogo";
 
 export function HeaderPublic() {
   return (
-    <header>
-      <a href="/">Logo</a>
+    <header className="flex items-center justify-between px-6 py-4">
+      <NavLogo href="/" />
       <a href="#">Sign in</a>
       <a href="#">Sign up</a>
     </header>
