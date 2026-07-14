@@ -215,4 +215,8 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+<<<<<<< HEAD
   });
+=======
+  });
+>>>>>>> 23f767e (chore(TR-38): WIP seeding the database)

@@ -107,25 +107,29 @@ export function SideBarCmp() {
               },
             }}
           >
-          <SidebarItems>
-            <SidebarItemGroup className="font-mono tracking-tight text-sm lg:text-base">
-              <SidebarItem as={Link} to="/dashboard" icon={MdOutlineDashboard}>
-                Dashboard
-              </SidebarItem>
-              <SidebarItem as={Link} to="/projects" icon={GoFileDirectory}>
-                Projects
-              </SidebarItem>
-            </SidebarItemGroup>
-            <SidebarItemGroup>
-              <li className="px-3 pb-2 font-mono text-xs tracking-wider text-text-muted uppercase">
-                Current projects
-              </li>
+            <SidebarItems>
+              <SidebarItemGroup className="font-mono tracking-tight text-sm lg:text-base">
+                <SidebarItem
+                  as={Link}
+                  to="/dashboard"
+                  icon={MdOutlineDashboard}
+                >
+                  Dashboard
+                </SidebarItem>
+                <SidebarItem as={Link} to="/projects" icon={GoFileDirectory}>
+                  Projects
+                </SidebarItem>
+              </SidebarItemGroup>
+              <SidebarItemGroup>
+                <li className="px-3 pb-2 font-mono text-xs tracking-wider text-text-muted uppercase">
+                  Current projects
+                </li>
 
-              {projects.map((project) => (
-                <ProjectRow key={project.slug} project={project} />
-              ))}
-            </SidebarItemGroup>
-          </SidebarItems>
+                {projects.map((project) => (
+                  <ProjectRow key={project.slug} project={project} />
+                ))}
+              </SidebarItemGroup>
+            </SidebarItems>
           </Sidebar>
         </div>
 
