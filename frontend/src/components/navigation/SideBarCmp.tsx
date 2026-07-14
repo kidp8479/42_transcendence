@@ -57,7 +57,7 @@ function ProjectRow({ project }: { project: Project }) {
   );
 }
 
-export function SideBar() {
+export function SideBarCmp() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
