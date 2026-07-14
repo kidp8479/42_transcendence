@@ -296,6 +296,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 	sessionToken, csrfToken, ok := s.sessionTokens(r)
 	if !ok {
+		s.clearSessionCookies(w)
 		writeError(w, http.StatusUnauthorized, "Unauthorized", "active session required")
 		return
 	}
@@ -312,6 +313,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !store.VerifyTokenHash(csrfToken, session.CSRFTokenHash) {
+		s.clearSessionCookies(w)
 		writeError(w, http.StatusUnauthorized, "Unauthorized", "active session required")
 		return
 	}

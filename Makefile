@@ -59,7 +59,7 @@ install:
 down:
 	$(COMPOSE) down
 
-## restart running containers
+## restart the local stack through dependency-aware startup
 restart:
 	$(COMPOSE) stop
 	$(COMPOSE) up -d
