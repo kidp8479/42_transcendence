@@ -42,8 +42,9 @@
   --color-status-completed: #4ade80;
 
   /* Category palette - unnamed/numbered, not tied to specific category names since
-     TaskCategory is created freely per-project. Index 1 reuses --color-brand-500. */
+     TaskCategory is created freely per-project. */
   --color-category-0: #94a3b8;
+  --color-category-1: #818cf8;
   --color-category-2: #71717a;
   --color-category-3: #22d3ee;
   --color-category-4: #fb923c;

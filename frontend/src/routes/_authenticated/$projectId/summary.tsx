@@ -5,7 +5,11 @@ export const Route = createFileRoute("/_authenticated/$projectId/summary")({
 });
 
 function SummaryPage() {
-  const summary_json_mock_up = {
+  // Fake data standing in for the real GET /api/projects/:id/summary response
+  // (blocked on auth for now). One object, one field per Summary section
+  // (tasks_by_status, categories, and more to come) - each field is that
+  // section's own mock block, matching what the backend will eventually send.
+  const summary_data_json_mock_up = {
     tasks_by_status: {
       TODO: 10,
       IN_PROGRESS: 5,
@@ -23,13 +27,21 @@ function SummaryPage() {
       { name: "Parsing", completed: 0, total: 2, color: 6 },
       { name: "Documentation", completed: 1, total: 2, color: 7 },
     ],
+    // mock up of upcoming events
+    upcoming_events: [],
+    // defense_readiness: { ... }, TODO
+    // team_workload: [ ... ], TODO
   };
 
-  // Shared palette every category picks from (via its color index) - bounded set,
-  // works no matter how many categories a project ends up creating.
+  // Shared palette every category picks from (via its color index).
+  // Bounded to 8 entries (0-7) - matches today's 8 default categories. A project
+  // with more than 8 categories has no defined color past index 7 yet: no
+  // wrap-around/modulo exists, and category creation (backend) doesn't cap
+  // the count either. Not fixed for now (edge case, unlikely with the current
+  // default list) - revisit if it becomes a real problem.
   const CATEGORY_COLOR_PALETTE = [
     "bg-category-0",
-    "bg-brand-500", // index 1 reuses the brand color directly, no separate token needed
+    "bg-category-1",
     "bg-category-2",
     "bg-category-3",
     "bg-category-4",
@@ -38,8 +50,17 @@ function SummaryPage() {
     "bg-category-7",
   ];
 
-  type TaskStatusKey = keyof typeof summary_json_mock_up.tasks_by_status;
+  // Locks status_key below to the real keys of tasks_by_status ("TODO" | "IN_PROGRESS" | ...),
+  // so a typo or a renamed status gets caught at compile time instead of silently rendering undefined.
+  type TaskStatusKey = keyof typeof summary_data_json_mock_up.tasks_by_status;
 
+  // Display info for each status: label + color + render order.
+  // Kept separate from summary_data_json_mock_up because the raw data is just bare
+  // numbers with no presentation info attached (unlike categories, see above).
+  //
+  // task_statuses itself is an array (the trailing [] below, right before "=").
+  // Each element must be an object shaped exactly like { status_name, status_key, color }
+  // - TypeScript checks that shape (and that status_key is a real TaskStatusKey) at compile time.
   const task_statuses: {
     status_name: string;
     status_key: TaskStatusKey;
@@ -75,7 +96,11 @@ function SummaryPage() {
               {current_status.status_name}
             </p>
             <p className={`text-2xl font-bold ${current_status.color}`}>
-              {summary_json_mock_up.tasks_by_status[current_status.status_key]}
+              {
+                summary_data_json_mock_up.tasks_by_status[
+                  current_status.status_key
+                ]
+              }
             </p>
           </div>
         ))}
@@ -85,7 +110,10 @@ function SummaryPage() {
         <h2 className="mb-4 text-lg font-bold text-text-primary">
           Progress by Category
         </h2>
-        {summary_json_mock_up.categories.map((category) => {
+        {summary_data_json_mock_up.categories.map((category) => {
+          // "=> {" here (vs "=> (" for task_statuses above) starts a real function
+          // body, so we can add a line like this before the JSX. That means no
+          // more auto-return - the explicit "return" below is required.
           const percent = (category.completed / category.total) * 100;
           return (
             <div key={category.name} className="mb-3">
