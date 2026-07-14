@@ -8,7 +8,7 @@ import {
   SidebarItems,
 } from "flowbite-react";
 import { Link } from "@tanstack/react-router";
-import { HiChevronLeft, HiChevronRight } from "react-icons/hi";
+import { HiChevronLeft, HiChevronRight, HiMenu, HiX } from "react-icons/hi";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
 
@@ -61,30 +61,52 @@ export function SideBarCmp() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div
-      className={`relative shrink-0 transition-all duration-300 ${
-        isCollapsed ? "w-0" : "w-64"
-      }`}
-    >
-      <div className="font-mono h-full overflow-hidden">
-        <Sidebar
-          aria-label="Sidebar"
-          className="h-full w-64"
-          theme={{
-            root: {
-              inner:
-                "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 !bg-surface-raised !dark:bg-surface-raised",
-            },
-            item: {
-              base: "flex items-center justify-center rounded-lg p-2 text-base font-normal text-text-secondary hover:bg-surface-overlay hover:text-text-primary",
-              active: "bg-brand-500/10 text-brand-500",
-              icon: {
-                base: "h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary",
-                active: "text-brand-500",
+    <>
+      {/* Backdrop: only shown on mobile when the sidebar is open, click to close */}
+      {!isCollapsed && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => setIsCollapsed(true)}
+          aria-hidden="true"
+        />
+      )}
+
+      <div
+        className={`
+          fixed inset-y-0 left-0 z-40 w-full transition-transform duration-300
+          ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
+          md:relative md:z-auto md:shrink-0 md:translate-x-0 md:transition-[width]
+          ${isCollapsed ? "md:w-0" : "md:w-64"}
+        `}
+      >
+        <div className="font-mono relative h-full w-full overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(true)}
+            aria-label="Close sidebar"
+            className="absolute top-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-md text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden"
+          >
+            <HiX size={18} />
+          </button>
+
+          <Sidebar
+            aria-label="Sidebar"
+            className="h-full w-full md:w-64"
+            theme={{
+              root: {
+                inner:
+                  "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 !bg-surface-raised !dark:bg-surface-raised",
               },
-            },
-          }}
-        >
+              item: {
+                base: "flex items-center justify-center rounded-lg p-2 text-base font-normal text-text-secondary hover:bg-surface-overlay hover:text-text-primary",
+                active: "bg-brand-500/10 text-brand-500",
+                icon: {
+                  base: "h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary",
+                  active: "text-brand-500",
+                },
+              },
+            }}
+          >
           <SidebarItems>
             <SidebarItemGroup className="font-mono tracking-tight text-sm lg:text-base">
               <SidebarItem as={Link} to="/dashboard" icon={MdOutlineDashboard}>
@@ -104,21 +126,35 @@ export function SideBarCmp() {
               ))}
             </SidebarItemGroup>
           </SidebarItems>
-        </Sidebar>
+          </Sidebar>
+        </div>
+
+        {/* Desktop collapse/expand toggle: squeezes the panel width, hidden on mobile */}
+        <button
+          type="button"
+          onClick={() => setIsCollapsed((prev) => !prev)}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="absolute top-1/2 right-0 hidden h-10 w-4 translate-x-full -translate-y-full items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:flex"
+        >
+          {isCollapsed ? (
+            <HiChevronRight size={14} />
+          ) : (
+            <HiChevronLeft size={14} />
+          )}
+        </button>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setIsCollapsed((prev) => !prev)}
-        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="absolute top-1/2 right-0 flex h-10 w-4 translate-x-full -translate-y-full items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary"
-      >
-        {isCollapsed ? (
-          <HiChevronRight size={14} />
-        ) : (
-          <HiChevronLeft size={14} />
-        )}
-      </button>
-    </div>
+      {/* Mobile open button: only rendered while the off-canvas sidebar is closed */}
+      {isCollapsed && (
+        <button
+          type="button"
+          onClick={() => setIsCollapsed(false)}
+          aria-label="Expand sidebar"
+          className="fixed top-4 left-4 z-40 flex h-10 w-10 items-center justify-center rounded-md border border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden"
+        >
+          <HiMenu size={18} />
+        </button>
+      )}
+    </>
   );
 }
