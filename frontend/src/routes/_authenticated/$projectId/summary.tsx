@@ -139,46 +139,51 @@ function SummaryPage() {
         ))}
       </div>
 
-      <div className="mt-6 rounded-lg border border-surface-border bg-surface-raised p-4">
-        <h2 className="mb-4 text-sm font-semibold text-text-primary">
-          Progress by Category
-        </h2>
-        {summary_data_json_mock_up.categories.map((category) => {
-          // "=> {" here (vs "=> (" for task_statuses above) starts a real function
-          // body, so we can add a line like this before the JSX. That means no
-          // more auto-return - the explicit "return" below is required.
-          const percent = (category.completed / category.total) * 100;
-          return (
-            <div key={category.name} className="mb-3">
-              <div className="mb-1 flex justify-between text-sm">
-                <span className="text-text-primary">{category.name}</span>
-                <span className="text-text-secondary">
-                  {category.completed}/{category.total}
-                </span>
+      <div className="mt-6 grid grid-cols-3 gap-6">
+        <div className="col-span-2 rounded-lg border border-surface-border bg-surface-raised p-4">
+          <h2 className="mb-4 text-sm font-semibold text-text-primary">
+            Progress by Category
+          </h2>
+          {summary_data_json_mock_up.categories.map((category) => {
+            // "=> {" here (vs "=> (" for task_statuses above) starts a real function
+            // body, so we can add a line like this before the JSX. That means no
+            // more auto-return - the explicit "return" below is required.
+            const percent = (category.completed / category.total) * 100;
+            return (
+              <div key={category.name} className="mb-3">
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="text-text-primary">{category.name}</span>
+                  <span className="text-text-secondary">
+                    {category.completed}/{category.total}
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-surface-overlay">
+                  <div
+                    className={`h-2 rounded-full ${CATEGORY_COLOR_PALETTE[category.color]}`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 w-full rounded-full bg-surface-overlay">
-                <div
-                  className={`h-2 rounded-full ${CATEGORY_COLOR_PALETTE[category.color]}`}
-                  style={{ width: `${percent}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      <div className="mt-6 rounded-lg border border-surface-border bg-surface-raised p-4">
-        <h2 className="mb-4 text-sm font-semibold 600 text-text-primary">
-          Upcoming Events
-        </h2>
-        {summary_data_json_mock_up.upcoming_events.map((events) => (
-          <div key={events.id}>
-            <span className="text-text-secondary">
-              {new Date(events.startAt).toLocaleDateString("en-GB")}
-            </span>
-            <span className="text-text-primary">{events.title}</span>
+        <div className="flex flex-col gap-6">
+          <div className="rounded-lg border border-surface-border bg-surface-raised p-4">
+            <h2 className="mb-4 text-sm font-semibold text-text-primary">
+              Upcoming Events
+            </h2>
+            {summary_data_json_mock_up.upcoming_events.map((events) => (
+              <div key={events.id}>
+                <span className="text-text-secondary">
+                  {new Date(events.startAt).toLocaleDateString("en-GB")}
+                </span>
+                <span className="text-text-primary">{events.title}</span>
+              </div>
+            ))}
           </div>
-        ))}
+          {/* defense_readiness card will go here, stacked below Upcoming Events */}
+        </div>
       </div>
     </>
   );
