@@ -1,22 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  HiOutlineDotsCircleHorizontal,
-  HiOutlineRefresh,
-  HiOutlineEye,
-  HiOutlineCheckCircle,
-} from "react-icons/hi";
-import type { IconType } from "react-icons";
+import { TaskStatusOverview } from "@/components/summary/TaskStatusOverview";
+import { ProgressByCategory } from "@/components/summary/ProgressByCategory";
+import { UpcomingEvents } from "@/components/summary/UpcomingEvents";
+import { DefenseReadiness } from "@/components/summary/DefenseReadiness";
+import { TeamWorkload } from "@/components/summary/TeamWorkload";
 
 export const Route = createFileRoute("/_authenticated/$projectId/summary")({
   component: SummaryPage,
 });
 
 function SummaryPage() {
+  // --- beginning of mock data - will be replaced by a call to
+  // GET /api/projects/:id/summary once auth is wired ---
   // Fake data standing in for the real GET /api/projects/:id/summary response
   // (blocked on auth for now). One object, one field per Summary section
-  // (tasks_by_status, categories, and more to come) - each field is that
+  // (tasks_by_status, categories, upcoming events, defense readiness, workload per member) - each field is that
   // section's own mock block, matching what the backend will eventually send.
+  // Each field below is passed down as props to its own section component.
   const summary_data_json_mock_up = {
+    // count of tasks per status, matches the TaskStatus enum in schema.prisma
     tasks_by_status: {
       TODO: 10,
       IN_PROGRESS: 5,
@@ -67,231 +69,74 @@ function SummaryPage() {
       checkpoints_done: 0,
       checkpoints_total: 8,
     },
-    // team_workload: [ ... ], TODO
+    // open_tasks: tasks assigned to this member that aren't COMPLETED yet.
+    // color: index into CATEGORY_COLOR_PALETTE, used for this member's avatar
+    // - it's the member's own display color, unrelated to task/calendar
+    // categories (User has no color field in schema.prisma yet, this is
+    // mock-only for now).
+    // categories: names of the categories this member has open tasks in -
+    // matched against summary_data_json_mock_up.categories (by name) to reuse
+    // the same color, instead of a separate per-category color system.
+    team_workload: [
+      {
+        username: "sboxd",
+        initials: "SA",
+        color: 1,
+        open_tasks: 5,
+        categories: ["Backend", "Testing"],
+      },
+      {
+        username: "mlebrun",
+        initials: "ML",
+        color: 5,
+        open_tasks: 4,
+        categories: ["Backend", "DevOps"],
+      },
+      {
+        username: "jdupont",
+        initials: "JD",
+        color: 2,
+        open_tasks: 5,
+        categories: ["Testing", "DevOps"],
+      },
+      {
+        username: "klaris",
+        initials: "KL",
+        color: 6,
+        open_tasks: 2,
+        categories: ["Frontend", "DevOps"],
+      },
+    ],
   };
-
-  // Shared palette every category picks from (via its color index).
-  // Bounded to 8 entries (0-7) - matches today's 8 default categories. A project
-  // with more than 8 categories has no defined color past index 7 yet: no
-  // wrap-around/modulo exists, and category creation (backend) doesn't cap
-  // the count either. Not fixed for now (edge case, unlikely with the current
-  // default list) - revisit if it becomes a real problem.
-  // Every class below is written out in full, character for character, even the
-  // "/15" and "/30" opacity variants. Tailwind only generates CSS for a class it
-  // can see written whole in the source - a class rebuilt at runtime by joining
-  // strings (ex: someClass + "/15") never appears in full in the source, so
-  // Tailwind silently skips it and the class ends up doing nothing.
-  const CATEGORY_COLOR_PALETTE = [
-    {
-      bg: "bg-category-0",
-      border: "border-category-0",
-      text: "text-category-0",
-      badgeBg: "bg-category-0/15",
-      badgeBorder: "border-category-0/30",
-    },
-    {
-      // index 1 reuses the brand color, matches the Figma prototype
-      bg: "bg-brand-500",
-      border: "border-brand-500",
-      text: "text-brand-500",
-      badgeBg: "bg-brand-500/15",
-      badgeBorder: "border-brand-500/30",
-    },
-    {
-      bg: "bg-category-2",
-      border: "border-category-2",
-      text: "text-category-2",
-      badgeBg: "bg-category-2/15",
-      badgeBorder: "border-category-2/30",
-    },
-    {
-      bg: "bg-category-3",
-      border: "border-category-3",
-      text: "text-category-3",
-      badgeBg: "bg-category-3/15",
-      badgeBorder: "border-category-3/30",
-    },
-    {
-      bg: "bg-category-4",
-      border: "border-category-4",
-      text: "text-category-4",
-      badgeBg: "bg-category-4/15",
-      badgeBorder: "border-category-4/30",
-    },
-    {
-      bg: "bg-category-5",
-      border: "border-category-5",
-      text: "text-category-5",
-      badgeBg: "bg-category-5/15",
-      badgeBorder: "border-category-5/30",
-    },
-    {
-      bg: "bg-category-6",
-      border: "border-category-6",
-      text: "text-category-6",
-      badgeBg: "bg-category-6/15",
-      badgeBorder: "border-category-6/30",
-    },
-    {
-      bg: "bg-category-7",
-      border: "border-category-7",
-      text: "text-category-7",
-      badgeBg: "bg-category-7/15",
-      badgeBorder: "border-category-7/30",
-    },
-  ];
-
-  // Locks status_key below to the real keys of tasks_by_status ("TODO" | "IN_PROGRESS" | ...),
-  // so a typo or a renamed status gets caught at compile time instead of silently rendering undefined.
-  type TaskStatusKey = keyof typeof summary_data_json_mock_up.tasks_by_status;
-
-  // Display info for each status: label + color + render order.
-  // Kept separate from summary_data_json_mock_up because the raw data is just bare
-  // numbers with no presentation info attached (unlike categories, see above).
-  //
-  // task_statuses itself is an array (the trailing [] below, right before "=").
-  // Each element must be an object shaped exactly like { status_name, status_key, color }
-  // - TypeScript checks that shape (and that status_key is a real TaskStatusKey) at compile time.
-  const task_statuses: {
-    status_name: string;
-    status_key: TaskStatusKey;
-    color: string;
-    icon: IconType;
-  }[] = [
-    {
-      status_name: "To Do",
-      status_key: "TODO",
-      color: "text-status-todo",
-      icon: HiOutlineDotsCircleHorizontal,
-    },
-    {
-      status_name: "In Progress",
-      status_key: "IN_PROGRESS",
-      color: "text-status-in-progress",
-      icon: HiOutlineRefresh,
-    },
-    {
-      status_name: "Review",
-      status_key: "REVIEW",
-      color: "text-status-review",
-      icon: HiOutlineEye,
-    },
-    {
-      status_name: "Completed",
-      status_key: "COMPLETED",
-      color: "text-status-completed",
-      icon: HiOutlineCheckCircle,
-    },
-  ];
+  // --- end of mock data ---
 
   return (
     <>
-      {/* bloc that displays the tasks */}
-      <div className="grid grid-cols-4 gap-4">
-        {task_statuses.map((current_status) => (
-          <div
-            key={current_status.status_key}
-            className="rounded-lg border border-surface-border bg-surface-raised p-4"
-          >
-            <p className="flex items-center gap-1.5 text-sm text-text-secondary">
-              <current_status.icon className={current_status.color} />
-              {current_status.status_name}
-            </p>
-            <p
-              className={`mt-2 mb-1 text-2xl font-bold ${current_status.color}`}
-            >
-              {
-                summary_data_json_mock_up.tasks_by_status[
-                  current_status.status_key
-                ]
-              }
-            </p>
-            <p className="text-xs text-text-secondary">tasks</p>
-          </div>
-        ))}
-      </div>
+      <TaskStatusOverview
+        tasksByStatus={summary_data_json_mock_up.tasks_by_status}
+      />
 
-      {/* bloc that displays the progress by category */}
-      <div className="mt-6 grid grid-cols-3 gap-6">
-        <div className="col-span-2 rounded-lg border border-surface-border bg-surface-raised p-4">
-          <h2 className="mb-4 text-sm font-semibold text-text-primary">
-            Progress by Category
-          </h2>
-          {summary_data_json_mock_up.categories.map((category) => {
-            // "=> {" here (vs "=> (" for task_statuses above) starts a real function
-            // body, so we can add a line like this before the JSX. That means no
-            // more auto-return - the explicit "return" below is required.
-            const percent = (category.completed / category.total) * 100;
-            return (
-              <div key={category.name} className="mb-3">
-                <div className="mb-1 flex justify-between text-sm">
-                  <span className="text-text-primary">{category.name}</span>
-                  <span className="text-text-secondary">
-                    {category.completed}/{category.total}
-                  </span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-surface-overlay">
-                  <div
-                    className={`h-2 rounded-full ${CATEGORY_COLOR_PALETTE[category.color].bg}`}
-                    style={{ width: `${percent}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <ProgressByCategory categories={summary_data_json_mock_up.categories} />
 
-        {/* bloc that displays the upcoming events */}
         <div className="flex flex-col gap-6">
-          <div className="rounded-lg border border-surface-border bg-surface-raised p-4">
-            <h2 className="mb-4 text-sm font-semibold text-text-primary">
-              Upcoming Events
-            </h2>
-            {summary_data_json_mock_up.upcoming_events.map((events) => (
-              <div
-                key={events.id}
-                className="mb-3 flex items-center gap-3 last:mb-0"
-              >
-                <span
-                  className={`shrink-0 rounded-md border px-2 py-1 text-xs font-semibold ${CATEGORY_COLOR_PALETTE[events.color].badgeBg} ${CATEGORY_COLOR_PALETTE[events.color].badgeBorder} ${CATEGORY_COLOR_PALETTE[events.color].text}`}
-                >
-                  {new Date(events.startAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "2-digit",
-                  })}
-                </span>
-                <span className="text-sm text-text-primary">
-                  {events.title}
-                </span>
-              </div>
-            ))}
-          </div>
-          {/* bloc that displays the defense readiness */}
-          <div className="rounded-lg border border-surface-border bg-surface-raised p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-text-primary">
-                Defense Readiness
-              </h2>
-              <span className="text-sm font-bold text-brand-500">
-                {summary_data_json_mock_up.defense_readiness.percent}%
-              </span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-surface-overlay">
-              <div
-                className="h-2 rounded-full bg-brand-500"
-                style={{
-                  width: `${summary_data_json_mock_up.defense_readiness.percent}%`,
-                }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-text-secondary">
-              {summary_data_json_mock_up.defense_readiness.checkpoints_done}/
-              {summary_data_json_mock_up.defense_readiness.checkpoints_total}{" "}
-              checkpoints
-            </p>
-          </div>
+          <UpcomingEvents events={summary_data_json_mock_up.upcoming_events} />
+          <DefenseReadiness
+            percent={summary_data_json_mock_up.defense_readiness.percent}
+            checkpointsDone={
+              summary_data_json_mock_up.defense_readiness.checkpoints_done
+            }
+            checkpointsTotal={
+              summary_data_json_mock_up.defense_readiness.checkpoints_total
+            }
+          />
         </div>
       </div>
+
+      <TeamWorkload
+        members={summary_data_json_mock_up.team_workload}
+        categories={summary_data_json_mock_up.categories}
+      />
     </>
   );
 }

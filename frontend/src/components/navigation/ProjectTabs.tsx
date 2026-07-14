@@ -49,14 +49,14 @@ export function ProjectTabs() {
   return (
     <nav
       aria-label="Project tabs"
-      className="flex border-b border-surface-border"
+      className="flex overflow-x-auto border-b border-surface-border"
     >
       {tabs_links.map((created_link) => (
         <Link
           key={created_link.to}
           to={created_link.to}
           params={{ projectId }}
-          className="flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium"
+          className="flex shrink-0 items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap"
           activeProps={{ className: "border-brand-500 text-brand-500" }}
           inactiveProps={{
             className:

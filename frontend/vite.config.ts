@@ -14,6 +14,11 @@ export default defineConfig({
     tailwindcss(),
     flowbiteReact(),
   ],
+  resolve: {
+    alias: {
+      "@": `${import.meta.dirname}/src`,
+    },
+  },
   server: {
     port: 5173,
     host: true,
