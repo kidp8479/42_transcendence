@@ -12,10 +12,12 @@ export function ProjectLayout() {
 
   return (
     <>
-      <div className="px-6 pt-6">
-        <h1 className="text-2xl font-bold text-text-primary">{project.name}</h1>
+      <div className="px-6 pt-6 mb-5">
+        <h1 className="text-xl font-bold font-mono text-text-primary">
+          {project.name}
+        </h1>
         {project.description && (
-          <p className="text-sm text-text-secondary">{project.description}</p>
+          <p className="text-xs text-text-secondary">{project.description}</p>
         )}
       </div>
       <ProjectTabs />
