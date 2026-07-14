@@ -8,7 +8,7 @@ export function PublicLayout() {
   return (
     <>
       {/* Top bar with logo, Sign In and Create Account buttons */}
-      <HeaderPublic logoTo="/" />
+      <HeaderPublic />
 
       {/* The active page (Landing, About, Contact...) renders here */}
       <main>
