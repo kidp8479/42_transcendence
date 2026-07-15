@@ -1,12 +1,13 @@
 // Terms of service page (/terms). Mandatory for 42 subject.
 import { createFileRoute } from "@tanstack/react-router";
+import {
+  LegalPageLayout,
+  type Section,
+} from "../../components/layout/LegalPageLayout";
 
 export const Route = createFileRoute("/_public/terms")({
   component: TermsPage,
 });
-
-type Block = string | { list: string[] };
-type Section = { heading: string; blocks: Block[] };
 
 const LAST_UPDATED = "July 2026";
 
@@ -112,34 +113,10 @@ const sections: Section[] = [
 
 export function TermsPage() {
   return (
-    <div className="bg-surface-base min-h-screen">
-      <div className="mx-auto max-w-3xl px-4 py-12 text-text-secondary">
-        <h1 className="text-3xl font-bold text-text-primary">
-          Terms of Service
-        </h1>
-        <p className="mt-2 text-sm">Last updated: {LAST_UPDATED}</p>
-
-        {sections.map((section, i) => (
-          <section key={i} className="mt-8 space-y-3">
-            <h2 className="text-xl font-semibold text-text-primary">
-              {section.heading}
-            </h2>
-            {section.blocks.map((block, j) =>
-              typeof block === "string" ? (
-                <p key={j} className="leading-relaxed">
-                  {block}
-                </p>
-              ) : (
-                <ul key={j} className="list-disc space-y-1 pl-6">
-                  {block.list.map((item, k) => (
-                    <li key={k}>{item}</li>
-                  ))}
-                </ul>
-              )
-            )}
-          </section>
-        ))}
-      </div>
-    </div>
+    <LegalPageLayout
+      title="Terms of Service"
+      subtitle={`Last updated: ${LAST_UPDATED}`}
+      sections={sections}
+    />
   );
 }

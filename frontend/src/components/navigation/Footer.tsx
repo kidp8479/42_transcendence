@@ -21,45 +21,43 @@ const RouterFooterLink = createLink(FooterLink);
 
 export function Footer() {
   return (
-    <footer>
-      <div className="bg-surface-base">
-        <FlowbiteFooter
-          container
-          className="bg-surface-base relative md:justify-start"
-        >
-          <FooterCopyright
-            className="text-text-secondary p-4"
-            by="Transcendence Project"
-            year={2026}
-          />
-          <FooterLinkGroup className="justify-center gap-4 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2">
-            <RouterFooterLink
-              className="text-text-secondary hover:text-brand-700"
-              to="/about"
-            >
-              About
-            </RouterFooterLink>
-            <RouterFooterLink
-              className="text-text-secondary hover:text-brand-700"
-              to="/privacy"
-            >
-              Privacy Policy
-            </RouterFooterLink>
-            <RouterFooterLink
-              className="text-text-secondary hover:text-brand-700"
-              to="/terms"
-            >
-              Terms of Service
-            </RouterFooterLink>
-            <RouterFooterLink
-              className="text-text-secondary hover:text-brand-700"
-              to="/contact"
-            >
-              Contact
-            </RouterFooterLink>
-          </FooterLinkGroup>
-        </FlowbiteFooter>
-      </div>
-    </footer>
+    <div className="bg-surface-base">
+      <FlowbiteFooter
+        container
+        className="bg-surface-base relative md:justify-start"
+      >
+        <FooterCopyright
+          className="text-text-secondary p-4"
+          by="42 Project Planner"
+          year={new Date().getFullYear()}
+        />
+        <FooterLinkGroup className="justify-center gap-4 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2">
+          <RouterFooterLink
+            className="text-text-secondary hover:text-brand-700"
+            to="/about"
+          >
+            About
+          </RouterFooterLink>
+          <RouterFooterLink
+            className="text-text-secondary hover:text-brand-700"
+            to="/privacy"
+          >
+            Privacy Policy
+          </RouterFooterLink>
+          <RouterFooterLink
+            className="text-text-secondary hover:text-brand-700"
+            to="/terms"
+          >
+            Terms of Service
+          </RouterFooterLink>
+          <RouterFooterLink
+            className="text-text-secondary hover:text-brand-700"
+            to="/contact"
+          >
+            Contact
+          </RouterFooterLink>
+        </FooterLinkGroup>
+      </FlowbiteFooter>
+    </div>
   );
 }

@@ -26,8 +26,7 @@ export function ContactPage() {
         <h1 className="text-3xl font-bold text-text-primary">Contact</h1>
         <p className="mt-2 leading-relaxed">
           Have a question about the workspace, found a bug, or want to share
-          feedback? Reach out to the team using the form below or the details
-          provided.
+          feedback? Reach out to any member of the team using the details below.
         </p>
 
         <section className="mt-8 space-y-3 rounded-lg border border-brand-500">
@@ -35,12 +34,12 @@ export function ContactPage() {
             The team
           </h2>
           <p className="pl-4 leading-relaxed">
-            You can also reach out to any team member directly:
+            You can reach out to any team member directly:
           </p>
 
           <ul className="grid sm:grid-cols-2">
-            {team.map((member, i) => (
-              <li key={i} className="p-4 pl-8">
+            {team.map((member) => (
+              <li key={member.email} className="p-4 pl-8">
                 <p className="font-medium text-text-primary">{member.name}</p>
                 <a
                   href={`mailto:${member.email}`}
