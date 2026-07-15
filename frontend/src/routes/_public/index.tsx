@@ -6,6 +6,7 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { Carousel } from "flowbite-react";
+import { useModal } from "../../hooks/useModal";
 
 // TO DISCUSS: if we want logged-in users to skip the landing page and go straight to /dashboard,
 // add a beforeLoad here that checks localStorage for a token and throws redirect({ to: '/dashboard' }).
@@ -39,6 +40,8 @@ const CAROUSEL_SLIDES = [
 ];
 
 function LandingPage() {
+  const { openAuthModal } = useModal();
+
   return (
     <>
       <section className="flex flex-col items-center justify-center bg-surface-base px-4 py-16 text-text-primary sm:py-20 lg:py-28">
@@ -120,23 +123,26 @@ function LandingPage() {
         </Carousel>
       </section>
 
-      {/* SCAFFOLD ONLY: mirrors HeaderPublic's inert auth links until the
-          auth modals exist - should trigger the same useModal().openModal()
-          calls as the header once that's wired up. */}
       <p className="px-4 py-16 text-center text-text-secondary sm:py-20 lg:py-28">
         Ready to jump in?{" "}
         <a
-          href="#"
-          onClick={(e) => e.preventDefault()}
-          className="font-semibold text-brand-500 hover:underline"
+          href="#create-account"
+          onClick={(event) => {
+            event.preventDefault();
+            openAuthModal("signup");
+          }}
+          className="font-semibold text-brand-500 hover:text-brand-600 hover:underline"
         >
           Create an account
         </a>{" "}
         or{" "}
         <a
-          href="#"
-          onClick={(e) => e.preventDefault()}
-          className="font-semibold text-brand-500 hover:underline"
+          href="#log-in"
+          onClick={(event) => {
+            event.preventDefault();
+            openAuthModal("signin");
+          }}
+          className="font-semibold text-brand-500 hover:text-brand-600 hover:underline"
         >
           log in
         </a>

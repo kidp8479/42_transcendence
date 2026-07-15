@@ -1,60 +1,41 @@
 // Top bar for public pages.
 // Contains: logo + Sign In button + Create Account button.
-//
-// SCAFFOLD ONLY:
-// Authentication modals are not implemented yet.
-// Both buttons are inert (#) to avoid bouncing through the auth guard.
-//
-// Future integration:
-// - Sign In button will call useModal().openModal('auth')
-// - Create Account button will call useModal().openModal('auth')
-// - AuthModal will determine whether to display the Sign In
-//   or Create Account form.
-import { Button } from "flowbite-react";
-import { NavLogo } from "./NavLogo";
-//import { useModal } from "../../hooks/useModal"
+import { Button, Navbar } from "flowbite-react";
 import { useLocation } from "@tanstack/react-router";
+import { useModal } from "../../hooks/useModal";
+import { NavLogo } from "./NavLogo";
 
 export function HeaderPublic() {
-  //const {openModal } = useModal();
+  const { openAuthModal } = useModal();
   const { pathname } = useLocation();
   const logoTo = pathname === "/" ? "/dont-panic" : "/";
 
   return (
-    <header className="flex items-center justify-between px-6 py-4">
-      <NavLogo to={logoTo} />
-
-      <div className="flex items-center gap-4">
-        <Button
-          className="
-		    bg-brand-600
-		    text-surface-base
-			hover:bg-brand-700
-		  "
-          onClick={() => {
-            // TODO: Open authentication modal
-            // Waiting for ModalProvider implemention
-          }}
-        >
-          Create Account
-        </Button>
-
-        <Button
-          className="
-		    border border-brand-600
-			bg-transparent
-			text-brand-600
-			hover:bg-brand-600
-			hover:text-surface-base
-		  "
-          onClick={() => {
-            // TODO: Open authentication modal
-            // waiting for ModalProvider implementation
-          }}
-        >
-          Sign In
-        </Button>
+    <Navbar
+      fluid
+      className="sticky top-0 z-40 border-b border-surface-border bg-surface-raised/95 px-4 py-3 backdrop-blur-xl sm:px-6"
+    >
+      <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-4">
+        <NavLogo to={logoTo} />
+        <nav className="flex items-center gap-2" aria-label="Account">
+          <Button
+            color="alternative"
+            size="sm"
+            onClick={() => openAuthModal("signin")}
+            className="border-transparent bg-transparent text-text-secondary hover:border-surface-border hover:bg-surface-overlay hover:text-text-primary"
+          >
+            Sign in
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => openAuthModal("signup")}
+            className="bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500"
+          >
+            <span className="hidden sm:inline">Create account</span>
+            <span className="sm:hidden">Join</span>
+          </Button>
+        </nav>
       </div>
-    </header>
+    </Navbar>
   );
 }

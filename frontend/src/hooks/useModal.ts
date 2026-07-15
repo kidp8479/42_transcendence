@@ -1,13 +1,18 @@
+import { useContext } from "react";
+import { ModalContext } from "../components/modals/ModalProvider";
+
 /**
- * Custom hook to access the global modal system.
- * Provides a simple API to open and close modals
- * without directly interacting with React context.
- *
- * This hook is a convenience wrapper around ModalContext.
- * It should be used anywhere in the app where modals need to be triggered.
+ * Accesses the global modal state.
  *
  * Returns:
- * - activeModal: currently open modal type (if any)
- * - openModal: function to open a modal
- * - closeModal: function to close the active modal
+ * - activeModal: currently open modal and its view, if any
+ * - openAuthModal: opens the authentication modal in sign-in or sign-up mode
+ * - closeModal: closes the active modal
  */
+export function useModal() {
+  const context = useContext(ModalContext);
+  if (!context) {
+    throw new Error("useModal must be used inside ModalProvider");
+  }
+  return context;
+}

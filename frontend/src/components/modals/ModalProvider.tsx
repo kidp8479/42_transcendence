@@ -1,24 +1,39 @@
+import {
+  createContext,
+  useCallback,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from "react";
+
+export type AuthView = "signin" | "signup";
+export type ModalState = { type: "auth"; view: AuthView } | null;
+
+interface ModalContextValue {
+  activeModal: ModalState;
+  openAuthModal: (view?: AuthView) => void;
+  closeModal: () => void;
+}
+
+export const ModalContext = createContext<ModalContextValue | null>(null);
+
 /**
- * Global modal state provider.
- * Manages the application-wide modal state and provides a centralized API
- * for opening and closing modals from any component.
- *
- * This component acts as the single source of truth for modal state.
- * It does NOT render any UI or modal components directly.
- *
- * Instead, it exposes state and actions that are consumed by ModalLayer,
- * which is responsible for rendering the actual modal UI.
- *
- * Handles:
- * - Tracking the currently active modal
- * - Providing openModal() to trigger a modal from anywhere in the app
- * - Providing closeModal() to dismiss the active modal
- * - Preventing prop drilling for modal state management
- *
- * NOTE:
- * This provider must wrap the application (or layout level) where modals
- * need to be accessible.
- *
- * It works in conjunction with ModalLayer.tsx to separate state management
- * from rendering logic.
+ * Owns global modal state while ModalLayer handles rendering.
  */
+export function ModalProvider({ children }: PropsWithChildren) {
+  const [activeModal, setActiveModal] = useState<ModalState>(null);
+
+  const openAuthModal = useCallback((view: AuthView = "signin") => {
+    setActiveModal({ type: "auth", view });
+  }, []);
+  const closeModal = useCallback(() => setActiveModal(null), []);
+
+  const value = useMemo(
+    () => ({ activeModal, openAuthModal, closeModal }),
+    [activeModal, closeModal, openAuthModal]
+  );
+
+  return (
+    <ModalContext.Provider value={value}>{children}</ModalContext.Provider>
+  );
+}
