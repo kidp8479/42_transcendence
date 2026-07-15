@@ -18,8 +18,9 @@ import { Alert, Button, Label, TextInput } from "flowbite-react";
 import { useState, type FocusEvent, type FormEvent } from "react";
 import { HiOutlineExclamationCircle } from "react-icons/hi2";
 import { useNavigate } from "@tanstack/react-router";
-import { login } from "../../lib/auth";
-import { darkTextInputTheme } from "../../lib/flowbite";
+import { AuthRequestError, login } from "../../lib/auth";
+import { validateAuthForm } from "../../lib/authForm";
+import { darkAlertTheme, darkTextInputTheme } from "../../lib/flowbite";
 import { useModal } from "../../hooks/useModal";
 
 interface SigninFormProps {
@@ -35,6 +36,9 @@ export function SigninForm({ onCreateAccount }: SigninFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    if (!validateAuthForm(event.currentTarget)) {
+      return;
+    }
     setSubmitting(true);
 
     const form = new FormData(event.currentTarget);
@@ -43,34 +47,48 @@ export function SigninForm({ onCreateAccount }: SigninFormProps) {
       closeModal();
       await navigate({ to: "/dashboard" });
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to sign in"
-      );
+      setError(signInErrorMessage(requestError));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <AuthField label="Email" name="email" type="email" autoComplete="email" />
+    <form noValidate onSubmit={handleSubmit} className="space-y-4">
+      <AuthField
+        label="Email address"
+        name="email"
+        type="email"
+        autoComplete="email"
+        validationMessages={{
+          required: "Enter your email address.",
+          invalid: "Enter a valid email address, like name@example.com.",
+          typeMismatch: "Enter a valid email address, like name@example.com.",
+        }}
+      />
       <AuthField
         label="Password"
         name="password"
         type="password"
         autoComplete="current-password"
+        validationMessages={{
+          required: "Enter your password.",
+          invalid: "Enter your password.",
+        }}
       />
 
       {error && (
-        <Alert color="failure" icon={HiOutlineExclamationCircle}>
+        <Alert
+          color="failure"
+          icon={HiOutlineExclamationCircle}
+          theme={darkAlertTheme}
+        >
           {error}
         </Alert>
       )}
 
       <Button
-        className="bg-brand-600 hover:bg-brand-700 focus:ring-brand-500"
+        className="bg-brand-700 text-white hover:bg-brand-800 focus:ring-brand-500"
         disabled={submitting}
         fullSized
         type="submit"
@@ -105,6 +123,9 @@ interface AuthFieldProps {
   validationMessages?: {
     required: string;
     invalid: string;
+    typeMismatch?: string;
+    tooShort?: string;
+    tooLong?: string;
   };
 }
 
@@ -133,6 +154,12 @@ export function AuthField({
     if (validationMessages) {
       if (input.validity.valueMissing) {
         message = validationMessages.required;
+      } else if (input.validity.typeMismatch) {
+        message = validationMessages.typeMismatch ?? validationMessages.invalid;
+      } else if (input.validity.tooShort) {
+        message = validationMessages.tooShort ?? validationMessages.invalid;
+      } else if (input.validity.tooLong) {
+        message = validationMessages.tooLong ?? validationMessages.invalid;
       } else if (!input.validity.valid) {
         message = validationMessages.invalid;
       }
@@ -174,7 +201,10 @@ export function AuthField({
             touched || validationError.length > 0
           )
         }
-        onInvalid={(event) => syncValidation(event.currentTarget, true)}
+        onInvalid={(event) => {
+          event.preventDefault();
+          syncValidation(event.currentTarget, true);
+        }}
         pattern={pattern}
         required
         theme={darkTextInputTheme}
@@ -182,29 +212,42 @@ export function AuthField({
         type={type}
         color={validationError ? "failure" : "gray"}
         aria-describedby={
-          [guidance && guidanceId, validationError && errorId]
-            .filter(Boolean)
-            .join(" ") || undefined
+          validationError ? errorId : guidance ? guidanceId : undefined
         }
         aria-invalid={validationError ? true : undefined}
       />
-      {guidance && (
+      {validationError ? (
+        <p
+          id={errorId}
+          role="alert"
+          className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-control-error"
+        >
+          <HiOutlineExclamationCircle
+            aria-hidden="true"
+            className="mt-0.5 h-4 w-4 shrink-0"
+          />
+          <span>{validationError}</span>
+        </p>
+      ) : guidance ? (
         <p
           id={guidanceId}
-          className="mt-2 text-xs leading-5 text-text-secondary"
+          className="mt-2 text-xs leading-5 text-control-helper"
         >
           {guidance}
         </p>
-      )}
-      {validationError && (
-        <p
-          id={errorId}
-          aria-live="polite"
-          className="mt-2 text-xs leading-5 text-red-400"
-        >
-          {validationError}
-        </p>
-      )}
+      ) : null}
     </div>
   );
+}
+
+function signInErrorMessage(error: unknown): string {
+  if (error instanceof AuthRequestError) {
+    if (error.status === 401) {
+      return "Email address or password is incorrect.";
+    }
+    if (error.status === 429) {
+      return "Too many attempts. Wait a minute and try again.";
+    }
+  }
+  return "We couldn't sign you in. Try again.";
 }

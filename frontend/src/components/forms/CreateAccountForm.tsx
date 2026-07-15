@@ -22,7 +22,9 @@ import { Alert, Button } from "flowbite-react";
 import { useState, type FormEvent } from "react";
 import { HiOutlineExclamationCircle } from "react-icons/hi2";
 import { useNavigate } from "@tanstack/react-router";
-import { register } from "../../lib/auth";
+import { AuthRequestError, register } from "../../lib/auth";
+import { validateAuthForm } from "../../lib/authForm";
+import { darkAlertTheme } from "../../lib/flowbite";
 import { useModal } from "../../hooks/useModal";
 import { AuthField } from "./SigninForm";
 
@@ -39,6 +41,13 @@ export function CreateAccountForm({ onSignIn }: CreateAccountFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    const usernameInput = event.currentTarget.elements.namedItem("username");
+    if (usernameInput instanceof HTMLInputElement) {
+      usernameInput.value = usernameInput.value.trim();
+    }
+    if (!validateAuthForm(event.currentTarget)) {
+      return;
+    }
     setSubmitting(true);
 
     const form = new FormData(event.currentTarget);
@@ -51,57 +60,69 @@ export function CreateAccountForm({ onSignIn }: CreateAccountFormProps) {
       closeModal();
       await navigate({ to: "/dashboard" });
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to create account"
-      );
+      setError(createAccountErrorMessage(requestError));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form noValidate onSubmit={handleSubmit} className="space-y-4">
       <AuthField
-        label="Username"
+        label="Email address"
+        name="email"
+        type="email"
+        autoComplete="email"
+        guidance="You'll use this to sign in."
+        validationMessages={{
+          required: "Enter your email address.",
+          invalid: "Enter a valid email address, like name@example.com.",
+          typeMismatch: "Enter a valid email address, like name@example.com.",
+        }}
+      />
+      <AuthField
+        label="App username"
         name="username"
         type="text"
         autoComplete="username"
         minLength={3}
         maxLength={32}
         pattern="(?:[A-Za-z0-9_]|-){3,32}"
-        guidance="3-32 characters. Use A-Z, a-z, 0-9, underscore (_), or hyphen (-)."
+        guidance="3-32 letters, numbers, underscores, or hyphens. It doesn't have to match your 42 login."
         trimOnBlur
         validationMessages={{
-          required: "Enter a username.",
-          invalid:
-            "Enter 3-32 characters using only A-Z, a-z, 0-9, underscore (_), or hyphen (-).",
+          required: "Enter an app username.",
+          invalid: "Use 3-32 letters, numbers, underscores, or hyphens.",
         }}
       />
-      <AuthField label="Email" name="email" type="email" autoComplete="email" />
       <AuthField
         label="Password"
         name="password"
         type="password"
         autoComplete="new-password"
+        guidance="Use 12-128 characters. Password reset isn't available yet."
         minLength={12}
         maxLength={128}
+        validationMessages={{
+          required: "Enter a password.",
+          invalid: "Use 12-128 characters.",
+          tooShort: "Use at least 12 characters.",
+          tooLong: "Use no more than 128 characters.",
+        }}
       />
 
-      <p className="text-xs leading-5 text-text-secondary">
-        Use at least 12 characters. Email verification and password recovery are
-        planned for the next authentication milestone.
-      </p>
-
       {error && (
-        <Alert color="failure" icon={HiOutlineExclamationCircle}>
+        <Alert
+          color="failure"
+          icon={HiOutlineExclamationCircle}
+          theme={darkAlertTheme}
+        >
           {error}
         </Alert>
       )}
 
       <Button
-        className="bg-brand-600 hover:bg-brand-700 focus:ring-brand-500"
+        className="bg-brand-700 text-white hover:bg-brand-800 focus:ring-brand-500"
         disabled={submitting}
         fullSized
         type="submit"
@@ -121,4 +142,16 @@ export function CreateAccountForm({ onSignIn }: CreateAccountFormProps) {
       </p>
     </form>
   );
+}
+
+function createAccountErrorMessage(error: unknown): string {
+  if (error instanceof AuthRequestError) {
+    if (error.status === 409) {
+      return "An account with that email address or app username already exists. Try signing in or choose another username.";
+    }
+    if (error.status === 429) {
+      return "Too many attempts. Wait a minute and try again.";
+    }
+  }
+  return "We couldn't create your account. Try again.";
 }

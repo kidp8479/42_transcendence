@@ -28,8 +28,8 @@ export function AuthModal({ initialView }: AuthModalProps) {
       </h2>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-text-secondary">
         {view === "signin"
-          ? "Sign in to your workspace"
-          : "Start managing projects with your team"}
+          ? "Sign in with your email address."
+          : "Use your email to sign in. Your app username is what teammates see."}
       </p>
 
       <div className="mt-6 text-left">

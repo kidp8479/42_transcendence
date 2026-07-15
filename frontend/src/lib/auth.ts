@@ -14,6 +14,16 @@ export interface AuthSession {
   absoluteExpiresAt: string;
 }
 
+export class AuthRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "AuthRequestError";
+  }
+}
+
 export async function getSession(): Promise<AuthSession | null> {
   const response = await fetch("/auth/session", {
     credentials: "include",
@@ -81,7 +91,10 @@ async function authRequest(
 
 async function parseSessionResponse(response: Response): Promise<AuthSession> {
   if (!response.ok) {
-    throw new Error(await readErrorMessage(response));
+    throw new AuthRequestError(
+      response.status,
+      await readErrorMessage(response)
+    );
   }
 
   const payload: unknown = await response.json();
