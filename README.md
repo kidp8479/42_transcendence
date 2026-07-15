@@ -152,6 +152,14 @@ This is only a frontend convenience loop. The canonical full application still r
 
 Default local values live in `.env.example`. For normal local development, the generated `.env` works as-is for database and internal service wiring.
 
+To discard the current local configuration and recreate it from the template:
+
+```sh
+make recreate-env
+```
+
+This overwrites the existing `.env` file.
+
 If you need OAuth login during development, fill in the provider credentials in `.env`:
 
 ```sh
@@ -225,6 +233,14 @@ make shell-db
 Run Prisma migrations from inside the backend container:
 
 ```sh
+make migrate
+```
+
+Stop the database and permanently remove its data volume:
+
+```sh
+make wipe-db
+make up-db
 make migrate
 ```
 

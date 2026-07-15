@@ -35,6 +35,10 @@ $(ENV_FILE):
 	@echo "No .env found. Copying .env.example.."
 	cp .env.example $(ENV_FILE)
 
+## overwrite .env with the default values from .env.example
+recreate-env:
+	cp .env.example $(ENV_FILE)
+
 
 # ---------------------------------------------------------------------------- #
 # lifecycle                                                                    #
@@ -140,8 +144,9 @@ shell-auth:
 	$(COMPOSE) exec auth sh
 
 ## open psql in the database container
-shell-db:
-	$(COMPOSE) exec db psql -U $${POSTGRES_USER} $${POSTGRES_DB}
+shell-db: $(ENV_FILE)
+	@set -a; . ./$(ENV_FILE); set +a; \
+	$(COMPOSE) exec db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
 
 
 # ---------------------------------------------------------------------------- #
@@ -159,6 +164,23 @@ prisma-studio:
 ## inject demo data into the database (run once after migrate, requires seed.ts to be implemented)
 seed:
 	$(COMPOSE) exec backend npx prisma db seed
+
+## stop the database and remove its Compose-managed data volume
+wipe-db: $(ENV_FILE)
+	$(COMPOSE) stop db
+	$(COMPOSE) rm -f db
+	@project=$$($(COMPOSE) config --format json | \
+		sed -n 's/^[[:space:]]*"name": "\([^"]*\)",/\1/p' | head -n 1); \
+	test -n "$$project"; \
+	volume=$$(docker volume ls -q \
+		--filter label=com.docker.compose.project="$$project" \
+		--filter label=com.docker.compose.volume=db_data); \
+	if [ -n "$$volume" ]; then \
+		docker volume rm $$volume; \
+	else \
+		echo "Database volume is already absent."; \
+	fi
+	@echo "Database wiped. Run 'make up-db' and 'make migrate' to recreate it."
 
 
 # ---------------------------------------------------------------------------- #
@@ -281,6 +303,7 @@ help:
 	@printf "\n"
 
 .PHONY: all up up-build down restart build logs ps clean fclean re ffclean rebuild \
+        recreate-env wipe-db \
         up-db up-frontend up-backend up-auth \
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
