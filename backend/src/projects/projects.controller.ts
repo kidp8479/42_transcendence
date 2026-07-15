@@ -5,7 +5,7 @@
 // req.user.id is a member of that project (ProjectMember) before returning/changing
 // anything, otherwise any authenticated user could read or modify any project by id (IDOR).
 
-import { Controller, Get, Req } from "@nestjs/common";
+import { Controller, Get, Req, Param, ParseUUIDPipe } from "@nestjs/common";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { ProjectsService } from "./projects.service";
 
@@ -20,16 +20,20 @@ export class ProjectsController {
     return this.projectsService.findAll(request.user.id);
   }
 
+  // GET /api/projects/:id => one project, only if the user is a member of it
+  // (membership enforced inside ProjectsService.findById, not trusted here)
+  @Get(":id")
+  findById(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectsService.findById(id, request.user.id);
+  }
+
   // TODO: POST /api/projects
   //       => create a new project
   //       => expects a request body matching CreateProjectDto (name, description?, status?, deadline?, isArchived?)
   //       => creator (req.user.id) should be added as a ProjectMember right after creation
-
-  // TODO: GET /api/projects/:id
-  //       => get one project by its id
-  //       => must verify req.user.id is a member of this project before returning it
-  //       => validate :id with @Param('id', ParseUUIDPipe) so a malformed id gets
-  //          rejected with a 400 before hitting the database
 
   // TODO: PATCH /api/projects/:id
   //       => update an existing project (any field, all optional)
