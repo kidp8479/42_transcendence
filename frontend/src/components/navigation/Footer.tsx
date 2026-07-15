@@ -21,10 +21,10 @@ const RouterFooterLink = createLink(FooterLink);
 
 export function Footer() {
   return (
-    <div className="bg-surface-base">
+    <div className="bg-surface-base!">
       <FlowbiteFooter
         container
-        className="bg-surface-base relative md:justify-start"
+        className="bg-surface-base! relative md:justify-start"
       >
         <FooterCopyright
           className="text-text-secondary p-4"
