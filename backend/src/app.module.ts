@@ -7,6 +7,7 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { ConfigModule } from "@nestjs/config";
 import { envValidationSchema } from "./config/env.validation";
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter";
+import { AuthGuard } from "./auth/auth.guard";
 
 // import each feature module so NestJS knows it exists
 import { PrismaModule } from "./prisma/prisma.module";
@@ -60,10 +61,10 @@ import { CalendarCategoriesModule } from "./calendar-categories/calendar-categor
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    // TODO (hard blocker before the first real route handler ships): add the auth
-    // team's guard here too, ex: { provide: APP_GUARD, useClass: AuthGuard } - see
-    // src/auth/auth.guard.ts. Multiple APP_GUARD entries all run, in order, so this
-    // can be added alongside ThrottlerGuard without replacing it.
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard,
+    },
 
     // translates raw Prisma errors (ex: unique constraint violation, record not
     // found) into clean HTTP responses (409, 404, ...) globally, instead of every
