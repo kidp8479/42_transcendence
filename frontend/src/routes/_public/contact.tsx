@@ -7,29 +7,16 @@ export const Route = createFileRoute("/_public/contact")({
 
 type TeamMember = {
   name: string;
-  role: string;
   email: string;
 };
 
 // Fill in your teammates here — one entry per person.
 const team: TeamMember[] = [
-  {
-    name: "Carlos",
-    role: "[role / 42 login]",
-    email: "cade-jes@student.42.fr",
-  },
-  { name: "Andrei", role: "[role / 42 login]", email: "abelov@student.42.fr" },
-  {
-    name: "Pauline",
-    role: "[role / 42 login]",
-    email: "pafroidu@student.42.fr",
-  },
-  {
-    name: "Christophe",
-    role: "[role / 42 login]",
-    email: "cgajean@student.42.fr",
-  },
-  { name: "Diana", role: "[role / 42 login]", email: "diade-so@student.42.fr" },
+  { name: "Carlos", email: "cade-jes@student.42.fr" },
+  { name: "Andrei", email: "abelov@student.42.fr" },
+  { name: "Pauline", email: "pafroidu@student.42.fr" },
+  { name: "Christophe", email: "cgajean@student.42.fr" },
+  { name: "Diana", email: "diade-so@student.42.fr" },
 ];
 
 export function ContactPage() {
@@ -53,7 +40,6 @@ export function ContactPage() {
             {team.map((member, i) => (
               <li key={i} className="rounded-lg border border-gray-200 p-4">
                 <p className="font-medium text-text-primary">{member.name}</p>
-                <p className="text-sm">{member.role}</p>
                 <a
                   href={`mailto:${member.email}`}
                   className="mt-1 inline-block text-sm font-medium text-blue-600 hover:underline"
