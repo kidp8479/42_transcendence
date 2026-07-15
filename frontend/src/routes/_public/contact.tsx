@@ -19,7 +19,7 @@ const team: TeamMember[] = [
   { name: "Diana", email: "diade-so@student.42.fr" },
 ];
 
-export function ContactPage() {
+function ContactPage() {
   return (
     <div className="bg-surface-base min-h-screen">
       <div className="mx-auto max-w-3xl px-4 py-12 text-text-secondary">

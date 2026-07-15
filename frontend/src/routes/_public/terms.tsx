@@ -111,7 +111,7 @@ const sections: Section[] = [
   },
 ];
 
-export function TermsPage() {
+function TermsPage() {
   return (
     <LegalPageLayout
       title="Terms of Service"

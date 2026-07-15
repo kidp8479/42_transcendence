@@ -47,6 +47,6 @@ const sections: Section[] = [
   },
 ];
 
-export function AboutPage() {
+function AboutPage() {
   return <LegalPageLayout title="About" sections={sections} />;
 }
