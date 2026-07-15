@@ -20,6 +20,11 @@
   --color-surface-overlay: #1c1c1c;
   --color-surface-border: #2a2a2a;
 
+  /* Controls */
+  --color-control-bg: #374151;
+  --color-control-border: #4b5563;
+  --color-control-placeholder: #9ca3af;
+
   /* Text */
   --color-text-primary: #f4f4f5;
   --color-text-secondary: #a1a1aa;
@@ -28,6 +33,30 @@
 
 body {
   background-color: var(--color-surface-base);
+}
+
+/* Keep auth fields on the same surface whether empty, typed, or autofilled. */
+input[data-auth-field]:autofill {
+  background-color: var(--color-control-bg) !important;
+  background-image: none !important;
+  color: var(--color-text-primary) !important;
+  caret-color: var(--color-text-primary);
+  filter: none;
+  box-shadow: 0 0 0 1000px var(--color-control-bg) inset !important;
+}
+
+input[data-auth-field]:-webkit-autofill,
+input[data-auth-field]:-webkit-autofill:hover,
+input[data-auth-field]:-webkit-autofill:focus {
+  background-color: var(--color-control-bg) !important;
+  background-image: none !important;
+  -webkit-text-fill-color: var(--color-text-primary) !important;
+  color: var(--color-text-primary) !important;
+  caret-color: var(--color-text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-control-bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--color-control-bg) inset !important;
+  filter: none;
+  transition: background-color 9999s ease-out;
 }
 
 /*
