@@ -5,12 +5,17 @@ import { Outlet, redirect } from "@tanstack/react-router";
 import { HeaderAuthenticated } from "../navigation/HeaderAuthenticated";
 import { Sidebar } from "../navigation/Sidebar";
 import { Footer } from "../navigation/Footer";
+import { getSession, type AuthSession } from "../../lib/auth";
 
-export function AuthenticatedLayout() {
+interface AuthenticatedLayoutProps {
+  session: AuthSession;
+}
+
+export function AuthenticatedLayout({ session }: AuthenticatedLayoutProps) {
   return (
     <>
       {/* Top navigation bar - search, notifications, user avatar */}
-      <HeaderAuthenticated />
+      <HeaderAuthenticated session={session} />
 
       {/* Side by side: collapsible sidebar + page content */}
       <div>
@@ -27,17 +32,12 @@ export function AuthenticatedLayout() {
   );
 }
 
-// Auth guard - called by _authenticated/route.tsx before rendering any authenticated page.
-// If no token is found in localStorage, redirects to the landing page (/).
-// This function runs for every route under _authenticated/, no need to repeat it per page.
-//
 // UX gate only - not a security boundary.
-// A forged token passes this check but every backend API call will fail without a valid JWT.
-// The real authorization authority is the backend.
-// TODO (auth team): replace localStorage.getItem("token") with the real session source
-// once the auth system is implemented.
-export function authGuard() {
-  if (!localStorage.getItem("token")) {
+// The NestJS global guard remains the authorization boundary.
+export async function authGuard() {
+  const session = await getSession();
+  if (!session) {
     throw redirect({ to: "/" });
   }
+  return { session };
 }

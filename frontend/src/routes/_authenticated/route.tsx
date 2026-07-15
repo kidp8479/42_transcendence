@@ -12,5 +12,10 @@ import {
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: authGuard,
-  component: AuthenticatedLayout,
+  component: AuthenticatedRoute,
 });
+
+function AuthenticatedRoute() {
+  const { session } = Route.useRouteContext();
+  return <AuthenticatedLayout session={session} />;
+}
