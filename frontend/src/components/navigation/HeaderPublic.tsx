@@ -29,7 +29,7 @@ export function HeaderPublic() {
           <Button
             size="sm"
             onClick={() => openAuthModal("signup")}
-            className="bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500"
+            className="bg-brand-700 text-white hover:bg-brand-800 focus:ring-brand-500"
           >
             <span className="hidden sm:inline">Create account</span>
             <span className="sm:hidden">Join</span>

@@ -13,6 +13,7 @@
   --color-brand-500: #22c55e;
   --color-brand-600: #16a34a;
   --color-brand-700: #15803d;
+  --color-brand-800: #166534;
 
   /* Surfaces */
   --color-surface-base: #0f0f0f;
@@ -20,10 +21,13 @@
   --color-surface-overlay: #1c1c1c;
   --color-surface-border: #2a2a2a;
 
-  /* Controls */
+  /* Auth and form controls - documented in the /dont-panic style guide. */
+  --color-alert-bg: #1f2937;
   --color-control-bg: #374151;
-  --color-control-border: #4b5563;
-  --color-control-placeholder: #9ca3af;
+  --color-control-border: #6b7280;
+  --color-control-error: #f87171;
+  --color-control-helper: #9ca3af;
+  --color-control-placeholder: #d1d5db;
 
   /* Text */
   --color-text-primary: #f4f4f5;

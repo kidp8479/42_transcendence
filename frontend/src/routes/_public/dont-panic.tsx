@@ -3,14 +3,16 @@
 // components, and conventions the whole team should follow. Can be changed anytime if styling decisions are made.
 import { createFileRoute } from "@tanstack/react-router";
 import { Badge, Button, Card, TextInput, ToggleSwitch } from "flowbite-react";
+import { darkTextInputTheme } from "../../lib/flowbite";
 
 export const Route = createFileRoute("/_public/dont-panic")({
   component: StyleGuidePage,
 });
 
 const PALETTE_COLORS = [
-  { bg: "bg-brand-500", label: "bg-brand-500", note: "primary action" },
-  { bg: "bg-brand-600", label: "bg-brand-600", note: "hover state" },
+  { bg: "bg-brand-500", label: "bg-brand-500", note: "focus and links" },
+  { bg: "bg-brand-700", label: "bg-brand-700", note: "primary action" },
+  { bg: "bg-brand-800", label: "bg-brand-800", note: "action hover" },
   {
     bg: "bg-surface-base",
     label: "bg-surface-base",
@@ -20,13 +22,13 @@ const PALETTE_COLORS = [
   {
     bg: "bg-surface-raised",
     label: "bg-surface-raised",
-    note: "cards",
+    note: "cards and modals",
     border: true,
   },
   {
     bg: "bg-surface-overlay",
     label: "bg-surface-overlay",
-    note: "modals",
+    note: "dropdowns and subtle overlays",
     border: true,
   },
   {
@@ -35,8 +37,71 @@ const PALETTE_COLORS = [
     note: "borders, dividers",
     border: true,
   },
-  { bg: "bg-red-700", label: "bg-red-700", note: "danger / error" },
+  { bg: "bg-red-700", label: "bg-red-700", note: "generic danger actions" },
   { bg: "bg-yellow-400", label: "bg-yellow-400", note: "warning" },
+];
+
+const AUTH_PALETTE = [
+  {
+    token: "surface-raised",
+    className: "bg-surface-raised",
+    hex: "#141414",
+    usage: "Modal surface",
+  },
+  {
+    token: "alert-bg",
+    className: "bg-alert-bg",
+    hex: "#1f2937",
+    usage: "Backend error alert",
+  },
+  {
+    token: "control-bg",
+    className: "bg-control-bg",
+    hex: "#374151",
+    usage: "Input background in every state",
+  },
+  {
+    token: "control-border",
+    className: "bg-control-border",
+    hex: "#6b7280",
+    usage: "Default input border",
+  },
+  {
+    token: "control-placeholder",
+    className: "bg-control-placeholder",
+    hex: "#d1d5db",
+    usage: "Input placeholder",
+  },
+  {
+    token: "control-helper",
+    className: "bg-control-helper",
+    hex: "#9ca3af",
+    usage: "Guidance below inputs",
+  },
+  {
+    token: "control-error",
+    className: "bg-control-error",
+    hex: "#f87171",
+    usage: "Error border, icon, and text",
+  },
+  {
+    token: "brand-500",
+    className: "bg-brand-500",
+    hex: "#22c55e",
+    usage: "Focus border and ring",
+  },
+  {
+    token: "brand-700",
+    className: "bg-brand-700",
+    hex: "#15803d",
+    usage: "Primary authentication action",
+  },
+  {
+    token: "brand-800",
+    className: "bg-brand-800",
+    hex: "#166534",
+    usage: "Primary action hover",
+  },
 ];
 
 const TEXT_STYLES = [
@@ -297,8 +362,104 @@ function StyleGuidePage() {
           </span>
         </p>
         <div className="flex flex-col gap-3 max-w-sm">
-          <TextInput placeholder="Search tasks..." />
-          <TextInput placeholder="Project name" />
+          <TextInput placeholder="Search tasks..." theme={darkTextInputTheme} />
+          <TextInput
+            color="failure"
+            readOnly
+            theme={darkTextInputTheme}
+            value="Invalid value"
+          />
+        </div>
+      </section>
+
+      {/* Authentication palette */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-mono uppercase tracking-widest text-text-muted">
+          Authentication palette
+        </h2>
+        <p className="max-w-3xl text-sm text-text-secondary">
+          Authentication UI uses a Flowbite blue-gray hierarchy inside the
+          neutral modal surface. Reuse these semantic tokens instead of applying
+          Flowbite's default light failure backgrounds or hardcoded colors.
+        </p>
+        <p className="max-w-3xl text-xs leading-5 text-text-muted">
+          Apply <span className="font-mono">darkTextInputTheme</span> and{" "}
+          <span className="font-mono">darkAlertTheme</span> from{" "}
+          <span className="font-mono">frontend/src/lib/flowbite.ts</span>.
+          Authentication inputs must also include{" "}
+          <span className="font-mono">data-auth-field</span> so browser autofill
+          uses the documented surface.
+        </p>
+        <div className="overflow-x-auto rounded-lg border border-surface-border">
+          <table className="w-full min-w-2xl text-left text-sm">
+            <thead className="bg-surface-overlay text-text-primary">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Token</th>
+                <th className="px-4 py-3 font-semibold">Value</th>
+                <th className="px-4 py-3 font-semibold">Usage</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-border">
+              {AUTH_PALETTE.map(({ token, className, hex, usage }) => (
+                <tr key={token}>
+                  <td className="px-4 py-3 font-mono text-text-primary">
+                    {token}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className={`h-5 w-5 border border-white/20 ${className}`}
+                      />
+                      <span className="font-mono text-text-secondary">
+                        {hex}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-text-secondary">{usage}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="max-w-3xl space-y-2 border-l-2 border-brand-500 pl-4 text-xs leading-5 text-text-secondary">
+          <p className="font-semibold text-text-primary">State rules</p>
+          <p>
+            Empty, typed, focused, invalid, and browser-autofilled inputs always
+            retain <span className="font-mono">bg-control-bg</span>.
+          </p>
+          <p>
+            A valid focused input uses{" "}
+            <span className="font-mono">brand-500</span>. An invalid input keeps{" "}
+            <span className="font-mono">control-error</span> for its border and
+            ring even while focused; entered text is never tinted.
+          </p>
+          <p>
+            Authentication guidance uses{" "}
+            <span className="font-mono">control-helper</span>; the generic{" "}
+            <span className="font-mono">text-muted</span> and{" "}
+            <span className="font-mono">red-700</span> examples elsewhere on
+            this page do not replace the auth-specific tokens.
+          </p>
+          <p>
+            Backend errors use <span className="font-mono">alert-bg</span> so
+            they belong to the same Flowbite gray family without looking like
+            another input. Render them with{" "}
+            <span className="font-mono">
+              {'<Alert color="failure" theme={darkAlertTheme}>'}
+            </span>
+            .
+          </p>
+          <p>
+            Primary authentication buttons use{" "}
+            <span className="font-mono">brand-700</span> with white text and{" "}
+            <span className="font-mono">brand-800</span> on hover. Apply{" "}
+            <span className="font-mono">
+              bg-brand-700 text-white hover:bg-brand-800
+            </span>{" "}
+            rather than the generic{" "}
+            <span className="font-mono">color="green"</span> example.
+          </p>
         </div>
       </section>
 
