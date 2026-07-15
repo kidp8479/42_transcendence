@@ -14,8 +14,8 @@ const sections: Section[] = [
   {
     heading: "1. Acceptance of Terms",
     blocks: [
-      `These Terms of Service ("Terms") govern your access to and use of Transcendence Project (the "Platform"), an online collaborative workspace for 42 students. By creating an account or using the Platform, you agree to be bound by these Terms. If you do not agree, you must not use the Platform.`,
-      `Transcendence Project is a non-commercial project developed for educational purposes as part of the 42 curriculum.`,
+      `These Terms of Service ("Terms") govern your access to and use of 42 Project Planner (the "Platform"), an online collaborative workspace for 42 students. By creating an account or using the Platform, you agree to be bound by these Terms. If you do not agree, you must not use the Platform.`,
+      `42 Project Planner is a non-commercial project developed for educational purposes as part of the 42 curriculum.`,
     ],
   },
   {
@@ -112,14 +112,12 @@ const sections: Section[] = [
 
 export function TermsPage() {
   return (
-    <main className="bg-surface-base min-h-screen">
+    <div className="bg-surface-base min-h-screen">
       <div className="mx-auto max-w-3xl px-4 py-12 text-text-secondary">
         <h1 className="text-3xl font-bold text-text-primary">
           Terms of Service
         </h1>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Last updated: {LAST_UPDATED}
-        </p>
+        <p className="mt-2 text-sm">Last updated: {LAST_UPDATED}</p>
 
         {sections.map((section, i) => (
           <section key={i} className="mt-8 space-y-3">
@@ -142,6 +140,6 @@ export function TermsPage() {
           </section>
         ))}
       </div>
-    </main>
+    </div>
   );
 }

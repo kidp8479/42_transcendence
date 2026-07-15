@@ -10,16 +10,16 @@ type Section = { heading: string; blocks: Block[] };
 
 const sections: Section[] = [
   {
-    heading: "What is Transcendence Project?",
+    heading: "What is 42 Project Planner?",
     blocks: [
-      `Transcendence Project is a collaborative workspace built by and for 42 students. It brings project planning, task tracking, and teamwork together in one simple web application, so student teams can organize their school projects from the first read of the subject to the final defense.`,
+      `42 Project Planner is a project management tool built by and for 42 students. It brings project planning, task tracking, and teamwork together in one simple web application, so students can organize their school projects from the first read of the subject to the final defense, solo or as a team.`,
       `It is a non-commercial project developed for educational purposes as part of the 42 curriculum.`,
     ],
   },
   {
     heading: "Why we built it",
     blocks: [
-      `Students at 42 work in groups all the time, yet there is no shared space designed for the way the school actually works. Professional organization tools exist, but they are often complex, heavy, and built for companies rather than students. Transcendence Project aims to be the simple alternative: a workspace that makes it easy for classmates to plan, share, and move forward together.`,
+      `Students at 42 rarely use a real project management tool during the curriculum, whether they're working solo or in a group, sometimes because they don't know such tools exist, sometimes because the ones out there feel like overkill for what we actually need, sometimes just out of laziness. Professional organization tools exist, but they are often complex, heavy, and built for companies rather than students. 42 Project Planner aims to be the simple alternative: a tool that makes it easy to plan, share, and move forward, whether you're working alone or with a team.`,
     ],
   },
   {
@@ -48,7 +48,7 @@ const sections: Section[] = [
 
 export function AboutPage() {
   return (
-    <main className="bg-surface-base min-h-screen">
+    <div className="bg-surface-base min-h-screen">
       <div className="mx-auto max-w-3xl px-4 py-12 text-text-secondary">
         <h1 className="text-3xl font-bold text-text-primary">About</h1>
 
@@ -73,6 +73,6 @@ export function AboutPage() {
           </section>
         ))}
       </div>
-    </main>
+    </div>
   );
 }

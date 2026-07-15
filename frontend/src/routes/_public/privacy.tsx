@@ -14,8 +14,8 @@ const sections: Section[] = [
   {
     heading: "1. Introduction",
     blocks: [
-      `Transcendence Project ("we", "our", or "the Platform") is an online collaborative workspace where 42 students organize their school projects, manage tasks, and work together as a team. This Privacy Policy explains what personal data we collect, why we collect it, how we use and protect it, and the rights you have over it.`,
-      `Transcendence Project is a non-commercial project developed for educational purposes as part of the 42 curriculum. We only process the data needed to operate the Platform, and we never sell your personal data.`,
+      `42 Project Planner ("we", "our", or "the Platform") is an online collaborative workspace where 42 students organize their school projects, manage tasks, and work together as a team. This Privacy Policy explains what personal data we collect, why we collect it, how we use and protect it, and the rights you have over it.`,
+      `42 Project Planner is a non-commercial project developed for educational purposes as part of the 42 curriculum. We only process the data needed to operate the Platform, and we never sell your personal data.`,
       `By creating an account and using the Platform, you acknowledge that you have read and understood this Privacy Policy.`,
     ],
   },
@@ -108,16 +108,20 @@ const sections: Section[] = [
       `We may update this Privacy Policy from time to time. When we make significant changes, we will update the "Last updated" date at the top of this page and, where appropriate, notify you within the Platform. Continued use of the Platform after changes take effect means you accept the updated policy.`,
     ],
   },
+  {
+    heading: "13. Contact Us",
+    blocks: [
+      `If you have questions about this Privacy Policy or want to exercise any of the rights described in Section 10, reach out to the team via the Contact page of the Platform, or directly on the 42 intranet using any of our logins.`,
+    ],
+  },
 ];
 
 export function PrivacyPage() {
   return (
-    <main className="bg-surface-base min-h-screen">
+    <div className="bg-surface-base min-h-screen">
       <div className="mx-auto max-w-3xl px-4 py-12 text-text-secondary">
         <h1 className="text-3xl font-bold text-text-primary">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Last updated: {LAST_UPDATED}
-        </p>
+        <p className="mt-2 text-sm">Last updated: {LAST_UPDATED}</p>
 
         {sections.map((section, i) => (
           <section key={i} className="mt-8 space-y-3">
@@ -140,6 +144,6 @@ export function PrivacyPage() {
           </section>
         ))}
       </div>
-    </main>
+    </div>
   );
 }
