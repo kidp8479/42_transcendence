@@ -25,24 +25,36 @@ export function Footer() {
       <div className="bg-surface-base">
         <FlowbiteFooter
           container
-          className="bg-surface-base relative md:justify-start "
+          className="bg-surface-base relative md:justify-start"
         >
           <FooterCopyright
-            className="text-text-secondary"
+            className="text-text-secondary p-4"
             by="Transcendence Project"
             year={2026}
           />
           <FooterLinkGroup className="justify-center gap-4 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2">
-            <RouterFooterLink className="text-text-secondary" to="/about">
+            <RouterFooterLink
+              className="text-text-secondary hover:text-brand-700"
+              to="/about"
+            >
               About
             </RouterFooterLink>
-            <RouterFooterLink className="text-text-secondary" to="/privacy">
+            <RouterFooterLink
+              className="text-text-secondary hover:text-brand-700"
+              to="/privacy"
+            >
               Privacy Policy
             </RouterFooterLink>
-            <RouterFooterLink className="text-text-secondary" to="/terms">
+            <RouterFooterLink
+              className="text-text-secondary hover:text-brand-700"
+              to="/terms"
+            >
               Terms of Service
             </RouterFooterLink>
-            <RouterFooterLink className="text-text-secondary" to="/contact">
+            <RouterFooterLink
+              className="text-text-secondary hover:text-brand-700"
+              to="/contact"
+            >
               Contact
             </RouterFooterLink>
           </FooterLinkGroup>

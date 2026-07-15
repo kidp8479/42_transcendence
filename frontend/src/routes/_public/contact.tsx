@@ -30,19 +30,21 @@ export function ContactPage() {
           provided.
         </p>
 
-        <section className="mt-8 space-y-3">
-          <h2 className="text-xl font-semibold text-text-primary">The team</h2>
-          <p className="leading-relaxed">
+        <section className="mt-8 space-y-3 rounded-lg border border-brand-500">
+          <h2 className="text-xl font-semibold text-text-primary pl-4 pt-4">
+            The team
+          </h2>
+          <p className="pl-4 leading-relaxed">
             You can also reach out to any team member directly:
           </p>
 
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid sm:grid-cols-2">
             {team.map((member, i) => (
-              <li key={i} className="rounded-lg border border-gray-200 p-4">
+              <li key={i} className="p-4 pl-8">
                 <p className="font-medium text-text-primary">{member.name}</p>
                 <a
                   href={`mailto:${member.email}`}
-                  className="mt-1 inline-block text-sm font-medium text-blue-600 hover:underline"
+                  className="mt-1 inline-block text-sm font-medium text-text-secondary hover:text-brand-700"
                 >
                   {member.email}
                 </a>
