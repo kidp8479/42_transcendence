@@ -170,10 +170,18 @@ async function main() {
     }
   }
 
-  // 4. Task categories - team-decided default list (matches the Summary tab
-  // mock data and the Notion doc), NOT the earlier draft list. Bounded to 8
-  // entries (0-7) - CATEGORY_COLOR_PALETTE on the frontend has no color past
-  // index 7 yet.
+  // 4. Task categories - REAL data, not dev-only like the users/projects
+  // above. This is the actual default category list every new project
+  // should get in production too (team-decided, matches the Summary tab
+  // mock data and the Notion doc "13. Summary" page), NOT the earlier draft
+  // list. Bounded to 8 entries (0-7) - CATEGORY_COLOR_PALETTE on the
+  // frontend has no color past index 7 yet.
+  // IMPORTANT: this seed only applies these categories to the fake demo
+  // projects created above - it does NOT run for real projects created
+  // through the app. Whoever implements ProjectsService.create() (still
+  // TODO) must insert this same list of 8 categories for every new project,
+  // not just rely on this seed - this array is the source of truth to copy
+  // from, not a substitute for that logic.
   const taskCategories = [
     { name: "Planning", color: 0 },
     { name: "Development", color: 1 },

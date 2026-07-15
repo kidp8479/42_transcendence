@@ -11,9 +11,12 @@ export const Route = createFileRoute("/_authenticated/$projectId/summary")({
 
 function SummaryPage() {
   // --- beginning of mock data - will be replaced by a call to
-  // GET /api/projects/:id/summary once auth is wired ---
-  // Fake data standing in for the real GET /api/projects/:id/summary response
-  // (blocked on auth for now). One object, one field per Summary section
+  // GET /api/projects/:id/summary once the backend for it exists ---
+  // Fake data standing in for the real GET /api/projects/:id/summary response.
+  // Auth is wired (see ProjectLayout) - what's still missing is the backend
+  // itself: Tasks/CalendarEvents/EvaluationChecklistItems endpoints, plus a
+  // team_workload aggregation, none of which exist yet (tracked for a
+  // follow-up PR). One object, one field per Summary section
   // (tasks_by_status, categories, upcoming events, defense readiness, workload per member) - each field is that
   // section's own mock block, matching what the backend will eventually send.
   // Each field below is passed down as props to its own section component.
