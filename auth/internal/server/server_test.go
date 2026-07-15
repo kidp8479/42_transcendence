@@ -79,3 +79,51 @@ func TestHandleSessionClearsCookiesWhenCSRFCookieIsMissing(t *testing.T) {
 		}
 	}
 }
+
+func TestClientIP(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		remoteAddr string
+		realIP     string
+		want       string
+	}{
+		{
+			name:       "trusted nginx header",
+			remoteAddr: "172.20.0.5:41234",
+			realIP:     "203.0.113.10",
+			want:       "203.0.113.10",
+		},
+		{
+			name:       "invalid header falls back to remote host",
+			remoteAddr: "10.0.0.5:53122",
+			realIP:     "spoofed",
+			want:       "10.0.0.5",
+		},
+		{
+			name:       "ipv6 remote address",
+			remoteAddr: "[2001:db8::1]:53122",
+			want:       "2001:db8::1",
+		},
+		{
+			name:       "bare remote address",
+			remoteAddr: "10.0.0.5",
+			want:       "10.0.0.5",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/auth/session", nil)
+			request.RemoteAddr = test.remoteAddr
+			if test.realIP != "" {
+				request.Header.Set("X-Real-IP", test.realIP)
+			}
+
+			if got := clientIP(request); got != test.want {
+				t.Errorf("clientIP() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}

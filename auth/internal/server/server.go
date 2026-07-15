@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/mail"
 	"regexp"
@@ -570,10 +571,16 @@ func requiresCSRF(method string) bool {
 }
 
 func clientIP(r *http.Request) string {
-	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+	// nginx is the only published entrypoint and overwrites X-Real-IP. If the
+	// auth service is ever exposed directly, replace this assumption with an
+	// explicit trusted-proxy allow-list before relying on forwarded headers.
+	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); net.ParseIP(realIP) != nil {
 		return realIP
 	}
-	return r.RemoteAddr
+	if host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr)); err == nil {
+		return host
+	}
+	return strings.Trim(strings.TrimSpace(r.RemoteAddr), "[]")
 }
 
 func toSessionResponse(session store.CreatedSession) sessionResponse {
