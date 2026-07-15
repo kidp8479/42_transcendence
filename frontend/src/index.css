@@ -83,6 +83,30 @@ input[data-auth-field]:-webkit-autofill:focus {
 }
 
 /*
+ * Thin, theme-colored scrollbar for horizontally-scrolling UI (ex: ProjectTabs
+ * on narrow screens, where 7 tabs don't fit and overflow-x-auto kicks in).
+ * Without this, the browser falls back to its bulky default OS scrollbar,
+ * which looks out of place against the dark surface palette. Two separate
+ * rule sets are needed: scrollbar-width/scrollbar-color for Firefox, the
+ * ::-webkit-scrollbar-* pseudo-elements for Chrome/Safari/Edge - neither
+ * engine understands the other's syntax, there's no single standard yet.
+ */
+.scrollbar-thin-surface {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-border) transparent;
+}
+.scrollbar-thin-surface::-webkit-scrollbar {
+  height: 6px;
+}
+.scrollbar-thin-surface::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin-surface::-webkit-scrollbar-thumb {
+  background-color: var(--color-surface-border);
+  border-radius: 9999px;
+}
+
+/*
  * flowbite-react's ScrollContainer (used internally by Carousel) hardcodes
  * hideScrollbars: true, which applies a "!overflow-x-hidden" class to hide
  * the native scrollbar. This exact class (important-prefix + bracket syntax)

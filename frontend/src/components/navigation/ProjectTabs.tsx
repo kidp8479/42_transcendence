@@ -49,7 +49,7 @@ export function ProjectTabs() {
   return (
     <nav
       aria-label="Project tabs"
-      className="flex overflow-x-auto border-b border-surface-border"
+      className="scrollbar-thin-surface flex overflow-x-auto border-b border-surface-border"
     >
       {tabs_links.map((created_link) => (
         <Link

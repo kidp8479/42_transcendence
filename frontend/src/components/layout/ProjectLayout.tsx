@@ -1,14 +1,12 @@
 // Nested wrapper for project sub-pages (tabs: Summary, Discovery, Kanban, List, Calendar, Evaluation Checklist, Project Settings).
 // Renders inside AuthenticatedLayout via its <Outlet />.
-import { Outlet } from "@tanstack/react-router";
+import { Outlet, useLoaderData } from "@tanstack/react-router";
 import { ProjectTabs } from "@/components/navigation/ProjectTabs";
 
 export function ProjectLayout() {
-  // TEMP mock - will be replaced by GET /api/projects/:id once auth is wired
-  const project = {
-    name: "ft_transcendence",
-    description: "Full-stack web app with real-time multiplayer Pong",
-  };
+  // real data now: fetched by the route's loader (GET /api/projects/:id),
+  // see routes/_authenticated/$projectId/route.tsx
+  const project = useLoaderData({ from: "/_authenticated/$projectId" });
 
   return (
     <>
