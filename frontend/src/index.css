@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "flowbite-react/plugin/tailwindcss";
 @source "../.flowbite-react/class-list.json";
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* Flowbite theme - swap this one line to change the global UI theme */
 /* Options: default - enterprise - minimal - mono - playful          */
@@ -13,12 +14,21 @@
   --color-brand-500: #22c55e;
   --color-brand-600: #16a34a;
   --color-brand-700: #15803d;
+  --color-brand-800: #166534;
 
   /* Surfaces */
   --color-surface-base: #0f0f0f;
   --color-surface-raised: #141414;
   --color-surface-overlay: #1c1c1c;
   --color-surface-border: #2a2a2a;
+
+  /* Auth and form controls - documented in the /dont-panic style guide. */
+  --color-alert-bg: #1f2937;
+  --color-control-bg: #374151;
+  --color-control-border: #6b7280;
+  --color-control-error: #f87171;
+  --color-control-helper: #9ca3af;
+  --color-control-placeholder: #d1d5db;
 
   /* Text */
   --color-text-primary: #f4f4f5;
@@ -28,6 +38,30 @@
 
 body {
   background-color: var(--color-surface-base);
+}
+
+/* Keep auth fields on the same surface whether empty, typed, or autofilled. */
+input[data-auth-field]:autofill {
+  background-color: var(--color-control-bg) !important;
+  background-image: none !important;
+  color: var(--color-text-primary) !important;
+  caret-color: var(--color-text-primary);
+  filter: none;
+  box-shadow: 0 0 0 1000px var(--color-control-bg) inset !important;
+}
+
+input[data-auth-field]:-webkit-autofill,
+input[data-auth-field]:-webkit-autofill:hover,
+input[data-auth-field]:-webkit-autofill:focus {
+  background-color: var(--color-control-bg) !important;
+  background-image: none !important;
+  -webkit-text-fill-color: var(--color-text-primary) !important;
+  color: var(--color-text-primary) !important;
+  caret-color: var(--color-text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-control-bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--color-control-bg) inset !important;
+  filter: none;
+  transition: background-color 9999s ease-out;
 }
 
 /*

@@ -5,12 +5,15 @@
 // Every page inside _authenticated/ (dashboard, projects...) is automatically wrapped by AuthenticatedLayout.
 // The auth guard runs before any _authenticated/ page renders - redirects to / if not logged in.
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  AuthenticatedLayout,
-  authGuard,
-} from "../../components/layout/AuthenticatedLayout";
+import { redirect } from "@tanstack/react-router";
+import { AuthenticatedLayout } from "../../components/layout/AuthenticatedLayout";
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: authGuard,
+  beforeLoad: ({ context }) => {
+    if (context.authState.status !== "authenticated") {
+      throw redirect({ to: "/" });
+    }
+    return { session: context.authState.session };
+  },
   component: AuthenticatedLayout,
 });

@@ -1,35 +1,37 @@
-// The root route, the one component that is always rendered, for every URL.
-// Think of it as the outermost box that contains the entire app.
-// Every other route (_public, _authenticated, and their pages) renders inside its <Outlet />.
-/*
- * TODO: Replace the Fragment wrapper with:
- *
- * <ModalProvider>
- *   <Outlet />
- *   <ModalLayer />
- *   <TanStackRouterDevtools />
- * </ModalProvider>
- *
- * once the modal system is implemented.
- *
- *   Why in __root.tsx?
- * - Modals are a global UI system, not a page or layout feature.
- * - Both _public and _authenticated routes need access to modals.
- * - Placing the modal system at the root ensures a single shared
- *   modal state across the entire application.
- * - ModalLayer renders above all pages and layouts, allowing
- *   popups (Sign In, Create Account, Forgot Password, etc.)
- *   to appear anywhere in the app.
- */
-
-import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { ModalLayer } from "../components/modals/ModalLayer";
+import { ModalProvider } from "../components/modals/ModalProvider";
+import { Footer } from "../components/navigation/Footer";
+import { HeaderAuthenticated } from "../components/navigation/HeaderAuthenticated";
+import { HeaderPublic } from "../components/navigation/HeaderPublic";
+import type { AppRouterContext } from "../lib/authState";
 
-export const Route = createRootRoute({
-  component: () => (
-    <>
-      <Outlet />
-      <TanStackRouterDevtools />
-    </>
-  ),
+export const Route = createRootRouteWithContext<AppRouterContext>()({
+  beforeLoad: async ({ context }) => ({
+    authState: await context.auth.resolve(),
+  }),
+  component: RootLayout,
 });
+
+function RootLayout() {
+  const { authState } = Route.useRouteContext();
+
+  return (
+    <ModalProvider>
+      <div className="flex min-h-screen flex-col bg-surface-base text-text-primary">
+        {authState.status === "authenticated" ? (
+          <HeaderAuthenticated session={authState.session} />
+        ) : (
+          <HeaderPublic authUnavailable={authState.status === "unavailable"} />
+        )}
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <Footer />
+      </div>
+      <ModalLayer />
+      <TanStackRouterDevtools />
+    </ModalProvider>
+  );
+}
