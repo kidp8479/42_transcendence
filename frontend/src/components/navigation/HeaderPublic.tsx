@@ -26,7 +26,7 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
             type="button"
             size="sm"
             onClick={() => openAuthModal("signup")}
-            className="dark:bg-brand-600 text-surface-base dark:hover:bg-brand-700"
+            className="bg-brand-600 text-surface-base hover:bg-brand-700"
           >
             <span className="hidden sm:inline">Create account</span>
             <span className="sm:hidden">Join</span>
