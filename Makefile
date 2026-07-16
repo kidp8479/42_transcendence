@@ -168,20 +168,22 @@ seed:
 ## stop the database and remove its Compose-managed data volume
 wipe-db: $(ENV_FILE)
 	@set -e; \
-	volume=$$($(COMPOSE) config --format json | jq -er \
-		'. as $$config \
-		| (.services.db.volumes[] \
-			| select(.type == "volume" \
-				and .target == "/var/lib/postgresql/data") \
-			| .source) as $$source \
-		| $$config.volumes[$$source].name'); \
-	test -n "$$volume"; \
+	config=$$($(COMPOSE) config --format json); \
+	project_name=$$(printf '%s' "$$config" | jq -er '.name'); \
+	volume_source=$$(printf '%s' "$$config" | jq -er \
+		'.services.db.volumes[] \
+		| select(.type == "volume" and .target == "/var/lib/postgresql/data") \
+		| .source'); \
+	volume_name=$$(printf '%s' "$$config" | jq -er --arg source "$$volume_source" \
+		'.volumes[$$source].name'); \
+	test -n "$$project_name"; \
+	test -n "$$volume_name"; \
 	$(COMPOSE) stop db; \
 	$(COMPOSE) rm -f db; \
-	if docker volume inspect "$$volume" >/dev/null 2>&1; then \
-		docker volume rm "$$volume"; \
+	if docker volume inspect "$$volume_name" >/dev/null 2>&1; then \
+		docker volume rm "$$volume_name"; \
 	else \
-		echo "Database volume is already absent."; \
+		echo "$$project_name database volume ($$volume_name) is already absent."; \
 	fi
 	@echo "Database wiped. Run 'make up-db' and 'make migrate' to recreate it."
 
@@ -267,6 +269,15 @@ fclean:
 re: fclean
 	+$(MAKE) up
 
+## fully recreate the application stack, dependencies, and database
+rere:
+	+$(MAKE) recreate-env
+	+$(MAKE) fclean
+	+$(MAKE) ffclean
+	+$(MAKE) wipe-db
+	+$(MAKE) up-build
+	+$(MAKE) migrate
+
 ## remove the named frontend/backend node_modules volumes and local build caches
 ffclean:
 	$(COMPOSE) stop nginx frontend backend auth
@@ -305,7 +316,7 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST) | sort -u
 	@printf "\n"
 
-.PHONY: all up up-build down restart build logs ps clean fclean re ffclean rebuild \
+.PHONY: all up up-build down restart build logs ps clean fclean re rere ffclean rebuild \
         recreate-env wipe-db \
         up-db up-frontend up-backend up-auth \
         rebuild-frontend rebuild-backend rebuild-auth \
