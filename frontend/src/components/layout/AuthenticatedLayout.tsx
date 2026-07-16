@@ -5,9 +5,9 @@ import { SideBarCmp } from "../navigation/SideBarCmp";
 
 export function AuthenticatedLayout() {
   return (
-    <div className="flex">
+    <div className="flex min-h-0 flex-1">
       <SideBarCmp />
-      <main className="min-w-0 flex-1">
+      <main className="min-w-0 flex-1 min-h-0">
         <Outlet />
       </main>
     </div>

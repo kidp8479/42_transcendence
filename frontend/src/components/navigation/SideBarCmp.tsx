@@ -1,11 +1,8 @@
 "use client";
 
+import type { ComponentType, SVGProps } from "react";
 import { useEffect, useState } from "react";
-import {
-  Sidebar,
-  SidebarItemGroup,
-  SidebarItems,
-} from "flowbite-react";
+import { Sidebar, SidebarItemGroup, SidebarItems } from "flowbite-react";
 import { Link } from "@tanstack/react-router";
 import { HiChevronLeft, HiChevronRight, HiMenu, HiX } from "react-icons/hi";
 import { MdOutlineDashboard } from "react-icons/md";
@@ -19,23 +16,45 @@ interface Project {
   statusColor: string;
 }
 
+interface NavigationItem {
+  to: string;
+  label: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+}
+
 const sidebarContainerClasses =
   "fixed inset-y-0 left-0 z-40 w-full transition-transform duration-300";
 const sidebarInnerClasses = "font-mono relative h-full w-full overflow-hidden";
+// Fixed: dark: variant must come right before the utility, `!` goes after the variant.
 const sidebarSurfaceClasses =
-  "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 !bg-surface-raised !dark:bg-surface-raised";
-const sidebarItemClasses =
-  "flex items-center justify-center rounded-lg p-2 text-base font-normal text-text-secondary hover:bg-surface-overlay hover:text-text-primary";
+  "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 !bg-surface-raised dark:!bg-surface-raised";
+const sidebarIconClasses =
+  "h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary";
 const sidebarNavLinkClasses =
   "flex items-center gap-3 rounded-lg p-2 text-base font-normal text-text-secondary hover:bg-surface-overlay hover:text-text-primary";
 const sidebarNavLinkActiveClasses = "bg-brand-500/10 text-brand-500";
+const activeSidebarLinkClasses = `${sidebarNavLinkClasses} ${sidebarNavLinkActiveClasses}`;
 const sidebarGroupClasses = "font-mono tracking-tight text-sm lg:text-base";
 const sidebarSectionLabelClasses =
   "px-3 pb-2 font-mono text-xs tracking-wider text-text-muted uppercase";
 const sidebarToggleBaseClasses =
   "absolute top-1/2 right-0 hidden h-10 w-4 translate-x-full -translate-y-full items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:flex";
 const sidebarMobileToggleClasses =
-  "fixed top-4 left-4 z-40 flex h-10 w-10 items-center justify-center rounded-md border border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden";
+  "fixed top-0 left-4 z-40 flex h-10 w-10 items-center justify-center rounded-md border border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden";
+
+// Only `root.inner` is used since nav rows are custom <Link> elements, not
+// Flowbite's <SidebarItem>. Removed the unused `item` theme block that was
+// dead code (active/icon styling never reached the DOM through this theme).
+const sidebarTheme = {
+  root: {
+    inner: sidebarSurfaceClasses,
+  },
+} as const;
+
+const sidebarPrimaryNavigation: NavigationItem[] = [
+  { to: "/dashboard", label: "Dashboard", icon: MdOutlineDashboard },
+  { to: "/projects", label: "Projects", icon: GoFileDirectory },
+];
 
 // Temporary mock data until the projects list is backed by the API.
 // The sidebar keeps the row structure stable so we can swap the data source later.
@@ -45,11 +64,7 @@ const projects: Project[] = [
     name: "ft_transcendence",
     statusColor: "bg-emerald-400",
   },
-  {
-    slug: "minishell",
-    name: "minishell",
-    statusColor: "bg-gray-500",
-  },
+  { slug: "minishell", name: "minishell", statusColor: "bg-gray-500" },
 ];
 
 function useIsDesktop() {
@@ -72,21 +87,38 @@ function useIsDesktop() {
   return isDesktop;
 }
 
+function SidebarNavLink({ to, label, icon: Icon }: NavigationItem) {
+  return (
+    <Link
+      to={to}
+      activeProps={{ className: activeSidebarLinkClasses }}
+      inactiveProps={{ className: sidebarNavLinkClasses }}
+    >
+      <Icon className={sidebarIconClasses} />
+      <span>{label}</span>
+    </Link>
+  );
+}
+
+function SidebarSectionTitle({ children }: { children: string }) {
+  return <li className={sidebarSectionLabelClasses}>{children}</li>;
+}
+
 function ProjectRow({ project }: { project: Project }) {
   return (
     <Link
       // Each project needs its own route target so only one row can be active at a time.
       to="/$projectId/summary"
       params={{ projectId: project.slug }}
-      activeProps={{ className: `${sidebarNavLinkClasses} ${sidebarNavLinkActiveClasses}` }}
+      activeProps={{ className: activeSidebarLinkClasses }}
       inactiveProps={{ className: sidebarNavLinkClasses }}
     >
       <span className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${project.statusColor}`}
         />
-        <span className="truncate">{project.name}</span>{" "}
-        <HiChevronRight className="h-4 w-4 text-text-muted" />{" "}
+        <span className="truncate">{project.name}</span>
+        <HiChevronRight className="h-4 w-4 text-text-muted" />
       </span>
     </Link>
   );
@@ -96,6 +128,26 @@ export function SideBarCmp() {
   const isDesktop = useIsDesktop();
   // Mobile starts collapsed; desktop starts open so the content stays visible.
   const [isCollapsed, setIsCollapsed] = useState(() => !isDesktop);
+
+  // Resync when crossing the desktop/mobile breakpoint after mount (resize,
+  // rotation). Without this, resizing from desktop-open to mobile instantly
+  // shows the full-screen backdrop, and resizing back to desktop can leave
+  // the sidebar collapsed with no visible way to reopen it except the toggle.
+  useEffect(() => {
+    setIsCollapsed(!isDesktop);
+  }, [isDesktop]);
+
+  // Close on Escape for basic keyboard accessibility on mobile.
+  useEffect(() => {
+    if (isCollapsed) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsCollapsed(true);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isCollapsed]);
 
   return (
     <>
@@ -128,46 +180,17 @@ export function SideBarCmp() {
 
           <Sidebar
             aria-label="Sidebar"
-            className="h-full w-full md:w-64"
-            theme={{
-              root: {
-                inner: sidebarSurfaceClasses,
-              },
-              item: {
-                base: sidebarItemClasses,
-                active: "bg-brand-500/10 text-brand-500",
-                icon: {
-                  base: "h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary",
-                  active: "text-brand-500",
-                },
-              },
-            }}
+            className="h-full w-full"
+            theme={sidebarTheme}
           >
             <SidebarItems>
               <SidebarItemGroup className={sidebarGroupClasses}>
-                <Link
-                  to="/dashboard"
-                  activeProps={{
-                    className: `${sidebarNavLinkClasses} ${sidebarNavLinkActiveClasses}`,
-                  }}
-                  inactiveProps={{ className: sidebarNavLinkClasses }}
-                >
-                  <MdOutlineDashboard className="h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary" />
-                  <span>Dashboard</span>
-                </Link>
-                <Link
-                  to="/projects"
-                  activeProps={{
-                    className: `${sidebarNavLinkClasses} ${sidebarNavLinkActiveClasses}`,
-                  }}
-                  inactiveProps={{ className: sidebarNavLinkClasses }}
-                >
-                  <GoFileDirectory className="h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary" />
-                  <span>Projects</span>
-                </Link>
+                {sidebarPrimaryNavigation.map((item) => (
+                  <SidebarNavLink key={item.to} {...item} />
+                ))}
               </SidebarItemGroup>
               <SidebarItemGroup>
-                <li className={sidebarSectionLabelClasses}>Current projects</li>
+                <SidebarSectionTitle>Current projects</SidebarSectionTitle>
 
                 {projects.map((project) => (
                   <ProjectRow key={project.slug} project={project} />
