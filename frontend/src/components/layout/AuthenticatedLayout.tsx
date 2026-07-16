@@ -5,9 +5,9 @@ import { Sidebar } from "../navigation/Sidebar";
 
 export function AuthenticatedLayout() {
   return (
-    <div>
+    <div className="flex">
       <Sidebar />
-      <main>
+      <main className="min-w-0 flex-1">
         <Outlet />
       </main>
     </div>

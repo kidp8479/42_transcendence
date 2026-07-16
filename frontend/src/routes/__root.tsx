@@ -19,13 +19,17 @@ function RootLayout() {
 
   return (
     <ModalProvider>
-      {authState.status === "authenticated" ? (
-        <HeaderAuthenticated session={authState.session} />
-      ) : (
-        <HeaderPublic authUnavailable={authState.status === "unavailable"} />
-      )}
-      <Outlet />
-      <Footer />
+      <div className="flex min-h-screen flex-col bg-surface-base text-text-primary">
+        {authState.status === "authenticated" ? (
+          <HeaderAuthenticated session={authState.session} />
+        ) : (
+          <HeaderPublic authUnavailable={authState.status === "unavailable"} />
+        )}
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <Footer />
+      </div>
       <ModalLayer />
       <TanStackRouterDevtools />
     </ModalProvider>

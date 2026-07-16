@@ -124,7 +124,7 @@ const TEXT_STYLES = [
 
 function StyleGuidePage() {
   return (
-    <div className="min-h-screen bg-surface-base text-text-primary p-10 space-y-14">
+    <div className="bg-surface-base p-10 text-text-primary space-y-14">
       {/* Header */}
       <div className="space-y-3">
         <h1 className="text-2xl font-mono font-bold text-brand-500">

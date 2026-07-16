@@ -21,43 +21,43 @@ const RouterFooterLink = createLink(FooterLink);
 
 export function Footer() {
   return (
-    <div className="bg-surface-base!">
-      <FlowbiteFooter
-        container
-        className="bg-surface-base! relative md:justify-start"
-      >
+    <FlowbiteFooter
+      container
+      className="w-full border-t border-surface-border !rounded-none !bg-surface-base !shadow-none"
+    >
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8 md:flex-row md:items-center md:justify-between">
         <FooterCopyright
-          className="text-text-secondary p-4"
+          className="text-text-secondary"
           by="42 Project Planner"
           year={new Date().getFullYear()}
         />
-        <FooterLinkGroup className="justify-center gap-4 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2">
+        <FooterLinkGroup className="flex-wrap gap-x-6 gap-y-2">
           <RouterFooterLink
-            className="text-text-secondary hover:text-brand-700"
+            className="text-text-secondary hover:text-brand-600"
             to="/about"
           >
             About
           </RouterFooterLink>
           <RouterFooterLink
-            className="text-text-secondary hover:text-brand-700"
+            className="text-text-secondary hover:text-brand-600"
             to="/privacy"
           >
             Privacy Policy
           </RouterFooterLink>
           <RouterFooterLink
-            className="text-text-secondary hover:text-brand-700"
+            className="text-text-secondary hover:text-brand-600"
             to="/terms"
           >
             Terms of Service
           </RouterFooterLink>
           <RouterFooterLink
-            className="text-text-secondary hover:text-brand-700"
+            className="text-text-secondary hover:text-brand-600"
             to="/contact"
           >
             Contact
           </RouterFooterLink>
         </FooterLinkGroup>
-      </FlowbiteFooter>
-    </div>
+      </div>
+    </FlowbiteFooter>
   );
 }

@@ -21,7 +21,7 @@ const team: TeamMember[] = [
 
 function ContactPage() {
   return (
-    <div className="bg-surface-base min-h-screen">
+    <div className="bg-surface-base">
       <div className="mx-auto max-w-3xl px-4 py-12 text-text-secondary">
         <h1 className="text-3xl font-bold text-text-primary">Contact</h1>
         <p className="mt-2 leading-relaxed">
