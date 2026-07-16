@@ -24,6 +24,7 @@ import { HiOutlineExclamationCircle } from "react-icons/hi2";
 import { useNavigate } from "@tanstack/react-router";
 import { AuthRequestError, register } from "../../lib/auth";
 import { validateAuthForm } from "../../lib/authForm";
+import { authSessionResource } from "../../lib/authState";
 import { darkAlertTheme } from "../../lib/flowbite";
 import { useModal } from "../../hooks/useModal";
 import { AuthField } from "./SigninForm";
@@ -52,11 +53,12 @@ export function CreateAccountForm({ onSignIn }: CreateAccountFormProps) {
 
     const form = new FormData(event.currentTarget);
     try {
-      await register(
+      const session = await register(
         String(form.get("email")),
         String(form.get("username")).trim(),
         String(form.get("password"))
       );
+      authSessionResource.setAuthenticated(session);
       closeModal();
       await navigate({ to: "/dashboard" });
     } catch (requestError) {

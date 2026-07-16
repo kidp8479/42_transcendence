@@ -14,6 +14,8 @@ import {
   HiOutlineSquares2X2,
 } from "react-icons/hi2";
 import { logout, type AuthSession } from "../../lib/auth";
+import { authSessionResource } from "../../lib/authState";
+import { darkDropdownTheme } from "../../lib/flowbite";
 
 interface UserMenuProps {
   session: AuthSession;
@@ -30,6 +32,7 @@ export function UserMenu({ session }: UserMenuProps) {
     setLoggingOut(true);
     try {
       await logout(session.csrfToken);
+      authSessionResource.setAnonymous();
       await navigate({ to: "/" });
     } catch (error) {
       setLogoutError(
@@ -46,6 +49,7 @@ export function UserMenu({ session }: UserMenuProps) {
         arrowIcon={false}
         inline
         placement="bottom-end"
+        theme={darkDropdownTheme}
         renderTrigger={() => (
           <button
             type="button"
@@ -60,8 +64,6 @@ export function UserMenu({ session }: UserMenuProps) {
               placeholderInitials={initials}
               rounded
               size="sm"
-              status="online"
-              statusPosition="bottom-right"
               theme={{
                 root: {
                   initials: {
@@ -75,11 +77,11 @@ export function UserMenu({ session }: UserMenuProps) {
         )}
       >
         <DropdownHeader>
+          <span className="block text-xs font-normal text-text-secondary">
+            Signed in as
+          </span>
           <span className="block truncate text-sm font-semibold text-text-primary">
             {session.user.username}
-          </span>
-          <span className="block truncate text-xs font-normal text-text-secondary">
-            {session.user.email}
           </span>
         </DropdownHeader>
         <DropdownItem
@@ -107,7 +109,7 @@ export function UserMenu({ session }: UserMenuProps) {
       {logoutError && (
         <p
           role="alert"
-          className="absolute right-0 top-12 z-50 w-72 rounded-lg border border-red-700/40 bg-red-950 px-3 py-2 text-sm text-red-200 shadow-xl"
+          className="absolute right-0 top-12 z-50 w-72 rounded-lg border border-error bg-surface-overlay px-3 py-2 text-sm text-error shadow-xl"
         >
           {logoutError}
         </p>

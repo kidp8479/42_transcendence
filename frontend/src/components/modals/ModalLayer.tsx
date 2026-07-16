@@ -26,7 +26,7 @@ export function ModalLayer() {
       <ModalHeader />
       <ModalBody>
         {activeModal?.type === "auth" && (
-          <AuthModal initialView={activeModal.view} />
+          <AuthModal key={activeModal.view} initialView={activeModal.view} />
         )}
       </ModalBody>
     </Modal>

@@ -1,6 +1,7 @@
 // Notification bell and dropdown. Notification data is a follow-up integration.
 import { Badge, Dropdown, DropdownHeader } from "flowbite-react";
 import { HiOutlineBell } from "react-icons/hi2";
+import { darkDropdownTheme } from "../../lib/flowbite";
 
 export function NotificationBell() {
   return (
@@ -9,6 +10,7 @@ export function NotificationBell() {
       dismissOnClick={false}
       inline
       placement="bottom-end"
+      theme={darkDropdownTheme}
       renderTrigger={() => (
         <button
           type="button"

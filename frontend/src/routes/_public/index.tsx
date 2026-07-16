@@ -125,27 +125,21 @@ function LandingPage() {
 
       <p className="px-4 py-16 text-center text-text-secondary sm:py-20 lg:py-28">
         Ready to jump in?{" "}
-        <a
-          href="#create-account"
-          onClick={(event) => {
-            event.preventDefault();
-            openAuthModal("signup");
-          }}
+        <button
+          type="button"
+          onClick={() => openAuthModal("signup")}
           className="font-semibold text-brand-500 hover:text-brand-600 hover:underline"
         >
           Create an account
-        </a>{" "}
+        </button>{" "}
         or{" "}
-        <a
-          href="#log-in"
-          onClick={(event) => {
-            event.preventDefault();
-            openAuthModal("signin");
-          }}
+        <button
+          type="button"
+          onClick={() => openAuthModal("signin")}
           className="font-semibold text-brand-500 hover:text-brand-600 hover:underline"
         >
           log in
-        </a>
+        </button>
         .
       </p>
     </>

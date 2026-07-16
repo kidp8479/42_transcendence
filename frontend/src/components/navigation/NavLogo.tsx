@@ -16,11 +16,8 @@ export function NavLogo({ to }: NavLogoProps) {
         <FcMindMap className="h-7 w-7" aria-hidden="true" />
       </span>
       <span className="hidden sm:block">
-        <span className="block font-mono text-[0.65rem] uppercase tracking-[0.24em] text-brand-500">
-          42 workspace
-        </span>
-        <span className="block text-base font-semibold tracking-tight text-text-primary">
-          Project Planner
+        <span className="block text-base font-semibold tracking-tight text-text-primary transition group-hover:text-white">
+          42 Project Planner
         </span>
       </span>
     </Link>

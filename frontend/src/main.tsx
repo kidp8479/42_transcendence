@@ -17,9 +17,13 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 
 // 1. Import the auto-generated route tree
 import { routeTree } from "./routeTree.gen";
+import { authSessionResource } from "./lib/authState";
 
 // 2. Create the router instance
-const router = createRouter({ routeTree });
+const router = createRouter({
+  routeTree,
+  context: { auth: authSessionResource },
+});
 
 // 3. Register the router type for TypeScript type-safety
 declare module "@tanstack/react-router" {
