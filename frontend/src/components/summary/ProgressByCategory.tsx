@@ -25,7 +25,14 @@ export function ProgressByCategory({ categories }: ProgressByCategoryProps) {
         Progress by Category
       </h2>
       {categories.map((category) => {
-        const percent = (category.completed / category.total) * 100;
+        // total is expected to be filtered server-side to always be > 0
+        // (see "13. Summary" Notion page - 0/0 categories should never reach
+        // this component) - guard anyway so a missed filter doesn't render
+        // NaN into aria-valuenow/width instead of just crashing loudly.
+        const percent =
+          category.total === 0
+            ? 0
+            : Math.min(100, (category.completed / category.total) * 100);
         return (
           <div key={category.name} className="mb-3">
             <div className="mb-1 flex justify-between text-sm">

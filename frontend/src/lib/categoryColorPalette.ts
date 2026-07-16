@@ -77,7 +77,9 @@ export type CategoryColor = (typeof CATEGORY_COLOR_PALETTE)[number];
 
 // Looks up a category by name (used by Team Workload's tags) and returns its
 // palette entry. Falls back to index 0 if the name doesn't match any known
-// category - shouldn't happen with real data, but keeps this from crashing.
+// category, or if the matched category's color is outside the palette's
+// 0-7 range (see the file-level comment above) - shouldn't happen with
+// real data, but keeps this from crashing either way.
 export function getCategoryColorByName(
   categories: { name: string; color: number }[],
   category_name: string
@@ -85,5 +87,8 @@ export function getCategoryColorByName(
   const found_category = categories.find(
     (category) => category.name === category_name
   );
-  return CATEGORY_COLOR_PALETTE[found_category?.color ?? 0];
+  return (
+    CATEGORY_COLOR_PALETTE[found_category?.color ?? 0] ??
+    CATEGORY_COLOR_PALETTE[0]
+  );
 }
