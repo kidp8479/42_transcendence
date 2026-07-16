@@ -20,9 +20,9 @@ function RootLayout() {
   return (
     <ModalProvider>
       {authState.status === "authenticated" ? (
-          <HeaderAuthenticated session={authState.session} />
+        <HeaderAuthenticated session={authState.session} />
       ) : (
-          <HeaderPublic authUnavailable={authState.status === "unavailable"} />
+        <HeaderPublic authUnavailable={authState.status === "unavailable"} />
       )}
       <Outlet />
       <Footer />
