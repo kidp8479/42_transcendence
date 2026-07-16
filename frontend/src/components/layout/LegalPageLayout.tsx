@@ -16,7 +16,7 @@ export function LegalPageLayout({
   sections,
 }: LegalPageLayoutProps) {
   return (
-    <div className="bg-surface-base">
+    <article className="bg-surface-base">
       <div className="mx-auto max-w-3xl px-4 py-12 text-text-secondary">
         <h1 className="text-3xl font-bold text-text-primary">{title}</h1>
         {subtitle && <p className="mt-2 text-sm">{subtitle}</p>}
@@ -42,6 +42,6 @@ export function LegalPageLayout({
           </section>
         ))}
       </div>
-    </div>
+    </article>
   );
 }

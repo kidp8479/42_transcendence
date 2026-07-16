@@ -11,6 +11,7 @@ import {
   FooterLink,
   FooterLinkGroup,
 } from "flowbite-react";
+import { LayoutContainer } from "./LayoutContainer";
 
 /* Link is TanStack Router's own ready-made link component.
 It works, but it renders its own markup — we'd lose the Flowbite FooterLink styling and integration.
@@ -23,9 +24,9 @@ export function Footer() {
   return (
     <FlowbiteFooter
       container
-      className="w-full border-t border-surface-border !rounded-none !bg-surface-base !shadow-none"
+      className="w-full !rounded-none !bg-surface-base !p-0 !shadow-none border-t border-surface-border"
     >
-      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8 md:flex-row md:items-center md:justify-between">
+      <LayoutContainer className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8 md:flex-row md:items-center md:justify-between">
         <FooterCopyright
           className="text-text-secondary"
           by="42 Project Planner"
@@ -57,7 +58,7 @@ export function Footer() {
             Contact
           </RouterFooterLink>
         </FooterLinkGroup>
-      </div>
+      </LayoutContainer>
     </FlowbiteFooter>
   );
 }

@@ -26,17 +26,16 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
             type="button"
             size="sm"
             onClick={() => openAuthModal("signup")}
-            className="bg-brand-700 text-white hover:bg-brand-800 focus:ring-brand-500"
+            className="dark:bg-brand-600 text-surface-base dark:hover:bg-brand-700"
           >
             <span className="hidden sm:inline">Create account</span>
             <span className="sm:hidden">Join</span>
           </Button>
           <Button
             type="button"
-            color="alternative"
             size="sm"
             onClick={() => openAuthModal("signin")}
-            className="border-transparent bg-transparent text-text-secondary hover:border-surface-border hover:bg-surface-overlay hover:text-text-primary"
+            className="border border-brand-600 bg-transparent text-brand-600 hover:bg-brand-600 hover:text-surface-base"
           >
             Sign in
           </Button>
