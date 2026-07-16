@@ -167,16 +167,19 @@ seed:
 
 ## stop the database and remove its Compose-managed data volume
 wipe-db: $(ENV_FILE)
-	$(COMPOSE) stop db
-	$(COMPOSE) rm -f db
-	@project=$$($(COMPOSE) config --format json | \
-		sed -n 's/^[[:space:]]*"name": "\([^"]*\)",/\1/p' | head -n 1); \
-	test -n "$$project"; \
-	volume=$$(docker volume ls -q \
-		--filter label=com.docker.compose.project="$$project" \
-		--filter label=com.docker.compose.volume=db_data); \
-	if [ -n "$$volume" ]; then \
-		docker volume rm $$volume; \
+	@set -e; \
+	volume=$$($(COMPOSE) config --format json | jq -er \
+		'. as $$config \
+		| (.services.db.volumes[] \
+			| select(.type == "volume" \
+				and .target == "/var/lib/postgresql/data") \
+			| .source) as $$source \
+		| $$config.volumes[$$source].name'); \
+	test -n "$$volume"; \
+	$(COMPOSE) stop db; \
+	$(COMPOSE) rm -f db; \
+	if docker volume inspect "$$volume" >/dev/null 2>&1; then \
+		docker volume rm "$$volume"; \
 	else \
 		echo "Database volume is already absent."; \
 	fi
