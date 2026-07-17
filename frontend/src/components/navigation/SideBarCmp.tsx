@@ -92,10 +92,10 @@ function ProjectRow({ project }: { project: SidebarProject }) {
   // Keep the visual indicator simple and deterministic from backend status.
   const statusColorClass =
     project.status === "COMPLETED"
-      ? "bg-gray-500"
+      ? "bg-status-completed"
       : project.status === "REVIEW"
-        ? "bg-amber-400"
-        : "bg-emerald-400";
+        ? "bg-status-review"
+        : "bg-status-in-progress";
 
   return (
     <Link
