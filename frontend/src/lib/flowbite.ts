@@ -2,9 +2,9 @@ export const darkTextInputTheme = {
   field: {
     input: {
       colors: {
-        gray: "border-control-border bg-control-bg text-text-primary placeholder:text-control-placeholder focus:border-brand-500 focus:ring-brand-500",
+        gray: "!border-control-border !bg-control-bg text-text-primary placeholder:!text-control-placeholder focus:!border-brand-500 focus:!ring-2 focus:!ring-green-500/40 focus-visible:!outline-none",
         failure:
-          "!border-control-error !bg-control-bg text-text-primary placeholder:!text-control-placeholder focus:!border-control-error focus:!bg-control-bg focus:!ring-control-error",
+          "!border-control-error !bg-control-bg text-text-primary placeholder:!text-control-placeholder focus:!border-control-error focus:!bg-control-bg focus:!ring-2 focus:!ring-control-error/40 focus-visible:!outline-none",
       },
     },
   },

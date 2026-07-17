@@ -516,9 +516,11 @@ function StyleGuidePage() {
           </p>
           <p>
             A valid focused input uses{" "}
-            <span className="font-mono">brand-500</span>. An invalid input keeps{" "}
-            <span className="font-mono">control-error</span> for its border and
-            ring even while focused; entered text is never tinted.
+            <span className="font-mono">brand-500</span> for its border and a
+            soft <span className="font-mono">green-500/40</span> ring. An
+            invalid input keeps <span className="font-mono">control-error</span>{" "}
+            for its border and a soft error ring even while focused; entered
+            text is never tinted.
           </p>
           <p>
             Authentication guidance uses{" "}
@@ -539,9 +541,13 @@ function StyleGuidePage() {
           <p>
             Primary authentication buttons use{" "}
             <span className="font-mono">brand-700</span> with white text and{" "}
-            <span className="font-mono">brand-800</span> on hover. Apply{" "}
+            <span className="font-mono">brand-800</span> on hover, with Flowbite
+            green focus rings (<span className="font-mono">green-300</span> in
+            light mode, <span className="font-mono">green-800</span> in dark
+            mode). Apply{" "}
             <span className="font-mono">
-              bg-brand-700 text-white hover:bg-brand-800
+              bg-brand-700 text-white hover:bg-brand-800 focus:ring-green-300
+              dark:focus:ring-green-800
             </span>{" "}
             rather than the generic{" "}
             <span className="font-mono">color="green"</span> example.

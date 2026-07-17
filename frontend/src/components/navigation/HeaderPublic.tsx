@@ -22,21 +22,53 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
         </span>
       ) : (
         <div className="flex items-center gap-2">
+          {/* primary button style */}
           <Button
             type="button"
             size="sm"
             onClick={() => openAuthModal("signup")}
-            className="bg-brand-700 text-white hover:bg-brand-800 focus:ring-brand-500"
+            className="
+				bg-brand-700
+				text-white
+				hover:bg-brand-800
+				dark:bg-brand-700
+				dark:text-white
+				dark:hover:bg-brand-800
+				focus:outline-none
+				focus-visible:outline-none
+				focus:ring-4
+				focus:ring-green-300
+			    dark:focus:ring-green-800
+			"
           >
             <span className="hidden sm:inline">Create account</span>
             <span className="sm:hidden">Join</span>
           </Button>
+          {/* outline button style */}
           <Button
             type="button"
-            color="alternative"
             size="sm"
             onClick={() => openAuthModal("signin")}
-            className="border-transparent bg-transparent text-text-secondary hover:border-surface-border hover:bg-surface-overlay hover:text-text-primary"
+            className="
+				border
+				border-brand-700
+				bg-transparent
+				text-brand-700
+				hover:border-brand-800
+				hover:bg-brand-50
+				hover:text-brand-800
+				dark:border-brand-600
+				dark:bg-transparent
+				dark:text-brand-500
+				dark:hover:border-brand-700
+				dark:hover:bg-brand-800/40
+				dark:hover:text-white
+				focus:outline-none
+				focus-visible:outline-none
+				focus:ring-4
+				focus:ring-green-300
+			    dark:focus:ring-green-800
+				"
           >
             Sign in
           </Button>
