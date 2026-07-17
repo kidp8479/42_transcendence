@@ -95,13 +95,16 @@ export function SigninForm({ onCreateAccount }: SigninFormProps) {
       <Button
         className="
 			bg-brand-700
-			text-text-primary
+			text-white
 			hover:bg-brand-800
-			focus:ring-brand-500
+			focus:outline-none
+			focus-visible:outline-none
+			focus:ring-4
+			focus:ring-green-300
 			dark:bg-brand-700
-			dark:text-text-primary
+			dark:text-white
 			dark:hover:bg-brand-800
-			dark:focus:ring-brand-500
+			dark:focus:ring-green-800
 		"
         disabled={submitting}
         fullSized

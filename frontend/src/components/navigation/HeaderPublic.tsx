@@ -29,14 +29,16 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
             onClick={() => openAuthModal("signup")}
             className="
 				bg-brand-700
-				text-text-primary
+				text-white
 				hover:bg-brand-800
 				dark:bg-brand-700
-				dark:text-text-primary
+				dark:text-white
 				dark:hover:bg-brand-800
 				focus:outline-none
-				focus:ring-brand-500
-			    dark:focus:ring-brand-500
+				focus-visible:outline-none
+				focus:ring-4
+				focus:ring-green-300
+			    dark:focus:ring-green-800
 			"
           >
             <span className="hidden sm:inline">Create account</span>
@@ -49,20 +51,23 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
             onClick={() => openAuthModal("signin")}
             className="
 				border
-				border-brand-600
+				border-brand-700
 				bg-transparent
-				text-brand-600
+				text-brand-700
 				hover:border-brand-800
-				hover:bg-brand-800
-				hover:text-text-primary
+				hover:bg-brand-50
+				hover:text-brand-800
 				dark:border-brand-600
 				dark:bg-transparent
-				dark:text-brand-600
-				dark:hover:border-brand-800
-				dark:hover:bg-brand-800
-				dark:hover:text-text-primary
-				focus:ring-brand-500
-			    dark:focus:ring-brand-500
+				dark:text-brand-500
+				dark:hover:border-brand-700
+				dark:hover:bg-brand-800/40
+				dark:hover:text-white
+				focus:outline-none
+				focus-visible:outline-none
+				focus:ring-4
+				focus:ring-green-300
+			    dark:focus:ring-green-800
 				"
           >
             Sign in
