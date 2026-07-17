@@ -71,14 +71,16 @@ function useIsDesktop() {
 
 function SidebarNavLink({ to, label, icon: Icon }: NavigationItem) {
   return (
-    <Link
-      to={to}
-      activeProps={{ className: activeSidebarLinkClasses }}
-      inactiveProps={{ className: sidebarNavLinkClasses }}
-    >
-      <Icon className={sidebarIconClasses} />
-      <span>{label}</span>
-    </Link>
+    <li>
+      <Link
+        to={to}
+        activeProps={{ className: activeSidebarLinkClasses }}
+        inactiveProps={{ className: sidebarNavLinkClasses }}
+      >
+        <Icon className={sidebarIconClasses} />
+        <span>{label}</span>
+      </Link>
+    </li>
   );
 }
 
