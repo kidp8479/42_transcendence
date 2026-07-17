@@ -14,8 +14,26 @@ export default defineConfig({
     tailwindcss(),
     flowbiteReact(),
   ],
+  resolve: {
+    alias: {
+      // import.meta.dirname needs Node 20.11+; safe here since every
+      // Dockerfile (frontend/backend/auth) pins Node 22. __dirname was
+      // rejected instead - it's undefined under ESM and broke `tsc -b`.
+      // See .github/copilot-instructions.md if this gets flagged again.
+      "@": `${import.meta.dirname}/src`,
+    },
+  },
   server: {
     port: 5173,
     host: true,
+    // The browser only ever talks to nginx on 8080 (5173 is Vite's internal
+    // dev server port, never published outside the Docker network). Without
+    // this, Vite's HMR client defaults to reconnecting on 5173 directly,
+    // which the browser can't reach - ERR_CONNECTION_REFUSED in the console
+    // even though the app itself works fine. This tells the client to
+    // reconnect through the port the browser can actually see.
+    hmr: {
+      clientPort: 8080,
+    },
   },
 });

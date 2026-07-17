@@ -41,8 +41,8 @@ async function bootstrap() {
   // which is exactly what an attacker scanning a public API wants handed to them
   if (process.env.NODE_ENV !== "production") {
     const config = new DocumentBuilder()
-      .setTitle("42 Projects Planner API")
-      .setDescription("API documentation for the 42 Projects Planner app")
+      .setTitle("42 Project Planner API")
+      .setDescription("API documentation for the 42 Project Planner app")
       .setVersion("1.0")
       .build();
     const document = SwaggerModule.createDocument(app, config);

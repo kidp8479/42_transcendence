@@ -34,6 +34,24 @@
   --color-text-primary: #f4f4f5;
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #52525b;
+
+  /* Task status, used for dashboards, kanban, list etc - matches the Figma prototype's COLUMN_ACCENTS */
+  --color-status-todo: #7a8aa8;
+  --color-status-in-progress: #22d3ee;
+  --color-status-review: #f59e0b;
+  --color-status-completed: #10b981;
+
+  /* Category palette - unnamed/numbered, not tied to specific category names since
+     TaskCategory is created freely per-project. Matches the Figma prototype's
+     STATIC_CATEGORIES colors (Planning..Documentation, in that order). Index 1
+     reuses --color-brand-500 directly (Figma does the same for "Development"). */
+  --color-category-0: #7a8aa8;
+  --color-category-2: #10b981;
+  --color-category-3: #22d3ee;
+  --color-category-4: #f59e0b;
+  --color-category-5: #ef4444;
+  --color-category-6: #7c3aed;
+  --color-category-7: #a1a1aa;
 }
 
 body {
@@ -62,6 +80,30 @@ input[data-auth-field]:-webkit-autofill:focus {
   box-shadow: 0 0 0 1000px var(--color-control-bg) inset !important;
   filter: none;
   transition: background-color 9999s ease-out;
+}
+
+/*
+ * Thin, theme-colored scrollbar for horizontally-scrolling UI (ex: ProjectTabs
+ * on narrow screens, where 7 tabs don't fit and overflow-x-auto kicks in).
+ * Without this, the browser falls back to its bulky default OS scrollbar,
+ * which looks out of place against the dark surface palette. Two separate
+ * rule sets are needed: scrollbar-width/scrollbar-color for Firefox, the
+ * ::-webkit-scrollbar-* pseudo-elements for Chrome/Safari/Edge - neither
+ * engine understands the other's syntax, there's no single standard yet.
+ */
+.scrollbar-thin-surface {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-border) transparent;
+}
+.scrollbar-thin-surface::-webkit-scrollbar {
+  height: 6px;
+}
+.scrollbar-thin-surface::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin-surface::-webkit-scrollbar-thumb {
+  background-color: var(--color-surface-border);
+  border-radius: 9999px;
 }
 
 /*

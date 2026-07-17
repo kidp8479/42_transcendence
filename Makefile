@@ -292,7 +292,7 @@ ffclean:
 	# throwaway root container instead of a plain host-side rm to avoid
 	# "Permission denied"
 	docker run --rm -v $(CURDIR)/frontend:/target -w /target alpine \
-		sh -c "rm -rf node_modules dist build .vite .tanstack .flowbite-react .cache .eslintcache .stylelintcache coverage *.tsbuildinfo"
+		sh -c "rm -rf node_modules dist build .vite .tanstack .flowbite-react .cache .eslintcache .stylelintcache coverage *.tsbuildinfo vite.config.js vite.config.d.ts"
 	docker run --rm -v $(CURDIR)/backend:/target -w /target alpine \
 		sh -c "rm -rf node_modules dist build .cache .eslintcache .stylelintcache coverage *.tsbuildinfo"
 	docker run --rm -v $(CURDIR)/auth:/target -w /target alpine \

@@ -1,7 +1,7 @@
 // Wrapper for all authenticated pages (login required).
 // The root application shell owns the authentication-aware header and footer.
 import { Outlet } from "@tanstack/react-router";
-import { Sidebar } from "../navigation/Sidebar";
+import { Sidebar } from "@/components/navigation/Sidebar";
 
 export function AuthenticatedLayout() {
   return (

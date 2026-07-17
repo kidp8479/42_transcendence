@@ -89,7 +89,7 @@ function LandingPage() {
           overflow-hidden. */}
       <section
         aria-label="Product tour"
-        className="mx-auto mt-3 h-[31rem] max-w-5xl overflow-hidden rounded-2xl border border-brand-500 shadow-lg sm:h-96 md:h-[26rem] lg:h-[28rem]"
+        className="mx-auto mt-3 h-124 max-w-5xl overflow-hidden rounded-2xl border border-brand-500 shadow-lg sm:h-96 md:h-104 lg:h-112"
       >
         <Carousel
           slideInterval={6000}
@@ -102,7 +102,7 @@ function LandingPage() {
           {CAROUSEL_SLIDES.map((slide) => (
             <div
               key={slide.image}
-              className="flex h-[31rem] flex-col items-center bg-surface-raised sm:h-96 md:h-[26rem] md:flex-row lg:h-[28rem]"
+              className="flex h-124 flex-col items-center bg-surface-raised sm:h-96 md:h-104 md:flex-row lg:h-112"
             >
               <img
                 src={slide.image}

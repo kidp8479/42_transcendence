@@ -104,6 +104,32 @@ const AUTH_PALETTE = [
   },
 ];
 
+const STATUS_COLORS = [
+  { bg: "bg-status-todo", label: "status-todo", note: "To Do" },
+  {
+    bg: "bg-status-in-progress",
+    label: "status-in-progress",
+    note: "In Progress",
+  },
+  { bg: "bg-status-review", label: "status-review", note: "Review" },
+  {
+    bg: "bg-status-completed",
+    label: "status-completed",
+    note: "Completed",
+  },
+];
+
+const CATEGORY_COLORS = [
+  { bg: "bg-category-0", label: "category-0" },
+  { bg: "bg-brand-500", label: "category-1 (reuses brand-500)" },
+  { bg: "bg-category-2", label: "category-2" },
+  { bg: "bg-category-3", label: "category-3" },
+  { bg: "bg-category-4", label: "category-4" },
+  { bg: "bg-category-5", label: "category-5" },
+  { bg: "bg-category-6", label: "category-6" },
+  { bg: "bg-category-7", label: "category-7" },
+];
+
 const TEXT_STYLES = [
   {
     color: "text-text-primary",
@@ -260,6 +286,66 @@ function StyleGuidePage() {
               <span className={`text-lg font-mono ${color}`}>Aa</span>
               <span className="text-text-muted text-xs font-mono">{label}</span>
               <span className="text-text-muted text-xs">{note}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Task status colors */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-mono uppercase tracking-widest text-text-muted">
+          Task status colors
+        </h2>
+        <p className="text-text-muted text-xs max-w-2xl">
+          Used on the Kanban board, Project Summary, and anywhere a task's
+          status is shown. Values matched to the Figma prototype's{" "}
+          <span className="font-mono text-text-secondary">COLUMN_ACCENTS</span>.
+        </p>
+        <div className="flex flex-wrap gap-6">
+          {STATUS_COLORS.map(({ bg, label, note }) => (
+            <div key={label} className="flex flex-col gap-1">
+              <div className={`w-14 h-14 rounded-lg ${bg}`} />
+              <span className="text-text-primary text-xs font-mono">
+                {label}
+              </span>
+              <span className="text-text-muted text-xs">{note}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Task category colors */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-mono uppercase tracking-widest text-text-muted">
+          Task category colors
+        </h2>
+        <p className="text-text-muted text-xs max-w-2xl">
+          Not tied to specific category names - a project's categories are
+          created freely, so each one just picks a color by index (0 to 7),
+          matching{" "}
+          <span className="font-mono text-text-secondary">
+            TaskCategory.color
+          </span>{" "}
+          (an <span className="font-mono text-text-secondary">Int</span> in
+          schema.prisma). Values matched to the Figma prototype's{" "}
+          <span className="font-mono text-text-secondary">
+            STATIC_CATEGORIES
+          </span>
+          . Bounded to 8 entries - a project with more than 8 categories has no
+          defined color past index 7 yet (see the comment on{" "}
+          <span className="font-mono text-text-secondary">
+            CATEGORY_COLOR_PALETTE
+          </span>{" "}
+          in <span className="font-mono text-text-secondary">summary.tsx</span>
+          ).
+        </p>
+        <div className="flex flex-wrap gap-6">
+          {CATEGORY_COLORS.map(({ bg, label }) => (
+            <div key={label} className="flex flex-col gap-1">
+              <div className={`w-14 h-14 rounded-lg ${bg}`} />
+              <span className="text-text-primary text-xs font-mono">
+                {label}
+              </span>
             </div>
           ))}
         </div>

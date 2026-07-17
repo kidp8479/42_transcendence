@@ -4,9 +4,8 @@
 // This file makes _authenticated/ a pathless layout - its name does not appear in the URL.
 // Every page inside _authenticated/ (dashboard, projects...) is automatically wrapped by AuthenticatedLayout.
 // The auth guard runs before any _authenticated/ page renders - redirects to / if not logged in.
-import { createFileRoute } from "@tanstack/react-router";
-import { redirect } from "@tanstack/react-router";
-import { AuthenticatedLayout } from "../../components/layout/AuthenticatedLayout";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { AuthenticatedLayout } from "@/components/layout/AuthenticatedLayout";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: ({ context }) => {
