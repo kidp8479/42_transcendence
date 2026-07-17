@@ -3,18 +3,13 @@
 import type { ComponentType, SVGProps } from "react";
 import { useEffect, useState } from "react";
 import { Sidebar, SidebarItemGroup, SidebarItems } from "flowbite-react";
-import { Link } from "@tanstack/react-router";
+import { Link, useLoaderData } from "@tanstack/react-router";
 import { HiChevronLeft, HiChevronRight, HiMenu, HiX } from "react-icons/hi";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
+import type { SidebarProject } from "@/lib/projects";
 
 // <SidebarItem as={Link} to="/location" ...> is used to load only the "working space" area, rather than the whole page
-
-interface Project {
-  slug: string;
-  name: string;
-  statusColor: string;
-}
 
 interface NavigationItem {
   to: string;
@@ -38,7 +33,7 @@ const sidebarGroupClasses = "font-mono tracking-tight text-sm lg:text-base";
 const sidebarSectionLabelClasses =
   "px-3 pb-2 font-mono text-xs tracking-wider text-text-muted uppercase";
 const sidebarToggleBaseClasses =
-  "absolute top-1/2 right-0 hidden h-10 w-4 translate-x-full -translate-y-full items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:flex";
+  "absolute top-1/2 right-0 hidden h-10 w-4 translate-x-full -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:flex";
 const sidebarMobileToggleClasses =
   "fixed top-0 left-4 z-40 flex h-10 w-10 items-center justify-center rounded-md border border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden";
 
@@ -54,17 +49,6 @@ const sidebarTheme = {
 const sidebarPrimaryNavigation: NavigationItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: MdOutlineDashboard },
   { to: "/projects", label: "Projects", icon: GoFileDirectory },
-];
-
-// Temporary mock data until the projects list is backed by the API.
-// The sidebar keeps the row structure stable so we can swap the data source later.
-const projects: Project[] = [
-  {
-    slug: "ft_transcendence",
-    name: "ft_transcendence",
-    statusColor: "bg-emerald-400",
-  },
-  { slug: "minishell", name: "minishell", statusColor: "bg-gray-500" },
 ];
 
 function useIsDesktop() {
@@ -104,19 +88,25 @@ function SidebarSectionTitle({ children }: { children: string }) {
   return <li className={sidebarSectionLabelClasses}>{children}</li>;
 }
 
-function ProjectRow({ project }: { project: Project }) {
+function ProjectRow({ project }: { project: SidebarProject }) {
+  // Keep the visual indicator simple and deterministic from backend status.
+  const statusColorClass =
+    project.status === "COMPLETED"
+      ? "bg-gray-500"
+      : project.status === "REVIEW"
+        ? "bg-amber-400"
+        : "bg-emerald-400";
+
   return (
     <Link
       // Each project needs its own route target so only one row can be active at a time.
       to="/$projectId/summary"
-      params={{ projectId: project.slug }}
+      params={{ projectId: project.id }}
       activeProps={{ className: activeSidebarLinkClasses }}
       inactiveProps={{ className: sidebarNavLinkClasses }}
     >
       <span className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-        <span
-          className={`h-2 w-2 shrink-0 rounded-full ${project.statusColor}`}
-        />
+        <span className={`h-2 w-2 shrink-0 rounded-full ${statusColorClass}`} />
         <span className="truncate">{project.name}</span>
         <HiChevronRight className="h-4 w-4 text-text-muted" />
       </span>
@@ -125,6 +115,12 @@ function ProjectRow({ project }: { project: Project }) {
 }
 
 export function SideBarCmp() {
+  // Data comes from /_authenticated route loader (GET /api/projects).
+  // This keeps sidebar data fetching at layout level instead of per page.
+  const projects = useLoaderData({ from: "/_authenticated" });
+  const visibleProjects = projects.filter(
+    (project) => project.status !== "COMPLETED"
+  );
   const isDesktop = useIsDesktop();
   // Mobile starts collapsed; desktop starts open so the content stays visible.
   const [isCollapsed, setIsCollapsed] = useState(() => !isDesktop);
@@ -164,7 +160,7 @@ export function SideBarCmp() {
         className={`
           ${sidebarContainerClasses}
           ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
-          md:relative md:z-auto md:shrink-0 md:translate-x-0 md:transition-[width]
+          md:sticky md:top-0 md:h-screen md:z-auto md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
           ${isCollapsed ? "md:w-0" : "md:w-64"}
         `}
       >
@@ -192,9 +188,15 @@ export function SideBarCmp() {
               <SidebarItemGroup>
                 <SidebarSectionTitle>Current projects</SidebarSectionTitle>
 
-                {projects.map((project) => (
-                  <ProjectRow key={project.slug} project={project} />
-                ))}
+                {visibleProjects.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-text-muted">
+                    No projects yet
+                  </li>
+                ) : (
+                  visibleProjects.map((project) => (
+                    <ProjectRow key={project.id} project={project} />
+                  ))
+                )}
               </SidebarItemGroup>
             </SidebarItems>
           </Sidebar>
