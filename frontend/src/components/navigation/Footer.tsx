@@ -26,7 +26,7 @@ export function Footer() {
       container
       className="w-full !rounded-none !bg-surface-base !p-0 !shadow-none border-t border-surface-border"
     >
-      <LayoutContainer className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8 md:flex-row md:items-center md:justify-between">
+      <LayoutContainer className="flex w-full flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
         <FooterCopyright
           className="text-text-secondary"
           by="42 Project Planner"
