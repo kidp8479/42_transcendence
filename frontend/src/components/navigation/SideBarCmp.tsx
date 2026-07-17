@@ -1,6 +1,4 @@
-"use client";
-
-import type { ComponentType, SVGProps } from "react";
+import type { IconType } from "react-icons";
 import { useEffect, useState } from "react";
 import { Sidebar, SidebarItemGroup, SidebarItems } from "flowbite-react";
 import { Link, useLoaderData } from "@tanstack/react-router";
@@ -14,7 +12,7 @@ import type { SidebarProject } from "@/lib/projects";
 interface NavigationItem {
   to: string;
   label: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  icon: IconType;
 }
 
 const sidebarContainerClasses =
