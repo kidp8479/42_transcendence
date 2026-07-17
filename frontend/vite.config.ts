@@ -16,6 +16,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
+      // import.meta.dirname needs Node 20.11+; safe here since every
+      // Dockerfile (frontend/backend/auth) pins Node 22. __dirname was
+      // rejected instead - it's undefined under ESM and broke `tsc -b`.
+      // See .github/copilot-instructions.md if this gets flagged again.
       "@": `${import.meta.dirname}/src`,
     },
   },

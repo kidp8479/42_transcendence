@@ -31,6 +31,7 @@ desktop.ini
 *.md
 !README.md
 !AGENTS.md
+!.github/copilot-instructions.md
 
 # ============================================================
 # Environment & secrets
