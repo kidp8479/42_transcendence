@@ -34,6 +34,9 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
 				dark:bg-brand-700
 				dark:text-text-primary
 				dark:hover:bg-brand-800
+				focus:outline-none
+				focus:ring-brand-500
+			    dark:focus:ring-brand-500
 			"
           >
             <span className="hidden sm:inline">Create account</span>
@@ -58,6 +61,8 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
 				dark:hover:border-brand-800
 				dark:hover:bg-brand-800
 				dark:hover:text-text-primary
+				focus:ring-brand-500
+			    dark:focus:ring-brand-500
 				"
           >
             Sign in

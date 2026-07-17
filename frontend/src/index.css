@@ -126,3 +126,12 @@ input[data-auth-field]:-webkit-autofill:focus {
 [data-testid="carousel"] .snap-mandatory {
   overflow-x: hidden !important;
 }
+
+/*
+ * Global keyboard focus indicator.
+ * Replaces browser default outlines with the application focus style.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
