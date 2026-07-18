@@ -12,15 +12,16 @@ interface HeaderAuthenticatedProps {
 }
 
 export function HeaderAuthenticated({ session }: HeaderAuthenticatedProps) {
-  const { toggleSidebar } = useSidebar();
+  const { isCollapsed, toggleSidebar } = useSidebar();
 
   return (
     <HeaderShell className="flex-wrap gap-3 py-3 md:flex-nowrap md:gap-6 md:py-0">
       <button
         type="button"
         onClick={toggleSidebar}
-        aria-label="Toggle sidebar"
-        className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden"
+        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-expanded={!isCollapsed}
+        className="ml-1 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-transparent text-text-secondary transition hover:border-surface-border hover:bg-surface-overlay hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40 md:hidden"
       >
         <HiMenu size={18} />
       </button>
