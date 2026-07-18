@@ -33,7 +33,7 @@ export function DefenseReadiness({
       <div className="mb-4 flex items-center justify-between">
         <h2
           id="defense-readiness-heading"
-          className="text-sm font-semibold text-text-primary"
+          className="font-mono text-base font-semibold text-text-primary"
         >
           Defense Readiness
         </h2>

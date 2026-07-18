@@ -25,7 +25,7 @@ function ContactPage() {
       <div className="mx-auto max-w-3xl px-4 py-12 text-text-secondary">
         <h1 className="text-3xl font-bold text-text-primary">Contact</h1>
         <p className="mt-2 leading-relaxed">
-          Have a question about the workspace, found a bug, or want to share
+          Have a question about the application, found a bug, or want to share
           feedback? Reach out to any member of the team using the details below.
         </p>
 
@@ -43,7 +43,7 @@ function ContactPage() {
                 <p className="font-medium text-text-primary">{member.name}</p>
                 <a
                   href={`mailto:${member.email}`}
-                  className="mt-1 inline-block text-sm font-medium text-text-secondary hover:text-brand-700"
+                  className="mt-1 inline-block text-sm font-medium text-text-secondary hover:text-brand-500"
                 >
                   {member.email}
                 </a>

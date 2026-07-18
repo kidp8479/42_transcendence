@@ -34,25 +34,25 @@ export function Footer() {
         />
         <FooterLinkGroup className="flex-wrap gap-x-6 gap-y-2">
           <RouterFooterLink
-            className="text-text-secondary hover:text-brand-600"
+            className="text-text-secondary hover:text-brand-500"
             to="/about"
           >
             About
           </RouterFooterLink>
           <RouterFooterLink
-            className="text-text-secondary hover:text-brand-600"
+            className="text-text-secondary hover:text-brand-500"
             to="/privacy"
           >
             Privacy Policy
           </RouterFooterLink>
           <RouterFooterLink
-            className="text-text-secondary hover:text-brand-600"
+            className="text-text-secondary hover:text-brand-500"
             to="/terms"
           >
             Terms of Service
           </RouterFooterLink>
           <RouterFooterLink
-            className="text-text-secondary hover:text-brand-600"
+            className="text-text-secondary hover:text-brand-500"
             to="/contact"
           >
             Contact

@@ -21,7 +21,7 @@ export function UpcomingEvents({ events }: UpcomingEventsProps) {
     >
       <h2
         id="upcoming-events-heading"
-        className="mb-4 text-sm font-semibold text-text-primary"
+        className="mb-4 font-mono text-base font-semibold text-text-primary"
       >
         Upcoming Events
       </h2>

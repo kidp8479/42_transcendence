@@ -20,7 +20,7 @@ export function ProgressByCategory({ categories }: ProgressByCategoryProps) {
     >
       <h2
         id="progress-by-category-heading"
-        className="mb-4 text-sm font-semibold text-text-primary"
+        className="mb-4 font-mono text-base font-semibold text-text-primary"
       >
         Progress by Category
       </h2>

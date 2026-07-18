@@ -28,12 +28,12 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
             size="sm"
             onClick={() => openAuthModal("signup")}
             className="
-				bg-brand-700
+				bg-brand-500
 				text-white
-				hover:bg-brand-800
-				dark:bg-brand-700
+				hover:bg-brand-600
+				dark:bg-brand-500
 				dark:text-white
-				dark:hover:bg-brand-800
+				dark:hover:bg-brand-600
 				focus:outline-none
 				focus-visible:outline-none
 				focus:ring-4
@@ -51,18 +51,18 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
             onClick={() => openAuthModal("signin")}
             className="
 				border
-				border-brand-700
+				border-brand-500
 				bg-transparent
-				text-brand-700
-				hover:border-brand-800
+				text-brand-500
+				hover:border-brand-600
 				hover:bg-brand-50
-				hover:text-brand-800
-				dark:border-brand-600
+				hover:text-brand-600
+				dark:border-brand-500
 				dark:bg-transparent
 				dark:text-brand-500
-				dark:hover:border-brand-700
-				dark:hover:bg-brand-800/40
-				dark:hover:text-white
+				dark:hover:border-brand-600
+				dark:hover:bg-brand-500/10
+				dark:hover:text-brand-600
 				focus:outline-none
 				focus-visible:outline-none
 				focus:ring-4

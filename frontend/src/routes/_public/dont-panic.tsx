@@ -10,9 +10,12 @@ export const Route = createFileRoute("/_public/dont-panic")({
 });
 
 const PALETTE_COLORS = [
-  { bg: "bg-brand-500", label: "bg-brand-500", note: "focus and links" },
-  { bg: "bg-brand-700", label: "bg-brand-700", note: "primary action" },
-  { bg: "bg-brand-800", label: "bg-brand-800", note: "action hover" },
+  {
+    bg: "bg-brand-500",
+    label: "bg-brand-500",
+    note: "focus, links, and primary action",
+  },
+  { bg: "bg-brand-600", label: "bg-brand-600", note: "primary action hover" },
   {
     bg: "bg-surface-base",
     label: "bg-surface-base",
@@ -88,18 +91,12 @@ const AUTH_PALETTE = [
     token: "brand-500",
     className: "bg-brand-500",
     hex: "#22c55e",
-    usage: "Focus border and ring",
+    usage: "Focus border and ring, primary authentication action",
   },
   {
-    token: "brand-700",
-    className: "bg-brand-700",
-    hex: "#15803d",
-    usage: "Primary authentication action",
-  },
-  {
-    token: "brand-800",
-    className: "bg-brand-800",
-    hex: "#166534",
+    token: "brand-600",
+    className: "bg-brand-600",
+    hex: "#16a34a",
     usage: "Primary action hover",
   },
 ];
@@ -231,6 +228,19 @@ function StyleGuidePage() {
               - Check flowbite-react.com/docs/getting-started/introduction
               first. If it's not there either, build it and add it to this page
               if you can so everyone can reuse it.
+            </span>
+          </p>
+          <p className="font-mono text-text-muted text-xs">
+            Step 5 - Naming a section (a card heading, a sidebar item, a project
+            title)?
+            <br />
+            <span className="text-text-secondary">
+              - Add font-mono. It marks structural labels/titles as intentional,
+              distinct from regular body copy - already used on the sidebar, the
+              project title, eyebrow labels, and the Summary tab's card headings
+              (Progress by Category, Upcoming Events, Defense Readiness, Team
+              Workload). Not used on plain body text or on people's
+              names/usernames - that's a separate, unrelated decision.
             </span>
           </p>
         </div>
@@ -540,13 +550,13 @@ function StyleGuidePage() {
           </p>
           <p>
             Primary authentication buttons use{" "}
-            <span className="font-mono">brand-700</span> with white text and{" "}
-            <span className="font-mono">brand-800</span> on hover, with Flowbite
+            <span className="font-mono">brand-500</span> with white text and{" "}
+            <span className="font-mono">brand-600</span> on hover, with Flowbite
             green focus rings (<span className="font-mono">green-300</span> in
             light mode, <span className="font-mono">green-800</span> in dark
             mode). Apply{" "}
             <span className="font-mono">
-              bg-brand-700 text-white hover:bg-brand-800 focus:ring-green-300
+              bg-brand-500 text-white hover:bg-brand-600 focus:ring-green-300
               dark:focus:ring-green-800
             </span>{" "}
             rather than the generic{" "}
