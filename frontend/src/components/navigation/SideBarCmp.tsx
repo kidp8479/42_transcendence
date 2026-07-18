@@ -1,10 +1,11 @@
 import type { IconType } from "react-icons";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Sidebar, SidebarItemGroup, SidebarItems } from "flowbite-react";
 import { Link, useLoaderData } from "@tanstack/react-router";
-import { HiChevronLeft, HiChevronRight, HiMenu, HiX } from "react-icons/hi";
+import { HiChevronLeft, HiChevronRight, HiX } from "react-icons/hi";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
+import { useSidebar } from "@/hooks/useSidebar";
 import type { SidebarProject } from "@/lib/projects";
 
 // <SidebarItem as={Link} to="/location" ...> is used to load only the "working space" area, rather than the whole page
@@ -32,8 +33,6 @@ const sidebarSectionLabelClasses =
   "px-3 pb-2 font-mono text-xs tracking-wider text-text-muted uppercase";
 const sidebarToggleBaseClasses =
   "absolute top-1/2 right-0 hidden h-10 w-4 translate-x-full -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:flex";
-const sidebarMobileToggleClasses =
-  "fixed top-0 left-4 z-40 flex h-10 w-10 items-center justify-center rounded-md border border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden";
 
 // Only `root.inner` is used since nav rows are custom <Link> elements, not
 // Flowbite's <SidebarItem>. Removed the unused `item` theme block that was
@@ -48,26 +47,6 @@ const sidebarPrimaryNavigation: NavigationItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: MdOutlineDashboard },
   { to: "/projects", label: "Projects", icon: GoFileDirectory },
 ];
-
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window !== "undefined"
-      ? window.matchMedia("(min-width: 768px)").matches
-      : true
-  );
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 768px)");
-
-    const update = () => setIsDesktop(mediaQuery.matches);
-    update();
-
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
-  }, []);
-
-  return isDesktop;
-}
 
 function SidebarNavLink({ to, label, icon: Icon }: NavigationItem) {
   return (
@@ -121,29 +100,19 @@ export function SideBarCmp() {
   const visibleProjects = projects.filter(
     (project) => project.status !== "COMPLETED"
   );
-  const isDesktop = useIsDesktop();
-  // Mobile starts collapsed; desktop starts open so the content stays visible.
-  const [isCollapsed, setIsCollapsed] = useState(() => !isDesktop);
-
-  // Resync when crossing the desktop/mobile breakpoint after mount (resize,
-  // rotation). Without this, resizing from desktop-open to mobile instantly
-  // shows the full-screen backdrop, and resizing back to desktop can leave
-  // the sidebar collapsed with no visible way to reopen it except the toggle.
-  useEffect(() => {
-    setIsCollapsed(!isDesktop);
-  }, [isDesktop]);
+  const { isCollapsed, toggleSidebar, closeSidebar } = useSidebar();
 
   // Close on Escape for basic keyboard accessibility on mobile.
   useEffect(() => {
     if (isCollapsed) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsCollapsed(true);
+      if (event.key === "Escape") closeSidebar();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isCollapsed]);
+  }, [isCollapsed, closeSidebar]);
 
   return (
     <>
@@ -151,7 +120,7 @@ export function SideBarCmp() {
       {!isCollapsed && (
         <div
           className="fixed inset-0 z-30 bg-black/50 md:hidden"
-          onClick={() => setIsCollapsed(true)}
+          onClick={closeSidebar}
           aria-hidden="true"
         />
       )}
@@ -167,7 +136,7 @@ export function SideBarCmp() {
         <div className={sidebarInnerClasses}>
           <button
             type="button"
-            onClick={() => setIsCollapsed(true)}
+            onClick={closeSidebar}
             aria-label="Close sidebar"
             className="absolute top-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-md text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden"
           >
@@ -205,7 +174,7 @@ export function SideBarCmp() {
         {/* Desktop collapse/expand toggle: squeezes the panel width, hidden on mobile */}
         <button
           type="button"
-          onClick={() => setIsCollapsed((prev) => !prev)}
+          onClick={toggleSidebar}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={sidebarToggleBaseClasses}
         >
@@ -216,18 +185,6 @@ export function SideBarCmp() {
           )}
         </button>
       </div>
-
-      {/* Mobile open button: only rendered while the off-canvas sidebar is closed */}
-      {isCollapsed && (
-        <button
-          type="button"
-          onClick={() => setIsCollapsed(false)}
-          aria-label="Expand sidebar"
-          className={sidebarMobileToggleClasses}
-        >
-          <HiMenu size={18} />
-        </button>
-      )}
     </>
   );
 }
