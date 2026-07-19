@@ -30,20 +30,18 @@
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.0"
   },
-  "prisma": {
-    "seed": "ts-node prisma/seed.ts"
-  },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.20.1",
     "@typescript-eslint/eslint-plugin": "^8.62.0",
     "@typescript-eslint/parser": "^8.62.0",
+    "dotenv": "^17.4.2",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
     "prettier": "^3.9.1",
     "prisma": "^6.0.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3"
   }
 }

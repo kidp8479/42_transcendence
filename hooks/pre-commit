@@ -11,13 +11,22 @@ if ! docker compose exec -T backend echo "ok" > /dev/null 2>&1; then
   exit 1
 fi
 
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
 echo "pre-commit: formatting frontend..."
 docker compose exec -T frontend npm run format
 
 echo "pre-commit: formatting backend..."
 docker compose exec -T backend npm run format
 
-git add -u
+# Only restage files that were already staged for this commit, so `npm run
+# format` (which runs over the whole repo) picks up formatting fixes on them
+# without silently sweeping in unrelated unstaged changes sitting elsewhere
+# in the working tree (git add -u used to stage everything, defeating
+# partial/atomic commits).
+if [ -n "$STAGED_FILES" ]; then
+  echo "$STAGED_FILES" | xargs -r git add --
+fi
 
 echo "pre-commit: linting frontend..."
 docker compose exec -T frontend npm run lint

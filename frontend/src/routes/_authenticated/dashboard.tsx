@@ -5,5 +5,5 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function DashboardPage() {
-  return <div>Hello "/dashboard"!</div>;
+  return <div className="text-brand-700">Hello "/dashboard"!</div>;
 }

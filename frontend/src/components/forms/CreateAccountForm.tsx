@@ -125,16 +125,16 @@ export function CreateAccountForm({ onSignIn }: CreateAccountFormProps) {
 
       <Button
         className="
-		  bg-brand-700
+		  bg-brand-500
 		  text-white
-		  hover:bg-brand-800
+		  hover:bg-brand-600
 		  focus:outline-none
 		  focus-visible:outline-none
 		  focus:ring-4
 		  focus:ring-green-300
-		  dark:bg-brand-700
+		  dark:bg-brand-500
 		  dark:text-white
-		  dark:hover:bg-brand-800
+		  dark:hover:bg-brand-600
 		  dark:focus:ring-green-800
 		 "
         disabled={submitting}

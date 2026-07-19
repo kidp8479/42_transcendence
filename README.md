@@ -122,7 +122,7 @@ make format-frontend  # frontend only
 make format-backend   # backend only
 ```
 
-**Pre-commit hook** - auto-formats and lints both services before every commit. Run once after cloning:
+**Pre-commit hook** - auto-formats and lints both services before every commit. Run after cloning, and again any time `hooks/pre-commit` itself changes (`.git/hooks/` is not tracked by git, so pulling an update to `hooks/pre-commit` does not update your locally installed copy on its own):
 
 ```sh
 make hooks

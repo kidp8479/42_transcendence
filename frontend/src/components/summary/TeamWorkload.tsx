@@ -35,7 +35,7 @@ export function TeamWorkload({ members, categories }: TeamWorkloadProps) {
     >
       <h2
         id="team-workload-heading"
-        className="mb-4 text-sm font-semibold text-text-primary"
+        className="mb-4 font-mono text-base font-semibold text-text-primary"
       >
         Team Workload
       </h2>
