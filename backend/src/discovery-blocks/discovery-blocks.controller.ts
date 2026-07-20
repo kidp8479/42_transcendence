@@ -8,20 +8,30 @@
 // anything, otherwise any authenticated user could read or modify any project's
 // discovery blocks just by changing the projectId in the URL (IDOR).
 
-import { Controller } from "@nestjs/common";
+import { Controller, Get, Req, Param, ParseUUIDPipe } from "@nestjs/common";
+import type { AuthenticatedRequest } from "../auth/authenticated-request";
+import { DiscoveryBlocksService } from "./discovery-blocks.service";
 
 @Controller("projects/:projectId/discovery-blocks")
 export class DiscoveryBlocksController {
-  // TODO: inject DiscoveryBlocksService here via constructor
-  // the constructor is called automatically by NestJS at startup - never called manually
+  discoveryBlockService: DiscoveryBlocksService;
+  constructor(discoveryBlockService: DiscoveryBlocksService) {
+    this.discoveryBlockService = discoveryBlockService;
+  }
+
+  @Get()
+  findAll(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockService.findAll(projectId, request.user.id);
+  }
+
   // ENDPOINTS:
   // POST   /api/projects/:projectId/discovery-blocks
   //        => create a new discovery block
   //        => expects a request body matching CreateDiscoveryBlockDto (title, description?, icon?, color?, notes?)
   //        => projectId comes from the URL, not the body
-  // GET    /api/projects/:projectId/discovery-blocks
-  //        => get all discovery blocks for a project
-  //        => :projectId is a placeholder filled by the frontend (no request body, no DTO)
   // GET    /api/projects/:projectId/discovery-blocks/:id
   //        => get one discovery block by its id
   //        => :id is a placeholder filled by the frontend (no request body, no DTO)
