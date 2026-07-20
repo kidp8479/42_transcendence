@@ -17,6 +17,7 @@ export const CATEGORY_COLOR_PALETTE = [
   {
     bg: "bg-category-0",
     border: "border-category-0",
+    hoverBorder: "hover:border-category-0",
     text: "text-category-0",
     badgeBg: "bg-category-0/15",
     badgeBorder: "border-category-0/30",
@@ -25,6 +26,7 @@ export const CATEGORY_COLOR_PALETTE = [
     // index 1 reuses the brand color, matches the Figma prototype
     bg: "bg-brand-500",
     border: "border-brand-500",
+    hoverBorder: "hover:border-brand-500",
     text: "text-brand-500",
     badgeBg: "bg-brand-500/15",
     badgeBorder: "border-brand-500/30",
@@ -32,6 +34,7 @@ export const CATEGORY_COLOR_PALETTE = [
   {
     bg: "bg-category-2",
     border: "border-category-2",
+    hoverBorder: "hover:border-category-2",
     text: "text-category-2",
     badgeBg: "bg-category-2/15",
     badgeBorder: "border-category-2/30",
@@ -39,6 +42,7 @@ export const CATEGORY_COLOR_PALETTE = [
   {
     bg: "bg-category-3",
     border: "border-category-3",
+    hoverBorder: "hover:border-category-3",
     text: "text-category-3",
     badgeBg: "bg-category-3/15",
     badgeBorder: "border-category-3/30",
@@ -46,6 +50,7 @@ export const CATEGORY_COLOR_PALETTE = [
   {
     bg: "bg-category-4",
     border: "border-category-4",
+    hoverBorder: "hover:border-category-4",
     text: "text-category-4",
     badgeBg: "bg-category-4/15",
     badgeBorder: "border-category-4/30",
@@ -53,6 +58,7 @@ export const CATEGORY_COLOR_PALETTE = [
   {
     bg: "bg-category-5",
     border: "border-category-5",
+    hoverBorder: "hover:border-category-5",
     text: "text-category-5",
     badgeBg: "bg-category-5/15",
     badgeBorder: "border-category-5/30",
@@ -60,6 +66,7 @@ export const CATEGORY_COLOR_PALETTE = [
   {
     bg: "bg-category-6",
     border: "border-category-6",
+    hoverBorder: "hover:border-category-6",
     text: "text-category-6",
     badgeBg: "bg-category-6/15",
     badgeBorder: "border-category-6/30",
@@ -67,6 +74,7 @@ export const CATEGORY_COLOR_PALETTE = [
   {
     bg: "bg-category-7",
     border: "border-category-7",
+    hoverBorder: "hover:border-category-7",
     text: "text-category-7",
     badgeBg: "bg-category-7/15",
     badgeBorder: "border-category-7/30",
