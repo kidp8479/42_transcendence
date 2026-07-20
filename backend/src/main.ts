@@ -44,6 +44,9 @@ async function bootstrap() {
       .setTitle("42 Project Planner API")
       .setDescription("API documentation for the 42 Project Planner app")
       .setVersion("1.0")
+      // registers X-CSRF-Token as a Swagger security scheme so "Try it out" can
+      // send it via the "Authorize" button, for POST/PATCH/DELETE routes
+      .addApiKey({ type: "apiKey", in: "header", name: "X-CSRF-Token" }, "csrf")
       .build();
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup("api/docs", app, document);
