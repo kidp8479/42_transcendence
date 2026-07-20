@@ -8,9 +8,19 @@
 // anything, otherwise any authenticated user could read or modify any project's
 // discovery blocks just by changing the projectId in the URL (IDOR).
 
-import { Controller, Get, Req, Param, ParseUUIDPipe } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Req,
+  Body,
+  Param,
+  ParseUUIDPipe,
+} from "@nestjs/common";
+import { ApiSecurity } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { DiscoveryBlocksService } from "./discovery-blocks.service";
+import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
 
 @Controller("projects/:projectId/discovery-blocks")
 export class DiscoveryBlocksController {
@@ -27,11 +37,17 @@ export class DiscoveryBlocksController {
     return this.discoveryBlockService.findAll(projectId, request.user.id);
   }
 
+  @ApiSecurity("csrf")
+  @Post()
+  create(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: CreateDiscoveryBlockDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockService.create(projectId, dto, request.user.id);
+  }
+
   // ENDPOINTS:
-  // POST   /api/projects/:projectId/discovery-blocks
-  //        => create a new discovery block
-  //        => expects a request body matching CreateDiscoveryBlockDto (title, description?, icon?, color?, notes?)
-  //        => projectId comes from the URL, not the body
   // GET    /api/projects/:projectId/discovery-blocks/:id
   //        => get one discovery block by its id
   //        => :id is a placeholder filled by the frontend (no request body, no DTO)
@@ -41,4 +57,9 @@ export class DiscoveryBlocksController {
   // DELETE /api/projects/:projectId/discovery-blocks/:id
   //        => delete a discovery block by its id
   //        => no request body needed, the ids in the URL are enough (no DTO)
+
+  // TODO
+  // @Get
+  // @Patch
+  // @Delete
 }
