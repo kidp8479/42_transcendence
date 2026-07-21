@@ -59,13 +59,19 @@ export class ProjectsService {
   //       => insert a new project in the database
   //       => default status: IN_PROGRESS (set by Prisma schema, not the DTO)
   //       => optional fields: description, deadline, isArchived
-  //       => must also create a ProjectMember row linking userId to the new project
+  //       => must also create a ProjectMember row linking userId to the new project,
+  //          with role: ADMIN (the creator becomes the project's first admin)
+
+  // NOTE ON ROLES: renaming/deleting the project is a team-affecting, hard-to-undo action -
+  // decided with the team (see TR-66) that this needs an ADMIN check, unlike most other
+  // modules where any member can act freely (tasks, discovery blocks, etc.)
 
   // TODO: update(id: string, dto: UpdateProjectDto, userId: string)
+  //       => const member = await this.assertMembership(id, userId)
+  //       => must also throw (ex: ForbiddenException) if member.role !== "ADMIN"
   //       => update project fields (name, status, deadline, isArchived)
-  //       => same membership check as findById
 
   // TODO: remove(id: string, userId: string)
+  //       => same requester + role check as update
   //       => permanently delete a project
-  //       => same membership check as findById
 }
