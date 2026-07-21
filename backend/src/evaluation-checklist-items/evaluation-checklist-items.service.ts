@@ -1,10 +1,24 @@
 // EvaluationChecklistItemsService: handles all database operations for EvaluationChecklistItems
 // called by the controller, never called directly by the frontend
 
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class EvaluationChecklistItemsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(projectId: string) {
+    return this.prisma.project.findMany({
+      where: {
+        members: {
+          some: { projectId }
+        }
+      },
+    });
+  }
+
+
   // code your logic here
   // all methods below will use PrismaService to query the database
   // none of these are called directly by the frontend - always via the controller

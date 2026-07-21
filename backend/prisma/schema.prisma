@@ -354,13 +354,19 @@ model DiscoveryBlockItem {
   @@index([discoveryBlockId])
 }
 
+enum EvaluationChecklistItemSection {
+  MANDATORY
+  BONUS
+  SUPPLEMENTAL
+}
+
 model EvaluationChecklistItem {
   id        String   @id @default(uuid())
   projectId String
   label     String
   isChecked Boolean  @default(false)
   order     Int // position of the item in the list, updated when user reorders
-  section   String
+  section   EvaluationChecklistItemSection @default(MANDATORY)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
