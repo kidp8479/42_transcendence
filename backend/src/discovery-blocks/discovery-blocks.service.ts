@@ -104,7 +104,17 @@ export class DiscoveryBlocksService {
     return updatedBlock;
   }
 
-  // TODO: remove(id: string, userId: string) => DELETE
-  //       => same membership check as findById
-  //       => permanently delete a discovery block and its items
+  // DELETE
+  // discoveryBlockItems cascade-delete automatically at the DB level
+  // (onDelete: Cascade on DiscoveryBlockItem.discoveryBlock in schema.prisma) - no need to delete them here
+  async remove(projectId: string, id: string, userId: string) {
+    // reuses findById as the access guard: it already checks both
+    // "is userId a member of projectId" and "does this id belong to projectId",
+    // and throws the right NotFoundException in each case - no need to repeat that logic here
+    await this.findById(projectId, id, userId);
+    const deletedBlock = await this.prisma.discoveryBlock.delete({
+      where: { id: id },
+    });
+    return deletedBlock;
+  }
 }
