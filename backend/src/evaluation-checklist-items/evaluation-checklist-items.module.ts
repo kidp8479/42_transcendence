@@ -2,10 +2,12 @@
 // NestJS will not know they exist until they are declared here
 
 import { Module } from "@nestjs/common";
+import { ProjectsModule } from "../projects/projects.module";
 import { EvaluationChecklistItemsService } from "./evaluation-checklist-items.service";
 import { EvaluationChecklistItemsController } from "./evaluation-checklist-items.controller";
 
 @Module({
+  imports: [ProjectsModule], // needed to inject ProjectsService (assertMembership) into EvaluationChecklistItemsService
   controllers: [EvaluationChecklistItemsController], // handles HTTP requests
   providers: [EvaluationChecklistItemsService], // handles database operations
   exports: [EvaluationChecklistItemsService], // expose EvaluationChecklistItemsService to other modules that may need it
