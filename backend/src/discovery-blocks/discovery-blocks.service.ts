@@ -33,7 +33,7 @@ export class DiscoveryBlocksService {
     }
   }
 
-  // GET
+  // GET (all)
   async findAll(projectId: string, userId: string) {
     await this.assertProjectMembership(projectId, userId);
 
@@ -67,9 +67,19 @@ export class DiscoveryBlocksService {
     return block;
   }
 
-  // TODO: findById(id: string, userId: string) => GET
-  //       => must throw if userId is not a ProjectMember of this block's project
-  //       => fetch one discovery block by its id
+  // GET (one)
+  async findById(projectId: string, id: string, userId: string) {
+    await this.assertProjectMembership(projectId, userId);
+
+    const block = await this.prisma.discoveryBlock.findFirst({
+      where: { id: id, projectId: projectId },
+    });
+    if (!block) {
+      throw new NotFoundException("Discovery block not found");
+    }
+    return block;
+  }
+
   // TODO: update(id: string, dto: UpdateDiscoveryBlockDto, userId: string) => PATCH
   //       => same membership check as findById
   //       => update an existing block (title, description, or notes)

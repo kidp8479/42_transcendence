@@ -29,6 +29,7 @@ export class DiscoveryBlocksController {
     this.discoveryBlockService = discoveryBlockService;
   }
 
+  // GET (all)
   @Get()
   findAll(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -37,6 +38,17 @@ export class DiscoveryBlocksController {
     return this.discoveryBlockService.findAll(projectId, request.user.id);
   }
 
+  // GET (one)
+  @Get(":id")
+  findById(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockService.findById(projectId, id, request.user.id);
+  }
+
+  // POST
   @ApiSecurity("csrf")
   @Post()
   create(
@@ -47,10 +59,6 @@ export class DiscoveryBlocksController {
     return this.discoveryBlockService.create(projectId, dto, request.user.id);
   }
 
-  // ENDPOINTS:
-  // GET    /api/projects/:projectId/discovery-blocks/:id
-  //        => get one discovery block by its id
-  //        => :id is a placeholder filled by the frontend (no request body, no DTO)
   // PATCH  /api/projects/:projectId/discovery-blocks/:id
   //        => update an existing discovery block (title, description, or notes)
   //        => expects a request body matching UpdateDiscoveryBlockDto (all fields optional)
@@ -59,7 +67,6 @@ export class DiscoveryBlocksController {
   //        => no request body needed, the ids in the URL are enough (no DTO)
 
   // TODO
-  // @Get
   // @Patch
   // @Delete
 }
