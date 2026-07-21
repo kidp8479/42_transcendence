@@ -4,6 +4,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
+import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
 
 @Injectable()
 export class DiscoveryBlocksService {
@@ -80,10 +81,29 @@ export class DiscoveryBlocksService {
     return block;
   }
 
-  // TODO: update(id: string, dto: UpdateDiscoveryBlockDto, userId: string) => PATCH
-  //       => same membership check as findById
-  //       => update an existing block (title, description, or notes)
-  //       => status is recalculated automatically, never updated directly
+  // PATCH (partial update)
+  // status is never set here - can't calculate it automatically until
+  // DiscoveryBlockItem (the checklist) is implemented, see the DTO's own comment
+  async update(
+    projectId: string,
+    id: string,
+    dto: UpdateDiscoveryBlockDto,
+    userId: string
+  ) {
+    // reuses findById as the access guard: it already checks both
+    // "is userId a member of projectId" and "does this id belong to projectId",
+    // and throws the right NotFoundException in each case - no need to repeat that logic here
+    await this.findById(projectId, id, userId);
+
+    // { ...dto } (spread notation in js) only contains the fields actually sent by the client (PATCH is partial):
+    // Prisma's update() only touches the keys present in `data`, leaving the rest of the row untouched
+    const updatedBlock = await this.prisma.discoveryBlock.update({
+      where: { id: id },
+      data: { ...dto },
+    });
+    return updatedBlock;
+  }
+
   // TODO: remove(id: string, userId: string) => DELETE
   //       => same membership check as findById
   //       => permanently delete a discovery block and its items

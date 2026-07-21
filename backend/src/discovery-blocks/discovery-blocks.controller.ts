@@ -12,6 +12,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Req,
   Body,
   Param,
@@ -21,6 +22,7 @@ import { ApiSecurity } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { DiscoveryBlocksService } from "./discovery-blocks.service";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
+import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
 
 @Controller("projects/:projectId/discovery-blocks")
 export class DiscoveryBlocksController {
@@ -59,14 +61,27 @@ export class DiscoveryBlocksController {
     return this.discoveryBlockService.create(projectId, dto, request.user.id);
   }
 
-  // PATCH  /api/projects/:projectId/discovery-blocks/:id
-  //        => update an existing discovery block (title, description, or notes)
-  //        => expects a request body matching UpdateDiscoveryBlockDto (all fields optional)
+  // PATCH
+  @ApiSecurity("csrf")
+  @Patch(":id")
+  update(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: UpdateDiscoveryBlockDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockService.update(
+      projectId,
+      id,
+      dto,
+      request.user.id
+    );
+  }
+
   // DELETE /api/projects/:projectId/discovery-blocks/:id
   //        => delete a discovery block by its id
   //        => no request body needed, the ids in the URL are enough (no DTO)
 
   // TODO
-  // @Patch
   // @Delete
 }
