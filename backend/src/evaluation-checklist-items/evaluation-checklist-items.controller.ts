@@ -8,10 +8,26 @@
 // anything, otherwise any authenticated user could read or modify any project's
 // checklist items just by changing the projectId in the URL (IDOR).
 
-import { Controller } from "@nestjs/common";
+import { Controller, Get, Req, Param, ParseUUIDPipe } from "@nestjs/common";
+import { AuthenticatedRequest } from "../auth/authenticated-request";
+import { EvaluationChecklistItemsService } from "./evaluation-checklist-items.service";
 
 @Controller("projects/:projectId/evaluation-checklist-items")
 export class EvaluationChecklistItemsController {
+  constructor(private readonly evaluationChechlistItemService: EvaluationChecklistItemsService) {}
+
+  @Get()
+  findAll(@Req() request: AuthenticatedRequest) {
+    return this.evaluationChechlistItemService.findAll(request.user.id);
+  }
+
+  @Get(":id")
+  findBySection(
+    @Param()
+  )
+
+
+
   // TODO: inject EvaluationChecklistItemsService here via constructor
   // the constructor is called automatically by NestJS at startup - never called manually
   // ENDPOINTS:
