@@ -7,7 +7,12 @@
 // note: everything else (form placeholders, empty state messages, input hints)
 // is handled in the frontend with the HTML "placeholder" attribute - no DB needed for that
 import "dotenv/config";
-import { PrismaClient, ProjectStatus, DiscoveryBlockStatus } from "@prisma/client";
+import {
+  PrismaClient,
+  ProjectStatus,
+  DiscoveryBlockStatus,
+  ProjectMemberRole,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -133,7 +138,12 @@ async function main() {
         description: p.description,
         status: p.status,
         members: {
-          create: p.members.map((u) => ({ userId: u.id })),
+          // first member of each project = ADMIN (arbitrary "creator" convention for seed
+          // data only - real assignment logic belongs in ProjectsService.create, not written yet)
+          create: p.members.map((u, index) => ({
+            userId: u.id,
+            role: index === 0 ? ProjectMemberRole.ADMIN : ProjectMemberRole.MEMBER,
+          })),
         },
       },
     });
