@@ -20,15 +20,22 @@ import { Dropdown, DropdownDivider, DropdownItem } from "flowbite-react";
 import {
   HiOutlineArrowRight,
   HiOutlineCalendar,
-  HiOutlineEllipsisHorizontal,
+  HiOutlineCog6Tooth,
   HiOutlineFolder,
   HiOutlineTrash,
   HiOutlineUserGroup,
   HiOutlineUsers,
 } from "react-icons/hi2";
-import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import type { ProjectStatus } from "@/lib/projects";
+
+// Scoped to this card's "..." menu only - rounds the item hover highlight
+// (rectangular by default in darkDropdownTheme, shared with NotificationBell
+// and UserMenu) without touching that shared theme.
+const roundedDropdownItemTheme = {
+  container: "mx-1",
+  base: "rounded-md",
+};
 
 const STATUS_META: Record<
   ProjectStatus,
@@ -38,6 +45,7 @@ const STATUS_META: Record<
     text: string;
     badgeBg: string;
     badgeBorder: string;
+    hoverBorder: string;
   }
 > = {
   IN_PROGRESS: {
@@ -46,6 +54,7 @@ const STATUS_META: Record<
     text: "text-status-in-progress",
     badgeBg: "bg-status-in-progress/15",
     badgeBorder: "border-status-in-progress/30",
+    hoverBorder: "hover:border-status-in-progress/50",
   },
   REVIEW: {
     label: "Review",
@@ -53,6 +62,7 @@ const STATUS_META: Record<
     text: "text-status-review",
     badgeBg: "bg-status-review/15",
     badgeBorder: "border-status-review/30",
+    hoverBorder: "hover:border-status-review/50",
   },
   COMPLETED: {
     label: "Completed",
@@ -60,6 +70,7 @@ const STATUS_META: Record<
     text: "text-status-completed",
     badgeBg: "bg-status-completed/15",
     badgeBorder: "border-status-completed/30",
+    hoverBorder: "hover:border-status-completed/50",
   },
 };
 
@@ -92,8 +103,6 @@ export function ProjectCard({
   onDeleteProject,
 }: ProjectCardProps) {
   const status = STATUS_META[project.status];
-  const accent =
-    CATEGORY_COLOR_PALETTE[project.color] ?? CATEGORY_COLOR_PALETTE[0];
   const formattedDeadline = new Date(project.deadline).toLocaleDateString(
     "en-US",
     { month: "short", day: "2-digit", year: "numeric" }
@@ -101,7 +110,7 @@ export function ProjectCard({
 
   return (
     <div
-      className={`relative cursor-pointer rounded-lg border border-surface-border bg-surface-raised transition-colors ${accent.hoverBorder}`}
+      className={`relative cursor-pointer rounded-lg border border-surface-border bg-surface-raised transition-colors ${status.hoverBorder}`}
     >
       <Link
         to="/$projectId/summary"
@@ -115,24 +124,26 @@ export function ProjectCard({
           it. Only the badge+menu wrapper below opts back in with
           pointer-events-auto, since it's the one actually-interactive area
           nested in here. */}
-      <div className="pointer-events-none relative flex flex-col gap-4 p-4">
+      <div className="pointer-events-none relative flex h-full flex-col gap-4 p-4">
         <div className="flex items-start justify-between gap-2">
           <div
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${accent.badgeBg}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${status.badgeBg}`}
           >
             <HiOutlineFolder
-              className={`h-5 w-5 ${accent.text}`}
+              className={`h-5 w-5 ${status.text}`}
               aria-hidden="true"
             />
           </div>
 
-          <div className="pointer-events-auto flex items-center gap-1">
+          <div className="pl-1 pt-2 flex flex-1 items-center justify-between gap-2">
             <span
-              className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${status.badgeBg} ${status.badgeBorder} ${status.text}`}
+              className={`rounded-md px-1 py-0.5 text-[10px] font-semibold ${status.badgeBg} ${status.text}`}
             >
               {status.label}
             </span>
+          </div>
 
+          <div className="pointer-events-auto flex items-center gap-1">
             {canManageProject && (
               <Dropdown
                 arrowIcon={false}
@@ -155,12 +166,13 @@ export function ProjectCard({
                     aria-label={`Open actions for ${project.name}`}
                     className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                   >
-                    <HiOutlineEllipsisHorizontal className="h-5 w-5" />
+                    <HiOutlineCog6Tooth className="h-5 w-5" />
                   </button>
                 )}
               >
                 <DropdownItem
                   icon={HiOutlineUserGroup}
+                  theme={roundedDropdownItemTheme}
                   onClick={() => onManageMembers?.()}
                 >
                   Manage members
@@ -168,6 +180,7 @@ export function ProjectCard({
                 <DropdownDivider />
                 <DropdownItem
                   icon={HiOutlineTrash}
+                  theme={roundedDropdownItemTheme}
                   className="text-control-error! dark:text-control-error!"
                   onClick={() => onDeleteProject?.()}
                 >
@@ -182,12 +195,12 @@ export function ProjectCard({
           <h3 className="font-mono text-base font-semibold text-text-primary">
             {project.name}
           </h3>
-          <p className="mt-1 text-sm text-text-secondary line-clamp-2">
+          <p className="mt-1 min-h-10 text-sm text-text-secondary line-clamp-2">
             {project.description}
           </p>
         </div>
 
-        <div>
+        <div className="mt-auto">
           <div className="mb-1 flex items-center justify-between text-xs">
             <span className="text-text-secondary">Progress</span>
             <span className={`font-bold ${status.text}`}>

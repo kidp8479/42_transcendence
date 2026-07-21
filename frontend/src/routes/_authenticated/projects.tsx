@@ -1,7 +1,13 @@
 // Projects list page (/projects).
-// Shows all projects the user belongs to as cards (status, progress, members, deadline).
-// Also contains the "New project" button which opens a creation modal (not a separate route).
+// Shows all projects the user belongs to as cards (status, progress, members, creation date).
+// Also renders NewProjectCard as the grid's last tile - it toggles inline
+// into a creation form itself, so there's no separate route or global modal
+// involved (see NewProjectCard.tsx).
 import { createFileRoute, useLoaderData } from "@tanstack/react-router";
+import {
+  NewProjectCard,
+  type NewProjectFormValues,
+} from "@/components/projects/NewProjectCard";
 import {
   ProjectCard,
   type ProjectCardData,
@@ -64,9 +70,15 @@ function ProjectsPage() {
   // project (see ProjectRow in components/navigation/SideBarCmp.tsx).
   const projects = useLoaderData({ from: "/_authenticated" });
 
+  // No create-project endpoint yet (see NewProjectCard.tsx) - placeholder
+  // until POST /projects lands, same as onManageMembers/onDeleteProject below.
+  function handleCreateProject(values: NewProjectFormValues) {
+    console.log("Create project:", values);
+  }
+
   return (
     <>
-      <div className="p-6 mb-5 border-b border-surface-border">
+      <div className="p-6 mb-2 border-b border-surface-border">
         <h1 className="text-xl font-bold font-mono text-text-primary">
           Projects
         </h1>
@@ -76,7 +88,10 @@ function ProjectsPage() {
       </div>
       <div className="p-6">
         {projects.length === 0 ? (
-          <p className="text-sm text-text-muted">No projects yet</p>
+          <div className="max-w-sm">
+            <p className="mb-4 text-sm text-text-muted">No projects yet</p>
+            <NewProjectCard onCreate={handleCreateProject} />
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {projects.map((project, index) => (
@@ -98,9 +113,9 @@ function ProjectsPage() {
                 }
               />
             ))}
+            <NewProjectCard onCreate={handleCreateProject} />
           </div>
         )}
-        <div>{/* le bouton "New project" qui ouvre un modal */}</div>
       </div>
     </>
   );
