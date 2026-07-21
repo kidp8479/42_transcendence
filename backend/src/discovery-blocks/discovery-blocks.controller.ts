@@ -13,6 +13,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Req,
   Body,
   Param,
@@ -78,10 +79,14 @@ export class DiscoveryBlocksController {
     );
   }
 
-  // DELETE /api/projects/:projectId/discovery-blocks/:id
-  //        => delete a discovery block by its id
-  //        => no request body needed, the ids in the URL are enough (no DTO)
-
-  // TODO
-  // @Delete
+  // DELETE
+  @ApiSecurity("csrf")
+  @Delete(":id")
+  remove(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockService.remove(projectId, id, request.user.id);
+  }
 }
