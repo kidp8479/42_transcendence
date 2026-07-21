@@ -43,12 +43,13 @@ export class ProjectsService {
   }
 
   async findById(id: string, userId: string) {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        id,
-        members: { some: { userId } },
-      },
-    });
+    // delegates the membership check to assertMembership instead of re-querying it here
+    await this.assertMembership(id, userId);
+
+    // assertMembership succeeding guarantees this project exists (foreign key integrity
+    // between ProjectMember.projectId and Project.id) - this check is a defensive
+    // fallback, not expected to ever trigger in practice
+    const project = await this.prisma.project.findUnique({ where: { id } });
     if (!project) {
       throw new NotFoundException("Project not found");
     }
