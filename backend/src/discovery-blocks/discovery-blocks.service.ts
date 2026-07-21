@@ -8,8 +8,9 @@ import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
 
 @Injectable()
 export class DiscoveryBlocksService {
-  // explicit constructor form kept on purpose (not "private readonly" this time) while learning
-  // will factor to the shorthand once the whole service is written
+  // explicit constructor form, kept for learning purposes in this module -
+  // strictly equivalent to the usual shorthand `constructor(private readonly prisma: PrismaService) {}`
+  // (that shorthand is the standard form to use elsewhere in the codebase)
   prisma: PrismaService;
   constructor(prisma: PrismaService) {
     this.prisma = prisma;
@@ -69,6 +70,9 @@ export class DiscoveryBlocksService {
   }
 
   // GET (one)
+  // also reused by update/remove as their access guard: it already checks both
+  // "is userId a member of projectId" and "does this id belong to projectId",
+  // and throws the right NotFoundException in each case
   async findById(projectId: string, id: string, userId: string) {
     await this.assertProjectMembership(projectId, userId);
 
@@ -90,10 +94,7 @@ export class DiscoveryBlocksService {
     dto: UpdateDiscoveryBlockDto,
     userId: string
   ) {
-    // reuses findById as the access guard: it already checks both
-    // "is userId a member of projectId" and "does this id belong to projectId",
-    // and throws the right NotFoundException in each case - no need to repeat that logic here
-    await this.findById(projectId, id, userId);
+    await this.findById(projectId, id, userId); // access guard, see findById's own comment
 
     // { ...dto } (spread notation in js) only contains the fields actually sent by the client (PATCH is partial):
     // Prisma's update() only touches the keys present in `data`, leaving the rest of the row untouched
@@ -108,10 +109,7 @@ export class DiscoveryBlocksService {
   // discoveryBlockItems cascade-delete automatically at the DB level
   // (onDelete: Cascade on DiscoveryBlockItem.discoveryBlock in schema.prisma) - no need to delete them here
   async remove(projectId: string, id: string, userId: string) {
-    // reuses findById as the access guard: it already checks both
-    // "is userId a member of projectId" and "does this id belong to projectId",
-    // and throws the right NotFoundException in each case - no need to repeat that logic here
-    await this.findById(projectId, id, userId);
+    await this.findById(projectId, id, userId); // access guard, see findById's own comment
     const deletedBlock = await this.prisma.discoveryBlock.delete({
       where: { id: id },
     });
