@@ -3,41 +3,28 @@
 
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { ProjectsService } from "../projects/projects.service";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
 import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
 
 @Injectable()
 export class DiscoveryBlocksService {
   // explicit constructor form, kept for learning purposes in this module -
-  // strictly equivalent to the usual shorthand `constructor(private readonly prisma: PrismaService) {}`
+  // strictly equivalent to the usual shorthand
+  // `constructor(private readonly prisma: PrismaService, private readonly projectsService: ProjectsService) {}`
   // (that shorthand is the standard form to use elsewhere in the codebase)
   prisma: PrismaService;
-  constructor(prisma: PrismaService) {
+  projectsService: ProjectsService;
+  constructor(prisma: PrismaService, projectsService: ProjectsService) {
     this.prisma = prisma;
-  }
-
-  // helper
-  // guard clause: verifies userId is a member of projectId before anything else runs.
-  // without this, any authenticated user could read another project's discovery blocks
-  // just by guessing/changing :projectId in the URL (IDOR) - see controller header comment
-  private async assertProjectMembership(
-    projectId: string,
-    userId: string
-  ): Promise<void> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        id: projectId,
-        members: { some: { userId: userId } },
-      },
-    });
-    if (!project) {
-      throw new NotFoundException("Project not found");
-    }
+    this.projectsService = projectsService;
   }
 
   // GET (all)
   async findAll(projectId: string, userId: string) {
-    await this.assertProjectMembership(projectId, userId);
+    // shared guard (see ProjectsService.assertMembership) - throws NotFoundException
+    // if the project doesn't exist or userId isn't a member of it
+    await this.projectsService.assertMembership(projectId, userId);
 
     // retrieve the discovery blocks after the ownership test passed
     const blocks = await this.prisma.discoveryBlock.findMany({
@@ -54,7 +41,7 @@ export class DiscoveryBlocksService {
     dto: CreateDiscoveryBlockDto,
     userId: string
   ) {
-    await this.assertProjectMembership(projectId, userId);
+    await this.projectsService.assertMembership(projectId, userId);
 
     const block = await this.prisma.discoveryBlock.create({
       data: {
@@ -74,7 +61,7 @@ export class DiscoveryBlocksService {
   // "is userId a member of projectId" and "does this id belong to projectId",
   // and throws the right NotFoundException in each case
   async findById(projectId: string, id: string, userId: string) {
-    await this.assertProjectMembership(projectId, userId);
+    await this.projectsService.assertMembership(projectId, userId);
 
     const block = await this.prisma.discoveryBlock.findFirst({
       where: { id: id, projectId: projectId },
