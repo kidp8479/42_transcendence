@@ -49,10 +49,19 @@ const sidebarPrimaryNavigation: NavigationItem[] = [
 ];
 
 function SidebarNavLink({ to, label, icon: Icon }: NavigationItem) {
+  const { isDesktop, closeSidebar } = useSidebar();
+
+  // On mobile the sidebar is a full-screen overlay, so picking a destination
+  // should dismiss it like any other drawer nav. On desktop it's a persistent
+  // panel (that's the whole point of the collapse/expand toggle), so leave
+  // it open there - closing it on every click would fight the user.
   return (
     <li>
       <Link
         to={to}
+        onClick={() => {
+          if (!isDesktop) closeSidebar();
+        }}
         activeProps={{ className: activeSidebarLinkClasses }}
         inactiveProps={{ className: sidebarNavLinkClasses }}
       >
@@ -75,12 +84,17 @@ function ProjectRow({ project }: { project: SidebarProject }) {
       : project.status === "REVIEW"
         ? "bg-status-review"
         : "bg-status-in-progress";
+  const { isDesktop, closeSidebar } = useSidebar();
 
   return (
     <Link
       // Each project needs its own route target so only one row can be active at a time.
       to="/$projectId/summary"
       params={{ projectId: project.id }}
+      // Mobile-only close-on-navigate, same reasoning as SidebarNavLink above.
+      onClick={() => {
+        if (!isDesktop) closeSidebar();
+      }}
       activeProps={{ className: activeSidebarLinkClasses }}
       inactiveProps={{ className: sidebarNavLinkClasses }}
     >

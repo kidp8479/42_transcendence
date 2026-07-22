@@ -26,8 +26,15 @@ export function HeaderAuthenticated({ session }: HeaderAuthenticatedProps) {
         <HiMenu size={18} />
       </button>
       <NavLogo to="/dashboard" />
-      <div className="order-3 w-full md:order-none md:mx-auto md:max-w-2xl">
-        <SearchBar />
+      {/* flex-1 claims all the row's leftover space outright, then
+          justify-center centers the search bar inside it. Don't swap this
+          for mx-auto: an auto margin here would split that leftover space
+          with the icons' ml-auto below instead of taking all of it,
+          dragging the search bar off-center (worse the wider the screen). */}
+      <div className="order-3 w-full md:order-none md:flex md:flex-1 md:justify-center">
+        <div className="w-full md:max-w-2xl">
+          <SearchBar />
+        </div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <NotificationBell />
