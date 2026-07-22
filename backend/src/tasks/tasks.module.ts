@@ -1,11 +1,13 @@
 // TasksModule: registers the controller and service for the Task feature
 // NestJS will not know they exist until they are declared here
 import { Module } from "@nestjs/common";
+import { ProjectsModule } from "../projects/projects.module";
 import { TasksService } from "./tasks.service";
 import { TasksController } from "./tasks.controller";
 import { TaskAssigneeService } from "./task-assignees.service";
 
 @Module({
+  imports: [ProjectsModule], // needed to inject ProjectsService (assertMembership) into TasksService
   controllers: [TasksController], // handles HTTP requests
   // TaskAssigneeService has no controller/module of its own - it's a plain internal
   // helper injected into TasksService to manage the TaskAssignee join-table rows

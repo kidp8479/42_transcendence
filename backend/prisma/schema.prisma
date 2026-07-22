@@ -158,16 +158,29 @@ model Notification {
 // One User can appear many times here (once per project)
 // One Project can appear many times here (once per member)
 model ProjectMember {
-  id        String   @id @default(uuid())
+  id        String            @id @default(uuid())
   userId    String // foreign key: which user
   projectId String // foreign key: which project
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // userId in this table = id in User
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade) // projectId in this table = id in Project
+  role      ProjectMemberRole @default(MEMBER) // per-project role, not global to the user (see enum below)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade) // userId in this table = id in User
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade) // projectId in this table = id in Project
 
+  @@unique([userId, projectId]) // one user can only have one membership row per project - prevents
+  // duplicate/conflicting role rows for the same (user, project) pair, which assertMembership's
+  // findFirst() would otherwise resolve arbitrarily
   @@index([userId])
   @@index([projectId])
+}
+
+// ADMIN can rename/delete the project and manage members; MEMBER can access and contribute to
+// project content (tasks, discovery blocks, calendar events, etc. stay open to any member either way).
+// Who gets assigned ADMIN (ex: the project creator) is decided wherever ProjectMember rows
+// get created (ProjectsService.create, ProjectMembersService.addMember) - not implemented yet.
+enum ProjectMemberRole {
+  ADMIN
+  MEMBER
 }
 
 enum ProjectStatus {
