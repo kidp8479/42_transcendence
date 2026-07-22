@@ -166,26 +166,25 @@ seed:
 	$(COMPOSE) exec backend npx prisma db seed
 
 ## stop the database and remove its Compose-managed data volume
+# same portable mechanism as ffclean: match containers/volumes by label or
+# name suffix instead of `compose config --format json` / `compose rm`, which
+# real docker compose supports but podman-compose does not (no `rm` subcommand
+# at all, and `config` doesn't accept --format).
+# backend and auth both have `depends_on: db`, and nginx depends on backend/auth
+# in turn - podman refuses to remove db while those dependent containers are
+# still around, so (like ffclean does for its own service set) they need to be
+# stopped and removed too, not just db itself. This means `make up-db` alone
+# is NOT enough afterwards (backend/auth/nginx are gone too, so `make migrate`
+# / `make seed` would have no backend container to exec into) - bring the
+# whole stack back with `make up` instead.
 wipe-db: $(ENV_FILE)
-	@set -e; \
-	config=$$($(COMPOSE) config --format json); \
-	project_name=$$(printf '%s' "$$config" | jq -er '.name'); \
-	volume_source=$$(printf '%s' "$$config" | jq -er \
-		'.services.db.volumes[] \
-		| select(.type == "volume" and .target == "/var/lib/postgresql/data") \
-		| .source'); \
-	volume_name=$$(printf '%s' "$$config" | jq -er --arg source "$$volume_source" \
-		'.volumes[$$source].name'); \
-	test -n "$$project_name"; \
-	test -n "$$volume_name"; \
-	$(COMPOSE) stop db; \
-	$(COMPOSE) rm -f db; \
-	if docker volume inspect "$$volume_name" >/dev/null 2>&1; then \
-		docker volume rm "$$volume_name"; \
-	else \
-		echo "$$project_name database volume ($$volume_name) is already absent."; \
-	fi
-	@echo "Database wiped. Run 'make up-db' and 'make migrate' to recreate it."
+	$(COMPOSE) stop nginx backend auth db
+	for svc in nginx backend auth db; do \
+	  ids=$$(docker ps -aq --filter label=com.docker.compose.service=$$svc); \
+	  if [ -n "$$ids" ]; then echo $$ids | xargs -r docker rm -f; fi; \
+	done
+	docker volume ls -q | grep -E '_db_data$$' | xargs -r docker volume rm -f
+	@echo "Database wiped. Run 'make up' (not just 'make up-db') then 'make migrate' to recreate it."
 
 
 # ---------------------------------------------------------------------------- #
