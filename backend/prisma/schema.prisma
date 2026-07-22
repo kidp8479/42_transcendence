@@ -167,11 +167,15 @@ model ProjectMember {
   user      User              @relation(fields: [userId], references: [id], onDelete: Cascade) // userId in this table = id in User
   project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade) // projectId in this table = id in Project
 
+  @@unique([userId, projectId]) // one user can only have one membership row per project - prevents
+  // duplicate/conflicting role rows for the same (user, project) pair, which assertMembership's
+  // findFirst() would otherwise resolve arbitrarily
   @@index([userId])
   @@index([projectId])
 }
 
-// ADMIN can edit/delete the project and its content, MEMBER has read/contribute access only.
+// ADMIN can rename/delete the project and manage members; MEMBER can access and contribute to
+// project content (tasks, discovery blocks, calendar events, etc. stay open to any member either way).
 // Who gets assigned ADMIN (ex: the project creator) is decided wherever ProjectMember rows
 // get created (ProjectsService.create, ProjectMembersService.addMember) - not implemented yet.
 enum ProjectMemberRole {
