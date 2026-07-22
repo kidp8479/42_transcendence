@@ -257,7 +257,7 @@ function EvaluationChecklistPage() {
             <ThemeProvider key={item.title} theme={customTheme}>
               <Accordion className="overflow-hidden rounded-lg border border-surface-border">
                 <AccordionPanel>
-                  <AccordionTitle>
+                  <AccordionTitle className="font-mono">
                     <div className="flex w-full items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <span
