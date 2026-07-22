@@ -4,7 +4,7 @@
 // order is updated here when the user drags and drops to reorder items.
 
 import { PartialType } from "@nestjs/mapped-types";
-import { IsBoolean, IsOptional } from "class-validator";
+import { IsInt, IsBoolean, IsString, IsOptional } from "class-validator";
 import { CreateEvaluationChecklistItemDto } from "./create-evaluation-checklist-item.dto";
 
 // Reuses CreateEvaluationChecklistItemDto's fields and validation decorators (label, section, order), makes them optional for PATCH.
@@ -13,6 +13,14 @@ export class UpdateEvaluationChecklistItemDto extends PartialType(
   CreateEvaluationChecklistItemDto
 ) {
   @IsOptional()
+  @IsString()
+  label?: string;
+
+  @IsOptional()
   @IsBoolean()
   isChecked?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  order?: number;
 }
