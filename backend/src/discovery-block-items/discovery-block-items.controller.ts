@@ -9,24 +9,110 @@
 // authenticated user could read or modify another project's items just by changing
 // the ids in the URL (IDOR).
 
-import { Controller } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Req,
+  Body,
+  Param,
+  ParseUUIDPipe,
+} from "@nestjs/common";
+import { ApiSecurity } from "@nestjs/swagger";
+import type { AuthenticatedRequest } from "../auth/authenticated-request";
+import { DiscoveryBlockItemsService } from "./discovery-block-items.service";
+import { CreateDiscoveryBlockItemDto } from "./dto/create-discovery-block-item.dto";
+import { UpdateDiscoveryBlockItemDto } from "./dto/update-discovery-block-item.dto";
 
 @Controller("projects/:projectId/discovery-blocks/:discoveryBlockId/items")
 export class DiscoveryBlockItemsController {
-  // TODO: inject DiscoveryBlockItemsService here via constructor
-  // the constructor is called automatically by NestJS at startup - never called manually
-  // ENDPOINTS:
-  // POST   /api/projects/:projectId/discovery-blocks/:discoveryBlockId/items
-  //        => create a new item inside a discovery block
-  //        => expects a request body matching CreateDiscoveryBlockItemDto (label, order)
-  //        => projectId and discoveryBlockId come from the URL, not the body
-  // GET    /api/projects/:projectId/discovery-blocks/:discoveryBlockId/items
-  //        => get all items belonging to a discovery block
-  // GET    /api/projects/:projectId/discovery-blocks/:discoveryBlockId/items/:id
-  //        => get one item by its id
-  // PATCH  /api/projects/:projectId/discovery-blocks/:discoveryBlockId/items/:id
-  //        => update an existing item (label or isChecked)
-  //        => expects a request body matching UpdateDiscoveryBlockItemDto (all fields optional)
-  // DELETE /api/projects/:projectId/discovery-blocks/:discoveryBlockId/items/:id
-  //        => delete an item by its id
+  discoveryBlockItemsService: DiscoveryBlockItemsService;
+  constructor(discoveryBlockItemsService: DiscoveryBlockItemsService) {
+    this.discoveryBlockItemsService = discoveryBlockItemsService;
+  }
+
+  // GET (all)
+  @Get()
+  findAll(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("discoveryBlockId", ParseUUIDPipe) discoveryBlockId: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockItemsService.findAll(
+      projectId,
+      discoveryBlockId,
+      request.user.id
+    );
+  }
+
+  // GET (one)
+  @Get(":id")
+  findById(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("discoveryBlockId", ParseUUIDPipe) discoveryBlockId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockItemsService.findById(
+      projectId,
+      discoveryBlockId,
+      id,
+      request.user.id
+    );
+  }
+
+  // POST
+  @ApiSecurity("csrf")
+  @Post()
+  create(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("discoveryBlockId", ParseUUIDPipe) discoveryBlockId: string,
+    @Body() dto: CreateDiscoveryBlockItemDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockItemsService.create(
+      projectId,
+      discoveryBlockId,
+      dto,
+      request.user.id
+    );
+  }
+
+  // PATCH
+  @ApiSecurity("csrf")
+  @Patch(":id")
+  update(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("discoveryBlockId", ParseUUIDPipe) discoveryBlockId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: UpdateDiscoveryBlockItemDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockItemsService.update(
+      projectId,
+      discoveryBlockId,
+      id,
+      dto,
+      request.user.id
+    );
+  }
+
+  // DELETE
+  @ApiSecurity("csrf")
+  @Delete(":id")
+  remove(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("discoveryBlockId", ParseUUIDPipe) discoveryBlockId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.discoveryBlockItemsService.remove(
+      projectId,
+      discoveryBlockId,
+      id,
+      request.user.id
+    );
+  }
 }

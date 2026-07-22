@@ -50,7 +50,7 @@ export class DiscoveryBlocksService {
         icon: dto.icon,
         color: dto.color,
         notes: dto.notes,
-        projectId: projectId,
+        projectId: projectId, // does not comes from the dto but from the url !
       },
     });
     return block;
