@@ -12,6 +12,7 @@ import {
   ProjectStatus,
   DiscoveryBlockStatus,
   ProjectMemberRole,
+  EvaluationChecklistItemSection,
 } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -214,9 +215,98 @@ async function main() {
       });
     }
   }
+  
+function getRandomInt(max) {
+  return Math.floor(Math.random() * max) + 1;
+}
 
+// hardcoded lorem-ipsum-style goals, picked at random for each seeded
+// checklist item - not real evaluation criteria, just placeholder text
+const GOALS = [
+  "Explain the purpose of the project clearly",
+  "Demonstrate a working build from a clean clone",
+  "Handle edge cases without crashing",
+  "Justify the chosen architecture",
+  "Show proper error handling throughout",
+  "Respect the mandatory coding norm",
+  "Provide a clear and complete README",
+  "Answer questions about any part of the code",
+  "Demonstrate memory is properly freed",
+  "Show that the program compiles without warnings",
+  "Walk through the main data structures used",
+  "Prove the program handles invalid input gracefully",
+  "Explain any tradeoffs made during development",
+  "Demonstrate the feature works end to end",
+  "Show test coverage for critical paths",
+  "Justify third-party libraries used, if any",
+  "Explain how concurrency issues were avoided",
+  "Demonstrate the UI matches the requested behavior",
+  "Show that the program does not leak file descriptors",
+  "Explain the git history and commit structure",
+  "Demonstrate recovery from a simulated failure",
+  "Show that inputs are properly validated",
+  "Explain how the team split the workload",
+  "Demonstrate the bonus feature in action",
+  "Justify any deviation from the subject",
+  "Show the program respects the given constraints",
+  "Explain the algorithm complexity where relevant",
+  "Demonstrate proper use of version control branches",
+  "Show that secrets are never committed to the repo",
+  "Explain how the project could be extended further",
+];
+
+function getRandomGoal() {
+  return GOALS[getRandomInt(GOALS.length) - 1];
+}
+
+  // 5. Evaluation checklist items
+  for (const project of createdProjects) {
+
+    let s = EvaluationChecklistItemSection.MANDATORY;
+    let iterations = getRandomInt(8);
+    for (let i = 0; i < iterations; ++i) {
+      await prisma.evaluationChecklistItem.create({
+        data: {
+          projectId: project.id,
+          section: s,
+          label: getRandomGoal(),
+          order: i
+        }
+      });
+    }
+
+    s = EvaluationChecklistItemSection.BONUS;
+    iterations = getRandomInt(8);
+    for (let i = 0; i < iterations; ++i) {
+      await prisma.evaluationChecklistItem.create({
+        data: {
+          projectId: project.id,
+          section: s,
+          label: getRandomGoal(),
+          order: i
+        }
+      });
+    }
+
+    s = EvaluationChecklistItemSection.SUPPLEMENTAL;
+    iterations = getRandomInt(8);
+    for (let i = 0; i < iterations; ++i) {
+      await prisma.evaluationChecklistItem.create({
+        data: {
+          projectId: project.id,
+          section: s,
+          label: getRandomGoal(),
+          order: i
+        }
+      });
+    }
+  }
+  
   console.log("Seed terminé.");
 }
+
+
+
 
 main()
   .catch((e) => {
