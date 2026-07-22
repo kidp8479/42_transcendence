@@ -7,14 +7,15 @@
 // isChecked is not here: it is always false at creation, handled by @default(false) in the database schema.
 // order: the frontend sends the initial position of the item in the list (0-based index).
 
-import { IsInt, IsString } from "class-validator";
+import { IsInt, IsString, IsEnum } from "class-validator";
+import { EvaluationChecklistItemSection } from "@prisma/client";
 
 export class CreateEvaluationChecklistItemDto {
   @IsString()
   label: string;
 
-  @IsString()
-  section: string;
+  @IsEnum(EvaluationChecklistItemSection)
+  section: EvaluationChecklistItemSection;
 
   @IsInt()
   order: number;
