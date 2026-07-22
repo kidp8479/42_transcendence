@@ -27,9 +27,9 @@ import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
 
 @Controller("projects/:projectId/discovery-blocks")
 export class DiscoveryBlocksController {
-  discoveryBlockService: DiscoveryBlocksService;
-  constructor(discoveryBlockService: DiscoveryBlocksService) {
-    this.discoveryBlockService = discoveryBlockService;
+  discoveryBlocksService: DiscoveryBlocksService;
+  constructor(discoveryBlocksService: DiscoveryBlocksService) {
+    this.discoveryBlocksService = discoveryBlocksService;
   }
 
   // GET (all)
@@ -38,7 +38,7 @@ export class DiscoveryBlocksController {
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.discoveryBlockService.findAll(projectId, request.user.id);
+    return this.discoveryBlocksService.findAll(projectId, request.user.id);
   }
 
   // GET (one)
@@ -48,7 +48,7 @@ export class DiscoveryBlocksController {
     @Param("id", ParseUUIDPipe) id: string,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.discoveryBlockService.findById(projectId, id, request.user.id);
+    return this.discoveryBlocksService.findById(projectId, id, request.user.id);
   }
 
   // POST
@@ -59,7 +59,7 @@ export class DiscoveryBlocksController {
     @Body() dto: CreateDiscoveryBlockDto,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.discoveryBlockService.create(projectId, dto, request.user.id);
+    return this.discoveryBlocksService.create(projectId, dto, request.user.id);
   }
 
   // PATCH
@@ -71,7 +71,7 @@ export class DiscoveryBlocksController {
     @Body() dto: UpdateDiscoveryBlockDto,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.discoveryBlockService.update(
+    return this.discoveryBlocksService.update(
       projectId,
       id,
       dto,
@@ -87,6 +87,6 @@ export class DiscoveryBlocksController {
     @Param("id", ParseUUIDPipe) id: string,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.discoveryBlockService.remove(projectId, id, request.user.id);
+    return this.discoveryBlocksService.remove(projectId, id, request.user.id);
   }
 }
