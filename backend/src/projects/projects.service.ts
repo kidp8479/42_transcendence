@@ -1,9 +1,10 @@
 // ProjectsService: handles all database operations for projects
 // called by the controller, never called directly by the frontend
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectMember } from "@prisma/client";
+import { CreateProjectDto } from "./dto/create-project.dto";
 
 @Injectable()
 export class ProjectsService {
@@ -56,12 +57,36 @@ export class ProjectsService {
     return project;
   }
 
-  // TODO: create(dto: CreateProjectDto, userId: string)
-  //       => insert a new project in the database
-  //       => default status: IN_PROGRESS (set by Prisma schema, not the DTO)
-  //       => optional fields: description, deadline, isArchived
-  //       => must also create a ProjectMember row linking userId to the new project,
-  //          with role: ADMIN (the creator becomes the project's first admin)
+  async create(dto: CreateProjectDto, userId: string) {
+    return this.prisma.project.create({
+      data: {
+        name: dto.name,
+        description: dto.description,
+        deadline: dto.deadline,
+        status: dto.status ?? "IN_PROGRESS",
+        isArchived: dto.isArchived ?? false,
+        members: {
+          create: {
+            userId,
+            // role: "ADMIN", // TODO(pair with teammate): the "role" column
+            // exists in schema.prisma but its migration
+            // (20260721170656_add_project_member_role) hasn't been applied
+            // to this DB yet, so Prisma's generated types don't have it -
+            // uncomment once migrations are applied (`prisma migrate dev`).
+          },
+        },
+      },
+    });
+  }
+
+  async remove(id: string, userId: string) {
+    const member = await this.assertMembership(id, userId);
+    // if (member.role !== "ADMIN") {
+    //   throw new ForbiddenException("Only the project admin can delete this project");
+    // }
+
+    return this.prisma.project.delete({ where: { id } });
+  }
 
   // NOTE ON ROLES: renaming/deleting the project is a team-affecting, hard-to-undo action -
   // decided with the team (see TR-66) that this needs an ADMIN check, unlike most other

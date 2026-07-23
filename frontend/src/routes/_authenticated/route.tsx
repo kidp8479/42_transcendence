@@ -6,10 +6,8 @@
 // The auth guard runs before any _authenticated/ page renders - redirects to / if not logged in.
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AuthenticatedLayout } from "@/components/layout/AuthenticatedLayout";
-import {
-  fetchSidebarProjects,
-  ProjectsUnauthorizedError,
-} from "@/lib/projects";
+import { ApiError } from "@/lib/apiClient";
+import { listProjects } from "@/lib/projectsApi";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: ({ context }) => {
@@ -22,11 +20,11 @@ export const Route = createFileRoute("/_authenticated")({
   // render real data on every private page without duplicating fetch logic.
   loader: async () => {
     try {
-      return await fetchSidebarProjects();
+      return await listProjects();
     } catch (error) {
       // If session expires between root auth check and loader execution,
       // recover with a safe redirect instead of rendering a broken sidebar.
-      if (error instanceof ProjectsUnauthorizedError) {
+      if (error instanceof ApiError && error.status === 401) {
         throw redirect({ to: "/" });
       }
       throw error;

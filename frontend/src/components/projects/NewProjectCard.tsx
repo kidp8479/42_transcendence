@@ -6,12 +6,12 @@
 // plain callback the parent decides what to do with, same pattern as
 // ProjectCard's onManageMembers/onDeleteProject.
 import { Button, TextInput } from "flowbite-react";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type SubmitEvent } from "react";
 import { HiOutlinePlus, HiOutlineXMark } from "react-icons/hi2";
 
 export interface NewProjectFormValues {
   name: string;
-  description: string;
+  description?: string;
 }
 
 interface NewProjectCardProps {
@@ -44,7 +44,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
     setDescription("");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {

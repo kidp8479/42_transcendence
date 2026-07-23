@@ -5,9 +5,10 @@
 // req.user.id is a member of that project (ProjectMember) before returning/changing
 // anything, otherwise any authenticated user could read or modify any project by id (IDOR).
 
-import { Controller, Get, Req, Param, ParseUUIDPipe } from "@nestjs/common";
+import { Controller, Get, Req, Param, ParseUUIDPipe, Post, Body, Delete} from "@nestjs/common";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { ProjectsService } from "./projects.service";
+import { CreateProjectDto } from "./dto/create-project.dto";
 
 @Controller("projects")
 export class ProjectsController {
@@ -28,6 +29,22 @@ export class ProjectsController {
     @Req() request: AuthenticatedRequest
   ) {
     return this.projectsService.findById(id, request.user.id);
+  }
+
+  @Post()
+  create(
+    @Body() dto: CreateProjectDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectsService.create(dto, request.user.id);
+  }
+
+  @Delete(":id")
+  delete(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectsService.remove(id, request.user.id);
   }
 
   // TODO: POST /api/projects
