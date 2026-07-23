@@ -244,6 +244,11 @@ format-auth:
 ## validate the authentication integration services
 check-auth-stack: check-auth check-prisma check-backend check-frontend
 
+## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
+check-shell:
+	docker run --rm -v $(CURDIR):/mnt -w /mnt koalaman/shellcheck:stable -s sh \
+		vault/bootstrap.sh db/init/10-vault-db-admin-password.sh hooks/pre-commit
+
 ## install git pre-commit hook (run once after cloning)
 hooks:
 	cp hooks/pre-commit .git/hooks/pre-commit
@@ -331,4 +336,4 @@ help:
         shell-frontend shell-backend shell-auth shell-db \
         migrate prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
-        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack
+        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell
