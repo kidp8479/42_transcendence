@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLoaderData } from "@tanstack/react-router";
 import {
   Accordion,
   AccordionContent,
@@ -14,10 +14,12 @@ import { FaRegStar } from "react-icons/fa";
 import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
 import { RiDeleteBackFill } from "react-icons/ri";
+import { EvaluationChecklistSection, fetchEvaluationChecklistItems } from "@/lib/evaluationChecklist";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
 )({
+  loader: ({ params }) => fetchEvaluationChecklistItems(params.projectId),
   component: EvaluationChecklistPage,
 });
 
@@ -92,33 +94,6 @@ export interface AccordionItemData {
   contents: string[];
 }
 
-const mockData: AccordionItemData[] = [
-  {
-    title: "Mandatory Part",
-    contents: [
-      "OAuth 42 login works end-to-end",
-      "Real-time Pong game runs without crash",
-      "Player matchmaking connects two users",
-      "User profile & stats plage render correctly",
-      "Docker compose starts all services cleanly",
-      "No forbidden functions / librairies used",
-      "Norm compliance checked (norminette passes)",
-      "All required bonus features toggled off for mandatory pass",
-    ],
-  },
-  {
-    title: "Bonus",
-    contents: [
-      "Tournament mode with bracket",
-      "Game customization options (speed, paddles)",
-      "Live chat between players",
-    ],
-  },
-  {
-    title: "Supplemental Goals",
-    contents: ["Use a 3D set of skins for the game", "Add AI opponent"],
-  },
-];
 
 // Presentation-only metadata per category (icon/color/description), kept
 // separate from mockData since none of this is real backend data yet.
@@ -191,6 +166,30 @@ function EvaluationChecklistPage() {
   const percent = Math.round((checkpointsDone / checkpointsTotal) * 100);
   const isReady = percent === 100;
 
+  // same file, no need "from"
+  const checklistItems = Route.useLoaderData();
+
+  let accordionItemData: AccordionItemData[] = [
+    {
+      title: "Mandatory Part",
+      contents: [],
+    },
+    {
+      title: "Bonus",
+      contents: [],
+    },
+    {
+      title: "Supplemental Goals",
+      contents: [],
+    },
+  ];  
+
+  for (const item of checklistItems) {
+    item.section === "MANDATORY" ? accordionItemData[0].contents.push(item.label) :
+      item.section === "BONUS" ? accordionItemData[1].contents.push(item.label) :
+        accordionItemData[2].contents.push(item.label);
+  }
+
   return (
     <div className="w-full space-y-6">
       <section className="flex flex-wrap items-center justify-between gap-4">
@@ -246,7 +245,7 @@ function EvaluationChecklistPage() {
       </section>
 
       <div className="space-y-4">
-        {mockData.map((item, i) => {
+        {accordionItemData.map((item, i) => {
           const style = CATEGORY_STYLE[item.title];
           const total = item.contents.length;
           const done = 0;
@@ -336,7 +335,7 @@ function EvaluationChecklistPage() {
         })}
       </div>
 
-      {mockData
+      {accordionItemData
         .filter((item) => CATEGORY_STYLE[item.title]?.description)
         .map((item) => (
           <div
