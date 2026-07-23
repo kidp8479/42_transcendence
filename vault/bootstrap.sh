@@ -13,8 +13,7 @@ SECRETS_DIR=${SECRETS_DIR:-/run/secrets}
 
 : "${VAULT_ADDR:?VAULT_ADDR is required}"
 : "${VAULT_TOKEN:?VAULT_TOKEN is required}"
-: "${POSTGRES_USER:?POSTGRES_USER is required}"
-: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+: "${VAULT_DB_ADMIN_PASSWORD:?VAULT_DB_ADMIN_PASSWORD is required}"
 : "${POSTGRES_DB:?POSTGRES_DB is required}"
 : "${AUTH_INTERNAL_TOKEN:?AUTH_INTERNAL_TOKEN is required}"
 
@@ -80,25 +79,32 @@ fi
 quiet vault kv put kv/internal/backend-auth internal_token="$AUTH_INTERNAL_TOKEN"
 
 step "configuring PostgreSQL database secrets engine"
+# vault_db_admin (created by db/init/01-vault-roles.sql) is a dedicated
+# CREATEROLE management user: not the bootstrap superuser, so `make shell-db`
+# and a future root-credential rotation cannot collide with it.
 quiet vault write database/config/postgresql \
 	plugin_name=postgresql-database-plugin \
 	allowed_roles="auth-runtime,backend-runtime,migration" \
 	connection_url="postgresql://{{username}}:{{password}}@db:5432/${POSTGRES_DB}?sslmode=disable" \
-	username="$POSTGRES_USER" \
-	password="$POSTGRES_PASSWORD"
+	username="vault_db_admin" \
+	password="$VAULT_DB_ADMIN_PASSWORD"
 
 step "creating database roles from ${SQL_DIR}"
 create_db_role() {
 	role=$1
+	shift
 	quiet vault write "database/roles/${role}" \
 		db_name=postgresql \
-		default_ttl=8h \
-		max_ttl=8h \
-		creation_statements="@${SQL_DIR}/${role}.sql"
+		creation_statements="@${SQL_DIR}/${role}.sql" \
+		"$@"
 }
-create_db_role auth-runtime
-create_db_role backend-runtime
-create_db_role migration
+create_db_role auth-runtime default_ttl=8h max_ttl=8h
+create_db_role backend-runtime default_ttl=8h max_ttl=8h
+# A migration runs in minutes; a short TTL bounds exposure of the most
+# privileged credential. Revocation reassigns owned objects to app_owner so
+# DROP ROLE can never fail on dependencies.
+create_db_role migration default_ttl=15m max_ttl=1h \
+	revocation_statements="@${SQL_DIR}/migration-revoke.sql"
 
 step "creating AppRoles and issuing Secret IDs"
 create_approle() {

@@ -157,9 +157,13 @@ shell-db: $(ENV_FILE)
 # database                                                                     #
 # ---------------------------------------------------------------------------- #
 
-## run Prisma migrations in the backend container
-migrate:
+## run Prisma migrations in the backend container, then re-apply the
+## table-level grants for the Vault runtime parent roles (new tables are
+## only reachable by auth/backend leases after this step)
+migrate: $(ENV_FILE)
 	$(COMPOSE) exec backend npx prisma migrate dev
+	@set -a; . ./$(ENV_FILE); set +a; \
+	$(COMPOSE) exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < db/runtime-grants.sql
 
 ## start Prisma Studio from the backend container
 prisma-studio:

@@ -19,8 +19,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      VAULT_DB_ADMIN_PASSWORD: ${VAULT_DB_ADMIN_PASSWORD:?set a random vault_db_admin database password in .env}
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -49,8 +51,7 @@ services:
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set a random local development Vault root token in .env}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      VAULT_DB_ADMIN_PASSWORD: ${VAULT_DB_ADMIN_PASSWORD:?set a random vault_db_admin database password in .env}
       POSTGRES_DB: ${POSTGRES_DB}
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN}
       OAUTH_42_CLIENT_ID: ${OAUTH_42_CLIENT_ID}
