@@ -9,3 +9,8 @@ path "database/creds/backend-runtime" {
 path "auth/token/renew-self" {
   capabilities = ["update"]
 }
+
+# Renew the dynamic database credential lease before it expires.
+path "sys/leases/renew" {
+  capabilities = ["update"]
+}

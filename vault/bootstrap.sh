@@ -111,13 +111,30 @@ create_approle() {
 	role=$1
 	secret_dir="${SECRETS_DIR}/${role}"
 
+	# token_max_ttl must exceed the 8h database lease horizon: dynamic-secret
+	# leases are children of the issuing token and are revoked with it. The
+	# 1h token still renews inside that window.
+	# secret_id_ttl=0 (non-expiring) is a dev-only choice: dev Vault is
+	# in-memory, so every restart re-bootstraps anyway, and an expiring
+	# Secret ID would just break long-lived local stacks after a day.
+	# Production hardening (single-use, response-wrapped, CIDR-bound Secret
+	# IDs) is tracked as an operational blocker.
 	quiet vault write "auth/approle/role/${role}" \
 		token_policies="$role" \
 		token_ttl=1h \
-		token_max_ttl=4h \
-		secret_id_ttl=24h \
+		token_max_ttl=9h \
+		secret_id_ttl=0 \
 		secret_id_num_uses=0 \
 		bind_secret_id=true
+
+	# Re-runs mint a fresh Secret ID; destroy the previous ones so stale
+	# credentials cannot outlive the files that held them.
+	vault list -format=json "auth/approle/role/${role}/secret-id" 2>/dev/null |
+		sed -n 's/^[[:space:]]*"\([^"]*\)",\{0,1\}$/\1/p' |
+		while IFS= read -r accessor; do
+			quiet vault write "auth/approle/role/${role}/secret-id-accessor/destroy" \
+				secret_id_accessor="$accessor"
+		done
 
 	vault read -field=role_id "auth/approle/role/${role}/role-id" \
 		>"${secret_dir}/role_id"
