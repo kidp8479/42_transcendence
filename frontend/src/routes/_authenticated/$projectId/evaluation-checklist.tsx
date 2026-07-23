@@ -21,8 +21,6 @@ export const Route = createFileRoute(
   component: EvaluationChecklistPage,
 });
 
-
-
 const customTheme = createTheme({
   accordion: {
     root: {
