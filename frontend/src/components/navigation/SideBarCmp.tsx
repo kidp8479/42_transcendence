@@ -6,7 +6,7 @@ import { HiChevronLeft, HiChevronRight, HiX } from "react-icons/hi";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
 import { useSidebar } from "@/hooks/useSidebar";
-import type { SidebarProject } from "@/lib/projects";
+import type { Project } from "@/lib/projectsApi";
 
 // <SidebarItem as={Link} to="/location" ...> is used to load only the "working space" area, rather than the whole page
 
@@ -76,7 +76,7 @@ function SidebarSectionTitle({ children }: { children: string }) {
   return <li className={sidebarSectionLabelClasses}>{children}</li>;
 }
 
-function ProjectRow({ project }: { project: SidebarProject }) {
+function ProjectRow({ project }: { project: Project }) {
   // Keep the visual indicator simple and deterministic from backend status.
   const statusColorClass =
     project.status === "COMPLETED"
@@ -108,7 +108,7 @@ function ProjectRow({ project }: { project: SidebarProject }) {
 }
 
 export function SideBarCmp() {
-  // Data comes from /_authenticated route loader (GET /api/projects).
+  // Data comes from /_authenticated route loader (GET /projects).
   // This keeps sidebar data fetching at layout level instead of per page.
   const projects = useLoaderData({ from: "/_authenticated" });
   const visibleProjects = projects.filter(
