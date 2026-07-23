@@ -10,17 +10,18 @@
 -- Instead, all privileges live on three static NOLOGIN parents, and Vault's
 -- creation statements reduce to CREATE ROLE ... IN ROLE <parent> INHERIT.
 --
---   app_owner        owns every application object; migrations run as it via
---                    SET ROLE, so DDL and object ownership survive lease expiry
+--   app_owner        owns every application object; a future Vault migration
+--                    lease will SET ROLE into it so DDL ownership survives expiry
 --   auth_runtime     Go auth: auth/session/identity/audit tables only
 --   backend_runtime  NestJS: application-domain tables, read-only User,
 --                    never PasswordCredential
 --
 -- Table-level grants for the two runtime parents are applied by
--- grant-runtime-privileges.sql AFTER migrations create the tables (Prisma
--- migrations run as app_owner; ALTER DEFAULT PRIVILEGES cannot express a
--- per-table exclusion such as PasswordCredential, so grants are re-applied
--- explicitly after each migration instead).
+-- db/runtime-grants.sql AFTER Prisma migrations create the tables. The
+-- current make migrate path uses the explicit bootstrap user; its future
+-- Vault migration lease will SET ROLE into app_owner. ALTER DEFAULT
+-- PRIVILEGES cannot express a per-table exclusion such as PasswordCredential,
+-- so grants are re-applied explicitly after each migration instead.
 --
 -- This script runs from the postgres image's docker-entrypoint-initdb.d on
 -- first cluster initialization only; it is written to be idempotent anyway.

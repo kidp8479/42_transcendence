@@ -26,7 +26,7 @@ created by `db/init/01-vault-roles.sql` on first cluster initialization:
 
 | Parent | Purpose |
 |---|---|
-| `app_owner` | Owns every application object; migration leases `SET ROLE` into it so DDL and ownership survive lease expiry |
+| `app_owner` | Owns every application object; the future Vault migration lease will `SET ROLE` into it so DDL ownership survives lease expiry |
 | `auth_runtime` | Go auth: auth/session/identity/audit tables (no `UPDATE` on the immutable `AuthEvent`) |
 | `backend_runtime` | NestJS: application-domain tables, read-only `User`, never `PasswordCredential` |
 | `vault_db_admin` | `CREATEROLE` management user for Vault's database engine — separate from the bootstrap superuser so `make shell-db` and future root-credential rotation don't collide |
