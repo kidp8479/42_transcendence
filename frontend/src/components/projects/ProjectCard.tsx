@@ -2,6 +2,11 @@
 // description, progress bar, member count, deadline, and a link into the
 // project's summary tab.
 //
+// progress/memberCount are placeholder values (see projects.tsx) - neither
+// field exists in the Project schema yet (no DB column, no members count
+// exposed by GET /projects), so there's nothing real to show. Swap the
+// placeholder for the real value once the backend adds them.
+//
 // Navigation reuses the same TanStack Router <Link> the sidebar uses for its
 // own project rows (ProjectRow in navigation/SideBarCmp.tsx), stretched over
 // the whole card (absolute inset-0) so clicking anywhere - or the decorative
@@ -27,7 +32,7 @@ import {
   HiOutlineUsers,
 } from "react-icons/hi2";
 import { darkDropdownTheme } from "@/lib/flowbite";
-import type { ProjectStatus } from "@/lib/projects";
+import type { ProjectStatus } from "@/lib/projectsApi";
 
 // Scoped to this card's "..." menu only - rounds the item hover highlight
 // (rectangular by default in darkDropdownTheme, shared with NotificationBell
@@ -79,14 +84,13 @@ export interface ProjectCardData {
   name: string;
   description: string;
   status: ProjectStatus;
-  // 0-100
+  // 0-100 - placeholder until the backend computes real progress.
   progress: number;
+  // Placeholder until GET /projects exposes a real member count.
   memberCount: number;
-  // ISO date string
-  deadline: string;
-  // index into CATEGORY_COLOR_PALETTE, used for this project's icon square -
-  // same palette-index pattern as TeamMemberWorkload.color / UpcomingEvent.color
-  color: number;
+  // ISO date string - null when the project has no deadline set yet
+  // (Project.deadline is nullable in schema.prisma and unseeded today).
+  deadline: string | null;
 }
 
 interface ProjectCardProps {
@@ -103,10 +107,13 @@ export function ProjectCard({
   onDeleteProject,
 }: ProjectCardProps) {
   const status = STATUS_META[project.status];
-  const formattedDeadline = new Date(project.deadline).toLocaleDateString(
-    "en-US",
-    { month: "short", day: "2-digit", year: "numeric" }
-  );
+  const formattedDeadline = project.deadline
+    ? new Date(project.deadline).toLocaleDateString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      })
+    : null;
 
   return (
     <div
@@ -228,10 +235,12 @@ export function ProjectCard({
               <HiOutlineUsers className="h-4 w-4" aria-hidden="true" />
               {project.memberCount}
             </span>
-            <span className="flex items-center gap-1">
-              <HiOutlineCalendar className="h-4 w-4" aria-hidden="true" />
-              {formattedDeadline}
-            </span>
+            {formattedDeadline && (
+              <span className="flex items-center gap-1">
+                <HiOutlineCalendar className="h-4 w-4" aria-hidden="true" />
+                {formattedDeadline}
+              </span>
+            )}
           </div>
 
           {/* Decorative only - the stretched Link above already covers this

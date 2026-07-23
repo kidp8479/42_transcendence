@@ -1,63 +1,24 @@
 // Projects list page (/projects).
-// Shows all projects the user belongs to as cards (status, progress, members, creation date).
+// Shows all projects the user belongs to as cards (status, description, deadline).
 // Also renders NewProjectCard as the grid's last tile - it toggles inline
 // into a creation form itself, so there's no separate route or global modal
 // involved (see NewProjectCard.tsx).
-import { createFileRoute, useLoaderData } from "@tanstack/react-router";
+//
+// description and deadline are real backend fields (Project.description/
+// deadline in schema.prisma). progress and memberCount are not - neither
+// column/computation exists in the backend yet, so PLACEHOLDER_STATS below
+// is a fixed stand-in just to keep the card layout complete, not real data.
+import { createFileRoute, useLoaderData, useRouter } from "@tanstack/react-router";
 import {
   NewProjectCard,
   type NewProjectFormValues,
 } from "@/components/projects/NewProjectCard";
-import {
-  ProjectCard,
-  type ProjectCardData,
-} from "@/components/projects/ProjectCard";
+import { ProjectCard } from "@/components/projects/ProjectCard";
+import { createProject } from "@/lib/projectsApi";
 
-// Display fields GET /projects doesn't return yet (today's endpoint only
-// backs SidebarProject - id/name/status, see lib/projects.ts), keyed by name
-// so they can be merged onto the real project below. Matches
-// backend/prisma/seed.ts (ft_transcendence: all 5 seed users; minishell: the
-// diana/pauline variant, the other minishell seed row has a shorter
-// description and 3 members instead; libft: seeded per-user, 1 member here).
-const PROJECT_ENRICHMENT: Record<
-  string,
-  Omit<ProjectCardData, "id" | "name" | "status">
-> = {
-  ft_transcendence: {
-    description:
-      "Full-stack web app with real-time multiplayer Pong game and OAuth",
-    progress: 68,
-    memberCount: 5,
-    deadline: "2026-07-12",
-    color: 3,
-  },
-  minishell: {
-    description:
-      "A minimal bash-like shell with built-ins, pipes, and redirections",
-    progress: 92,
-    memberCount: 2,
-    deadline: "2026-06-28",
-    color: 2,
-  },
-  libft: {
-    description: "Custom C standard library reimplementation",
-    progress: 100,
-    memberCount: 1,
-    deadline: "2026-05-01",
-    color: 4,
-  },
-};
-
-// Real seeded projects with no curated entry above (philosophers, push_swap,
-// the other minishell...) - still a real id/name/status, just no hand-written
-// progress/description yet.
-const FALLBACK_ENRICHMENT: Omit<ProjectCardData, "id" | "name" | "status"> = {
-  description: "No description yet.",
-  progress: 0,
-  memberCount: 1,
-  deadline: new Date().toISOString(),
-  color: 0,
-};
+// Same fixed placeholder for every project - swap for the real values once
+// GET /projects exposes progress and a member count (see ProjectCard.tsx).
+const PLACEHOLDER_STATS = { progress: 0, memberCount: 1 };
 
 export const Route = createFileRoute("/_authenticated/projects")({
   component: ProjectsPage,
@@ -65,15 +26,24 @@ export const Route = createFileRoute("/_authenticated/projects")({
 
 function ProjectsPage() {
   // Same project list the sidebar renders - already fetched once by the
-  // _authenticated loader (real GET /projects, see lib/projects.ts) - reused
-  // here instead of inventing ids, so every card's link resolves to a real
-  // project (see ProjectRow in components/navigation/SideBarCmp.tsx).
+  // _authenticated loader (real GET /projects, see lib/projectsApi.ts) -
+  // reused here instead of inventing ids, so every card's link resolves to
+  // a real project (see ProjectRow in components/navigation/SideBarCmp.tsx).
   const projects = useLoaderData({ from: "/_authenticated" });
+  const router = useRouter();
 
-  // No create-project endpoint yet (see NewProjectCard.tsx) - placeholder
-  // until POST /projects lands, same as onManageMembers/onDeleteProject below.
-  function handleCreateProject(values: NewProjectFormValues) {
-    console.log("Create project:", values);
+  // onManageMembers/onDeleteProject below are still placeholders - no
+  // update/delete-membership endpoints wired up on the frontend yet.
+  async function handleCreateProject(values: NewProjectFormValues) {
+    try {
+      await createProject(values);
+      // The list this page (and the sidebar) reads comes from the
+      // /_authenticated loader, cached by the router - invalidate() re-runs
+      // it so the new project shows up without a full page reload.
+      await router.invalidate();
+    } catch (error) {
+      console.error("Failed to create project:", error);
+    }
   }
 
   return (
@@ -87,35 +57,32 @@ function ProjectsPage() {
         </p>
       </div>
       <div className="p-6">
-        {projects.length === 0 ? (
-          <div className="max-w-sm">
-            <p className="mb-4 text-sm text-text-muted">No projects yet</p>
-            <NewProjectCard onCreate={handleCreateProject} />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project, index) => (
-              <ProjectCard
-                key={project.id}
-                project={{
-                  ...project,
-                  ...(PROJECT_ENRICHMENT[project.name] ?? FALLBACK_ENRICHMENT),
-                }}
-                // No role field on the API yet (see ProjectCard.tsx) -
-                // alternates true/false here only to keep previewing both
-                // menu states.
-                canManageProject={index % 2 === 0}
-                onManageMembers={() =>
-                  console.log(`Manage members: ${project.name}`)
-                }
-                onDeleteProject={() =>
-                  console.log(`Delete project: ${project.name}`)
-                }
-              />
-            ))}
-            <NewProjectCard onCreate={handleCreateProject} />
-          </div>
-        )}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {projects.map((project, index) => (
+            <ProjectCard
+              key={project.id}
+              // description is nullable on the backend (no seed data for
+              // most projects yet) - fall back to a placeholder string
+              // here rather than pushing that null-handling into the card.
+              project={{
+                ...project,
+                description: project.description ?? "No description yet.",
+                ...PLACEHOLDER_STATS,
+              }}
+              // No role field on the API yet (see ProjectCard.tsx) -
+              // alternates true/false here only to keep previewing both
+              // menu states.
+              canManageProject={index % 2 === 0}
+              onManageMembers={() =>
+                console.log(`Manage members: ${project.name}`)
+              }
+              onDeleteProject={() =>
+                console.log(`Delete project: ${project.name}`)
+              }
+            />
+          ))}
+          <NewProjectCard onCreate={handleCreateProject} />
+        </div>
       </div>
     </>
   );
