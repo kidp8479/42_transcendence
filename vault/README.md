@@ -46,14 +46,27 @@ application table, update `db/runtime-grants.sql` in the same PR.
 `make wipe-db` and recreate, or apply `db/init/01-vault-roles.sql` manually
 and set the `vault_db_admin` password from `VAULT_DB_ADMIN_PASSWORD`.
 
-## Status and boundaries
+## Runtime consumers
 
-The current application processes still use their existing database connection
-configuration. Subsequent Auth 7.1 changes must consume only their own
-`role_id` and mounted `secret_id`, use direct Vault clients, renew tokens and
-leases, and remove runtime static database credentials. Do not treat this
-development instance as production-ready: initialization, unseal, custody,
-TLS, storage, backup, HA, root-credential rotation
+Go auth uses its mounted `role_id` and `secret_id` to authenticate directly
+with AppRole. It keeps the resulting Vault token, KV values, and dynamic
+PostgreSQL credentials only in process memory. It reads the OAuth credentials
+and backend-to-auth credential from KV, asks Vault for the `auth-runtime`
+database lease, and swaps to a freshly connected pool whenever that lease is
+renewed. Its health endpoint returns `503` and request handling stops when
+Vault credentials cannot be renewed with a one-minute safety margin.
+
+The AppRole token has a nine-hour maximum TTL to bound a leaked in-memory
+token. Before that maximum is reached, the auth process re-authenticates using
+the Secret ID retained in memory and issues a new database lease/pool; it
+never falls back to `DATABASE_URL`, OAuth environment variables, or
+`AUTH_INTERNAL_TOKEN`. Go's `vault.Runtime.Sign` is the narrow, Transit-backed
+Ed25519 signing interface for the later JWT feature; it cannot export private
+key material.
+
+NestJS and the migration process have not yet consumed their separate Vault
+credentials. Do not treat this development instance as production-ready:
+initialization, unseal, custody, TLS, storage, backup, HA, root-credential rotation
 (`vault write -force database/rotate-root/postgresql`), and the emergency
 root-token runbook remain unresolved operational blockers.
 
