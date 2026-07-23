@@ -1,119 +1,125 @@
 #!/bin/sh
+# Local development Vault bootstrap. Thin imperative glue only: all policy
+# (HCL) and grant (SQL) content lives in version-controlled files under
+# /vault/bootstrap, mounted read-only by the vault-bootstrap Compose service.
 set -eu
 
-required_env() {
-	if [ -z "$(eval "printf '%s' \"\${$1:-}\"")" ]; then
-		echo "$1 is required" >&2
-		exit 1
+# Secret files must never be readable by other users; set once, deliberately.
+umask 077
+
+POLICY_DIR=${POLICY_DIR:-/vault/bootstrap/policies}
+SQL_DIR=${SQL_DIR:-/vault/bootstrap/sql}
+SECRETS_DIR=${SECRETS_DIR:-/run/secrets}
+
+: "${VAULT_ADDR:?VAULT_ADDR is required}"
+: "${VAULT_TOKEN:?VAULT_TOKEN is required}"
+: "${POSTGRES_USER:?POSTGRES_USER is required}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+: "${POSTGRES_DB:?POSTGRES_DB is required}"
+: "${AUTH_INTERNAL_TOKEN:?AUTH_INTERNAL_TOKEN is required}"
+
+on_exit() {
+	rc=$?
+	if [ "$rc" -ne 0 ]; then
+		echo "BOOTSTRAP FAILED (exit $rc) - see last step above" >&2
 	fi
 }
+trap on_exit EXIT
 
-for name in VAULT_ADDR VAULT_TOKEN POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB AUTH_INTERNAL_TOKEN; do
-	required_env "$name"
+step() { echo ">>> $*"; }
+
+quiet() { "$@" >/dev/null; }
+
+# Tolerate exactly "path is already in use" (idempotent re-run); fail loudly
+# on anything else (bad token, connection refused, sealed Vault, typos).
+enable_once() {
+	out=$(vault "$@" 2>&1) && return 0
+	case "$out" in
+	*"path is already in use"*) return 0 ;;
+	esac
+	printf '%s\n' "$out" >&2
+	return 1
+}
+
+step "waiting for Vault at ${VAULT_ADDR}"
+i=0
+until vault status >/dev/null 2>&1; do
+	i=$((i + 1))
+	if [ "$i" -ge 30 ]; then
+		echo "vault not reachable at ${VAULT_ADDR} after 30s" >&2
+		exit 1
+	fi
+	sleep 1
 done
 
-write_policy() {
-	name=$1
-	cat >"/tmp/${name}.hcl"
-	vault policy write "$name" "/tmp/${name}.hcl"
-	rm "/tmp/${name}.hcl"
-}
+step "writing policies from ${POLICY_DIR}"
+for policy_file in "$POLICY_DIR"/*.hcl; do
+	vault policy write "$(basename "$policy_file" .hcl)" "$policy_file"
+done
 
-write_policy auth-runtime <<'EOF'
-path "transit/sign/auth-access-jwt" {
-  capabilities = ["update"]
-}
-path "kv/data/auth/oauth" {
-  capabilities = ["read"]
-}
-path "kv/data/internal/backend-auth" {
-  capabilities = ["read"]
-}
-path "database/creds/auth-runtime" {
-  capabilities = ["read"]
-}
-path "auth/token/renew-self" {
-  capabilities = ["update"]
-}
-EOF
+step "enabling secrets engines and AppRole auth"
+enable_once secrets enable -path=transit transit
+enable_once secrets enable -path=kv -version=2 kv
+enable_once auth enable approle
+enable_once secrets enable database
 
-write_policy backend-runtime <<'EOF'
-path "kv/data/internal/backend-auth" {
-  capabilities = ["read"]
-}
-path "database/creds/backend-runtime" {
-  capabilities = ["read"]
-}
-path "auth/token/renew-self" {
-  capabilities = ["update"]
-}
-EOF
+step "creating Transit signing key"
+# create-or-noop on an existing key; re-run-safe without any error tolerance
+quiet vault write transit/keys/auth-access-jwt \
+	type=ed25519 exportable=false allow_plaintext_backup=false
 
-write_policy migration <<'EOF'
-path "database/creds/migration" {
-  capabilities = ["read"]
-}
-path "auth/token/renew-self" {
-  capabilities = ["update"]
-}
-EOF
-
-vault secrets enable -path=transit transit 2>/dev/null || true
-vault secrets enable -path=kv -version=2 kv 2>/dev/null || true
-vault auth enable approle 2>/dev/null || true
-vault secrets enable database 2>/dev/null || true
-
-vault write transit/keys/auth-access-jwt type=ed25519 exportable=false allow_plaintext_backup=false >/dev/null
-vault kv put kv/auth/oauth \
+step "writing KV secrets"
+quiet vault kv put kv/auth/oauth \
 	oauth_42_client_id="${OAUTH_42_CLIENT_ID:-}" \
 	oauth_42_client_secret="${OAUTH_42_CLIENT_SECRET:-}" \
 	oauth_google_client_id="${OAUTH_GOOGLE_CLIENT_ID:-}" \
-	oauth_google_client_secret="${OAUTH_GOOGLE_CLIENT_SECRET:-}" >/dev/null
-vault kv put kv/internal/backend-auth internal_token="$AUTH_INTERNAL_TOKEN" >/dev/null
+	oauth_google_client_secret="${OAUTH_GOOGLE_CLIENT_SECRET:-}"
+if [ -z "${OAUTH_42_CLIENT_ID:-}" ] || [ -z "${OAUTH_GOOGLE_CLIENT_ID:-}" ]; then
+	echo "WARNING: OAuth client credentials are empty in kv/auth/oauth" >&2
+fi
+quiet vault kv put kv/internal/backend-auth internal_token="$AUTH_INTERNAL_TOKEN"
 
-vault write database/config/postgresql \
+step "configuring PostgreSQL database secrets engine"
+quiet vault write database/config/postgresql \
 	plugin_name=postgresql-database-plugin \
 	allowed_roles="auth-runtime,backend-runtime,migration" \
 	connection_url="postgresql://{{username}}:{{password}}@db:5432/${POSTGRES_DB}?sslmode=disable" \
 	username="$POSTGRES_USER" \
-	password="$POSTGRES_PASSWORD" >/dev/null
+	password="$POSTGRES_PASSWORD"
 
-vault write database/roles/auth-runtime \
-	db_name=postgresql \
-	default_ttl=8h \
-	max_ttl=8h \
-	creation_statements=@/vault/bootstrap/sql/auth-runtime.sql >/dev/null
-vault write database/roles/backend-runtime \
-	db_name=postgresql \
-	default_ttl=8h \
-	max_ttl=8h \
-	creation_statements=@/vault/bootstrap/sql/backend-runtime.sql >/dev/null
-vault write database/roles/migration \
-	db_name=postgresql \
-	default_ttl=8h \
-	max_ttl=8h \
-	creation_statements=@/vault/bootstrap/sql/migration.sql >/dev/null
+step "creating database roles from ${SQL_DIR}"
+create_db_role() {
+	role=$1
+	quiet vault write "database/roles/${role}" \
+		db_name=postgresql \
+		default_ttl=8h \
+		max_ttl=8h \
+		creation_statements="@${SQL_DIR}/${role}.sql"
+}
+create_db_role auth-runtime
+create_db_role backend-runtime
+create_db_role migration
 
+step "creating AppRoles and issuing Secret IDs"
 create_approle() {
 	role=$1
-	policy=$2
-	secret_file=$3
+	secret_dir="${SECRETS_DIR}/${role}"
 
-	vault write "auth/approle/role/${role}" \
-		token_policies="$policy" \
+	quiet vault write "auth/approle/role/${role}" \
+		token_policies="$role" \
 		token_ttl=1h \
 		token_max_ttl=4h \
 		secret_id_ttl=24h \
 		secret_id_num_uses=0 \
-		bind_secret_id=true >/dev/null
+		bind_secret_id=true
 
-	umask 077
-	vault read -field=role_id "auth/approle/role/${role}/role-id" >"${secret_file}/role_id"
-	vault write -f -field=secret_id "auth/approle/role/${role}/secret-id" >"${secret_file}/secret_id"
+	vault read -field=role_id "auth/approle/role/${role}/role-id" \
+		>"${secret_dir}/role_id"
+	vault write -f -field=secret_id "auth/approle/role/${role}/secret-id" \
+		>"${secret_dir}/secret_id"
 }
+create_approle auth-runtime
+create_approle backend-runtime
+create_approle migration
 
-create_approle auth-runtime auth-runtime /run/secrets/auth-runtime
-create_approle backend-runtime backend-runtime /run/secrets/backend-runtime
-create_approle migration migration /run/secrets/migration
-
-echo "Vault local development bootstrap completed."
+step "Vault local development bootstrap completed"

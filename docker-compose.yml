@@ -59,6 +59,7 @@ services:
       OAUTH_GOOGLE_CLIENT_SECRET: ${OAUTH_GOOGLE_CLIENT_SECRET}
     volumes:
       - ./vault/bootstrap.sh:/vault/bootstrap/bootstrap.sh:ro
+      - ./vault/bootstrap/policies:/vault/bootstrap/policies:ro
       - ./vault/bootstrap/sql:/vault/bootstrap/sql:ro
       - vault_auth_runtime_secret:/run/secrets/auth-runtime
       - vault_backend_runtime_secret:/run/secrets/backend-runtime
