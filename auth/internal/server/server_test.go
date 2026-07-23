@@ -59,6 +59,7 @@ func TestHandleSessionClearsCookiesWhenCSRFCookieIsMissing(t *testing.T) {
 			CSRFCookieName:    "tr_csrf",
 		},
 	}
+
 	request := httptest.NewRequest(http.MethodGet, "/auth/session", nil)
 	request.AddCookie(&http.Cookie{Name: "tr_session", Value: "session-token"})
 	response := httptest.NewRecorder()
@@ -77,6 +78,19 @@ func TestHandleSessionClearsCookiesWhenCSRFCookieIsMissing(t *testing.T) {
 		if cookie.MaxAge != -1 {
 			t.Errorf("cleared cookie %q MaxAge = %d, want -1", cookie.Name, cookie.MaxAge)
 		}
+	}
+}
+
+func TestHandleHealthFailsWhenRuntimeIsUnavailable(t *testing.T) {
+	t.Parallel()
+
+	server := &Server{ready: func() bool { return false }}
+	response := httptest.NewRecorder()
+
+	server.handleHealth(response, httptest.NewRequest(http.MethodGet, "/auth/health", nil))
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("handleHealth() status = %d, want %d", response.Code, http.StatusServiceUnavailable)
 	}
 }
 

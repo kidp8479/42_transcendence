@@ -35,9 +35,13 @@ $(ENV_FILE):
 	@echo "No .env found. Copying .env.example.."
 	cp .env.example $(ENV_FILE)
 
-## overwrite .env with the default values from .env.example
+## overwrite .env with .env.example values and fresh random local secrets
 recreate-env:
-	cp .env.example $(ENV_FILE)
+	sed \
+		-e "s|^AUTH_INTERNAL_TOKEN=.*|AUTH_INTERNAL_TOKEN=$$(openssl rand -hex 32)|" \
+		-e "s|^VAULT_DEV_ROOT_TOKEN=.*|VAULT_DEV_ROOT_TOKEN=$$(openssl rand -hex 32)|" \
+		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD=$$(openssl rand -hex 32)|" \
+		.env.example > $(ENV_FILE)
 
 
 # ---------------------------------------------------------------------------- #
@@ -88,6 +92,10 @@ up-backend:  $(ENV_FILE) ; $(COMPOSE) up -d backend
 
 ## start only the auth service without forcing a rebuild
 up-auth:     $(ENV_FILE) ; $(COMPOSE) up -d auth
+
+## show local Vault status (development mode only)
+vault-status: $(ENV_FILE)
+	$(COMPOSE) exec vault sh -c "VAULT_ADDR=http://127.0.0.1:8200 vault status"
 
 ## rebuild and start only the frontend service
 rebuild-frontend: $(ENV_FILE)
@@ -153,9 +161,13 @@ shell-db: $(ENV_FILE)
 # database                                                                     #
 # ---------------------------------------------------------------------------- #
 
-## run Prisma migrations in the backend container
-migrate:
+## run Prisma migrations in the backend container, then re-apply the
+## table-level grants for the Vault runtime parent roles (new tables are
+## only reachable by auth/backend leases after this step)
+migrate: $(ENV_FILE)
 	$(COMPOSE) exec backend npx prisma migrate dev
+	@set -a; . ./$(ENV_FILE); set +a; \
+	$(COMPOSE) exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < db/runtime-grants.sql
 
 ## start Prisma Studio from the backend container
 prisma-studio:
@@ -235,6 +247,11 @@ format-auth:
 
 ## validate the authentication integration services
 check-auth-stack: check-auth check-prisma check-backend check-frontend
+
+## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
+check-shell:
+	docker run --rm -v $(CURDIR):/mnt -w /mnt koalaman/shellcheck:stable -s sh \
+		vault/bootstrap.sh db/init/10-vault-db-admin-password.sh hooks/pre-commit
 
 ## install git pre-commit hook (run once after cloning)
 hooks:
@@ -317,10 +334,10 @@ help:
 
 .PHONY: all up up-build down restart build logs ps clean fclean re rere ffclean rebuild \
         recreate-env wipe-db \
-        up-db up-frontend up-backend up-auth \
+        up-db up-frontend up-backend up-auth vault-status \
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
         migrate prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
-        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack
+        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell

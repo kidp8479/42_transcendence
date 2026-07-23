@@ -41,6 +41,7 @@ type Server struct {
 	loginAccountLimiter *middleware.FixedWindowLimiter
 	passwordSlots       chan struct{}
 	decoyPasswordHash   string
+	ready               func() bool
 }
 
 type registerRequest struct {
@@ -91,6 +92,18 @@ func New(
 	authStore *store.Store,
 	passwords *password.Hasher,
 ) (http.Handler, error) {
+	return NewWithReadiness(cfg, authStore, passwords, func() bool { return true })
+}
+
+func NewWithReadiness(
+	cfg config.Config,
+	authStore *store.Store,
+	passwords *password.Hasher,
+	ready func() bool,
+) (http.Handler, error) {
+	if ready == nil {
+		ready = func() bool { return true }
+	}
 	decoyPasswordHash, err := passwords.Hash("auth-decoy-password")
 	if err != nil {
 		return nil, fmt.Errorf("create decoy password hash: %w", err)
@@ -105,6 +118,7 @@ func New(
 		loginAccountLimiter: middleware.NewFixedWindowLimiter(loginRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
 		passwordSlots:       make(chan struct{}, passwordConcurrency),
 		decoyPasswordHash:   decoyPasswordHash,
+		ready:               ready,
 	}
 
 	mux := http.NewServeMux()
@@ -115,10 +129,14 @@ func New(
 	mux.HandleFunc("GET /auth/session", server.handleSession)
 	mux.HandleFunc("POST /auth/internal/introspect", server.handleIntrospect)
 
-	return server.recoverPanic(server.securityHeaders(mux)), nil
+	return server.recoverPanic(server.securityHeaders(server.requireReady(mux))), nil
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	if !s.ready() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -548,6 +566,16 @@ func (s *Server) recoverPanic(next http.Handler) http.Handler {
 				writeError(w, http.StatusInternalServerError, "Internal Server Error", "request could not be completed")
 			}
 		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) requireReady(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/health" && !s.ready() {
+			writeError(w, http.StatusServiceUnavailable, "Service Unavailable", "authentication service credentials are unavailable")
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
