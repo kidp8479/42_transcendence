@@ -35,9 +35,13 @@ $(ENV_FILE):
 	@echo "No .env found. Copying .env.example.."
 	cp .env.example $(ENV_FILE)
 
-## overwrite .env with the default values from .env.example
+## overwrite .env with .env.example values and fresh random local secrets
 recreate-env:
-	cp .env.example $(ENV_FILE)
+	sed \
+		-e "s|^AUTH_INTERNAL_TOKEN=.*|AUTH_INTERNAL_TOKEN=$$(openssl rand -hex 32)|" \
+		-e "s|^VAULT_DEV_ROOT_TOKEN=.*|VAULT_DEV_ROOT_TOKEN=$$(openssl rand -hex 32)|" \
+		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD=$$(openssl rand -hex 32)|" \
+		.env.example > $(ENV_FILE)
 
 
 # ---------------------------------------------------------------------------- #
