@@ -89,6 +89,10 @@ up-backend:  $(ENV_FILE) ; $(COMPOSE) up -d backend
 ## start only the auth service without forcing a rebuild
 up-auth:     $(ENV_FILE) ; $(COMPOSE) up -d auth
 
+## show local Vault status (development mode only)
+vault-status: $(ENV_FILE)
+	$(COMPOSE) exec vault sh -c "VAULT_ADDR=http://127.0.0.1:8200 vault status"
+
 ## rebuild and start only the frontend service
 rebuild-frontend: $(ENV_FILE)
 	$(COMPOSE) up --build -d frontend
@@ -317,7 +321,7 @@ help:
 
 .PHONY: all up up-build down restart build logs ps clean fclean re rere ffclean rebuild \
         recreate-env wipe-db \
-        up-db up-frontend up-backend up-auth \
+        up-db up-frontend up-backend up-auth vault-status \
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
