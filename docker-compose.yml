@@ -1,3 +1,8 @@
+# NOTE: all services deliberately share the default Compose network. Reviewed
+# and accepted: the authentication boundary is possession of each workload's
+# AppRole role_id/secret_id file pair (isolated per-service volumes), not
+# network reach. Segmented networks are deferred to the production Vault
+# design - see .github/copilot-instructions.md "Flat Compose network".
 services:
   nginx:
     image: nginx:alpine
