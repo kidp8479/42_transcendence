@@ -14,8 +14,20 @@
 // 2026-07-20) only renders when canManageProject is true - the parent
 // derives that from the caller's own project role (see
 // routes/_authenticated/projects.tsx).
+//
+// "Delete project" doesn't call onDeleteProject right away - it swaps the
+// whole card for an inline "type the project name to confirm" view first
+// (same open/closed toggle idea as NewProjectCard's create form), and only
+// fires onDeleteProject once the typed text matches project.name exactly.
 import { Link } from "@tanstack/react-router";
-import { Dropdown, DropdownDivider, DropdownItem } from "flowbite-react";
+import {
+  Button,
+  Dropdown,
+  DropdownDivider,
+  DropdownItem,
+  TextInput,
+} from "flowbite-react";
+import { useId, useState } from "react";
 import {
   HiOutlineCalendar,
   HiOutlineCog6Tooth,
@@ -23,6 +35,7 @@ import {
   HiOutlineTrash,
   HiOutlineUserGroup,
   HiOutlineUsers,
+  HiOutlineXMark,
 } from "react-icons/hi2";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import type { ProjectStatus } from "@/lib/projectsApi";
@@ -33,6 +46,18 @@ import type { ProjectStatus } from "@/lib/projectsApi";
 const roundedDropdownItemTheme = {
   container: "mx-1",
   base: "rounded-md",
+};
+
+// Scoped to the delete-confirmation input only - same black-background
+// treatment as NewProjectCard's projectFormInputTheme.
+const confirmDeleteInputTheme = {
+  field: {
+    input: {
+      colors: {
+        gray: "!border-control-border !bg-black text-text-primary placeholder:!text-text-secondary focus:!border-control-error focus:!ring-2 focus:!ring-red-500/40 focus-visible:!outline-none",
+      },
+    },
+  },
 };
 
 const STATUS_META: Record<
@@ -99,6 +124,21 @@ export function ProjectCard({
   onManageMembers,
   onDeleteProject,
 }: ProjectCardProps) {
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const confirmInputId = useId();
+
+  function handleCancelDelete() {
+    setIsConfirmingDelete(false);
+    setConfirmText("");
+  }
+
+  function handleConfirmDelete() {
+    onDeleteProject?.();
+    setIsConfirmingDelete(false);
+    setConfirmText("");
+  }
+
   const status = STATUS_META[project.status];
   const formattedDeadline = project.deadline
     ? new Date(project.deadline).toLocaleDateString("en-US", {
@@ -124,6 +164,66 @@ export function ProjectCard({
       : daysUntilDeadline >= 0
         ? `J-${daysUntilDeadline}`
         : `J+${Math.abs(daysUntilDeadline)}`;
+
+  if (isConfirmingDelete) {
+    const canConfirmDelete = confirmText.trim() === project.name;
+
+    return (
+      <div className="flex h-full flex-col gap-3 rounded-lg border border-control-error bg-surface-raised p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-text-primary">Delete project</h3>
+          <button
+            type="button"
+            aria-label="Cancel delete project"
+            onClick={handleCancelDelete}
+            className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          >
+            <HiOutlineXMark className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-col justify-center gap-3">
+          <p className="text-sm text-text-secondary">
+            Type{" "}
+            <span className="font-semibold text-text-primary">
+              {project.name}
+            </span>{" "}
+            to confirm deletion. This cannot be undone.
+          </p>
+
+          <label htmlFor={confirmInputId} className="sr-only">
+            Project name
+          </label>
+          <TextInput
+            id={confirmInputId}
+            autoFocus
+            onChange={(event) => setConfirmText(event.target.value)}
+            placeholder={project.name}
+            theme={confirmDeleteInputTheme}
+            value={confirmText}
+          />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <Button
+            type="button"
+            onClick={handleConfirmDelete}
+            disabled={!canConfirmDelete}
+            className="flex-1 bg-control-error text-white! hover:bg-red-700 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-red-300 dark:bg-control-error dark:hover:bg-red-700 dark:focus:ring-red-800"
+          >
+            Delete
+          </Button>
+          <Button
+            type="button"
+            onClick={handleCancelDelete}
+            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40"
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -189,7 +289,7 @@ export function ProjectCard({
               >
                 <DropdownItem
                   icon={HiOutlineUserGroup}
-                  theme={roundedDropdownItemTheme}
+                  theme={roundedDropdownItemTheme}make down
                   onClick={() => onManageMembers?.()}
                 >
                   Manage members
@@ -199,7 +299,7 @@ export function ProjectCard({
                   icon={HiOutlineTrash}
                   theme={roundedDropdownItemTheme}
                   className="text-control-error! dark:text-control-error!"
-                  onClick={() => onDeleteProject?.()}
+                  onClick={() => setIsConfirmingDelete(true)}
                 >
                   Delete project
                 </DropdownItem>
@@ -209,7 +309,10 @@ export function ProjectCard({
         </div>
 
         <div>
-          <h3 className="font-mono text-base font-semibold text-text-primary">
+          <h3
+            title={project.name}
+            className="truncate font-mono text-base font-semibold text-text-primary"
+          >
             {project.name}
           </h3>
           <p className="mt-1 min-h-10 text-sm text-text-secondary line-clamp-2">

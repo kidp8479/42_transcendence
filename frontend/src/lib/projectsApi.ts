@@ -33,10 +33,12 @@ export function createProject(input: { name: string; description?: string }) {
   return apiClient<Project>("/projects", { method: "POST", body: input });
 }
 
+// DELETE /projects/:id => remove a project; caller must be ADMIN (see projects.service)
 export function deleteProject(id: string) {
   return apiClient<void>(`/projects/${id}`, { method: "DELETE" });
 }
 
+// PATCH /projects/:id => partial update; only provided fields are changed; caller must be ADMIN
 export function updateProject(
   id: string,
   input: {

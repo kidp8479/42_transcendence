@@ -23,11 +23,15 @@ type ApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
 
+// Single fetch wrapper for every /api call: attaches the CSRF token for
+// mutating requests, JSON-encodes the body, and normalizes non-OK responses
+// into ApiError instead of every caller re-implementing this.
 export async function apiClient<T>(
   path: string,
   { body, ...options }: ApiOptions = {}
 ): Promise<T> {
   const method = options.method?.toUpperCase() ?? "GET";
+  // CSRF only matters for state-changing requests - safe methods are exempt.
   const isMutation = !["GET", "HEAD", "OPTIONS"].includes(method);
   const headers = new Headers(options.headers);
 
@@ -47,6 +51,7 @@ export async function apiClient<T>(
   }
   headers.set("Accept", "application/json");
 
+  // nginx proxies /api/* to the backend (see nginx/nginx.conf) - not a Vite dev-proxy.
   const response = await fetch(`/api${path}`, {
     ...options,
     method,
@@ -62,5 +67,7 @@ export async function apiClient<T>(
     );
   }
 
+  // 204 responses (ex: deleteProject) have no body - response.json() would
+  // throw on empty input, so short-circuit to undefined instead.
   return response.status === 204 ? (undefined as T) : response.json();
 }

@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectMember } from "@prisma/client";
@@ -19,8 +20,8 @@ export class ProjectsService {
   // "is userId allowed to access projectId" (discovery-blocks, tasks, calendar-events, etc.)
   // instead of each module writing its own membership query.
   // Returns the ProjectMember row itself (not void) so callers who need the role later
-  // (ex: only ADMIN can delete/update) can read `.role` off it without this method's
-  // signature ever having to change - role-based checks are not implemented yet.
+  // (ex: only ADMIN can delete/update, see remove/update below) can read `.role` off
+  // it without this method's signature ever having to change.
   // Always throws NotFoundException (never Forbidden) whether the project doesn't exist
   // or userId just isn't a member of it - deliberately not revealing which, to avoid
   // leaking project existence to users who don't have access (IDOR).
@@ -110,7 +111,23 @@ export class ProjectsService {
     };
   }
 
+  // The creator becomes ADMIN by design (see the ProjectMemberRole comment in
+  // schema.prisma) - there's no other way to get an ADMIN row on a brand-new project.
+  // Note: unlike findAll/findById, this returns the raw Prisma row - no role/progress/
+  // memberCount. Harmless today since every caller re-fetches via router.invalidate()
+  // instead of reading this response directly, but keep that in mind before doing so.
   async create(dto: CreateProjectDto, userId: string) {
+    // Cap how many projects a single user can belong to (created or invited to),
+    // so one account can't spam an unbounded number of projects.
+    const membershipCount = await this.prisma.projectMember.count({
+      where: { userId },
+    });
+    if (membershipCount >= 50) {
+      throw new BadRequestException(
+        "You've reached the maximum of 50 projects."
+      );
+    }
+
     return this.prisma.project.create({
       data: {
         name: dto.name,
@@ -128,6 +145,9 @@ export class ProjectsService {
     });
   }
 
+  // NOTE ON ROLES: deleting the project is a team-affecting, hard-to-undo action -
+  // decided with the team (see TR-66) that this needs an ADMIN check, unlike most
+  // other modules where any member can act freely (tasks, discovery blocks, etc.).
   async remove(id: string, userId: string) {
     const member = await this.assertMembership(id, userId);
     if (member.role !== "ADMIN") {
@@ -136,9 +156,16 @@ export class ProjectsService {
       );
     }
 
-    return this.prisma.project.delete({ where: { id } });
+    // Cascades in schema.prisma: every ProjectMember, Task, TaskCategory,
+    // CalendarEvent, CalendarCategory, DiscoveryBlock, and EvaluationChecklistItem
+    // row for this project is deleted too. Permanent, no soft-delete/undo.
+    // No return value: the controller responds 204 No Content (see delete() there).
+    await this.prisma.project.delete({ where: { id } });
   }
 
+  // Same ADMIN-only rationale as remove above (see TR-66).
+  // Note: like create above, this returns the raw Prisma row, not the
+  // role/progress/memberCount-enriched shape findAll/findById return.
   async update(id: string, dto: UpdateProjectDto, userId: string) {
     const member = await this.assertMembership(id, userId);
     if (member.role !== "ADMIN") {

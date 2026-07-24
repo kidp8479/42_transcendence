@@ -46,8 +46,6 @@ function ProjectsPage() {
   }
 
   async function handleDeleteProject(project: Project) {
-    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`))
-      return;
     try {
       await deleteProject(project.id);
       await router.invalidate();

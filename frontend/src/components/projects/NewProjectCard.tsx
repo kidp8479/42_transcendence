@@ -79,7 +79,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex h-full flex-col gap-3 rounded-lg border border-brand-500 bg-surface-raised p-4"
+      className="flex h-full flex-col gap-3 rounded-lg border border-brand-500 bg-surface-raised p-5"
     >
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-text-primary">New project</h3>
@@ -100,7 +100,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
         <TextInput
           id={nameInputId}
           autoFocus
-          maxLength={64}
+          maxLength={100}
           onChange={(event) => setName(event.target.value)}
           placeholder="Project name (e.g. ft_irc)"
           required
@@ -113,7 +113,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
         </label>
         <TextInput
           id={descriptionInputId}
-          maxLength={140}
+          maxLength={1000}
           onChange={(event) => setDescription(event.target.value)}
           placeholder="Short description (optional)"
           theme={projectFormInputTheme}

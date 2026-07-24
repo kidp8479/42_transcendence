@@ -108,7 +108,7 @@ function ProjectRow({ project }: { project: Project }) {
 }
 
 export function SideBarCmp() {
-  // Data comes from /_authenticated route loader (GET /projects).
+  // Data comes from /_authenticated route loader (listProjects() => GET /api/projects).
   // This keeps sidebar data fetching at layout level instead of per page.
   const projects = useLoaderData({ from: "/_authenticated" });
   const visibleProjects = projects.filter(
