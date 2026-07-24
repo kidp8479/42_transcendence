@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Badge, Card } from "flowbite-react";
+import { Badge, Card, Checkbox } from "flowbite-react";
 import {
   listDiscoveryBlocks,
+  type DiscoveryBlock,
   type DiscoveryBlockStatus,
 } from "@/lib/discoveryBlocks";
+import {
+  listDiscoveryBlockItems,
+  type DiscoveryBlockItem,
+} from "@/lib/discoveryBlockItems";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import type { IconType } from "react-icons";
 import {
@@ -16,12 +21,41 @@ import {
   HiOutlineFolder,
 } from "react-icons/hi";
 
+// bundles one DiscoveryBlock together with the items that belong to it -
+// the shape the component actually needs to render a card's checklist.
+interface DiscoveryBlockWithItems {
+  discoveryBlock: DiscoveryBlock;
+  items: DiscoveryBlockItem[];
+}
+
+// fetches every block, then - one block at a time (for...of, not .map(),
+// since we need `await` inside the loop) - fetches that block's own items,
+// and combines both into a single array the component can render directly.
+async function loadDiscoveryPageData(
+  projectId: string
+): Promise<DiscoveryBlockWithItems[]> {
+  const discoveryBlocks = await listDiscoveryBlocks(projectId);
+
+  const discoveryBlocksWithItems: DiscoveryBlockWithItems[] = [];
+
+  for (const discoveryBlock of discoveryBlocks) {
+    const items = await listDiscoveryBlockItems(projectId, discoveryBlock.id);
+    discoveryBlocksWithItems.push({
+      discoveryBlock: discoveryBlock,
+      items: items,
+    });
+  }
+
+  return discoveryBlocksWithItems;
+}
+
 // loader runs before the page renders - fetches this route's own data
 // (TanStack Router convention: each route loads what it needs, no parent
 // over-fetch + filter). component is what actually gets displayed once the
 // loader's promise resolves.
 export const Route = createFileRoute("/_authenticated/$projectId/discovery")({
-  loader: (routeContext) => listDiscoveryBlocks(routeContext.params.projectId),
+  loader: (routeContext) =>
+    loadDiscoveryPageData(routeContext.params.projectId),
   component: DiscoveryPage,
 });
 
@@ -49,14 +83,18 @@ const DISCOVERY_BLOCK_ICON: Record<string, IconType> = {
 };
 
 function DiscoveryPage() {
-  // pulls out whatever the loader above returned once its promise resolved
-  const discoveryBlocks = Route.useLoaderData();
+  // pulls out whatever the loader above returned once its promise resolved -
+  // now an array of { discoveryBlock, items }, not DiscoveryBlock[] directly
+  const discoveryBlocksWithItems = Route.useLoaderData();
   return (
-    <div className="flex flex-wrap gap-4">
-      {/* .map: transforms the DiscoveryBlock[] array into one <Card> per
-          block. Runs once per element - everything inside this callback is
-          computed fresh for each discoveryBlock. */}
-      {discoveryBlocks.map((discoveryBlock) => {
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* .map: transforms DiscoveryBlockWithItems[] into one <Card> per
+          entry. Runs once per element - everything inside this callback is
+          computed fresh for each entry. */}
+      {discoveryBlocksWithItems.map((discoveryBlockWithItems) => {
+        const discoveryBlock = discoveryBlockWithItems.discoveryBlock;
+        const items = discoveryBlockWithItems.items;
+
         // index into the palette by this block's own color (0-7), falling
         // back to index 0 twice: once if color is missing (?? 0), once if
         // the resulting index is somehow out of the palette's range
@@ -67,6 +105,19 @@ function DiscoveryPage() {
         // names fall back to a generic folder icon instead of crashing
         const DiscoveryBlockIcon =
           DISCOVERY_BLOCK_ICON[discoveryBlock.icon ?? ""] ?? HiOutlineFolder;
+
+        // "X/Y done" + progress percent, computed fresh from the items array
+        // on every render (no separate state to keep in sync - the items
+        // array is always the single source of truth)
+        const itemsDoneCount = items.filter(
+          (item) => item.isChecked === true
+        ).length;
+        const itemsTotalCount = items.length;
+        const itemsDonePercent =
+          itemsTotalCount === 0
+            ? 0
+            : Math.round((itemsDoneCount / itemsTotalCount) * 100);
+
         return (
           <Card
             // key is required whenever React renders a list from .map() - it
@@ -74,7 +125,13 @@ function DiscoveryPage() {
             // across re-renders. id is perfect for that (title/color aren't
             // guaranteed unique).
             key={discoveryBlock.id}
-            className="max-w-sm bg-surface-raised border-surface-border"
+            // dark: variants written explicitly, not just the plain classes:
+            // Flowbite's own Card theme sets "dark:bg-gray-800 dark:border-
+            // gray-700" by default, and an unprefixed override loses that
+            // fight in dark mode (same issue already hit on Checkbox
+            // elsewhere in the app) - our own dark: rule has to be spelled
+            // out to actually win.
+            className="bg-surface-raised border-surface-border dark:border-surface-border dark:bg-surface-raised"
           >
             {/* color bar: an empty div, just a colored rectangle (height set,
                 no content) */}
@@ -111,6 +168,34 @@ function DiscoveryPage() {
                 {discoveryBlock.description}
               </p>
             )}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-text-secondary">
+                {itemsDoneCount}/{itemsTotalCount} done
+              </span>
+              <div className="h-1.5 w-full flex-1 rounded-full bg-surface-overlay">
+                <div
+                  className={discoveryBlockColor.bg + " h-1.5 rounded-full"}
+                  style={{ width: itemsDonePercent + "%" }}
+                ></div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              {/* .map: one row per item, checkbox + label, always visible
+                  (no expand/collapse - Figma doesn't call for that here) */}
+              {items.map((item) => {
+                return (
+                  <div key={item.id} className="flex items-center gap-2.5">
+                    {/* readOnly for now: no PATCH endpoint wired up yet to
+                        actually persist a checkbox toggle - that's a future
+                        brick (optimistic update) */}
+                    <Checkbox checked={item.isChecked} readOnly={true} />
+                    <span className="text-sm text-text-secondary">
+                      {item.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </Card>
         );
       })}
