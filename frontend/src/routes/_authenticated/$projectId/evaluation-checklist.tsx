@@ -98,7 +98,6 @@ const customTheme = createTheme({
 export const EVALUATION_CHECKLIST_ITEM_MAX_LENGTH = 350;
 // Need a max item limit
 
-
 // Presentation-only metadata per category (icon/color/description), kept
 // separate from mockData since none of this is real backend data yet.
 const CATEGORY_STYLE: Record<
