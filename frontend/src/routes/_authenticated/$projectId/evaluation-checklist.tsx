@@ -11,10 +11,17 @@ import {
   ThemeProvider,
 } from "flowbite-react";
 import { FaRegStar } from "react-icons/fa";
+import { useState } from "react";
 import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
 import { RiDeleteBackFill } from "react-icons/ri";
-import { EvaluationChecklistSection, fetchEvaluationChecklistItems } from "@/lib/evaluationChecklist";
+import {
+  EvaluationChecklistItem,
+  EvaluationChecklistSection,
+  fetchEvaluationChecklistItems,
+  updateEvaluationChecklistItem,
+} from "@/lib/evaluationChecklist";
+import { it } from "node:test";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -87,14 +94,6 @@ const customTheme = createTheme({
   },
 });
 
-// Mock data
-
-export interface AccordionItemData {
-  title: string;
-  contents: string[];
-}
-
-
 // Presentation-only metadata per category (icon/color/description), kept
 // separate from mockData since none of this is real backend data yet.
 const CATEGORY_STYLE: Record<
@@ -158,17 +157,23 @@ const CATEGORY_STYLE: Record<
   },
 };
 
-function EvaluationChecklistPage() {
-  // Mock readiness numbers - will come from the same defense_readiness payload
-  // as summary.tsx once the backend endpoint exists.
-  const checkpointsTotal = 12;
-  const checkpointsDone = 9;
-  const percent = Math.round((checkpointsDone / checkpointsTotal) * 100);
-  const isReady = percent === 100;
+export interface AccordionItemData {
+  title: string;
+  contents: EvaluationChecklistItem[];
+}
 
-  // same file, no need "from"
-  const checklistItems = Route.useLoaderData();
+enum ChecklistItemSortOption {
+  SORT_ON_ID,
+  SORT_ON_LABEL,
+  SORT_ON_ISCHECKED,
+  SORT_ON_ORDER,
+  SORT_ON_SECTION,
+}
 
+function categorizeChecklistItems(
+  items: EvaluationChecklistItem[],
+  sortOn?: ChecklistItemSortOption | null
+) {
   let accordionItemData: AccordionItemData[] = [
     {
       title: "Mandatory Part",
@@ -182,12 +187,94 @@ function EvaluationChecklistPage() {
       title: "Supplemental Goals",
       contents: [],
     },
-  ];  
+  ];
 
-  for (const item of checklistItems) {
-    item.section === "MANDATORY" ? accordionItemData[0].contents.push(item.label) :
-      item.section === "BONUS" ? accordionItemData[1].contents.push(item.label) :
-        accordionItemData[2].contents.push(item.label);
+  for (const item of items) {
+    if (item.section === "MANDATORY") accordionItemData[0].contents.push(item);
+    else if (item.section === "BONUS") accordionItemData[1].contents.push(item);
+    else accordionItemData[2].contents.push(item);
+  }
+
+  switch (sortOn) {
+    case ChecklistItemSortOption.SORT_ON_ID:
+      for (const item of accordionItemData)
+        item.contents.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      break;
+
+    case ChecklistItemSortOption.SORT_ON_LABEL:
+      for (const item of accordionItemData)
+        item.contents.sort((a, b) =>
+          a.label < b.label ? -1 : a.label > b.label ? 1 : 0
+        );
+      break;
+
+    case ChecklistItemSortOption.SORT_ON_ISCHECKED:
+      for (const item of accordionItemData)
+        item.contents.sort((a, b) =>
+          a.isChecked < b.isChecked ? -1 : a.isChecked > b.isChecked ? 1 : 0
+        );
+      break;
+
+    case ChecklistItemSortOption.SORT_ON_ORDER:
+      for (const item of accordionItemData)
+        item.contents.sort((a, b) =>
+          a.order < b.order ? -1 : a.order > b.order ? 1 : 0
+        );
+      break;
+
+    case ChecklistItemSortOption.SORT_ON_SECTION:
+      for (const item of accordionItemData)
+        item.contents.sort((a, b) =>
+          a.section < b.section ? -1 : a.section > b.section ? 1 : 0
+        );
+      break;
+  }
+
+  return accordionItemData;
+}
+
+function EvaluationChecklistPage() {
+  // Mock readiness numbers - will come from the same defense_readiness payload
+  // as summary.tsx once the backend endpoint exists.
+  const checkpointsTotal = 12;
+  const checkpointsDone = 9;
+  const percent = Math.round((checkpointsDone / checkpointsTotal) * 100);
+  const isReady = percent === 100;
+
+  const { session } = Route.useRouteContext();
+  const { projectId } = Route.useParams();
+  const checklistItems = Route.useLoaderData();
+  const [items, setItems] = useState<EvaluationChecklistItem[]>(checklistItems);
+  const accordionItemData = categorizeChecklistItems(
+    items,
+    ChecklistItemSortOption.SORT_ON_LABEL
+  );
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  async function updateItem(
+    id: string,
+    changes: Partial<EvaluationChecklistItem>
+  ) {
+    // save previous state in case rollback is needed
+    const previousItem = items.find((it) => it.id === id);
+    if (!previousItem) return;
+
+    // optimistic update
+    setItems((prevItems) =>
+      prevItems.map((it) => (it.id === id ? { ...it, ...changes } : it))
+    );
+
+    try {
+      await updateEvaluationChecklistItem(
+        projectId,
+        id,
+        changes,
+        session.csrfToken
+      );
+    } catch {
+      setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
+    }
   }
 
   return (
@@ -286,6 +373,7 @@ function EvaluationChecklistPage() {
                       </div>
                     </div>
                   </AccordionTitle>
+
                   <AccordionContent>
                     {item.contents.map((c, j) => (
                       <div
@@ -294,13 +382,55 @@ function EvaluationChecklistPage() {
                       >
                         {/* checked:bg-current uses this text color as the
                         checkmark fill. */}
-                        <Checkbox className={style.checkedColor} />
-                        <p className="w-full px-2 text-sm">{c}</p>
+                        <Checkbox
+                          className={style.checkedColor}
+                          checked={c.isChecked}
+                          onChange={() =>
+                            updateItem(c.id, { isChecked: !c.isChecked })
+                          }
+                        />
+
+                        {editingId === c.id ? (
+                          <TextInput
+                            className="w-full px-2 text-sm"
+                            defaultValue={c.label}
+                            autoFocus
+                            onBlur={(e) => {
+                              updateItem(c.id, { label: e.target.value });
+                              setEditingId(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                updateItem(c.id, { label: e.currentTarget.value });
+                                setEditingId(null);
+                              } 
+                              if (e.key === "Escape") {
+                                setEditingId(null);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <p
+                            className="w-full px-2 text-sm"
+                            onDoubleClick={() => setEditingId(c.id)}
+                            // onDoubleClick={() => {console.log("double");}}
+                          >
+                            {c.label}
+                          </p>
+                        )}
+
+                        {/* <p
+                          className="w-full px-2 text-sm"
+                          // onChange={() => updateItem(c.id, { label: c.label })}
+                          // onDoubleClick={() => {console.log("double");}}
+                        >
+                          {c.label}
+                        </p> */}
                         <button
                           type="button"
-                          onClick={() => console.log("deleted")}
                           className="opacity-0 transition-opacity group-hover:opacity-50"
                           aria-label="delete a project requirement"
+                          onClick={() => console.log("deleted")}
                         >
                           <RiDeleteBackFill className="h-5 w-5" />
                         </button>

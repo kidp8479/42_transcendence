@@ -112,14 +112,18 @@ export async function updateEvaluationChecklistItem(
     isChecked: boolean;
     order: number;
     section: EvaluationChecklistSection;
-  }>
+  }>,
+  csrfToken: string
 ): Promise<EvaluationChecklistItem> {
   const response = await fetch(
     `${import.meta.env.VITE_API_URL}/projects/${projectId}/evaluation-checklist-items/${id}`,
     {
       method: "PATCH",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
       body: JSON.stringify(dto),
     }
   );
