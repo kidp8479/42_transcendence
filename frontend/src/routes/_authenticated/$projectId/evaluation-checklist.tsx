@@ -96,7 +96,7 @@ const customTheme = createTheme({
 });
 
 export const EVALUATION_CHECKLIST_ITEM_MAX_LENGTH = 350;
-// Need a max item limit
+export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
 
 // Presentation-only metadata per category (icon/color/description), kept
 // separate from mockData since none of this is real backend data yet.
@@ -464,8 +464,12 @@ function EvaluationChecklistPage() {
           const style = CATEGORY_STYLE[item.title];
           const categoryPercent = categoryPercents[i];
           const isCategoryComplete = categoryPercent >= 100;
+          const isCategoryFull =
+            item.contents.length >= EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY;
 
           function addChecklistItem() {
+            if (item.contents.length >= EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY)
+              return;
             const input = document.getElementById(
               `textinput-${i}`
             ) as HTMLInputElement;
@@ -596,8 +600,13 @@ function EvaluationChecklistPage() {
                         className="flex-1"
                         id={`textinput-${i}`}
                         type="text"
-                        placeholder="Add a defense checkpoint..."
+                        placeholder={
+                          isCategoryFull
+                            ? `Limit of ${EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY} items reached`
+                            : "Add a defense checkpoint..."
+                        }
                         required
+                        disabled={isCategoryFull}
                         // className only reaches TextInput's outer wrapper, not the
                         // <input> itself, so the per-category hover/focus border has
                         // to go through the theme prop (merged onto field.input.colors.gray).
@@ -613,6 +622,7 @@ function EvaluationChecklistPage() {
                       <Button
                         color="gray"
                         className={style.addButtonHover}
+                        disabled={isCategoryFull}
                         onClick={() => {
                           addChecklistItem();
                         }}
