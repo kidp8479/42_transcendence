@@ -1,29 +1,22 @@
 // One project card for the /projects grid: icon, status badge, name,
-// description, progress bar, member count, deadline, and a link into the
-// project's summary tab.
-//
-// progress/memberCount are placeholder values (see projects.tsx) - neither
-// field exists in the Project schema yet (no DB column, no members count
-// exposed by GET /projects), so there's nothing real to show. Swap the
-// placeholder for the real value once the backend adds them.
+// description, progress bar, member count, deadline (as a J- countdown),
+// and a link into the project's summary tab.
 //
 // Navigation reuses the same TanStack Router <Link> the sidebar uses for its
 // own project rows (ProjectRow in navigation/SideBarCmp.tsx), stretched over
-// the whole card (absolute inset-0) so clicking anywhere - or the decorative
-// arrow - opens the project, while staying one real <a> instead of a fake
-// clickable div. The "..." trigger renders after it in DOM order inside a
-// `relative` wrapper, so it stacks on top and stays independently clickable
-// without needing to nest inside, or stop propagation from, that link.
+// the whole card (absolute inset-0) so clicking anywhere opens the project,
+// while staying one real <a> instead of a fake clickable div. The "..."
+// trigger renders after it in DOM order inside a `relative` wrapper, so it
+// stacks on top and stays independently clickable without needing to nest
+// inside, or stop propagation from, that link.
 //
 // The "..." menu (Manage members / Delete project, added to the Figma
-// 2026-07-20) only renders when canManageProject is true. There's no role
-// field on the API yet - membership is still just "in the project or not" -
-// so until the owner/chef role and its auth sync land, the parent decides
-// this flag (see the mock wiring in routes/_authenticated/projects.tsx).
+// 2026-07-20) only renders when canManageProject is true - the parent
+// derives that from the caller's own project role (see
+// routes/_authenticated/projects.tsx).
 import { Link } from "@tanstack/react-router";
 import { Dropdown, DropdownDivider, DropdownItem } from "flowbite-react";
 import {
-  HiOutlineArrowRight,
   HiOutlineCalendar,
   HiOutlineCog6Tooth,
   HiOutlineFolder,
@@ -84,9 +77,9 @@ export interface ProjectCardData {
   name: string;
   description: string;
   status: ProjectStatus;
-  // 0-100 - placeholder until the backend computes real progress.
+  // 0-100, computed backend-side from EvaluationChecklistItem.isChecked.
   progress: number;
-  // Placeholder until GET /projects exposes a real member count.
+  // count of ProjectMember rows for this project.
   memberCount: number;
   // ISO date string - null when the project has no deadline set yet
   // (Project.deadline is nullable in schema.prisma and unseeded today).
@@ -115,6 +108,23 @@ export function ProjectCard({
       })
     : null;
 
+  // Whole calendar days between today and the deadline, ignoring time of
+  // day (setHours(0,0,0,0) on both sides) so "tomorrow at 23:00" and
+  // "tomorrow at 01:00" both count as J-1.
+  const daysUntilDeadline = project.deadline
+    ? Math.ceil(
+        (new Date(project.deadline).setHours(0, 0, 0, 0) -
+          new Date().setHours(0, 0, 0, 0)) /
+          86_400_000
+      )
+    : null;
+  const deadlineLabel =
+    daysUntilDeadline === null
+      ? null
+      : daysUntilDeadline >= 0
+        ? `J-${daysUntilDeadline}`
+        : `J+${Math.abs(daysUntilDeadline)}`;
+
   return (
     <div
       className={`relative cursor-pointer rounded-lg border border-surface-border bg-surface-raised transition-colors ${status.hoverBorder}`}
@@ -127,8 +137,8 @@ export function ProjectCard({
       />
 
       {/* pointer-events-none lets clicks on plain content (name, description,
-          progress, the decorative arrow...) fall through to the Link behind
-          it. Only the badge+menu wrapper below opts back in with
+          progress, member count, deadline...) fall through to the Link
+          behind it. Only the badge+menu wrapper below opts back in with
           pointer-events-auto, since it's the one actually-interactive area
           nested in here. */}
       <div className="pointer-events-none relative flex h-full flex-col gap-4 p-4">
@@ -243,14 +253,11 @@ export function ProjectCard({
             )}
           </div>
 
-          {/* Decorative only - the stretched Link above already covers this
-              whole card, clicking here just activates that link underneath. */}
-          <span
-            aria-hidden="true"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted"
-          >
-            <HiOutlineArrowRight className="h-4 w-4" />
-          </span>
+          {deadlineLabel && (
+            <span className="shrink-0 text-xs font-semibold text-text-muted">
+              {deadlineLabel}
+            </span>
+          )}
         </div>
       </div>
     </div>

@@ -4,21 +4,21 @@
 // into a creation form itself, so there's no separate route or global modal
 // involved (see NewProjectCard.tsx).
 //
-// description and deadline are real backend fields (Project.description/
-// deadline in schema.prisma). progress and memberCount are not - neither
-// column/computation exists in the backend yet, so PLACEHOLDER_STATS below
-// is a fixed stand-in just to keep the card layout complete, not real data.
-import { createFileRoute, useLoaderData, useRouter } from "@tanstack/react-router";
+// description, deadline, progress, and memberCount are all real backend
+// fields (see lib/projectsApi.ts) - progress is computed from
+// EvaluationChecklistItem.isChecked, memberCount from the ProjectMember count.
+import {
+  createFileRoute,
+  useLoaderData,
+  useRouter,
+  useNavigate,
+} from "@tanstack/react-router";
 import {
   NewProjectCard,
   type NewProjectFormValues,
 } from "@/components/projects/NewProjectCard";
 import { ProjectCard } from "@/components/projects/ProjectCard";
-import { createProject } from "@/lib/projectsApi";
-
-// Same fixed placeholder for every project - swap for the real values once
-// GET /projects exposes progress and a member count (see ProjectCard.tsx).
-const PLACEHOLDER_STATS = { progress: 0, memberCount: 1 };
+import { createProject, deleteProject, type Project } from "@/lib/projectsApi";
 
 export const Route = createFileRoute("/_authenticated/projects")({
   component: ProjectsPage,
@@ -31,9 +31,8 @@ function ProjectsPage() {
   // a real project (see ProjectRow in components/navigation/SideBarCmp.tsx).
   const projects = useLoaderData({ from: "/_authenticated" });
   const router = useRouter();
+  const navigate = useNavigate();
 
-  // onManageMembers/onDeleteProject below are still placeholders - no
-  // update/delete-membership endpoints wired up on the frontend yet.
   async function handleCreateProject(values: NewProjectFormValues) {
     try {
       await createProject(values);
@@ -43,6 +42,17 @@ function ProjectsPage() {
       await router.invalidate();
     } catch (error) {
       console.error("Failed to create project:", error);
+    }
+  }
+
+  async function handleDeleteProject(project: Project) {
+    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`))
+      return;
+    try {
+      await deleteProject(project.id);
+      await router.invalidate();
+    } catch (error) {
+      console.error("Failed to delete project:", error);
     }
   }
 
@@ -58,27 +68,21 @@ function ProjectsPage() {
       </div>
       <div className="p-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project, index) => (
+          {projects.map((project) => (
             <ProjectCard
               key={project.id}
-              // description is nullable on the backend (no seed data for
-              // most projects yet) - fall back to a placeholder string
-              // here rather than pushing that null-handling into the card.
               project={{
                 ...project,
                 description: project.description ?? "No description yet.",
-                ...PLACEHOLDER_STATS,
               }}
-              // No role field on the API yet (see ProjectCard.tsx) -
-              // alternates true/false here only to keep previewing both
-              // menu states.
-              canManageProject={index % 2 === 0}
+              canManageProject={project.role === "ADMIN"}
               onManageMembers={() =>
-                console.log(`Manage members: ${project.name}`)
+                navigate({
+                  to: "/$projectId/project-settings",
+                  params: { projectId: project.id },
+                })
               }
-              onDeleteProject={() =>
-                console.log(`Delete project: ${project.name}`)
-              }
+              onDeleteProject={() => handleDeleteProject(project)}
             />
           ))}
           <NewProjectCard onCreate={handleCreateProject} />
