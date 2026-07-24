@@ -68,6 +68,22 @@ const DISCOVERY_BLOCK_STATUS_BADGE_COLOR: Record<DiscoveryBlockStatus, string> =
     COMPLETED: "success",
   };
 
+// Pill style per status, for the status-count pills only - built from the
+// app's own status-* design tokens (index.css) rather than Flowbite's fixed
+// Badge colors, since those tokens are what the rest of the app already uses
+// for status (see TaskStatusOverview.tsx) and are a closer match to Figma's
+// thin-border/translucent-fill look than a solid-filled Badge. Every class
+// written out in full - see categoryColorPalette.ts's note on why a class
+// built at runtime by joining strings never gets picked up by Tailwind.
+const DISCOVERY_BLOCK_STATUS_PILL_STYLE: Record<DiscoveryBlockStatus, string> =
+  {
+    NOT_STARTED: "bg-status-todo/15 border-status-todo/30 text-status-todo",
+    IN_PROGRESS:
+      "bg-status-in-progress/15 border-status-in-progress/30 text-status-in-progress",
+    COMPLETED:
+      "bg-status-completed/15 border-status-completed/30 text-status-completed",
+  };
+
 // Icon per icon name - matches the free-text names stored in seed.ts
 // ("search", "layers", ...). Not an exhaustive Record like the status table
 // above: DiscoveryBlock.icon is a free string on the backend (no fixed set
@@ -86,119 +102,215 @@ function DiscoveryPage() {
   // pulls out whatever the loader above returned once its promise resolved -
   // now an array of { discoveryBlock, items }, not DiscoveryBlock[] directly
   const discoveryBlocksWithItems = Route.useLoaderData();
+
+  // status pill counts: how many blocks currently have each status. .filter()
+  // keeps only the entries matching, .length counts them - same pattern
+  // already used for itemsDoneCount below, just filtering blocks instead of
+  // items.
+  const completedBlockCount = discoveryBlocksWithItems.filter(
+    (entry) => entry.discoveryBlock.status === "COMPLETED"
+  ).length;
+  const inProgressBlockCount = discoveryBlocksWithItems.filter(
+    (entry) => entry.discoveryBlock.status === "IN_PROGRESS"
+  ).length;
+  const notStartedBlockCount = discoveryBlocksWithItems.filter(
+    (entry) => entry.discoveryBlock.status === "NOT_STARTED"
+  ).length;
+
+  // overall progress: total items done / total items, across every block.
+  // A loop nested inside another loop - the outer one visits each block
+  // entry, the inner one visits that block's own items - accumulating into
+  // two counters declared before both loops start.
+  let overallItemsDoneCount = 0;
+  let overallItemsTotalCount = 0;
+  for (const entry of discoveryBlocksWithItems) {
+    for (const item of entry.items) {
+      overallItemsTotalCount = overallItemsTotalCount + 1;
+      if (item.isChecked === true) {
+        overallItemsDoneCount = overallItemsDoneCount + 1;
+      }
+    }
+  }
+  const overallItemsDonePercent =
+    overallItemsTotalCount === 0
+      ? 0
+      : Math.round((overallItemsDoneCount / overallItemsTotalCount) * 100);
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {/* .map: transforms DiscoveryBlockWithItems[] into one <Card> per
-          entry. Runs once per element - everything inside this callback is
-          computed fresh for each entry. */}
-      {discoveryBlocksWithItems.map((discoveryBlockWithItems) => {
-        const discoveryBlock = discoveryBlockWithItems.discoveryBlock;
-        const items = discoveryBlockWithItems.items;
+    <div className="flex flex-col gap-4">
+      {/* intro text (left) + compact Overall Progress card (right), side by
+          side - matches Figma's layout instead of a full-width banner */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <p className="max-w-2xl text-sm text-text-secondary">
+          Break down the subject before you write a single line of code -
+          organize constraints, questions, and resources into checklists you can
+          track.
+        </p>
+        <div className="w-full max-w-xs rounded-lg border border-surface-border bg-surface-raised p-4 dark:border-surface-border dark:bg-surface-raised">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-mono text-sm font-semibold text-text-primary">
+              Overall Progress
+            </span>
+            <span className="text-sm font-semibold text-brand-500">
+              {overallItemsDonePercent}%
+            </span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-surface-overlay">
+            <div
+              className="h-1.5 rounded-full bg-brand-500"
+              style={{ width: overallItemsDonePercent + "%" }}
+            ></div>
+          </div>
+          <p className="mt-2 text-xs text-brand-500">
+            {overallItemsDoneCount} / {overallItemsTotalCount} completed
+          </p>
+        </div>
+      </div>
 
-        // index into the palette by this block's own color (0-7), falling
-        // back to index 0 twice: once if color is missing (?? 0), once if
-        // the resulting index is somehow out of the palette's range
-        const discoveryBlockColor =
-          CATEGORY_COLOR_PALETTE[discoveryBlock.color ?? 0] ??
-          CATEGORY_COLOR_PALETTE[0];
-        // look up this block's icon name in the lookup table; unknown/missing
-        // names fall back to a generic folder icon instead of crashing
-        const DiscoveryBlockIcon =
-          DISCOVERY_BLOCK_ICON[discoveryBlock.icon ?? ""] ?? HiOutlineFolder;
+      {/* status pills - read-only counters, not clickable filters (decided
+          explicitly: no useState needed for this brick). Plain <span>, not
+          Flowbite's <Badge> - the status-* tokens give a thin-border,
+          translucent-fill pill Badge's fixed color set can't produce. */}
+      <div className="flex flex-wrap gap-2">
+        <span
+          className={
+            "rounded-full border px-3 py-1 text-sm font-medium " +
+            DISCOVERY_BLOCK_STATUS_PILL_STYLE.NOT_STARTED
+          }
+        >
+          {notStartedBlockCount} Not Started
+        </span>
+        <span
+          className={
+            "rounded-full border px-3 py-1 text-sm font-medium " +
+            DISCOVERY_BLOCK_STATUS_PILL_STYLE.IN_PROGRESS
+          }
+        >
+          {inProgressBlockCount} In Progress
+        </span>
+        <span
+          className={
+            "rounded-full border px-3 py-1 text-sm font-medium " +
+            DISCOVERY_BLOCK_STATUS_PILL_STYLE.COMPLETED
+          }
+        >
+          {completedBlockCount} Completed
+        </span>
+      </div>
 
-        // "X/Y done" + progress percent, computed fresh from the items array
-        // on every render (no separate state to keep in sync - the items
-        // array is always the single source of truth)
-        const itemsDoneCount = items.filter(
-          (item) => item.isChecked === true
-        ).length;
-        const itemsTotalCount = items.length;
-        const itemsDonePercent =
-          itemsTotalCount === 0
-            ? 0
-            : Math.round((itemsDoneCount / itemsTotalCount) * 100);
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* .map: transforms DiscoveryBlockWithItems[] into one <Card> per
+            entry. Runs once per element - everything inside this callback is
+            computed fresh for each entry. */}
+        {discoveryBlocksWithItems.map((discoveryBlockWithItems) => {
+          const discoveryBlock = discoveryBlockWithItems.discoveryBlock;
+          const items = discoveryBlockWithItems.items;
 
-        return (
-          <Card
-            // key is required whenever React renders a list from .map() - it
-            // needs a stable, unique value per item to track which is which
-            // across re-renders. id is perfect for that (title/color aren't
-            // guaranteed unique).
-            key={discoveryBlock.id}
-            // dark: variants written explicitly, not just the plain classes:
-            // Flowbite's own Card theme sets "dark:bg-gray-800 dark:border-
-            // gray-700" by default, and an unprefixed override loses that
-            // fight in dark mode (same issue already hit on Checkbox
-            // elsewhere in the app) - our own dark: rule has to be spelled
-            // out to actually win.
-            className="bg-surface-raised border-surface-border dark:border-surface-border dark:bg-surface-raised"
-          >
-            {/* color bar: an empty div, just a colored rectangle (height set,
+          // index into the palette by this block's own color (0-7), falling
+          // back to index 0 twice: once if color is missing (?? 0), once if
+          // the resulting index is somehow out of the palette's range
+          const discoveryBlockColor =
+            CATEGORY_COLOR_PALETTE[discoveryBlock.color ?? 0] ??
+            CATEGORY_COLOR_PALETTE[0];
+          // look up this block's icon name in the lookup table; unknown/missing
+          // names fall back to a generic folder icon instead of crashing
+          const DiscoveryBlockIcon =
+            DISCOVERY_BLOCK_ICON[discoveryBlock.icon ?? ""] ?? HiOutlineFolder;
+
+          // "X/Y done" + progress percent, computed fresh from the items array
+          // on every render (no separate state to keep in sync - the items
+          // array is always the single source of truth)
+          const itemsDoneCount = items.filter(
+            (item) => item.isChecked === true
+          ).length;
+          const itemsTotalCount = items.length;
+          const itemsDonePercent =
+            itemsTotalCount === 0
+              ? 0
+              : Math.round((itemsDoneCount / itemsTotalCount) * 100);
+
+          return (
+            <Card
+              // key is required whenever React renders a list from .map() - it
+              // needs a stable, unique value per item to track which is which
+              // across re-renders. id is perfect for that (title/color aren't
+              // guaranteed unique).
+              key={discoveryBlock.id}
+              // dark: variants written explicitly, not just the plain classes:
+              // Flowbite's own Card theme sets "dark:bg-gray-800 dark:border-
+              // gray-700" by default, and an unprefixed override loses that
+              // fight in dark mode (same issue already hit on Checkbox
+              // elsewhere in the app) - our own dark: rule has to be spelled
+              // out to actually win.
+              className="bg-surface-raised border-surface-border dark:border-surface-border dark:bg-surface-raised"
+            >
+              {/* color bar: an empty div, just a colored rectangle (height set,
                 no content) */}
-            <div className={discoveryBlockColor.bg + " h-1.5"}></div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {/* icon circle: same background color as the bar above, icon
+              <div className={discoveryBlockColor.bg + " h-1.5"}></div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {/* icon circle: same background color as the bar above, icon
                     component rendered as a JSX tag (capitalized variable name
                     required for that) */}
-                <div
-                  className={
-                    discoveryBlockColor.bg +
-                    " flex h-8 w-8 items-center justify-center rounded-full text-white"
+                  <div
+                    className={
+                      discoveryBlockColor.bg +
+                      " flex h-8 w-8 items-center justify-center rounded-full text-white"
+                    }
+                  >
+                    <DiscoveryBlockIcon />
+                  </div>
+                  <h5 className="font-mono font-semibold text-text-primary">
+                    {discoveryBlock.title}
+                  </h5>
+                </div>
+                <Badge
+                  color={
+                    DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
                   }
                 >
-                  <DiscoveryBlockIcon />
-                </div>
-                <h5 className="font-mono font-semibold text-text-primary">
-                  {discoveryBlock.title}
-                </h5>
+                  {discoveryBlock.status}
+                </Badge>
               </div>
-              <Badge
-                color={
-                  DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
-                }
-              >
-                {discoveryBlock.status}
-              </Badge>
-            </div>
-            {/* conditional render: `x && (...)` shows the JSX only if x is
+              {/* conditional render: `x && (...)` shows the JSX only if x is
                 truthy - here, only when description actually has a value */}
-            {discoveryBlock.description && (
-              <p className="text-text-secondary text-sm">
-                {discoveryBlock.description}
-              </p>
-            )}
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-text-secondary">
-                {itemsDoneCount}/{itemsTotalCount} done
-              </span>
-              <div className="h-1.5 w-full flex-1 rounded-full bg-surface-overlay">
-                <div
-                  className={discoveryBlockColor.bg + " h-1.5 rounded-full"}
-                  style={{ width: itemsDonePercent + "%" }}
-                ></div>
+              {discoveryBlock.description && (
+                <p className="text-text-secondary text-sm">
+                  {discoveryBlock.description}
+                </p>
+              )}
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-text-secondary">
+                  {itemsDoneCount}/{itemsTotalCount} done
+                </span>
+                <div className="h-1.5 w-full flex-1 rounded-full bg-surface-overlay">
+                  <div
+                    className={discoveryBlockColor.bg + " h-1.5 rounded-full"}
+                    style={{ width: itemsDonePercent + "%" }}
+                  ></div>
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              {/* .map: one row per item, checkbox + label, always visible
+              <div className="flex flex-col gap-2">
+                {/* .map: one row per item, checkbox + label, always visible
                   (no expand/collapse - Figma doesn't call for that here) */}
-              {items.map((item) => {
-                return (
-                  <div key={item.id} className="flex items-center gap-2.5">
-                    {/* readOnly for now: no PATCH endpoint wired up yet to
+                {items.map((item) => {
+                  return (
+                    <div key={item.id} className="flex items-center gap-2.5">
+                      {/* readOnly for now: no PATCH endpoint wired up yet to
                         actually persist a checkbox toggle - that's a future
                         brick (optimistic update) */}
-                    <Checkbox checked={item.isChecked} readOnly={true} />
-                    <span className="text-sm text-text-secondary">
-                      {item.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        );
-      })}
+                      <Checkbox checked={item.isChecked} readOnly={true} />
+                      <span className="text-sm text-text-secondary">
+                        {item.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
