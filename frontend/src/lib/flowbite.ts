@@ -10,6 +10,29 @@ export const darkTextInputTheme = {
   },
 };
 
+// surface-* tokens (dark neutral) instead of control-* (lighter blue-gray,
+// meant for auth forms) - for form fields on darker pages like Discovery.
+// !important needed: Flowbite's own default classes apply alongside these
+// and would otherwise win the CSS conflict.
+//
+// Textarea applies its `className` prop directly on the real <textarea>
+// element, so this plain class string is enough there. TextInput does NOT -
+// its className only reaches an outer wrapper <div>, the actual <input>'s
+// background comes from a separate `theme.field.input.colors` path that only
+// the `theme` prop can reach - see darkSurfaceTextInputTheme below for that.
+export const darkSurfaceFieldClassName =
+  "!border-surface-border !bg-surface-overlay text-text-primary dark:!border-surface-border dark:!bg-surface-overlay focus:!border-brand-500 focus:!ring-2 focus:!ring-green-500/40 focus-visible:!outline-none";
+
+export const darkSurfaceTextInputTheme = {
+  field: {
+    input: {
+      colors: {
+        gray: darkSurfaceFieldClassName,
+      },
+    },
+  },
+};
+
 export const darkAlertTheme = {
   color: {
     failure: "border !border-control-error !bg-alert-bg !text-control-error",
