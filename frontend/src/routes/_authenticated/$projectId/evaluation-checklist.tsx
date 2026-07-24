@@ -94,6 +94,8 @@ const customTheme = createTheme({
   },
 });
 
+export const evaluationChecklistItemLength = 350;
+
 // Presentation-only metadata per category (icon/color/description), kept
 // separate from mockData since none of this is real backend data yet.
 const CATEGORY_STYLE: Record<
@@ -375,67 +377,73 @@ function EvaluationChecklistPage() {
                   </AccordionTitle>
 
                   <AccordionContent>
-                    {item.contents.map((c, j) => (
-                      <div
-                        key={j}
-                        className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border"
-                      >
-                        {/* checked:bg-current uses this text color as the
-                        checkmark fill. */}
-                        <Checkbox
-                          className={style.checkedColor}
-                          checked={c.isChecked}
-                          onChange={() =>
-                            updateItem(c.id, { isChecked: !c.isChecked })
-                          }
-                        />
-
-                        {editingId === c.id ? (
-                          <TextInput
-                            className="w-full px-2 text-sm"
-                            defaultValue={c.label}
-                            autoFocus
-                            onBlur={(e) => {
-                              updateItem(c.id, { label: e.target.value });
-                              setEditingId(null);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                updateItem(c.id, { label: e.currentTarget.value });
-                                setEditingId(null);
-                              } 
-                              if (e.key === "Escape") {
-                                setEditingId(null);
-                              }
-                            }}
+                    {item.contents.map((c, j) => {
+                      function commitLabel(newValue: string) {
+                        if (newValue.trim().length && newValue !== c.label) {
+                          updateItem(c.id, { label: newValue });
+                        }
+                        setEditingId(null);
+                      }
+                      return (
+                        <div
+                          key={j}
+                          className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border"
+                        >
+                          {/* checked:bg-current uses this text color as the
+                          checkmark fill. */}
+                          <Checkbox
+                            className={style.checkedColor}
+                            checked={c.isChecked}
+                            onChange={() =>
+                              updateItem(c.id, { isChecked: !c.isChecked })
+                            }
                           />
-                        ) : (
-                          <p
-                            className="w-full px-2 text-sm"
-                            onDoubleClick={() => setEditingId(c.id)}
-                            // onDoubleClick={() => {console.log("double");}}
-                          >
-                            {c.label}
-                          </p>
-                        )}
 
-                        {/* <p
-                          className="w-full px-2 text-sm"
-                          // onChange={() => updateItem(c.id, { label: c.label })}
-                          // onDoubleClick={() => {console.log("double");}}
-                        >
-                          {c.label}
-                        </p> */}
-                        <button
-                          type="button"
-                          className="opacity-0 transition-opacity group-hover:opacity-50"
-                          aria-label="delete a project requirement"
-                          onClick={() => console.log("deleted")}
-                        >
-                          <RiDeleteBackFill className="h-5 w-5" />
-                        </button>
-                      </div>
-                    ))}
+                          /**
+                            This edits the text:
+                              - cancel on ESCAPE
+                              - commit new text on ENTER or click out of the box                   
+                          */
+                          {editingId === c.id ? (
+                            <TextInput
+                              maxLength={evaluationChecklistItemLength}
+                              className="w-full px-2 text-sm"
+                              defaultValue={c.label}
+                              autoFocus
+                              onBlur={(e) => {
+                                if (e.currentTarget.value.length <= evaluationChecklistItemLength)
+                                  commitLabel(e.currentTarget.value)
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  if (e.currentTarget.value.length <= evaluationChecklistItemLength)
+                                    commitLabel(e.currentTarget.value);
+                                }
+                                if (e.key === "Escape") {
+                                  setEditingId(null);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <p
+                              className="w-full px-2 text-sm"
+                              onDoubleClick={() => setEditingId(c.id)}
+                            >
+                              {c.label}
+                            </p>
+                          )}
+
+                          <button
+                            type="button"
+                            className="opacity-0 transition-opacity group-hover:opacity-50"
+                            aria-label="delete a project requirement"
+                            onClick={() => console.log("deleted")}
+                          >
+                            <RiDeleteBackFill className="h-5 w-5" />
+                          </button>
+                        </div>
+                      );
+                    })}
                     <div className="mt-5 flex items-center gap-3">
                       <TextInput
                         className="flex-1"

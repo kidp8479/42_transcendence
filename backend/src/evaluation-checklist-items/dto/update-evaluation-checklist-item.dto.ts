@@ -4,8 +4,11 @@
 // order is updated here when the user drags and drops to reorder items.
 
 import { PartialType } from "@nestjs/mapped-types";
-import { IsInt, IsBoolean, IsString, IsOptional } from "class-validator";
-import { CreateEvaluationChecklistItemDto } from "./create-evaluation-checklist-item.dto";
+import { IsInt, IsBoolean, IsString, IsOptional, MaxLength } from "class-validator";
+import {
+  CreateEvaluationChecklistItemDto,
+  EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH,
+} from "./create-evaluation-checklist-item.dto";
 
 // Reuses CreateEvaluationChecklistItemDto's fields and validation decorators (label, section, order), makes them optional for PATCH.
 // isChecked is added manually below: PartialType only knows about fields that already exist in the create DTO.
@@ -14,6 +17,7 @@ export class UpdateEvaluationChecklistItemDto extends PartialType(
 ) {
   @IsOptional()
   @IsString()
+  @MaxLength(EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH)
   label?: string;
 
   @IsOptional()
