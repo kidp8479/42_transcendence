@@ -15,6 +15,7 @@ import {
   Body,
   Delete,
   Patch,
+  HttpCode,
 } from "@nestjs/common";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { ProjectsService } from "./projects.service";
@@ -42,12 +43,16 @@ export class ProjectsController {
     return this.projectsService.findById(id, request.user.id);
   }
 
+  // POST /api/projects => create a project; the caller becomes its first member (ADMIN)
   @Post()
   create(@Body() dto: CreateProjectDto, @Req() request: AuthenticatedRequest) {
     return this.projectsService.create(dto, request.user.id);
   }
 
+  // DELETE /api/projects/:id => ADMIN-only (enforced in ProjectsService.remove)
+  // 204 No Content: nothing to return once the project (and its cascaded rows) is gone.
   @Delete(":id")
+  @HttpCode(204)
   delete(
     @Param("id", ParseUUIDPipe) id: string,
     @Req() request: AuthenticatedRequest
@@ -55,6 +60,7 @@ export class ProjectsController {
     return this.projectsService.remove(id, request.user.id);
   }
 
+  // PATCH /api/projects/:id => ADMIN-only (enforced in ProjectsService.update)
   @Patch(":id")
   update(
     @Param("id", ParseUUIDPipe) id: string,
