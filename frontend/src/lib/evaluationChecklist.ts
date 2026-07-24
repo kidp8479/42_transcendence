@@ -81,14 +81,18 @@ export async function fetchEvaluationChecklistItems(
 
 export async function createEvaluationChecklistItem(
   projectId: string,
-  dto: { label: string; section: EvaluationChecklistSection; order: number }
+  dto: { label: string; section: EvaluationChecklistSection; order: number },
+  csrfToken: string
 ): Promise<EvaluationChecklistItem> {
   const response = await fetch(
     `${import.meta.env.VITE_API_URL}/projects/${projectId}/evaluation-checklist-items`,
     {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
       body: JSON.stringify(dto),
     }
   );

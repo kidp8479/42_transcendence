@@ -16,8 +16,10 @@ import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
 import { RiDeleteBackFill } from "react-icons/ri";
 import {
+  createEvaluationChecklistItem,
   deleteEvaluationChecklistItem,
   EvaluationChecklistItem,
+  EvaluationChecklistSection,
   fetchEvaluationChecklistItems,
   updateEvaluationChecklistItem,
 } from "@/lib/evaluationChecklist";
@@ -93,7 +95,7 @@ const customTheme = createTheme({
   },
 });
 
-export const evaluationChecklistItemLength = 350;
+export const EVALUATION_CHECKLIST_ITEM_MAX_LENGTH = 350;
 
 // Presentation-only metadata per category (icon/color/description), kept
 // separate from mockData since none of this is real backend data yet.
@@ -248,10 +250,33 @@ function EvaluationChecklistPage() {
   const [items, setItems] = useState<EvaluationChecklistItem[]>(checklistItems);
   const accordionItemData = categorizeChecklistItems(
     items,
-    ChecklistItemSortOption.SORT_ON_LABEL
+    ChecklistItemSortOption.SORT_ON_ORDER
   );
 
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const sectionByIndex: EvaluationChecklistSection[] = [
+    "MANDATORY",
+    "BONUS",
+    "SUPPLEMENTAL",
+  ];
+
+  async function createItem(dto: {
+    label: string;
+    section: EvaluationChecklistSection;
+    order: number;
+  }) {
+    try {
+      const created = await createEvaluationChecklistItem(
+        projectId,
+        dto,
+        session.csrfToken
+      );
+      setItems((prevItems) => [...prevItems, created]);
+    } catch {
+      return;
+    }
+  }
 
   async function updateItem(
     id: string,
@@ -305,7 +330,6 @@ function EvaluationChecklistPage() {
           {isReady ? "Ready" : "Not ready yet"}
         </div>
       </section>
-
       <section
         aria-labelledby="overall-progress-heading"
         className="rounded-lg border border-surface-border bg-surface-raised p-4"
@@ -344,7 +368,6 @@ function EvaluationChecklistPage() {
           <span>Defense day</span>
         </div>
       </section>
-
       <div className="space-y-4">
         {accordionItemData.map((item, i) => {
           const style = CATEGORY_STYLE[item.title];
@@ -353,6 +376,21 @@ function EvaluationChecklistPage() {
           const categoryPercent =
             total === 0 ? 0 : Math.round((done / total) * 100);
 
+          function addChecklistItem() {
+            const input = document.getElementById(
+              `textinput-${i}`
+            ) as HTMLInputElement;
+            if (
+              input.value.trim().length > 0 &&
+              input.value.length <= EVALUATION_CHECKLIST_ITEM_MAX_LENGTH
+            )
+              createItem({
+                label: input.value,
+                order: item.contents.length,
+                section: sectionByIndex[i],
+              });
+            input.value = "";
+          }
           return (
             <ThemeProvider key={item.title} theme={customTheme}>
               <Accordion className="overflow-hidden rounded-lg border border-surface-border">
@@ -396,6 +434,7 @@ function EvaluationChecklistPage() {
                         }
                         setEditingId(null);
                       }
+
                       return (
                         <div
                           key={j}
@@ -416,14 +455,14 @@ function EvaluationChecklistPage() {
                             - commit new text on ENTER or click out of the box                    */}
                           {editingId === c.id ? (
                             <TextInput
-                              maxLength={evaluationChecklistItemLength}
+                              maxLength={EVALUATION_CHECKLIST_ITEM_MAX_LENGTH}
                               className="w-full px-2 text-sm"
                               defaultValue={c.label}
                               autoFocus
                               onBlur={(e) => {
                                 if (
                                   e.currentTarget.value.length <=
-                                  evaluationChecklistItemLength
+                                  EVALUATION_CHECKLIST_ITEM_MAX_LENGTH
                                 )
                                   commitLabel(e.currentTarget.value);
                               }}
@@ -431,7 +470,7 @@ function EvaluationChecklistPage() {
                                 if (e.key === "Enter") {
                                   if (
                                     e.currentTarget.value.length <=
-                                    evaluationChecklistItemLength
+                                    EVALUATION_CHECKLIST_ITEM_MAX_LENGTH
                                   )
                                     commitLabel(e.currentTarget.value);
                                 }
@@ -475,8 +514,17 @@ function EvaluationChecklistPage() {
                             input: { colors: { gray: style.inputBorder } },
                           },
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") addChecklistItem();
+                        }}
                       />
-                      <Button color="gray" className={style.addButtonHover}>
+                      <Button
+                        color="gray"
+                        className={style.addButtonHover}
+                        onClick={() => {
+                          addChecklistItem();
+                        }}
+                      >
                         <HiPlus className="mr-1 h-4 w-4" />
                         Add
                       </Button>
@@ -488,7 +536,9 @@ function EvaluationChecklistPage() {
           );
         })}
       </div>
-
+      id: string; label: string; isChecked: boolean; order: number; section:
+      EvaluationChecklistSection;
+      {/* bottom advice */}
       {accordionItemData
         .filter((item) => CATEGORY_STYLE[item.title]?.description)
         .map((item) => (
