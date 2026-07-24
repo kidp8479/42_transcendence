@@ -48,3 +48,17 @@ churn cost (frontend `lib/auth.ts`, docs, tests) for a naming nit.
 
 **Revisit when:** the auth routes get touched for another reason anyway —
 fold the rename in then instead of a dedicated PR.
+
+## Flat Compose network (no nginx/frontend ↔ Vault/db segmentation)
+
+`docker-compose.yml` — all services share the default Compose network, so
+nginx and the frontend container can technically reach `vault:8200` and
+`db:5432`. Deliberate: the real authentication boundary is possession of a
+per-workload AppRole `role_id`/`secret_id` file pair, and those are already
+isolated in per-service volumes — network reach alone yields nothing.
+Segmenting into edge/data/vault networks was reviewed and rejected as
+disproportionate for a student project's local dev stack. See the comment
+at the top of `docker-compose.yml`.
+
+**Revisit when:** a production (non-dev-mode) Vault deployment is designed —
+network policy is on the documented operational-blocker list for that phase.

@@ -15,11 +15,12 @@ const (
 	defaultCSRFCookieName  = "tr_csrf"
 	defaultIdleTimeout     = 30 * time.Minute
 	defaultAbsoluteTimeout = 7 * 24 * time.Hour
+	defaultVaultDBHost     = "db"
+	defaultVaultDBPort     = "5432"
 )
 
 type Config struct {
 	Port                   string
-	DatabaseURL            string
 	AppOrigin              string
 	InternalToken          string
 	SessionCookieName      string
@@ -27,22 +28,34 @@ type Config struct {
 	CookieSecure           bool
 	SessionIdleTimeout     time.Duration
 	SessionAbsoluteTimeout time.Duration
+	VaultAddress           string
+	VaultRoleIDFile        string
+	VaultSecretIDFile      string
+	VaultDatabaseRole      string
+	VaultDatabaseHost      string
+	VaultDatabasePort      string
+	VaultDatabaseName      string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
 		Port:                   envOrDefault("PORT", defaultPort),
-		DatabaseURL:            strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		AppOrigin:              strings.TrimRight(strings.TrimSpace(os.Getenv("APP_ORIGIN")), "/"),
-		InternalToken:          strings.TrimSpace(os.Getenv("AUTH_INTERNAL_TOKEN")),
 		SessionCookieName:      envOrDefault("AUTH_SESSION_COOKIE", defaultCookieName),
 		CSRFCookieName:         envOrDefault("AUTH_CSRF_COOKIE", defaultCSRFCookieName),
 		SessionIdleTimeout:     defaultIdleTimeout,
 		SessionAbsoluteTimeout: defaultAbsoluteTimeout,
+		VaultAddress:           strings.TrimRight(strings.TrimSpace(os.Getenv("VAULT_ADDR")), "/"),
+		VaultRoleIDFile:        strings.TrimSpace(os.Getenv("VAULT_ROLE_ID_FILE")),
+		VaultSecretIDFile:      strings.TrimSpace(os.Getenv("VAULT_SECRET_ID_FILE")),
+		VaultDatabaseRole:      strings.TrimSpace(os.Getenv("VAULT_DB_ROLE")),
+		VaultDatabaseHost:      envOrDefault("VAULT_DB_HOST", defaultVaultDBHost),
+		VaultDatabasePort:      envOrDefault("VAULT_DB_PORT", defaultVaultDBPort),
+		VaultDatabaseName:      strings.TrimSpace(os.Getenv("VAULT_DB_NAME")),
 	}
 
-	if cfg.DatabaseURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required")
+	if err := validateVaultConfig(cfg); err != nil {
+		return Config{}, err
 	}
 	if cfg.AppOrigin == "" {
 		return Config{}, fmt.Errorf("APP_ORIGIN is required")
@@ -51,10 +64,6 @@ func Load() (Config, error) {
 	if err != nil || origin.Scheme == "" || origin.Host == "" || origin.Path != "" {
 		return Config{}, fmt.Errorf("APP_ORIGIN must be an origin such as http://localhost:8080")
 	}
-	if len(cfg.InternalToken) < 32 {
-		return Config{}, fmt.Errorf("AUTH_INTERNAL_TOKEN must be at least 32 characters")
-	}
-
 	cfg.CookieSecure, err = parseBool("AUTH_COOKIE_SECURE", false)
 	if err != nil {
 		return Config{}, err
@@ -75,6 +84,29 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func validateVaultConfig(cfg Config) error {
+	address, err := url.Parse(cfg.VaultAddress)
+	if err != nil || (address.Scheme != "http" && address.Scheme != "https") || address.Host == "" {
+		return fmt.Errorf("VAULT_ADDR must be an http or https URL")
+	}
+	if cfg.VaultRoleIDFile == "" {
+		return fmt.Errorf("VAULT_ROLE_ID_FILE is required")
+	}
+	if cfg.VaultSecretIDFile == "" {
+		return fmt.Errorf("VAULT_SECRET_ID_FILE is required")
+	}
+	if cfg.VaultDatabaseRole == "" {
+		return fmt.Errorf("VAULT_DB_ROLE is required")
+	}
+	if cfg.VaultDatabaseHost == "" || cfg.VaultDatabasePort == "" || cfg.VaultDatabaseName == "" {
+		return fmt.Errorf("VAULT_DB_HOST, VAULT_DB_PORT, and VAULT_DB_NAME are required")
+	}
+	if _, err := strconv.ParseUint(cfg.VaultDatabasePort, 10, 16); err != nil {
+		return fmt.Errorf("VAULT_DB_PORT must be a valid port")
+	}
+	return nil
 }
 
 func envOrDefault(name, fallback string) string {

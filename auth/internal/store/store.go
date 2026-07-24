@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ var (
 )
 
 type Store struct {
-	pool *pgxpool.Pool
+	pool atomic.Pointer[pgxpool.Pool]
 }
 
 type User struct {
@@ -57,7 +58,18 @@ type CreatedSession struct {
 }
 
 func New(pool *pgxpool.Pool) *Store {
-	return &Store{pool: pool}
+	store := &Store{}
+	store.pool.Store(pool)
+	return store
+}
+
+// ReplacePool publishes a fully connected pool before its predecessor drains.
+func (s *Store) ReplacePool(pool *pgxpool.Pool) *pgxpool.Pool {
+	return s.pool.Swap(pool)
+}
+
+func (s *Store) currentPool() *pgxpool.Pool {
+	return s.pool.Load()
 }
 
 func (s *Store) CreateLocalAccount(
@@ -66,7 +78,7 @@ func (s *Store) CreateLocalAccount(
 	username string,
 	passwordHash string,
 ) (User, error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.currentPool().BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return User{}, fmt.Errorf("begin local account transaction: %w", err)
 	}
@@ -133,7 +145,7 @@ func (s *Store) CreateLocalAccount(
 
 func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string) (LocalCredential, error) {
 	var credential LocalCredential
-	err := s.pool.QueryRow(
+	err := s.currentPool().QueryRow(
 		ctx,
 		`SELECT
 			u."id",
@@ -201,7 +213,7 @@ func (s *Store) CreateSession(
 		},
 	}
 
-	_, err = s.pool.Exec(
+	_, err = s.currentPool().Exec(
 		ctx,
 		`INSERT INTO "AuthSession"
 			("id", "userId", "tokenHash", "csrfTokenHash", "authenticationMethod",
@@ -236,7 +248,7 @@ func (s *Store) IntrospectSession(
 	tokenHash := hashToken(token)
 	var session Session
 
-	err := s.pool.QueryRow(
+	err := s.currentPool().QueryRow(
 		ctx,
 		`UPDATE "AuthSession" AS s
 		 SET "lastSeenAt" = CURRENT_TIMESTAMP,
@@ -289,7 +301,7 @@ func (s *Store) IntrospectSession(
 }
 
 func (s *Store) RevokeSession(ctx context.Context, token string) error {
-	command, err := s.pool.Exec(
+	command, err := s.currentPool().Exec(
 		ctx,
 		`UPDATE "AuthSession"
 		 SET "revokedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
@@ -313,7 +325,7 @@ func (s *Store) RecordEvent(
 	sessionID *string,
 	ipHash *string,
 ) error {
-	_, err := s.pool.Exec(
+	_, err := s.currentPool().Exec(
 		ctx,
 		`INSERT INTO "AuthEvent"
 			("id", "userId", "eventType", "provider", "sessionId", "ipHash", "createdAt")

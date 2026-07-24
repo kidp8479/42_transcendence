@@ -1,3 +1,8 @@
+# NOTE: all services deliberately share the default Compose network. Reviewed
+# and accepted: the authentication boundary is possession of each workload's
+# AppRole role_id/secret_id file pair (isolated per-service volumes), not
+# network reach. Segmented networks are deferred to the production Vault
+# design - see .github/copilot-instructions.md "Flat Compose network".
 services:
   nginx:
     image: nginx:alpine
@@ -19,14 +24,59 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      VAULT_DB_ADMIN_PASSWORD: ${VAULT_DB_ADMIN_PASSWORD:?set_vault_db_admin_password_in_env}
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
+
+  vault:
+    image: hashicorp/vault:1.18
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN:?set_vault_dev_root_token_in_env}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    command: vault server -dev
+    healthcheck:
+      test: ["CMD-SHELL", "VAULT_ADDR=http://127.0.0.1:8200 vault status >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+
+  vault-bootstrap:
+    image: hashicorp/vault:1.18
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set_vault_dev_root_token_in_env}
+      VAULT_DB_ADMIN_PASSWORD: ${VAULT_DB_ADMIN_PASSWORD:?set_vault_db_admin_password_in_env}
+      POSTGRES_DB: ${POSTGRES_DB}
+      AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN}
+      OAUTH_42_CLIENT_ID: ${OAUTH_42_CLIENT_ID}
+      OAUTH_42_CLIENT_SECRET: ${OAUTH_42_CLIENT_SECRET}
+      OAUTH_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID}
+      OAUTH_GOOGLE_CLIENT_SECRET: ${OAUTH_GOOGLE_CLIENT_SECRET}
+    volumes:
+      - ./vault/bootstrap.sh:/vault/bootstrap/bootstrap.sh:ro
+      - ./vault/bootstrap/policies:/vault/bootstrap/policies:ro
+      - ./vault/bootstrap/sql:/vault/bootstrap/sql:ro
+      - vault_auth_runtime_secret:/run/secrets/auth-runtime
+      - vault_backend_runtime_secret:/run/secrets/backend-runtime
+      - vault_migration_secret:/run/secrets/migration
+    command: sh /vault/bootstrap/bootstrap.sh
+    depends_on:
+      db:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    restart: "no"
 
   frontend:
     build:
@@ -49,14 +99,21 @@ services:
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
       - AUTH_INTERNAL_TOKEN=${AUTH_INTERNAL_TOKEN}
       - AUTH_SESSION_COOKIE=${AUTH_SESSION_COOKIE}
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_ROLE_ID_FILE=/run/secrets/vault/role_id
+      - VAULT_SECRET_ID_FILE=/run/secrets/vault/secret_id
+      - VAULT_DB_ROLE=backend-runtime
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
+      - vault_backend_runtime_secret:/run/secrets/vault:ro
     depends_on:
       db:
         condition: service_healthy
       auth:
         condition: service_healthy
+      vault-bootstrap:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   auth:
@@ -64,26 +121,28 @@ services:
       context: ./auth
       target: dev
     environment:
-      - DATABASE_URL=${DATABASE_URL}
       - APP_ORIGIN=${APP_ORIGIN}
-      - AUTH_INTERNAL_TOKEN=${AUTH_INTERNAL_TOKEN}
       - AUTH_SESSION_COOKIE=${AUTH_SESSION_COOKIE}
       - AUTH_CSRF_COOKIE=${AUTH_CSRF_COOKIE}
       - AUTH_COOKIE_SECURE=${AUTH_COOKIE_SECURE}
       - AUTH_SESSION_IDLE_TIMEOUT=${AUTH_SESSION_IDLE_TIMEOUT}
       - AUTH_SESSION_ABSOLUTE_TIMEOUT=${AUTH_SESSION_ABSOLUTE_TIMEOUT}
-      - OAUTH_42_CLIENT_ID=${OAUTH_42_CLIENT_ID}
-      - OAUTH_42_CLIENT_SECRET=${OAUTH_42_CLIENT_SECRET}
-      - OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID}
-      - OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET}
-      - OAUTH_GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID}
-      - OAUTH_GITHUB_CLIENT_SECRET=${OAUTH_GITHUB_CLIENT_SECRET}
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_ROLE_ID_FILE=/run/secrets/vault/role_id
+      - VAULT_SECRET_ID_FILE=/run/secrets/vault/secret_id
+      - VAULT_DB_ROLE=auth-runtime
+      - VAULT_DB_HOST=db
+      - VAULT_DB_PORT=5432
+      - VAULT_DB_NAME=${POSTGRES_DB}
       - TOTP_ISSUER=${TOTP_ISSUER}
     volumes:
       - ./auth:/app
+      - vault_auth_runtime_secret:/run/secrets/vault:ro
     depends_on:
       db:
         condition: service_healthy
+      vault-bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3001/auth/health"]
       interval: 5s
@@ -96,3 +155,6 @@ volumes:
   db_data:
   frontend_node_modules:
   backend_node_modules:
+  vault_auth_runtime_secret:
+  vault_backend_runtime_secret:
+  vault_migration_secret:
