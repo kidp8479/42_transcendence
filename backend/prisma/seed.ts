@@ -152,12 +152,54 @@ async function main() {
 
   // 3. Default Discovery Blocks (on every project)
   const discoveryCategories = [
-    { title: "PDF Project Understanding", icon: "search", color: 0 },
-    { title: "Constraints", icon: "layers", color: 1 },
-    { title: "Questions", icon: "palette", color: 2 },
-    { title: "Roadmap", icon: "link", color: 3 },
-    { title: "Resources", icon: "notebook", color: 4 },
-    { title: "Concepts", icon: "wheel", color: 5 },
+    {
+      title: "PDF Project Understanding",
+      icon: "search",
+      color: 0,
+      items: [
+        "Read the subject PDF fully",
+        "List every mandatory requirement",
+      ],
+    },
+    {
+      title: "Constraints",
+      icon: "layers",
+      color: 1,
+      items: [
+        "Identify technical constraints (allowed libs, languages)",
+        "Identify norm/style constraints",
+      ],
+    },
+    {
+      title: "Questions",
+      icon: "palette",
+      color: 2,
+      items: [
+        "List open questions for the team",
+        "List questions to ask evaluators",
+      ],
+    },
+    {
+      title: "Roadmap",
+      icon: "link",
+      color: 3,
+      items: ["Draft a rough milestone plan", "Assign first tasks to teammates"],
+    },
+    {
+      title: "Resources",
+      icon: "notebook",
+      color: 4,
+      items: ["Collect useful docs/links", "Bookmark similar past projects"],
+    },
+    {
+      title: "Concepts",
+      icon: "wheel",
+      color: 5,
+      items: [
+        "List unfamiliar concepts to learn",
+        "Find a resource for each concept",
+      ],
+    },
   ];
 
   for (const project of createdProjects) {
@@ -170,10 +212,9 @@ async function main() {
           color: cat.color,
           status: DiscoveryBlockStatus.NOT_STARTED,
           discoveryBlockItems: {
-            create: [
-              { label: "", order: 0 },
-              { label: "", order: 1 },
-            ],
+            create: cat.items.map((label, index) => {
+              return { label: label, order: index };
+            }),
           },
         },
       });
