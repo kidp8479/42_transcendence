@@ -4,6 +4,8 @@
 // Same equivalent meaning, just spelled out for now.
 export type DiscoveryBlockStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 
+// shape of a DiscoveryBlock exactly as the frontend uses it - mirrors the
+// backend's Prisma model, not something we invent independently
 export interface DiscoveryBlock {
   id: string;
   projectId: string;
@@ -67,6 +69,8 @@ export async function getDiscoveryBlock(
     throw new Error("Failed to load discovery block");
   }
 
+  // same "don't trust it, parse it" pattern as listDiscoveryBlocks, just on
+  // a single object instead of an array - no .map()/.some() needed here
   const payload: unknown = await response.json();
 
   const parsed = parseDiscoveryBlock(payload);
@@ -77,6 +81,56 @@ export async function getDiscoveryBlock(
   return parsed;
 }
 
+// PATCH - same URL as getDiscoveryBlock (one block, identified by both ids),
+// but a different HTTP method + a request body carrying the new field values.
+export async function updateDiscoveryBlock(
+  projectId: string,
+  discoveryBlockId: string,
+  title: string,
+  description: string,
+  notes: string
+): Promise<DiscoveryBlock> {
+  const response = await fetch(
+    import.meta.env.VITE_API_URL +
+      "/projects/" +
+      projectId +
+      "/discovery-blocks/" +
+      discoveryBlockId,
+    {
+      method: "PATCH",
+      credentials: "include",
+      // tells the backend the body is JSON, not e.g. a plain string or form data
+      headers: { "Content-Type": "application/json" },
+      // fetch's body must be a string - JSON.stringify turns our object into
+      // the JSON text actually sent over the wire
+      body: JSON.stringify({
+        title: title,
+        description: description,
+        notes: notes,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to modify discovery block");
+  }
+
+  // backend returns the updated block - parse it the same way as
+  // getDiscoveryBlock, so the caller gets back a real DiscoveryBlock, not
+  // just "success"
+  const payload: unknown = await response.json();
+
+  const parsed = parseDiscoveryBlock(payload);
+  if (parsed === null) {
+    throw new Error("Discovery block modification was invalid");
+  }
+  return parsed;
+}
+
+// converts an untrusted JSON value into a real DiscoveryBlock, or null if it
+// doesn't match the shape we expect. Never trust a `fetch` response body's
+// type just because a TS type annotation says so - the backend, network, or
+// a future API change could all send something unexpected at runtime.
 function parseDiscoveryBlock(value: unknown): DiscoveryBlock | null {
   if (!isRecord(value)) {
     return null;
@@ -137,6 +191,10 @@ function parseDiscoveryBlock(value: unknown): DiscoveryBlock | null {
   };
 }
 
+// narrows `unknown` down to "an object we can read string-keyed properties
+// from" - the minimum needed before parseDiscoveryBlock can safely do
+// value.id, value.title, etc. without TypeScript complaining. Doesn't check
+// which properties exist or their types - parseDiscoveryBlock does that part.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
