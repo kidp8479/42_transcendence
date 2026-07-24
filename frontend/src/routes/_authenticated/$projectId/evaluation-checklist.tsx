@@ -123,6 +123,8 @@ const CATEGORY_STYLE: Record<
     // generated last isn't reliable (confirmed: dark:text-brand-500 actually
     // compiles *before* the default theme's dark:text-brand-700).
     checkedColor: string;
+    // Applied to the accordion's own border once that category reaches 100%.
+    borderColor: string;
     description?: string;
   }
 > = {
@@ -136,6 +138,7 @@ const CATEGORY_STYLE: Record<
     inputBorder:
       "hover:border-status-in-progress dark:hover:border-status-in-progress",
     checkedColor: "!text-status-in-progress dark:!text-status-in-progress",
+    borderColor: "border-status-in-progress dark:border-status-in-progress",
   },
   Bonus: {
     icon: HiOutlineGift,
@@ -146,6 +149,7 @@ const CATEGORY_STYLE: Record<
       "hover:border-brand-500 hover:text-brand-500 dark:hover:border-brand-500 dark:hover:text-brand-500",
     inputBorder: "hover:border-brand-500 dark:hover:border-brand-500",
     checkedColor: "!text-brand-500 dark:!text-brand-500",
+    borderColor: "border-brand-500 dark:border-brand-500",
   },
   "Supplemental Goals": {
     icon: FaRegStar,
@@ -156,14 +160,22 @@ const CATEGORY_STYLE: Record<
       "hover:border-status-review hover:text-status-review dark:hover:border-status-review dark:hover:text-status-review",
     inputBorder: "hover:border-status-review dark:hover:border-status-review",
     checkedColor: "!text-status-review dark:!text-status-review",
+    borderColor: "border-status-review dark:border-status-review",
     description:
       "Supplemental goals are extras beyond the subject requirements. They won't affect your mandatory pass, but show evaluators you went the extra mile.",
   },
 };
 
+export interface ItemCount {
+  currentValue: number;
+  completeAt: number;
+  percent?: number | null;
+}
+
 export interface AccordionItemData {
   title: string;
   contents: EvaluationChecklistItem[];
+  count: ItemCount;
 }
 
 enum ChecklistItemSortOption {
@@ -182,21 +194,40 @@ function categorizeChecklistItems(
     {
       title: "Mandatory Part",
       contents: [],
+      count: { currentValue: 0, completeAt: 0 },
     },
     {
       title: "Bonus",
       contents: [],
+      count: { currentValue: 0, completeAt: 0 },
     },
     {
       title: "Supplemental Goals",
       contents: [],
+      count: { currentValue: 0, completeAt: 0 },
     },
   ];
 
   for (const item of items) {
-    if (item.section === "MANDATORY") accordionItemData[0].contents.push(item);
-    else if (item.section === "BONUS") accordionItemData[1].contents.push(item);
-    else accordionItemData[2].contents.push(item);
+    if (item.section === "MANDATORY") {
+      accordionItemData[0].contents.push(item);
+      ++accordionItemData[0].count.completeAt;
+      if (item.isChecked) {
+        ++accordionItemData[0].count.currentValue;
+      }
+    } else if (item.section === "BONUS") {
+      accordionItemData[1].contents.push(item);
+      ++accordionItemData[1].count.completeAt;
+      if (item.isChecked) {
+        ++accordionItemData[1].count.currentValue;
+      }
+    } else {
+      accordionItemData[2].contents.push(item);
+      ++accordionItemData[2].count.completeAt;
+      if (item.isChecked) {
+        ++accordionItemData[2].count.currentValue;
+      }
+    }
   }
 
   switch (sortOn) {
@@ -238,13 +269,6 @@ function categorizeChecklistItems(
 }
 
 function EvaluationChecklistPage() {
-  // Mock readiness numbers - will come from the same defense_readiness payload
-  // as summary.tsx once the backend endpoint exists.
-  const checkpointsTotal = 12;
-  const checkpointsDone = 9;
-  const percent = Math.round((checkpointsDone / checkpointsTotal) * 100);
-  const isReady = percent === 100;
-
   const { session } = Route.useRouteContext();
   const { projectId } = Route.useParams();
   const checklistItems = Route.useLoaderData();
@@ -253,6 +277,49 @@ function EvaluationChecklistPage() {
     items,
     ChecklistItemSortOption.SORT_ON_ORDER
   );
+
+  function categoryPercent(data: AccordionItemData): number {
+    return data.count.completeAt === 0
+      ? 0
+      : Math.round((data.count.currentValue / data.count.completeAt) * 100);
+  }
+
+  // accordionItemData is always [Mandatory, Bonus, Supplemental], in that
+  // order - see categorizeChecklistItems.
+  const [mandatoryData, bonusData, supplementalData] = accordionItemData;
+  const categoryPercents = accordionItemData.map(categoryPercent);
+  const [mandatoryPercent, bonusPercent, supplementalPercent] =
+    categoryPercents;
+  const mandatoryComplete = mandatoryPercent >= 100;
+  const bonusComplete = bonusPercent >= 100;
+
+  // Same gating as the percent below: a category's items only join the
+  // overall "X / Y" count once the previous category is fully done.
+  const totalProgress: ItemCount = {
+    currentValue: mandatoryData.count.currentValue,
+    completeAt: mandatoryData.count.completeAt,
+  };
+  if (mandatoryComplete) {
+    totalProgress.currentValue += bonusData.count.currentValue;
+    totalProgress.completeAt += bonusData.count.completeAt;
+    if (bonusComplete) {
+      totalProgress.currentValue += supplementalData.count.currentValue;
+      totalProgress.completeAt += supplementalData.count.completeAt;
+    }
+  }
+
+  // Mandatory alone carries the first 100 points. Bonus only starts counting
+  // once Mandatory is done (worth up to another 25), and Supplemental only
+  // once both Mandatory and Bonus are done (worth a final 25) - so the score
+  // tops out at 150.
+  let overallPercent = mandatoryPercent;
+  if (mandatoryComplete) {
+    overallPercent += (bonusPercent / 100) * 25;
+    if (bonusComplete) {
+      overallPercent += (supplementalPercent / 100) * 25;
+    }
+  }
+  totalProgress.percent = Math.round(overallPercent);
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -317,6 +384,25 @@ function EvaluationChecklistPage() {
     }
   }
 
+  const readinessLabel =
+    totalProgress.percent >= 150
+      ? "Extra Ready"
+      : totalProgress.percent >= 125
+        ? "Super Ready"
+        : totalProgress.percent >= 100
+          ? "Ready"
+          : "Not ready yet";
+
+  // Each milestone borrows the color of the category that unlocked it.
+  const readinessColor =
+    totalProgress.percent >= 150
+      ? CATEGORY_STYLE["Supplemental Goals"].iconText
+      : totalProgress.percent >= 125
+        ? CATEGORY_STYLE["Bonus"].iconText
+        : totalProgress.percent >= 100
+          ? CATEGORY_STYLE["Mandatory Part"].iconText
+          : "text-text-secondary";
+
   return (
     <div className="w-full space-y-6">
       <section className="flex flex-wrap items-center justify-between gap-4">
@@ -324,11 +410,9 @@ function EvaluationChecklistPage() {
           Track your own defense checklist so you know exactly what to review
           before the correction.
         </p>
-        <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-sm font-medium text-text-secondary">
-          <HiOutlineShieldCheck
-            className={`h-5 w-5 ${isReady ? "text-brand-500" : "text-status-review"}`}
-          />
-          {isReady ? "Ready" : "Not ready yet"}
+        <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-sm font-medium">
+          <HiOutlineShieldCheck className={`h-5 w-5 ${readinessColor}`} />
+          <span className={readinessColor}>{readinessLabel}</span>
         </div>
       </section>
       <section
@@ -343,39 +427,43 @@ function EvaluationChecklistPage() {
             Overall progress
           </h2>
           <span className="text-sm">
-            <span className="font-bold text-brand-500">{checkpointsDone}</span>
+            <span className="font-bold text-brand-500">
+              {totalProgress.currentValue}
+            </span>
             <span className="text-text-secondary">
               {" "}
-              / {checkpointsTotal} —{" "}
+              / {totalProgress.completeAt} —{" "}
             </span>
-            <span className="font-bold text-brand-500">{percent}%</span>
+            <span className="font-bold text-brand-500">
+              {totalProgress.percent}%
+            </span>
           </span>
         </div>
         <div
           className="h-2 w-full rounded-full bg-surface-overlay"
           role="progressbar"
-          aria-valuenow={percent}
+          aria-valuenow={totalProgress.percent}
           aria-valuemin={0}
-          aria-valuemax={100}
+          aria-valuemax={150}
           aria-labelledby="overall-progress-heading"
         >
           <div
             className="h-2 rounded-full bg-brand-500"
-            style={{ width: `${percent}%` }}
+            style={{
+              width: `${Math.min((totalProgress.percent / 150) * 100, 100)}%`,
+            }}
           />
         </div>
         <div className="mt-2 flex items-center justify-between text-xs text-text-muted">
-          <span>{percent}%</span>
+          <span>{totalProgress.percent}%</span>
           <span>Defense day</span>
         </div>
       </section>
       <div className="space-y-4">
         {accordionItemData.map((item, i) => {
           const style = CATEGORY_STYLE[item.title];
-          const total = item.contents.length;
-          const done = 0;
-          const categoryPercent =
-            total === 0 ? 0 : Math.round((done / total) * 100);
+          const categoryPercent = categoryPercents[i];
+          const isCategoryComplete = categoryPercent >= 100;
 
           function addChecklistItem() {
             const input = document.getElementById(
@@ -394,7 +482,9 @@ function EvaluationChecklistPage() {
           }
           return (
             <ThemeProvider key={item.title} theme={customTheme}>
-              <Accordion className="overflow-hidden rounded-lg border border-surface-border">
+              <Accordion
+                className={`overflow-hidden rounded-lg border ${isCategoryComplete ? style.borderColor : "border-surface-border"}`}
+              >
                 <AccordionPanel>
                   <AccordionTitle className="font-mono">
                     <div className="flex w-full items-center justify-between gap-4">
@@ -409,7 +499,8 @@ function EvaluationChecklistPage() {
                             {item.title}
                           </span>
                           <span className="block text-xs text-text-secondary">
-                            {done}/{total} completed
+                            {item.count.currentValue}/{item.count.completeAt}{" "}
+                            completed
                           </span>
                         </span>
                       </div>
@@ -537,8 +628,7 @@ function EvaluationChecklistPage() {
           );
         })}
       </div>
-      id: string; label: string; isChecked: boolean; order: number; section:
-      EvaluationChecklistSection;
+
       {/* bottom advice */}
       {accordionItemData
         .filter((item) => CATEGORY_STYLE[item.title]?.description)
