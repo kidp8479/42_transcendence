@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Badge, Card, Checkbox } from "flowbite-react";
 import {
   listDiscoveryBlocks,
@@ -97,6 +97,10 @@ const DISCOVERY_BLOCK_ICON: Record<string, IconType> = {
   notebook: HiBookOpen,
   wheel: HiCog,
 };
+
+// max items shown per card - keeps every card's height the same regardless
+// of how many items the block actually has
+const MAX_ITEMS_PREVIEW = 5;
 
 function DiscoveryPage() {
   // pulls out whatever the loader above returned once its promise resolved -
@@ -198,7 +202,9 @@ function DiscoveryPage() {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* capped at 2 columns (not 3) to match Figma - more width per card,
+        long titles like "PDF Project Understanding" fit on one line */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* .map: transforms DiscoveryBlockWithItems[] into one <Card> per
             entry. Runs once per element - everything inside this callback is
             computed fresh for each entry. */}
@@ -229,85 +235,115 @@ function DiscoveryPage() {
               ? 0
               : Math.round((itemsDoneCount / itemsTotalCount) * 100);
 
+          // preview: at most MAX_ITEMS_PREVIEW rows, so card height stays
+          // fixed regardless of how many items the block actually has
+          const previewItems = items.slice(0, MAX_ITEMS_PREVIEW);
+          const hiddenItemsCount = itemsTotalCount - previewItems.length;
+
           return (
-            <Card
-              // key is required whenever React renders a list from .map() - it
-              // needs a stable, unique value per item to track which is which
-              // across re-renders. id is perfect for that (title/color aren't
-              // guaranteed unique).
+            // key moved to Link (the outermost element .map() produces now) -
+            // clicking anywhere on the card navigates to its edit screen.
+            // no-underline/text-inherit: Link renders as <a>, which the
+            // browser styles blue+underlined by default - overridden here
+            // since this isn't meant to read as a text link.
+            <Link
               key={discoveryBlock.id}
-              // dark: variants written explicitly, not just the plain classes:
-              // Flowbite's own Card theme sets "dark:bg-gray-800 dark:border-
-              // gray-700" by default, and an unprefixed override loses that
-              // fight in dark mode (same issue already hit on Checkbox
-              // elsewhere in the app) - our own dark: rule has to be spelled
-              // out to actually win.
-              className="bg-surface-raised border-surface-border dark:border-surface-border dark:bg-surface-raised"
+              to="/$projectId/discovery/$discoveryBlockId/edit"
+              params={{
+                projectId: discoveryBlock.projectId,
+                discoveryBlockId: discoveryBlock.id,
+              }}
+              className="text-inherit no-underline"
             >
-              {/* color bar: an empty div, just a colored rectangle (height set,
+              <Card
+                // dark: variants written explicitly, not just the plain classes:
+                // Flowbite's own Card theme sets "dark:bg-gray-800 dark:border-
+                // gray-700" by default, and an unprefixed override loses that
+                // fight in dark mode (same issue already hit on Checkbox
+                // elsewhere in the app) - our own dark: rule has to be spelled
+                // out to actually win.
+                className="bg-surface-raised border-surface-border dark:border-surface-border dark:bg-surface-raised"
+              >
+                {/* color bar: an empty div, just a colored rectangle (height set,
                 no content) */}
-              <div className={discoveryBlockColor.bg + " h-1.5"}></div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {/* icon circle: same background color as the bar above, icon
+                <div className={discoveryBlockColor.bg + " h-1.5"}></div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {/* icon circle: same background color as the bar above, icon
                     component rendered as a JSX tag (capitalized variable name
                     required for that) */}
-                  <div
-                    className={
-                      discoveryBlockColor.bg +
-                      " flex h-8 w-8 items-center justify-center rounded-full text-white"
+                    <div
+                      className={
+                        discoveryBlockColor.bg +
+                        " flex h-8 w-8 items-center justify-center rounded-full text-white"
+                      }
+                    >
+                      <DiscoveryBlockIcon />
+                    </div>
+                    <h5 className="font-mono font-semibold text-text-primary">
+                      {discoveryBlock.title}
+                    </h5>
+                  </div>
+                  <Badge
+                    color={
+                      DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
                     }
                   >
-                    <DiscoveryBlockIcon />
-                  </div>
-                  <h5 className="font-mono font-semibold text-text-primary">
-                    {discoveryBlock.title}
-                  </h5>
+                    {discoveryBlock.status}
+                  </Badge>
                 </div>
-                <Badge
-                  color={
-                    DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
-                  }
-                >
-                  {discoveryBlock.status}
-                </Badge>
-              </div>
-              {/* conditional render: `x && (...)` shows the JSX only if x is
+                {/* conditional render: `x && (...)` shows the JSX only if x is
                 truthy - here, only when description actually has a value */}
-              {discoveryBlock.description && (
-                <p className="text-text-secondary text-sm">
-                  {discoveryBlock.description}
-                </p>
-              )}
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-text-secondary">
-                  {itemsDoneCount}/{itemsTotalCount} done
-                </span>
-                <div className="h-1.5 w-full flex-1 rounded-full bg-surface-overlay">
-                  <div
-                    className={discoveryBlockColor.bg + " h-1.5 rounded-full"}
-                    style={{ width: itemsDonePercent + "%" }}
-                  ></div>
+                {discoveryBlock.description && (
+                  <p className="text-text-secondary text-sm">
+                    {discoveryBlock.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-text-secondary">
+                    {itemsDoneCount}/{itemsTotalCount} done
+                  </span>
+                  <div className="h-1.5 w-full flex-1 rounded-full bg-surface-overlay">
+                    <div
+                      className={discoveryBlockColor.bg + " h-1.5 rounded-full"}
+                      style={{ width: itemsDonePercent + "%" }}
+                    ></div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                {/* .map: one row per item, checkbox + label, always visible
-                  (no expand/collapse - Figma doesn't call for that here) */}
-                {items.map((item) => {
-                  return (
-                    <div key={item.id} className="flex items-center gap-2.5">
-                      {/* readOnly for now: no PATCH endpoint wired up yet to
+                <div className="flex flex-col gap-2">
+                  {/* previewItems, not items: caps rows at MAX_ITEMS_PREVIEW so
+                  every card has the same height regardless of item count */}
+                  {previewItems.map((item) => {
+                    return (
+                      <div key={item.id} className="flex items-center gap-2.5">
+                        {/* readOnly for now: no PATCH endpoint wired up yet to
                         actually persist a checkbox toggle - that's a future
                         brick (optimistic update) */}
-                      <Checkbox checked={item.isChecked} readOnly={true} />
-                      <span className="text-sm text-text-secondary">
-                        {item.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+                        <Checkbox checked={item.isChecked} readOnly={true} />
+                        {/* truncate: forces one line (ellipsis instead of
+                        wrapping) so every item row is the same height,
+                        regardless of label length - min-w-0 needed because
+                        flex items don't shrink below their content size
+                        otherwise, which would silently disable truncate */}
+                        {/* title: native browser tooltip on hover, shows the
+                        full label when it's been cut off by truncate */}
+                        <span
+                          className="min-w-0 truncate text-sm text-text-secondary"
+                          title={item.label}
+                        >
+                          {item.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {hiddenItemsCount > 0 && (
+                    <span className="text-xs text-text-secondary">
+                      +{hiddenItemsCount} more
+                    </span>
+                  )}
+                </div>
+              </Card>
+            </Link>
           );
         })}
       </div>
