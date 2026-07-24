@@ -1,10 +1,15 @@
 // ProjectsService: handles all database operations for projects
 // called by the controller, never called directly by the frontend
 
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectMember } from "@prisma/client";
 import { CreateProjectDto } from "./dto/create-project.dto";
+import { UpdateProjectDto } from "./dto/update-project.dto";
 
 @Injectable()
 export class ProjectsService {
@@ -34,27 +39,75 @@ export class ProjectsService {
 
   // fetch all projects where userId is a ProjectMember
   async findAll(userId: string) {
-    return this.prisma.project.findMany({
+    const projects = await this.prisma.project.findMany({
       where: {
         members: {
           some: { userId },
         },
       },
+      include: {
+        members: {
+          where: { userId },
+          select: { role: true },
+        },
+        evaluationChecklistItems: {
+          select: { isChecked: true },
+        },
+        _count: {
+          select: { members: true },
+        },
+      },
     });
+
+    return projects.map(
+      ({ members, evaluationChecklistItems, _count, ...project }) => {
+        const total = evaluationChecklistItems.length;
+        const validated = evaluationChecklistItems.filter(
+          (i) => i.isChecked
+        ).length;
+        return {
+          ...project,
+          role: members[0].role,
+          progress: total === 0 ? 0 : Math.round((validated / total) * 100),
+          memberCount: _count.members,
+        };
+      }
+    );
   }
 
   async findById(id: string, userId: string) {
     // delegates the membership check to assertMembership instead of re-querying it here
-    await this.assertMembership(id, userId);
+    const member = await this.assertMembership(id, userId);
 
     // assertMembership succeeding guarantees this project exists (foreign key integrity
     // between ProjectMember.projectId and Project.id) - this check is a defensive
     // fallback, not expected to ever trigger in practice
-    const project = await this.prisma.project.findUnique({ where: { id } });
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      include: {
+        evaluationChecklistItems: {
+          select: { isChecked: true },
+        },
+        _count: {
+          select: { members: true },
+        },
+      },
+    });
     if (!project) {
       throw new NotFoundException("Project not found");
     }
-    return project;
+
+    const { evaluationChecklistItems, _count, ...rest } = project;
+    const total = evaluationChecklistItems.length;
+    const validated = evaluationChecklistItems.filter(
+      (i: { isChecked: boolean }) => i.isChecked
+    ).length;
+    return {
+      ...rest,
+      role: member.role,
+      progress: total === 0 ? 0 : Math.round((validated / total) * 100),
+      memberCount: _count.members,
+    };
   }
 
   async create(dto: CreateProjectDto, userId: string) {
@@ -68,11 +121,7 @@ export class ProjectsService {
         members: {
           create: {
             userId,
-            // role: "ADMIN", // TODO(pair with teammate): the "role" column
-            // exists in schema.prisma but its migration
-            // (20260721170656_add_project_member_role) hasn't been applied
-            // to this DB yet, so Prisma's generated types don't have it -
-            // uncomment once migrations are applied (`prisma migrate dev`).
+            role: "ADMIN",
           },
         },
       },
@@ -81,23 +130,23 @@ export class ProjectsService {
 
   async remove(id: string, userId: string) {
     const member = await this.assertMembership(id, userId);
-    // if (member.role !== "ADMIN") {
-    //   throw new ForbiddenException("Only the project admin can delete this project");
-    // }
+    if (member.role !== "ADMIN") {
+      throw new ForbiddenException(
+        "Only the project admin can delete this project"
+      );
+    }
 
     return this.prisma.project.delete({ where: { id } });
   }
 
-  // NOTE ON ROLES: renaming/deleting the project is a team-affecting, hard-to-undo action -
-  // decided with the team (see TR-66) that this needs an ADMIN check, unlike most other
-  // modules where any member can act freely (tasks, discovery blocks, etc.)
+  async update(id: string, dto: UpdateProjectDto, userId: string) {
+    const member = await this.assertMembership(id, userId);
+    if (member.role !== "ADMIN") {
+      throw new ForbiddenException(
+        "Only the project admin can update this project"
+      );
+    }
 
-  // TODO: update(id: string, dto: UpdateProjectDto, userId: string)
-  //       => const member = await this.assertMembership(id, userId)
-  //       => must also throw (ex: ForbiddenException) if member.role !== "ADMIN"
-  //       => update project fields (name, status, deadline, isArchived)
-
-  // TODO: remove(id: string, userId: string)
-  //       => same requester + role check as update
-  //       => permanently delete a project
+    return this.prisma.project.update({ where: { id }, data: dto });
+  }
 }

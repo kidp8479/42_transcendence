@@ -11,6 +11,11 @@ export interface Project {
   // handle null rather than assume every project has one.
   description: string | null;
   deadline: string | null;
+  role: "ADMIN" | "MEMBER"; // the role of the authenticated user in this project
+  // 0-100, computed backend-side from EvaluationChecklistItem.isChecked.
+  progress: number;
+  // count of ProjectMember rows for this project.
+  memberCount: number;
 }
 
 // GET /projects => every project the authenticated user is a member of
@@ -26,4 +31,24 @@ export function getProject(id: string) {
 // POST /projects => create a project; the caller becomes its first member
 export function createProject(input: { name: string; description?: string }) {
   return apiClient<Project>("/projects", { method: "POST", body: input });
+}
+
+export function deleteProject(id: string) {
+  return apiClient<void>(`/projects/${id}`, { method: "DELETE" });
+}
+
+export function updateProject(
+  id: string,
+  input: {
+    name?: string;
+    description?: string;
+    status?: ProjectStatus;
+    isArchived?: boolean;
+    deadline?: string | null;
+  }
+) {
+  return apiClient<Project>(`/projects/${id}`, {
+    method: "PATCH",
+    body: input,
+  });
 }
