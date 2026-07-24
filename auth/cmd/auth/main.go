@@ -91,7 +91,12 @@ func main() {
 	errCh := make(chan error, 1)
 	runtimeCtx, runtimeCancel := context.WithCancel(context.Background())
 	defer runtimeCancel()
-	go runtime.Run(runtimeCtx)
+	runtimeErrCh := make(chan error, 1)
+	go func() {
+		if err := runtime.Run(runtimeCtx); err != nil {
+			runtimeErrCh <- err
+		}
+	}()
 	go func() {
 		log.Printf("auth service listening on :%s", cfg.Port)
 		errCh <- httpServer.ListenAndServe()
@@ -108,6 +113,8 @@ func main() {
 			log.Fatalf("serve auth service: %v", err)
 		}
 		return
+	case err := <-runtimeErrCh:
+		log.Fatalf("Vault runtime failed closed: %v", err)
 	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)

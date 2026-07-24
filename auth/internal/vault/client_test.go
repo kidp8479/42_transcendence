@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestClientUsesAppRoleTokenForRuntimeOperations(t *testing.T) {
@@ -92,7 +93,7 @@ func TestRenewDatabaseCredentialsRetainsCredentialFields(t *testing.T) {
 			return
 		}
 		writeTestJSON(t, w, map[string]any{
-			"lease_id":       "database/creds/auth-runtime/renewed",
+			"lease_id":       "previous-lease",
 			"lease_duration": 28_800,
 			"renewable":      true,
 		})
@@ -112,6 +113,73 @@ func TestRenewDatabaseCredentialsRetainsCredentialFields(t *testing.T) {
 	}
 	if renewed.Username != "v-auth" || renewed.Password != "database-password" {
 		t.Errorf("RenewDatabaseCredentials() lost database credentials: %#v", renewed)
+	}
+}
+
+func TestRenewDatabaseCredentialsRejectsUnexpectedLeaseID(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requireVaultToken(t, r)
+		writeTestJSON(t, w, map[string]any{
+			"lease_id":       "different-lease",
+			"lease_duration": 28_800,
+			"renewable":      true,
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	client.setToken("runtime-token")
+	_, err = client.RenewDatabaseCredentials(context.Background(), DatabaseCredentials{
+		Username: "v-auth", Password: "database-password", LeaseID: "previous-lease",
+	})
+	if err == nil {
+		t.Fatal("RenewDatabaseCredentials() error = nil, want lease mismatch rejection")
+	}
+}
+
+func TestRuntimeRetainsRenewedTokenDeadlineAfterDatabaseRenewalFailure(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requireVaultToken(t, r)
+		switch r.URL.Path {
+		case "/v1/auth/token/renew-self":
+			writeTestJSON(t, w, map[string]any{"auth": map[string]any{
+				"lease_duration": 3600, "renewable": true,
+			}})
+		case "/v1/sys/leases/renew":
+			http.Error(w, "temporary database renewal failure", http.StatusInternalServerError)
+		default:
+			t.Errorf("unexpected Vault path %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	client.setToken("runtime-token")
+	before := time.Now()
+	runtime := &Runtime{
+		client: client,
+		database: DatabaseCredentials{
+			Username: "v-auth", Password: "database-password", LeaseID: "database-lease",
+		},
+		tokenExpiresAt: before.Add(time.Minute),
+	}
+
+	if err := runtime.renew(context.Background()); err == nil {
+		t.Fatal("renew() error = nil, want database renewal failure")
+	}
+	if runtime.tokenExpiresAt.Before(before.Add(59 * time.Minute)) {
+		t.Errorf("token expiry = %s, want refreshed deadline after database failure", runtime.tokenExpiresAt)
 	}
 }
 

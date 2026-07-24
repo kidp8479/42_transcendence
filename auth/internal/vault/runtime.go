@@ -87,14 +87,14 @@ func (r *Runtime) Start(ctx context.Context) (Secrets, error) {
 	return secrets, nil
 }
 
-func (r *Runtime) Run(ctx context.Context) {
+func (r *Runtime) Run(ctx context.Context) error {
 	for {
 		delay := renewalDelay(time.Until(r.tokenExpiresAt), time.Until(r.databaseExpiresAt))
 		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return
+			return nil
 		case <-timer.C:
 		}
 
@@ -103,12 +103,11 @@ func (r *Runtime) Run(ctx context.Context) {
 				time.Until(r.tokenExpiresAt) <= renewalSafetyMargin ||
 				time.Until(r.databaseExpiresAt) <= renewalSafetyMargin {
 				r.ready.Store(false)
-				log.Printf("Vault credentials can no longer be renewed before expiry: %v", err)
-				return
+				return fmt.Errorf("Vault credentials can no longer be renewed before expiry: %w", err)
 			}
 			log.Printf("Vault credential renewal failed; retrying before expiry: %v", err)
 			if !wait(ctx, retryInterval) {
-				return
+				return nil
 			}
 		}
 	}
@@ -130,6 +129,7 @@ func (r *Runtime) renew(ctx context.Context) error {
 	if err != nil {
 		return r.reauthenticate(ctx)
 	}
+	r.tokenExpiresAt = time.Now().Add(token.LeaseDuration)
 	credentials, err := r.client.RenewDatabaseCredentials(ctx, r.database)
 	if err != nil {
 		return err
@@ -137,9 +137,7 @@ func (r *Runtime) renew(ctx context.Context) error {
 	if err := r.refreshDatabase(ctx, credentials); err != nil {
 		return fmt.Errorf("refresh database pool: %w", err)
 	}
-	now := time.Now()
-	r.tokenExpiresAt = now.Add(token.LeaseDuration)
-	r.databaseExpiresAt = now.Add(credentials.LeaseDuration)
+	r.databaseExpiresAt = time.Now().Add(credentials.LeaseDuration)
 	r.database = credentials
 	return nil
 }
@@ -149,6 +147,7 @@ func (r *Runtime) reauthenticate(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("renew Vault token or reauthenticate: %w", err)
 	}
+	r.tokenExpiresAt = time.Now().Add(token.LeaseDuration)
 	credentials, err := r.client.IssueDatabaseCredentials(ctx, r.config.DatabaseRole)
 	if err != nil {
 		return fmt.Errorf("issue database credentials after Vault reauthentication: %w", err)
@@ -156,9 +155,7 @@ func (r *Runtime) reauthenticate(ctx context.Context) error {
 	if err := r.refreshDatabase(ctx, credentials); err != nil {
 		return fmt.Errorf("refresh database pool after Vault reauthentication: %w", err)
 	}
-	now := time.Now()
-	r.tokenExpiresAt = now.Add(token.LeaseDuration)
-	r.databaseExpiresAt = now.Add(credentials.LeaseDuration)
+	r.databaseExpiresAt = time.Now().Add(credentials.LeaseDuration)
 	r.database = credentials
 	return nil
 }

@@ -148,6 +148,9 @@ func (c *Client) RenewDatabaseCredentials(ctx context.Context, credentials Datab
 	if err != nil {
 		return DatabaseCredentials{}, err
 	}
+	if renewed.LeaseID != credentials.LeaseID {
+		return DatabaseCredentials{}, fmt.Errorf("Vault renewed an unexpected database lease")
+	}
 	// Lease renewal responses do not repeat the database username/password.
 	renewed.Username = credentials.Username
 	renewed.Password = credentials.Password
