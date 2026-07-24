@@ -17,6 +17,7 @@ export interface DiscoveryBlock {
   updatedAt: string;
 }
 
+// GET all
 export async function listDiscoveryBlocks(
   projectId: string
 ): Promise<DiscoveryBlock[]> {
@@ -46,6 +47,34 @@ export async function listDiscoveryBlocks(
   }
 
   return parsed as DiscoveryBlock[];
+}
+
+// GET (one)
+export async function getDiscoveryBlock(
+  projectId: string,
+  discoveryBlockId: string
+): Promise<DiscoveryBlock> {
+  const response = await fetch(
+    import.meta.env.VITE_API_URL +
+      "/projects/" +
+      projectId +
+      "/discovery-blocks/" +
+      discoveryBlockId,
+    { credentials: "include" }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load discovery block");
+  }
+
+  const payload: unknown = await response.json();
+
+  const parsed = parseDiscoveryBlock(payload);
+  if (parsed === null) {
+    throw new Error("Discovery block response is invalid");
+  }
+
+  return parsed;
 }
 
 function parseDiscoveryBlock(value: unknown): DiscoveryBlock | null {

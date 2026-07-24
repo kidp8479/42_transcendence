@@ -33,6 +33,7 @@ import { Route as AuthenticatedProjectIdKanbanRouteImport } from './routes/_auth
 import { Route as AuthenticatedProjectIdEvaluationChecklistRouteImport } from './routes/_authenticated/$projectId/evaluation-checklist'
 import { Route as AuthenticatedProjectIdDiscoveryRouteImport } from './routes/_authenticated/$projectId/discovery'
 import { Route as AuthenticatedProjectIdCalendarRouteImport } from './routes/_authenticated/$projectId/calendar'
+import { Route as AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRouteImport } from './routes/_authenticated/$projectId/discovery_.$discoveryBlockId.edit'
 
 const SplatRoute = SplatRouteImport.update({
   id: '/$',
@@ -162,6 +163,12 @@ const AuthenticatedProjectIdCalendarRoute =
     path: '/calendar',
     getParentRoute: () => AuthenticatedProjectIdRouteRoute,
   } as any)
+const AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute =
+  AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRouteImport.update({
+    id: '/discovery_/$discoveryBlockId/edit',
+    path: '/discovery/$discoveryBlockId/edit',
+    getParentRoute: () => AuthenticatedProjectIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
   '/users/$username': typeof AuthenticatedUsersUsernameRoute
+  '/$projectId/discovery/$discoveryBlockId/edit': typeof AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof PublicIndexRoute
@@ -210,6 +218,7 @@ export interface FileRoutesByTo {
   '/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
   '/users/$username': typeof AuthenticatedUsersUsernameRoute
+  '/$projectId/discovery/$discoveryBlockId/edit': typeof AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -237,6 +246,7 @@ export interface FileRoutesById {
   '/_authenticated/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/_authenticated/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
   '/_authenticated/users/$username': typeof AuthenticatedUsersUsernameRoute
+  '/_authenticated/$projectId/discovery_/$discoveryBlockId/edit': typeof AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/$projectId/project-settings'
     | '/$projectId/summary'
     | '/users/$username'
+    | '/$projectId/discovery/$discoveryBlockId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/$projectId/project-settings'
     | '/$projectId/summary'
     | '/users/$username'
+    | '/$projectId/discovery/$discoveryBlockId/edit'
   id:
     | '__root__'
     | '/_authenticated'
@@ -313,6 +325,7 @@ export interface FileRouteTypes {
     | '/_authenticated/$projectId/project-settings'
     | '/_authenticated/$projectId/summary'
     | '/_authenticated/users/$username'
+    | '/_authenticated/$projectId/discovery_/$discoveryBlockId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -491,6 +504,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectIdCalendarRouteImport
       parentRoute: typeof AuthenticatedProjectIdRouteRoute
     }
+    '/_authenticated/$projectId/discovery_/$discoveryBlockId/edit': {
+      id: '/_authenticated/$projectId/discovery_/$discoveryBlockId/edit'
+      path: '/discovery/$discoveryBlockId/edit'
+      fullPath: '/$projectId/discovery/$discoveryBlockId/edit'
+      preLoaderRoute: typeof AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRouteImport
+      parentRoute: typeof AuthenticatedProjectIdRouteRoute
+    }
   }
 }
 
@@ -502,6 +522,7 @@ interface AuthenticatedProjectIdRouteRouteChildren {
   AuthenticatedProjectIdListRoute: typeof AuthenticatedProjectIdListRoute
   AuthenticatedProjectIdProjectSettingsRoute: typeof AuthenticatedProjectIdProjectSettingsRoute
   AuthenticatedProjectIdSummaryRoute: typeof AuthenticatedProjectIdSummaryRoute
+  AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute: typeof AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute
 }
 
 const AuthenticatedProjectIdRouteRouteChildren: AuthenticatedProjectIdRouteRouteChildren =
@@ -515,6 +536,8 @@ const AuthenticatedProjectIdRouteRouteChildren: AuthenticatedProjectIdRouteRoute
     AuthenticatedProjectIdProjectSettingsRoute:
       AuthenticatedProjectIdProjectSettingsRoute,
     AuthenticatedProjectIdSummaryRoute: AuthenticatedProjectIdSummaryRoute,
+    AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute:
+      AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute,
   }
 
 const AuthenticatedProjectIdRouteRouteWithChildren =
