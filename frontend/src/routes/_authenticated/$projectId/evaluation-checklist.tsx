@@ -1,4 +1,4 @@
-import { createFileRoute, useLoaderData } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   Accordion,
   AccordionContent,
@@ -16,12 +16,11 @@ import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
 import { RiDeleteBackFill } from "react-icons/ri";
 import {
+  deleteEvaluationChecklistItem,
   EvaluationChecklistItem,
-  EvaluationChecklistSection,
   fetchEvaluationChecklistItems,
   updateEvaluationChecklistItem,
 } from "@/lib/evaluationChecklist";
-import { it } from "node:test";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -279,6 +278,19 @@ function EvaluationChecklistPage() {
     }
   }
 
+  async function deleteItem(id: string) {
+    const previousItem = items.find((it) => it.id === id);
+    if (!previousItem) return;
+
+    setItems((prevItems) => prevItems.filter((it) => it.id !== id));
+
+    try {
+      await deleteEvaluationChecklistItem(projectId, id, session.csrfToken);
+    } catch {
+      setItems((prevItems) => [...prevItems, previousItem]);
+    }
+  }
+
   return (
     <div className="w-full space-y-6">
       <section className="flex flex-wrap items-center justify-between gap-4">
@@ -399,11 +411,9 @@ function EvaluationChecklistPage() {
                             }
                           />
 
-                          /**
-                            This edits the text:
-                              - cancel on ESCAPE
-                              - commit new text on ENTER or click out of the box                   
-                          */
+                          {/* This edits the text:
+                            - cancel on ESCAPE
+                            - commit new text on ENTER or click out of the box                    */}
                           {editingId === c.id ? (
                             <TextInput
                               maxLength={evaluationChecklistItemLength}
@@ -411,12 +421,18 @@ function EvaluationChecklistPage() {
                               defaultValue={c.label}
                               autoFocus
                               onBlur={(e) => {
-                                if (e.currentTarget.value.length <= evaluationChecklistItemLength)
-                                  commitLabel(e.currentTarget.value)
+                                if (
+                                  e.currentTarget.value.length <=
+                                  evaluationChecklistItemLength
+                                )
+                                  commitLabel(e.currentTarget.value);
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
-                                  if (e.currentTarget.value.length <= evaluationChecklistItemLength)
+                                  if (
+                                    e.currentTarget.value.length <=
+                                    evaluationChecklistItemLength
+                                  )
                                     commitLabel(e.currentTarget.value);
                                 }
                                 if (e.key === "Escape") {
@@ -437,7 +453,7 @@ function EvaluationChecklistPage() {
                             type="button"
                             className="opacity-0 transition-opacity group-hover:opacity-50"
                             aria-label="delete a project requirement"
-                            onClick={() => console.log("deleted")}
+                            onClick={() => deleteItem(c.id)}
                           >
                             <RiDeleteBackFill className="h-5 w-5" />
                           </button>

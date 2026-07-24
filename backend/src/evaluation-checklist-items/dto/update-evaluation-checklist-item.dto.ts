@@ -4,7 +4,13 @@
 // order is updated here when the user drags and drops to reorder items.
 
 import { PartialType } from "@nestjs/mapped-types";
-import { IsInt, IsBoolean, IsString, IsOptional, MaxLength } from "class-validator";
+import {
+  IsInt,
+  IsBoolean,
+  IsString,
+  IsOptional,
+  MaxLength,
+} from "class-validator";
 import {
   CreateEvaluationChecklistItemDto,
   EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH,

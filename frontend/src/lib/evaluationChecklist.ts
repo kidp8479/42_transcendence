@@ -141,13 +141,17 @@ export async function updateEvaluationChecklistItem(
 
 export async function deleteEvaluationChecklistItem(
   projectId: string,
-  id: string
+  id: string,
+  csrfToken: string
 ): Promise<void> {
   const response = await fetch(
     `${import.meta.env.VITE_API_URL}/projects/${projectId}/evaluation-checklist-items/${id}`,
     {
       method: "DELETE",
       credentials: "include",
+      headers: {
+        "X-CSRF-Token": csrfToken,
+      },
     }
   );
 
