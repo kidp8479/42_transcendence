@@ -61,7 +61,7 @@ async function bootstrap() {
   void vaultRuntime.waitForFatal().catch(async (error: Error) => {
     console.error(error.message);
     await app.close();
-    process.exitCode = 1;
+    process.exit(1);
   });
 }
 bootstrap();

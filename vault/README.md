@@ -74,9 +74,9 @@ near-expiry lease.
 NestJS also uses its mounted AppRole files to obtain its backend-to-auth KV
 credential and a `backend-runtime` database lease. It atomically publishes a
 new Prisma client only after it connects successfully, then drains the former
-client for 30 seconds. Its `/api/health` endpoint returns `503` while Vault is
-unavailable, and a fatal renewal failure closes the process for its supervisor
-to restart.
+client for 30 seconds. Its `/api/health` endpoint returns `503` until the
+Vault runtime is ready and again after a fatal renewal failure; transient
+Vault outages keep it ready while its existing credentials remain valid.
 
 `make migrate` starts the explicit `migration` Compose workload. It receives a
 short-lived `migration` lease from its own AppRole and runs `prisma migrate

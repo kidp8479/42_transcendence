@@ -32,6 +32,8 @@ export class VaultRuntimeService implements OnModuleDestroy {
   private databaseExpiresAt = 0;
   private databaseCredentials?: DatabaseCredentials;
   private internalToken?: string;
+  private roleId?: string;
+  private secretId?: string;
   private ready = false;
   private stopped = false;
 
@@ -106,6 +108,8 @@ export class VaultRuntimeService implements OnModuleDestroy {
       this.client.issueDatabaseCredentials(this.databaseRole),
     ]);
     this.internalToken = internalToken;
+    this.roleId = roleId;
+    this.secretId = secretId;
     this.databaseCredentials = credentials;
     this.tokenExpiresAt = Date.now() + token.leaseDurationMs;
     this.databaseExpiresAt = Date.now() + credentials.leaseDurationMs;
@@ -125,7 +129,13 @@ export class VaultRuntimeService implements OnModuleDestroy {
 
   private async renew(): Promise<void> {
     try {
-      const token = await this.client.renewToken();
+      let token;
+      try {
+        token = await this.client.renewToken();
+      } catch {
+        await this.reauthenticate();
+        return;
+      }
       this.tokenExpiresAt = Date.now() + token.leaseDurationMs;
       if (!this.databaseCredentials) {
         throw new Error("Vault runtime has no database credentials");
@@ -143,11 +153,11 @@ export class VaultRuntimeService implements OnModuleDestroy {
           this.databaseRole
         );
       }
-      this.databaseCredentials = credentials;
-      this.databaseExpiresAt = Date.now() + credentials.leaseDurationMs;
       await Promise.all(
         [...this.databaseRefreshers].map((refresher) => refresher(credentials))
       );
+      this.databaseCredentials = credentials;
+      this.databaseExpiresAt = Date.now() + credentials.leaseDurationMs;
       this.scheduleRenewal();
     } catch (error) {
       if (
@@ -160,6 +170,23 @@ export class VaultRuntimeService implements OnModuleDestroy {
       }
       this.renewalTimer = setTimeout(() => void this.renew(), retryIntervalMs);
     }
+  }
+
+  private async reauthenticate(): Promise<void> {
+    if (!this.roleId || !this.secretId) {
+      throw new Error("Vault runtime has no AppRole credentials");
+    }
+    const token = await this.client.login(this.roleId, this.secretId);
+    const credentials = await this.client.issueDatabaseCredentials(
+      this.databaseRole
+    );
+    await Promise.all(
+      [...this.databaseRefreshers].map((refresher) => refresher(credentials))
+    );
+    this.tokenExpiresAt = Date.now() + token.leaseDurationMs;
+    this.databaseCredentials = credentials;
+    this.databaseExpiresAt = Date.now() + credentials.leaseDurationMs;
+    this.scheduleRenewal();
   }
 
   private fail(error: unknown): void {

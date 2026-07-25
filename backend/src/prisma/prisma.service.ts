@@ -78,7 +78,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     if (previousClient) {
       const timer = setTimeout(() => {
         this.drainTimers.delete(timer);
-        void previousClient.$disconnect();
+        void previousClient.$disconnect().catch((error: unknown) => {
+          console.error("Failed to drain previous Prisma client", error);
+        });
       }, poolDrainTimeoutMs);
       this.drainTimers.add(timer);
     }
