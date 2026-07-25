@@ -24,6 +24,18 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.currentClient().projectMember;
   }
 
+  get evaluationChecklistItem(): PrismaClient["evaluationChecklistItem"] {
+    return this.currentClient().evaluationChecklistItem;
+  }
+
+  get discoveryBlock(): PrismaClient["discoveryBlock"] {
+    return this.currentClient().discoveryBlock;
+  }
+
+  get discoveryBlockItem(): PrismaClient["discoveryBlockItem"] {
+    return this.currentClient().discoveryBlockItem;
+  }
+
   async onModuleInit(): Promise<void> {
     const credentials = await this.vaultRuntime.start();
     await this.replaceClient(this.vaultRuntime.databaseUrl(credentials));
