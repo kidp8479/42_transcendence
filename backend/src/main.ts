@@ -55,13 +55,12 @@ async function bootstrap() {
   // because the schema gives it a default, so app startup already failed above if
   // any required configuration was missing.
   const configService = app.get(ConfigService);
-  await app.listen(configService.get<number>("PORT")!);
-
   const vaultRuntime = app.get(VaultRuntimeService);
   void vaultRuntime.waitForFatal().catch(async (error: Error) => {
     console.error(error.message);
     await app.close();
     process.exit(1);
   });
+  await app.listen(configService.get<number>("PORT")!);
 }
 bootstrap();

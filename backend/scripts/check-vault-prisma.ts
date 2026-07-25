@@ -1,9 +1,10 @@
-import { readFile, stat } from "node:fs/promises";
 import { PrismaClient } from "@prisma/client";
+import { DatabaseCredentials, VaultClient } from "../src/vault/vault.client";
 import {
-  DatabaseCredentials,
-  VaultClient,
-} from "../src/vault/vault.client";
+  buildDatabaseUrl,
+  readProtectedIDFile,
+  requiredEnv,
+} from "./vault-prisma-utils";
 
 async function main(): Promise<void> {
   const client = new VaultClient(requiredEnv("VAULT_ADDR").replace(/\/$/, ""));
@@ -35,34 +36,18 @@ async function main(): Promise<void> {
 }
 
 function newPrismaClient(credentials: DatabaseCredentials): PrismaClient {
-  const url = new URL(
-    `postgresql://${requiredEnv("VAULT_DB_HOST")}:${requiredEnv("VAULT_DB_PORT")}`
-  );
-  url.pathname = requiredEnv("VAULT_DB_NAME");
-  url.username = credentials.username;
-  url.password = credentials.password;
-  url.searchParams.set("sslmode", "disable");
-  return new PrismaClient({ datasources: { db: { url: url.toString() } } });
-}
-
-function requiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
-
-async function readProtectedIDFile(path: string, label: string): Promise<string> {
-  const info = await stat(path);
-  if ((info.mode & 0o077) !== 0) {
-    throw new Error(`Vault ${label} file permissions are too broad`);
-  }
-  const value = (await readFile(path, "utf8")).trim();
-  if (!value) {
-    throw new Error(`Vault ${label} file is empty`);
-  }
-  return value;
+  return new PrismaClient({
+    datasources: {
+      db: {
+        url: buildDatabaseUrl(
+          requiredEnv("VAULT_DB_HOST"),
+          requiredEnv("VAULT_DB_PORT"),
+          requiredEnv("VAULT_DB_NAME"),
+          credentials
+        ),
+      },
+    },
+  });
 }
 
 void main().catch((error: unknown) => {
