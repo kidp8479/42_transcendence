@@ -105,6 +105,10 @@ rebuild-frontend: $(ENV_FILE)
 rebuild-backend: $(ENV_FILE)
 	$(COMPOSE) up --build -d backend
 
+## refresh backend dependencies in its Compose-managed node_modules volume
+install-backend: $(ENV_FILE)
+	$(COMPOSE) run --rm --no-deps backend npm ci
+
 ## rebuild and start only the auth service
 rebuild-auth: $(ENV_FILE)
 	$(COMPOSE) up --build -d auth
@@ -161,13 +165,18 @@ shell-db: $(ENV_FILE)
 # database                                                                     #
 # ---------------------------------------------------------------------------- #
 
-## run Prisma migrations in the backend container, then re-apply the
-## table-level grants for the Vault runtime parent roles (new tables are
-## only reachable by auth/backend leases after this step)
+## run Prisma migrations with the short-lived Vault migration lease, then
+## re-apply table-level grants for the Vault runtime parent roles
 migrate: $(ENV_FILE)
-	$(COMPOSE) exec backend npx prisma migrate dev
+	$(COMPOSE) --profile tools run --rm migration
 	@set -a; . ./$(ENV_FILE); set +a; \
 	$(COMPOSE) exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < db/runtime-grants.sql
+
+## author a Prisma migration with the existing Vault migration lease (NAME is required)
+migrate-dev: $(ENV_FILE)
+	@test -n "$(NAME)" || (echo "Usage: make migrate-dev NAME=lowercase-migration-name" >&2; exit 1)
+	$(COMPOSE) --profile tools run --rm -e PRISMA_MIGRATION_NAME="$(NAME)" \
+		migration npx tsx scripts/vault-migrate-dev.ts
 
 ## start Prisma Studio from the backend container
 prisma-studio:
@@ -239,7 +248,7 @@ check-auth:
 
 ## validate the Prisma schema inside the backend Compose service
 check-prisma:
-	$(COMPOSE) exec backend npx prisma validate
+	$(COMPOSE) exec -e DATABASE_URL=postgresql://prisma-validation:prisma-validation@localhost:5432/prisma-validation backend npx prisma validate
 
 ## format Go authentication service sources
 format-auth:
@@ -251,7 +260,15 @@ check-auth-stack: check-auth check-prisma check-backend check-frontend
 ## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
 check-shell:
 	docker run --rm -v $(CURDIR):/mnt -w /mnt koalaman/shellcheck:stable -s sh \
-		vault/bootstrap.sh db/init/10-vault-db-admin-password.sh hooks/pre-commit
+		vault/bootstrap.sh vault/check-policies.sh db/init/10-vault-db-admin-password.sh hooks/pre-commit
+
+## verify local Vault AppRole policy isolation, Transit signing, and lease renewal
+check-vault-policies: $(ENV_FILE)
+	$(COMPOSE) --profile tests run --rm vault-test
+
+## verify Prisma can rotate between Vault-issued backend database credentials
+check-vault-prisma: $(ENV_FILE)
+	$(COMPOSE) --profile tests run --rm backend-vault-test
 
 ## install git pre-commit hook (run once after cloning)
 hooks:
@@ -338,6 +355,6 @@ help:
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate prisma-studio install seed \
+        migrate migrate-dev prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
         check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell

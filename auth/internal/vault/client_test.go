@@ -183,6 +183,61 @@ func TestRuntimeRetainsRenewedTokenDeadlineAfterDatabaseRenewalFailure(t *testin
 	}
 }
 
+func TestRuntimeReissuesDatabaseCredentialsAtLeaseRenewalLimit(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requireVaultToken(t, r)
+		switch r.URL.Path {
+		case "/v1/auth/token/renew-self":
+			writeTestJSON(t, w, map[string]any{"auth": map[string]any{
+				"lease_duration": 3600, "renewable": true,
+			}})
+		case "/v1/sys/leases/renew":
+			http.Error(w, "lease renewal exceeds maximum TTL", http.StatusBadRequest)
+		case "/v1/database/creds/auth-runtime":
+			writeTestJSON(t, w, map[string]any{
+				"lease_id":       "replacement-lease",
+				"lease_duration": 28_800,
+				"renewable":      true,
+				"data":           map[string]string{"username": "v-auth-replacement", "password": "replacement-password"},
+			})
+		default:
+			t.Errorf("unexpected Vault path %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	client.setToken("runtime-token")
+	refreshes := 0
+	runtime := &Runtime{
+		client: client,
+		config: RuntimeConfig{
+			DatabaseRole: "auth-runtime",
+		},
+		refreshDatabase: func(context.Context, DatabaseCredentials) error {
+			refreshes++
+			return nil
+		},
+		database: DatabaseCredentials{
+			Username: "v-auth", Password: "database-password", LeaseID: "database-lease",
+		},
+		tokenExpiresAt: time.Now().Add(time.Minute),
+	}
+
+	if err := runtime.renew(context.Background()); err != nil {
+		t.Fatalf("renew() error = %v", err)
+	}
+	if runtime.database.LeaseID != "replacement-lease" || refreshes != 1 {
+		t.Errorf("renew() did not replace the exhausted database lease: %#v, refreshes=%d", runtime.database, refreshes)
+	}
+}
+
 func TestRuntimeReauthenticatesAndReplacesDatabaseLease(t *testing.T) {
 	t.Parallel()
 

@@ -8,6 +8,9 @@ import { ConfigModule } from "@nestjs/config";
 import { envValidationSchema } from "./config/env.validation";
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter";
 import { AuthGuard } from "./auth/auth.guard";
+import { VaultReadinessGuard } from "./auth/vault-readiness.guard";
+import { VaultModule } from "./vault/vault.module";
+import { HealthModule } from "./health/health.module";
 
 // import each feature module so NestJS knows it exists
 import { PrismaModule } from "./prisma/prisma.module";
@@ -33,6 +36,7 @@ import { CalendarCategoriesModule } from "./calendar-categories/calendar-categor
       isGlobal: true,
       validationSchema: envValidationSchema,
     }),
+    VaultModule,
     // global rate limit: max 100 requests per 60s per IP, applied to every route
     // via the APP_GUARD below - protects against brute-force and basic spam/DoS
     ThrottlerModule.forRoot([
@@ -42,6 +46,7 @@ import { CalendarCategoriesModule } from "./calendar-categories/calendar-categor
       },
     ]),
     PrismaModule, // registers all modules, NestJS starts them in order at boot
+    HealthModule,
     UsersModule,
     NotificationsModule,
     ProjectMembersModule,
@@ -60,6 +65,10 @@ import { CalendarCategoriesModule } from "./calendar-categories/calendar-categor
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: VaultReadinessGuard,
     },
     {
       provide: APP_GUARD,

@@ -1,35 +1,105 @@
-// PrismaService: manages the connection to the database
-// used by every other service that needs to read or write data
+import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Prisma, PrismaClient } from "@prisma/client";
+import { VaultRuntimeService } from "../vault/vault-runtime.service";
 
-// Injectable: tells NestJS this service can be shared with other files
-// OnModuleInit: interface that lets us run code when the app starts up
-// OnModuleDestroy: interface that lets us run code when the app shuts down
-import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
+const poolDrainTimeoutMs = 30_000;
 
-// PrismaClient: the main Prisma class, contains all the methods to talk to the database
-// (ex: prisma.user.findMany(), prisma.task.create()...)
-import { PrismaClient } from "@prisma/client";
+export type ApplicationDatabaseTransaction = Pick<
+  Prisma.TransactionClient,
+  | "user"
+  | "project"
+  | "projectMember"
+  | "evaluationChecklistItem"
+  | "discoveryBlock"
+  | "discoveryBlockItem"
+>;
 
-// @Injectable(): marks this class as a NestJS service that can be injected elsewhere
 @Injectable()
-// extends PrismaClient: PrismaService inherits all database methods from PrismaClient
-// implements OnModuleInit: NestJS will automatically call onModuleInit() on startup
-// implements OnModuleDestroy: NestJS will automatically call onModuleDestroy() on shutdown
-// (only fires if app.enableShutdownHooks() is called in main.ts)
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
-  // NestJS calls this method automatically when the application starts
-  // async/await: $connect() takes time (network call), so we wait for it to finish
-  async onModuleInit() {
-    await this.$connect(); // opens the connection to the PostgreSQL database
+export class PrismaService implements OnModuleInit, OnModuleDestroy {
+  private client?: PrismaClient;
+  private unregisterDatabaseRefresher?: () => void;
+  private readonly drainTimers = new Set<NodeJS.Timeout>();
+
+  constructor(private readonly vaultRuntime: VaultRuntimeService) {}
+
+  get user(): PrismaClient["user"] {
+    return this.currentClient().user;
   }
 
-  // NestJS calls this method automatically when the application shuts down
-  // (ex: SIGTERM from Docker on container stop/restart) - releases the Postgres
-  // connection cleanly instead of letting it hang until the OS kills it
-  async onModuleDestroy() {
-    await this.$disconnect();
+  get project(): PrismaClient["project"] {
+    return this.currentClient().project;
+  }
+
+  get projectMember(): PrismaClient["projectMember"] {
+    return this.currentClient().projectMember;
+  }
+
+  get evaluationChecklistItem(): PrismaClient["evaluationChecklistItem"] {
+    return this.currentClient().evaluationChecklistItem;
+  }
+
+  get discoveryBlock(): PrismaClient["discoveryBlock"] {
+    return this.currentClient().discoveryBlock;
+  }
+
+  get discoveryBlockItem(): PrismaClient["discoveryBlockItem"] {
+    return this.currentClient().discoveryBlockItem;
+  }
+
+  async transaction<T>(
+    operation: (database: ApplicationDatabaseTransaction) => Promise<T>
+  ): Promise<T> {
+    const client = this.currentClient();
+    return client.$transaction((transaction) => operation(transaction));
+  }
+
+  async onModuleInit(): Promise<void> {
+    const credentials = await this.vaultRuntime.start();
+    await this.replaceClient(this.vaultRuntime.databaseUrl(credentials));
+    this.unregisterDatabaseRefresher =
+      this.vaultRuntime.registerDatabaseRefresher(async (nextCredentials) => {
+        await this.replaceClient(
+          this.vaultRuntime.databaseUrl(nextCredentials)
+        );
+      });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    this.unregisterDatabaseRefresher?.();
+    for (const timer of this.drainTimers) {
+      clearTimeout(timer);
+    }
+    await this.client?.$disconnect();
+  }
+
+  private currentClient(): PrismaClient {
+    if (!this.client) {
+      throw new Error("Prisma client is unavailable");
+    }
+    return this.client;
+  }
+
+  private async replaceClient(databaseUrl: string): Promise<void> {
+    const nextClient = new PrismaClient({
+      datasources: { db: { url: databaseUrl } },
+    });
+    try {
+      await nextClient.$connect();
+    } catch (error) {
+      await nextClient.$disconnect();
+      throw error;
+    }
+
+    const previousClient = this.client;
+    this.client = nextClient;
+    if (previousClient) {
+      const timer = setTimeout(() => {
+        this.drainTimers.delete(timer);
+        void previousClient.$disconnect().catch((error: unknown) => {
+          console.error("Failed to drain previous Prisma client", error);
+        });
+      }, poolDrainTimeoutMs);
+      this.drainTimers.add(timer);
+    }
   }
 }

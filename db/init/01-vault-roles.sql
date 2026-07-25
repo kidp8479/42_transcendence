@@ -10,8 +10,9 @@
 -- Instead, all privileges live on three static NOLOGIN parents, and Vault's
 -- creation statements reduce to CREATE ROLE ... IN ROLE <parent> INHERIT.
 --
---   app_owner        owns every application object; a future Vault migration
---                    lease will SET ROLE into it so DDL ownership survives expiry
+--   app_owner        owns every application object; the migration lease SETs
+--                    ROLE into it so DDL ownership survives expiry and can
+--                    create Prisma's disposable local-development shadow DB
 --   auth_runtime     Go auth: auth/session/identity/audit tables only
 --   backend_runtime  NestJS: application-domain tables, read-only User,
 --                    never PasswordCredential
@@ -64,5 +65,6 @@ ALTER ROLE vault_db_admin SET createrole_self_grant = 'set, inherit';
 
 -- Application objects live in schema public, owned by app_owner.
 GRANT ALL ON SCHEMA public TO app_owner;
+ALTER ROLE app_owner CREATEDB;
 GRANT USAGE ON SCHEMA public TO auth_runtime;
 GRANT USAGE ON SCHEMA public TO backend_runtime;

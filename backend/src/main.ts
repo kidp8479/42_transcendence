@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { AppModule } from "./app.module";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import helmet from "helmet";
+import { VaultRuntimeService } from "./vault/vault-runtime.service";
 
 // Entry point of the NestJS application.
 // Flow: bootstrap() => NestFactory.create(AppModule) => setGlobalPrefix => Swagger => listen
@@ -52,8 +53,14 @@ async function bootstrap() {
   // ConfigService reads from the same validated, typed config as envValidationSchema
   // (see app.module.ts) instead of raw process.env - PORT is guaranteed to exist here
   // because the schema gives it a default, so app startup already failed above if
-  // any *required* variable (ex: DATABASE_URL) was missing.
+  // any required configuration was missing.
   const configService = app.get(ConfigService);
+  const vaultRuntime = app.get(VaultRuntimeService);
+  void vaultRuntime.waitForFatal().catch(async (error: Error) => {
+    console.error(error.message);
+    await app.close();
+    process.exit(1);
+  });
   await app.listen(configService.get<number>("PORT")!);
 }
 bootstrap();

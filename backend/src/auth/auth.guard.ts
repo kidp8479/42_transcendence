@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
+import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import { IS_PUBLIC_KEY } from "./public.decorator";
 import type {
   AuthenticatedRequest,
@@ -32,17 +33,14 @@ interface IntrospectionError {
 @Injectable()
 export class AuthGuard implements CanActivate {
   private readonly authServiceUrl: string;
-  private readonly internalToken: string;
   private readonly sessionCookieName: string;
 
   constructor(
     private readonly reflector: Reflector,
-    configService: ConfigService
+    configService: ConfigService,
+    private readonly vaultRuntime: VaultRuntimeService
   ) {
     this.authServiceUrl = configService.getOrThrow<string>("AUTH_SERVICE_URL");
-    this.internalToken = configService.getOrThrow<string>(
-      "AUTH_INTERNAL_TOKEN"
-    );
     this.sessionCookieName = configService.getOrThrow<string>(
       "AUTH_SESSION_COOKIE"
     );
@@ -99,7 +97,7 @@ export class AuthGuard implements CanActivate {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${this.internalToken}`,
+            Authorization: `Bearer ${this.vaultRuntime.getInternalToken()}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(body),
