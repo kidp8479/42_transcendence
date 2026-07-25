@@ -1,5 +1,6 @@
 // Same explicit style as discoveryBlocks.ts on purpose - no destructuring,
 // no object shorthand, while learning.
+import { getSession } from "@/lib/auth";
 
 // All fields here are required (unlike DiscoveryBlock, which has optional
 // description/icon/color/notes) - DiscoveryBlockItem has no optional field
@@ -49,6 +50,134 @@ export async function listDiscoveryBlockItems(
   }
 
   return parsed as DiscoveryBlockItem[];
+}
+
+// POST - creates a new item under the given block, always starts unchecked
+// (isChecked defaults to false on the backend, not sent here).
+export async function createDiscoveryBlockItem(
+  projectId: string,
+  discoveryBlockId: string,
+  label: string,
+  order: number
+): Promise<DiscoveryBlockItem> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(
+    import.meta.env.VITE_API_URL +
+      "/projects/" +
+      projectId +
+      "/discovery-blocks/" +
+      discoveryBlockId +
+      "/items",
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify({
+        label: label,
+        order: order,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to create discovery block item");
+  }
+
+  const payload: unknown = await response.json();
+
+  const parsed = parseDiscoveryBlockItem(payload);
+  if (parsed === null) {
+    throw new Error("Discovery block item creation response was invalid");
+  }
+  return parsed;
+}
+
+// PATCH - all three fields optional (mirrors UpdateDiscoveryBlockItemDto on
+// the backend, which extends the create DTO with PartialType + adds
+// isChecked). Takes one options object instead of 3 positional params,
+// since callers only ever set one field at a time: toggling the checkbox
+// sends only isChecked, renaming sends only label, drag-to-reorder sends
+// only order.
+export async function updateDiscoveryBlockItem(
+  projectId: string,
+  discoveryBlockId: string,
+  id: string,
+  updates: { label?: string; order?: number; isChecked?: boolean }
+): Promise<DiscoveryBlockItem> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(
+    import.meta.env.VITE_API_URL +
+      "/projects/" +
+      projectId +
+      "/discovery-blocks/" +
+      discoveryBlockId +
+      "/items/" +
+      id,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify(updates),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to modify discovery block item");
+  }
+
+  const payload: unknown = await response.json();
+
+  const parsed = parseDiscoveryBlockItem(payload);
+  if (parsed === null) {
+    throw new Error("Discovery block item modification response was invalid");
+  }
+  return parsed;
+}
+
+// DELETE - the backend returns the deleted item's own body (200, not 204),
+// unlike deleteProject on the projects side, so this parses a response the
+// same way every other function here does instead of returning void.
+export async function deleteDiscoveryBlockItem(
+  projectId: string,
+  discoveryBlockId: string,
+  id: string
+): Promise<DiscoveryBlockItem> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(
+    import.meta.env.VITE_API_URL +
+      "/projects/" +
+      projectId +
+      "/discovery-blocks/" +
+      discoveryBlockId +
+      "/items/" +
+      id,
+    {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "X-CSRF-Token": csrfToken },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to delete discovery block item");
+  }
+
+  const payload: unknown = await response.json();
+
+  const parsed = parseDiscoveryBlockItem(payload);
+  if (parsed === null) {
+    throw new Error("Discovery block item deletion response was invalid");
+  }
+  return parsed;
 }
 
 function parseDiscoveryBlockItem(value: unknown): DiscoveryBlockItem | null {
@@ -102,4 +231,17 @@ function parseDiscoveryBlockItem(value: unknown): DiscoveryBlockItem | null {
 // so we can safely read arbitrary properties off it (value.id, value.label...)
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+// mutating requests (PATCH/POST/DELETE) are rejected with a 403 by the auth
+// service unless X-CSRF-Token is attached - see auth.guard.ts on the backend
+// and requiresCSRF() in the Go auth service. Local to this file on purpose
+// (not added to lib/auth.ts, which isn't ours - keeping the fix scoped to
+// our own files for now, coordinate with Andrei on a shared helper later).
+async function getCsrfToken(): Promise<string> {
+  const session = await getSession();
+  if (!session) {
+    throw new Error("An active session is required");
+  }
+  return session.csrfToken;
 }
