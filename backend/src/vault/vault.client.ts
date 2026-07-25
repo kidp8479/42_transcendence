@@ -1,4 +1,4 @@
-import nodeVault = require("node-vault");
+import * as nodeVault from "node-vault";
 
 const httpStatusBadRequest = 400;
 const httpStatusUnauthorized = 401;
