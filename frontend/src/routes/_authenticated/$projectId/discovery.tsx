@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { Badge, Card, Checkbox } from "flowbite-react";
 import {
   listDiscoveryBlocks,
@@ -7,9 +8,11 @@ import {
 } from "@/lib/discoveryBlocks";
 import {
   listDiscoveryBlockItems,
+  updateDiscoveryBlockItem,
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
+import { darkSurfaceCheckboxTheme } from "@/lib/flowbite";
 import type { IconType } from "react-icons";
 import {
   HiSearch,
@@ -103,9 +106,72 @@ const DISCOVERY_BLOCK_ICON: Record<string, IconType> = {
 const MAX_ITEMS_PREVIEW = 5;
 
 function DiscoveryPage() {
-  // pulls out whatever the loader above returned once its promise resolved -
-  // now an array of { discoveryBlock, items }, not DiscoveryBlock[] directly
-  const discoveryBlocksWithItems = Route.useLoaderData();
+  // seeded from whatever the loader returned, but now kept in useState -
+  // the loader's own result never changes after the initial render, so
+  // toggling a checkbox needs its own local, mutable copy to update.
+  // useLoaderData is itself generic (it accepts options like `select`) -
+  // calling it directly inside useState(...) makes TS fail to infer its
+  // return type (it falls back to `never`), so it's resolved to a plain
+  // local const first, then passed to useState separately.
+  const loaderData = Route.useLoaderData();
+  const [discoveryBlocksWithItems, setDiscoveryBlocksWithItems] =
+    useState(loaderData);
+
+  // optimistic update: flips isChecked in local state immediately (so the
+  // checkbox reacts instantly, no waiting on the network), fires the PATCH
+  // in the background, and rolls the state back if the request fails -
+  // rather than waiting for the server's response before showing anything.
+  async function handleToggleItem(
+    discoveryBlock: DiscoveryBlock,
+    item: DiscoveryBlockItem
+  ): Promise<void> {
+    const discoveryBlockId = discoveryBlock.id;
+    const newIsChecked = !item.isChecked;
+
+    setDiscoveryBlocksWithItems((previous) =>
+      previous.map((entry) => {
+        if (entry.discoveryBlock.id !== discoveryBlockId) {
+          return entry;
+        }
+        return {
+          discoveryBlock: entry.discoveryBlock,
+          items: entry.items.map((currentItem) =>
+            currentItem.id === item.id
+              ? { ...currentItem, isChecked: newIsChecked }
+              : currentItem
+          ),
+        };
+      })
+    );
+
+    try {
+      await updateDiscoveryBlockItem(
+        discoveryBlock.projectId,
+        discoveryBlockId,
+        item.id,
+        { isChecked: newIsChecked }
+      );
+    } catch (error) {
+      console.error("Failed to update discovery block item", error);
+      // rollback: put isChecked back to what it was before the optimistic
+      // update, since the PATCH never actually succeeded
+      setDiscoveryBlocksWithItems((previous) =>
+        previous.map((entry) => {
+          if (entry.discoveryBlock.id !== discoveryBlockId) {
+            return entry;
+          }
+          return {
+            discoveryBlock: entry.discoveryBlock,
+            items: entry.items.map((currentItem) =>
+              currentItem.id === item.id
+                ? { ...currentItem, isChecked: item.isChecked }
+                : currentItem
+            ),
+          };
+        })
+      );
+    }
+  }
 
   // status pill counts: how many blocks currently have each status. .filter()
   // keeps only the entries matching, .length counts them - same pattern
@@ -316,10 +382,35 @@ function DiscoveryPage() {
                   {previewItems.map((item) => {
                     return (
                       <div key={item.id} className="flex items-center gap-2.5">
-                        {/* readOnly for now: no PATCH endpoint wired up yet to
-                        actually persist a checkbox toggle - that's a future
-                        brick (optimistic update) */}
-                        <Checkbox checked={item.isChecked} readOnly={true} />
+                        {/* readOnly is a no-op on checkbox/radio inputs per
+                        the HTML spec (only text-like inputs respect it) -
+                        using it here caused a real visual bug: the browser's
+                        own native checked-toggle-on-click still fired
+                        unpredictably alongside our own state update, so the
+                        box sometimes didn't visually flip until a later
+                        render. Fixed by using a real onChange (the correct
+                        controlled-checkbox pattern) and letting the browser's
+                        native toggle happen normally - onClick's
+                        stopPropagation (not preventDefault) is enough to stop
+                        the click from bubbling into the wrapping <Link> and
+                        navigating, without blocking the checkbox's own
+                        default toggle/repaint. */}
+                        <Checkbox
+                          // h-4/w-4 already come from Flowbite's own theme,
+                          // but repeated explicitly + shrink-0 here as a
+                          // defensive fix for a real distortion bug seen on
+                          // narrow (mobile-emulated) viewports - the box
+                          // rendered stretched into a tall oval instead of a
+                          // 16x16 square, shrink-0 stops a flex child from
+                          // being compressed/stretched to fill the row
+                          className="h-4 w-4 shrink-0"
+                          theme={darkSurfaceCheckboxTheme}
+                          checked={item.isChecked}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() =>
+                            void handleToggleItem(discoveryBlock, item)
+                          }
+                        />
                         {/* truncate: forces one line (ellipsis instead of
                         wrapping) so every item row is the same height,
                         regardless of label length - min-w-0 needed because

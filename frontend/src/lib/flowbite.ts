@@ -33,6 +33,20 @@ export const darkSurfaceTextInputTheme = {
   },
 };
 
+// brand-green border + checkmark instead of Flowbite's default gray
+// border/primary-blue checkmark. `theme` here is merged (not replaced) with
+// Checkbox's own default theme via twMerge, so only the conflicting classes
+// (border color, checkmark/focus-ring color) actually get overridden - the
+// base sizing/shape classes (h-4 w-4 rounded, etc.) are untouched.
+// checked:bg-current on the base theme is what makes color.default's
+// text-brand-500 become the checkmark's actual fill color.
+export const darkSurfaceCheckboxTheme = {
+  base: "border-surface-border dark:border-surface-border bg-surface-overlay dark:bg-surface-overlay",
+  color: {
+    default: "text-brand-500 focus:ring-brand-500 dark:focus:ring-brand-500",
+  },
+};
+
 export const darkAlertTheme = {
   color: {
     failure: "border !border-control-error !bg-alert-bg !text-control-error",
