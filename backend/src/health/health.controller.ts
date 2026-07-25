@@ -1,8 +1,4 @@
-import {
-  Controller,
-  Get,
-  ServiceUnavailableException,
-} from "@nestjs/common";
+import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
 import { Public } from "../auth/public.decorator";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
 

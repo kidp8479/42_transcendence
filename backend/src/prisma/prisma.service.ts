@@ -29,7 +29,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     await this.replaceClient(this.vaultRuntime.databaseUrl(credentials));
     this.unregisterDatabaseRefresher =
       this.vaultRuntime.registerDatabaseRefresher(async (nextCredentials) => {
-        await this.replaceClient(this.vaultRuntime.databaseUrl(nextCredentials));
+        await this.replaceClient(
+          this.vaultRuntime.databaseUrl(nextCredentials)
+        );
       });
   }
 

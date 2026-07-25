@@ -1,4 +1,4 @@
-import NodeVault = require("node-vault");
+import nodeVault from "node-vault";
 
 export interface VaultToken {
   leaseDurationMs: number;
@@ -12,10 +12,10 @@ export interface DatabaseCredentials {
 }
 
 export class VaultClient {
-  private readonly client: NodeVault.client;
+  private readonly client: ReturnType<typeof nodeVault>;
 
   constructor(address: string) {
-    this.client = NodeVault({
+    this.client = nodeVault({
       apiVersion: "v1",
       endpoint: address,
       requestOptions: { timeout: 10_000 },
@@ -40,7 +40,8 @@ export class VaultClient {
   }
 
   async renewToken(): Promise<VaultToken> {
-    const response = (await this.client.tokenRenewSelf()) as TokenRenewalResponse;
+    const response =
+      (await this.client.tokenRenewSelf()) as TokenRenewalResponse;
     if (
       !response.auth?.renewable ||
       !isPositiveNumber(response.auth.lease_duration)
@@ -56,14 +57,14 @@ export class VaultClient {
     )) as KVResponse;
     const token = response.data?.data?.internal_token;
     if (!token || token.length < 32) {
-      throw new Error("Vault internal credential must be at least 32 characters");
+      throw new Error(
+        "Vault internal credential must be at least 32 characters"
+      );
     }
     return token;
   }
 
-  async issueDatabaseCredentials(
-    role: string
-  ): Promise<DatabaseCredentials> {
+  async issueDatabaseCredentials(role: string): Promise<DatabaseCredentials> {
     const response = (await this.client.read(
       `database/creds/${encodeURIComponent(role)}`
     )) as DatabaseResponse;
@@ -119,7 +120,8 @@ function parseDatabaseCredentials(
     !response.lease_id ||
     !response.renewable ||
     !isPositiveNumber(response.lease_duration) ||
-    (requireCredentials && (!response.data?.username || !response.data?.password))
+    (requireCredentials &&
+      (!response.data?.username || !response.data?.password))
   ) {
     throw new Error("Vault database credentials response is incomplete");
   }

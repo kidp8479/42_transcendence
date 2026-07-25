@@ -67,7 +67,9 @@ export class VaultRuntimeService implements OnModuleDestroy {
   }
 
   databaseUrl(credentials: DatabaseCredentials): string {
-    const url = new URL(`postgresql://${this.databaseHost}:${this.databasePort}`);
+    const url = new URL(
+      `postgresql://${this.databaseHost}:${this.databasePort}`
+    );
     url.pathname = this.databaseName;
     url.username = credentials.username;
     url.password = credentials.password;
@@ -156,10 +158,7 @@ export class VaultRuntimeService implements OnModuleDestroy {
         this.fail(error);
         return;
       }
-      this.renewalTimer = setTimeout(
-        () => void this.renew(),
-        retryIntervalMs
-      );
+      this.renewalTimer = setTimeout(() => void this.renew(), retryIntervalMs);
     }
   }
 
@@ -176,7 +175,10 @@ export class VaultRuntimeService implements OnModuleDestroy {
   }
 }
 
-async function readProtectedIDFile(path: string, label: string): Promise<string> {
+async function readProtectedIDFile(
+  path: string,
+  label: string
+): Promise<string> {
   const info = await stat(path);
   if ((info.mode & 0o077) !== 0) {
     throw new Error(`Vault ${label} file permissions are too broad`);
