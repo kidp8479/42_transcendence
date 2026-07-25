@@ -19,6 +19,7 @@ export function setApiSession(session: AuthSession | null) {
   csrfToken = session?.csrfToken;
 }
 
+// eslint-disable-next-line no-undef -- RequestInit is a TypeScript DOM ambient type.
 type ApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
@@ -61,13 +62,41 @@ export async function apiClient<T>(
   });
 
   if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      `API request failed (${response.status})`
-    );
+    throw new ApiError(response.status, await readErrorMessage(response));
   }
 
   // 204 responses (ex: deleteProject) have no body - response.json() would
   // throw on empty input, so short-circuit to undefined instead.
   return response.status === 204 ? (undefined as T) : response.json();
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const fallback = `API request failed (${response.status})`;
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    return fallback;
+  }
+
+  try {
+    const payload: unknown = await response.json();
+    if (!isRecord(payload)) {
+      return fallback;
+    }
+    const { message } = payload;
+    if (typeof message === "string" && message.length > 0) {
+      return message;
+    }
+    if (Array.isArray(message)) {
+      const messages = message.filter(
+        (entry): entry is string => typeof entry === "string"
+      );
+      return messages.length > 0 ? messages.join(", ") : fallback;
+    }
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

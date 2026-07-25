@@ -6,6 +6,7 @@ import { Footer } from "../components/navigation/Footer";
 import { HeaderAuthenticated } from "../components/navigation/HeaderAuthenticated";
 import { HeaderPublic } from "../components/navigation/HeaderPublic";
 import { SidebarProvider } from "../components/navigation/SidebarProvider";
+import { ToastProvider } from "../components/toast/ToastProvider";
 import type { AppRouterContext } from "../lib/authState";
 
 export const Route = createRootRouteWithContext<AppRouterContext>()({
@@ -20,21 +21,23 @@ function RootLayout() {
 
   return (
     <ModalProvider>
-      <SidebarProvider>
-        <div className="flex min-h-screen flex-col bg-surface-base text-text-primary">
-          {authState.status === "authenticated" ? (
-            <HeaderAuthenticated session={authState.session} />
-          ) : (
-            <HeaderPublic
-              authUnavailable={authState.status === "unavailable"}
-            />
-          )}
-          <div className="flex flex-col flex-1 min-h-0">
-            <Outlet />
+      <ToastProvider>
+        <SidebarProvider>
+          <div className="flex min-h-screen flex-col bg-surface-base text-text-primary">
+            {authState.status === "authenticated" ? (
+              <HeaderAuthenticated session={authState.session} />
+            ) : (
+              <HeaderPublic
+                authUnavailable={authState.status === "unavailable"}
+              />
+            )}
+            <div className="flex flex-col flex-1 min-h-0">
+              <Outlet />
+            </div>
+            <Footer />
           </div>
-          <Footer />
-        </div>
-      </SidebarProvider>
+        </SidebarProvider>
+      </ToastProvider>
       <ModalLayer />
       <TanStackRouterDevtools />
     </ModalProvider>

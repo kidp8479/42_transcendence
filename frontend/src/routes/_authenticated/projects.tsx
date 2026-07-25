@@ -19,6 +19,7 @@ import {
 } from "@/components/projects/NewProjectCard";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { createProject, deleteProject, type Project } from "@/lib/projectsApi";
+import { useToast } from "@/hooks/useToast";
 
 export const Route = createFileRoute("/_authenticated/projects")({
   component: ProjectsPage,
@@ -32,6 +33,7 @@ function ProjectsPage() {
   const projects = useLoaderData({ from: "/_authenticated" });
   const router = useRouter();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   async function handleCreateProject(values: NewProjectFormValues) {
     try {
@@ -40,8 +42,11 @@ function ProjectsPage() {
       // /_authenticated loader, cached by the router - invalidate() re-runs
       // it so the new project shows up without a full page reload.
       await router.invalidate();
+      showToast({ type: "success", message: "Project created" });
+      return true;
     } catch (error) {
-      console.error("Failed to create project:", error);
+      showToast({ type: "error", message: errorMessage(error) });
+      return false;
     }
   }
 
@@ -49,8 +54,11 @@ function ProjectsPage() {
     try {
       await deleteProject(project.id);
       await router.invalidate();
+      showToast({ type: "success", message: "Project deleted" });
+      return true;
     } catch (error) {
-      console.error("Failed to delete project:", error);
+      showToast({ type: "error", message: errorMessage(error) });
+      return false;
     }
   }
 
@@ -88,4 +96,8 @@ function ProjectsPage() {
       </div>
     </>
   );
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Project request failed";
 }

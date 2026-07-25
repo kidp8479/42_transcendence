@@ -1,13 +1,14 @@
 // The last tile in the /projects grid: idle, it's a dashed-border button
 // inviting the user to create a project. Clicking it swaps the same grid
 // cell for an inline creation form (name + optional description) instead of
-// opening a separate route or the global auth-style modal (see useModal) -
-// there's no backend endpoint to create a project yet, so onCreate is a
-// plain callback the parent decides what to do with, same pattern as
-// ProjectCard's onManageMembers/onDeleteProject.
+// opening a separate route or the global auth-style modal (see useModal).
 import { Button, TextInput } from "flowbite-react";
 import { useId, useState, type SubmitEvent } from "react";
 import { HiOutlinePlus, HiOutlineXMark } from "react-icons/hi2";
+import {
+  maxProjectDescriptionLength,
+  maxProjectNameLength,
+} from "@/lib/projectsApi";
 
 export interface NewProjectFormValues {
   name: string;
@@ -15,7 +16,7 @@ export interface NewProjectFormValues {
 }
 
 interface NewProjectCardProps {
-  onCreate?: (values: NewProjectFormValues) => void;
+  onCreate: (values: NewProjectFormValues) => Promise<boolean>;
 }
 
 // Scoped to this card's 2 fields only - black background + secondary-toned
@@ -35,6 +36,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const nameInputId = useId();
   const descriptionInputId = useId();
 
@@ -44,14 +46,24 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
     setDescription("");
   }
 
-  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
       return;
     }
-    onCreate?.({ name: trimmedName, description: description.trim() });
-    handleClose();
+    setIsSubmitting(true);
+    try {
+      const wasCreated = await onCreate({
+        name: trimmedName,
+        description: description.trim() || undefined,
+      });
+      if (wasCreated) {
+        handleClose();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (!isOpen) {
@@ -100,7 +112,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
         <TextInput
           id={nameInputId}
           autoFocus
-          maxLength={100}
+          maxLength={maxProjectNameLength}
           onChange={(event) => setName(event.target.value)}
           placeholder="Project name (e.g. ft_irc)"
           required
@@ -113,7 +125,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
         </label>
         <TextInput
           id={descriptionInputId}
-          maxLength={1000}
+          maxLength={maxProjectDescriptionLength}
           onChange={(event) => setDescription(event.target.value)}
           placeholder="Short description (optional)"
           theme={projectFormInputTheme}
@@ -124,14 +136,15 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
       <div className="flex gap-2 pt-1">
         <Button
           type="submit"
-          disabled={!name.trim()}
+          disabled={!name.trim() || isSubmitting}
           className="flex-1 bg-brand-500 text-black! hover:bg-brand-600 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:hover:bg-brand-600 dark:focus:ring-green-800"
         >
-          Create
+          {isSubmitting ? "Creating..." : "Create"}
         </Button>
         <Button
           type="button"
           onClick={handleClose}
+          disabled={isSubmitting}
           className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40"
         >
           Cancel

@@ -16,6 +16,7 @@ const PRISMA_ERROR_STATUS: Record<string, HttpStatus> = {
   P2002: HttpStatus.CONFLICT, // unique constraint violation (ex: duplicate email)
   P2025: HttpStatus.NOT_FOUND, // record to update/delete/connect doesn't exist
   P2003: HttpStatus.BAD_REQUEST, // foreign key constraint violation (ex: bad projectId)
+  P2034: HttpStatus.CONFLICT, // serializable transaction conflict; client can retry
 };
 
 @Catch(Prisma.PrismaClientKnownRequestError)
