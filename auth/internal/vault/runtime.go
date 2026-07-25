@@ -132,10 +132,26 @@ func (r *Runtime) renew(ctx context.Context) error {
 	r.tokenExpiresAt = time.Now().Add(token.LeaseDuration)
 	credentials, err := r.client.RenewDatabaseCredentials(ctx, r.database)
 	if err != nil {
+		if isLeaseRenewalLimit(err) {
+			return r.issueDatabaseCredentials(ctx)
+		}
 		return err
 	}
 	if err := r.refreshDatabase(ctx, credentials); err != nil {
 		return fmt.Errorf("refresh database pool: %w", err)
+	}
+	r.databaseExpiresAt = time.Now().Add(credentials.LeaseDuration)
+	r.database = credentials
+	return nil
+}
+
+func (r *Runtime) issueDatabaseCredentials(ctx context.Context) error {
+	credentials, err := r.client.IssueDatabaseCredentials(ctx, r.config.DatabaseRole)
+	if err != nil {
+		return fmt.Errorf("issue replacement database credentials: %w", err)
+	}
+	if err := r.refreshDatabase(ctx, credentials); err != nil {
+		return fmt.Errorf("refresh database pool with replacement credentials: %w", err)
 	}
 	r.databaseExpiresAt = time.Now().Add(credentials.LeaseDuration)
 	r.database = credentials
@@ -213,4 +229,9 @@ func isAuthorizationError(err error) bool {
 	var vaultError *HTTPError
 	return errors.As(err, &vaultError) && (vaultError.StatusCode == http.StatusForbidden ||
 		vaultError.StatusCode == http.StatusUnauthorized)
+}
+
+func isLeaseRenewalLimit(err error) bool {
+	var vaultError *HTTPError
+	return errors.As(err, &vaultError) && vaultError.StatusCode == http.StatusBadRequest
 }

@@ -66,8 +66,30 @@ never falls back to `DATABASE_URL`, OAuth environment variables, or
 Ed25519 signing interface for the later JWT feature; it cannot export private
 key material.
 
-NestJS and the migration process have not yet consumed their separate Vault
-credentials. Do not treat this development instance as production-ready:
+Database roles have an eight-hour maximum lease TTL. When Vault declines a
+renewal at that boundary, Go auth and NestJS issue replacement credentials and
+atomically refresh their database client rather than continuing on a
+near-expiry lease.
+
+NestJS also uses its mounted AppRole files to obtain its backend-to-auth KV
+credential and a `backend-runtime` database lease. It atomically publishes a
+new Prisma client only after it connects successfully, then drains the former
+client for 30 seconds. Its `/api/health` endpoint returns `503` while Vault is
+unavailable, and a fatal renewal failure closes the process for its supervisor
+to restart.
+
+`make migrate` starts the explicit `migration` Compose workload. It receives a
+short-lived `migration` lease from its own AppRole and runs `prisma migrate
+deploy`; it never receives the bootstrap `DATABASE_URL`. The subsequent grants
+step remains an explicit developer/operator action through `make` and the
+database shell's bootstrap user.
+
+Before the first Vault migration on a development volume created before this
+cutover, the team must run `make wipe-db` and then `make up`: legacy schema
+objects are owned by the former bootstrap role and must not be silently
+re-privileged to preserve a compatibility path.
+
+Do not treat this development instance as production-ready:
 initialization, unseal, custody, TLS, storage, backup, HA, root-credential rotation
 (`vault write -force database/rotate-root/postgresql`), and the emergency
 root-token runbook remain unresolved operational blockers.

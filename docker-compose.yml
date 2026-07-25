@@ -95,14 +95,15 @@ services:
       context: ./backend
       target: dev
     environment:
-      - DATABASE_URL=${DATABASE_URL}
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
-      - AUTH_INTERNAL_TOKEN=${AUTH_INTERNAL_TOKEN}
       - AUTH_SESSION_COOKIE=${AUTH_SESSION_COOKIE}
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID_FILE=/run/secrets/vault/role_id
       - VAULT_SECRET_ID_FILE=/run/secrets/vault/secret_id
       - VAULT_DB_ROLE=backend-runtime
+      - VAULT_DB_HOST=db
+      - VAULT_DB_PORT=5432
+      - VAULT_DB_NAME=${POSTGRES_DB}
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
@@ -114,7 +115,76 @@ services:
         condition: service_healthy
       vault-bootstrap:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     restart: unless-stopped
+
+  migration:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+      target: dev
+    command: npx tsx scripts/vault-migrate.ts
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_ROLE_ID_FILE=/run/secrets/vault/role_id
+      - VAULT_SECRET_ID_FILE=/run/secrets/vault/secret_id
+      - VAULT_DB_ROLE=migration
+      - VAULT_DB_HOST=db
+      - VAULT_DB_PORT=5432
+      - VAULT_DB_NAME=${POSTGRES_DB}
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+      - vault_migration_secret:/run/secrets/vault:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      vault-bootstrap:
+        condition: service_completed_successfully
+
+  vault-test:
+    profiles: ["tests"]
+    image: hashicorp/vault:1.18
+    entrypoint: ["/bin/sh", "/vault/check-policies.sh"]
+    environment:
+      VAULT_ADDR: http://vault:8200
+    volumes:
+      - ./vault/check-policies.sh:/vault/check-policies.sh:ro
+      - vault_auth_runtime_secret:/run/secrets/auth:ro
+      - vault_backend_runtime_secret:/run/secrets/backend:ro
+      - vault_migration_secret:/run/secrets/migration:ro
+    depends_on:
+      vault-bootstrap:
+        condition: service_completed_successfully
+
+  backend-vault-test:
+    profiles: ["tests"]
+    build:
+      context: ./backend
+      target: dev
+    command: npx tsx scripts/check-vault-prisma.ts
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_ROLE_ID_FILE=/run/secrets/vault/role_id
+      - VAULT_SECRET_ID_FILE=/run/secrets/vault/secret_id
+      - VAULT_DB_ROLE=backend-runtime
+      - VAULT_DB_HOST=db
+      - VAULT_DB_PORT=5432
+      - VAULT_DB_NAME=${POSTGRES_DB}
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+      - vault_backend_runtime_secret:/run/secrets/vault:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      vault-bootstrap:
+        condition: service_completed_successfully
 
   auth:
     build:
