@@ -2,6 +2,8 @@
 // spread) on purpose, while learning - explicit forms only, ex: `{ id: id }`
 // instead of `{ id }`, `const id = value.id` instead of `const { id } = value`.
 // Same equivalent meaning, just spelled out for now.
+import { getSession } from "@/lib/auth";
+
 export type DiscoveryBlockStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 
 // shape of a DiscoveryBlock exactly as the frontend uses it - mirrors the
@@ -90,6 +92,14 @@ export async function updateDiscoveryBlock(
   description: string,
   notes: string
 ): Promise<DiscoveryBlock> {
+  // mutating requests (PATCH/POST/DELETE) are rejected with a 403 by the
+  // auth service unless X-CSRF-Token is attached - see auth.guard.ts on the
+  // backend and requiresCSRF() in the Go auth service
+  const session = await getSession();
+  if (!session) {
+    throw new Error("An active session is required");
+  }
+
   const response = await fetch(
     import.meta.env.VITE_API_URL +
       "/projects/" +
@@ -100,7 +110,10 @@ export async function updateDiscoveryBlock(
       method: "PATCH",
       credentials: "include",
       // tells the backend the body is JSON, not e.g. a plain string or form data
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": session.csrfToken,
+      },
       // fetch's body must be a string - JSON.stringify turns our object into
       // the JSON text actually sent over the wire
       body: JSON.stringify({
