@@ -80,9 +80,14 @@ Vault outages keep it ready while its existing credentials remain valid.
 
 `make migrate` starts the explicit `migration` Compose workload. It receives a
 short-lived `migration` lease from its own AppRole and runs `prisma migrate
-deploy`; it never receives the bootstrap `DATABASE_URL`. The subsequent grants
-step remains an explicit developer/operator action through `make` and the
-database shell's bootstrap user.
+deploy`; it never receives the bootstrap `DATABASE_URL`. Use
+`make migrate-dev NAME=lowercase-name` to author a migration through that same
+AppRole and lease. Prisma requires `CREATEDB` for its disposable shadow
+database, so the migration lease's `app_owner` parent has that capability.
+This is an intentional local student-project tradeoff; runtime roles cannot
+create databases. The subsequent grants step remains an explicit
+developer/operator action through `make` and the database shell's bootstrap
+user.
 
 Before the first Vault migration on a development volume created before this
 cutover, the team must run `make wipe-db` and then `make up`: legacy schema

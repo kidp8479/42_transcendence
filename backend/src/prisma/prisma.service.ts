@@ -1,8 +1,18 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
 
 const poolDrainTimeoutMs = 30_000;
+
+export type ApplicationDatabaseTransaction = Pick<
+  Prisma.TransactionClient,
+  | "user"
+  | "project"
+  | "projectMember"
+  | "evaluationChecklistItem"
+  | "discoveryBlock"
+  | "discoveryBlockItem"
+>;
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
@@ -34,6 +44,13 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get discoveryBlockItem(): PrismaClient["discoveryBlockItem"] {
     return this.currentClient().discoveryBlockItem;
+  }
+
+  async transaction<T>(
+    operation: (database: ApplicationDatabaseTransaction) => Promise<T>
+  ): Promise<T> {
+    const client = this.currentClient();
+    return client.$transaction((transaction) => operation(transaction));
   }
 
   async onModuleInit(): Promise<void> {
