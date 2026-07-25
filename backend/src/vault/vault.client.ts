@@ -1,5 +1,9 @@
 import nodeVault from "node-vault";
 
+const httpStatusBadRequest = 400;
+const httpStatusUnauthorized = 401;
+const httpStatusForbidden = 403;
+
 export interface VaultToken {
   leaseDurationMs: number;
 }
@@ -139,11 +143,18 @@ function isPositiveNumber(value: unknown): value is number {
 
 export function isVaultAuthorizationError(error: unknown): boolean {
   const statusCode = vaultErrorStatusCode(error);
-  return statusCode === 401 || statusCode === 403;
+  return (
+    statusCode === httpStatusUnauthorized || statusCode === httpStatusForbidden
+  );
 }
 
 export function isVaultLeaseRenewalLimit(error: unknown): boolean {
-  return vaultErrorStatusCode(error) === 400;
+  if (vaultErrorStatusCode(error) !== httpStatusBadRequest) {
+    return false;
+  }
+  return vaultErrorMessages(error).some((message) =>
+    /lease.*maximum.*ttl|maximum.*ttl.*lease/i.test(message)
+  );
 }
 
 function vaultErrorStatusCode(error: unknown): number | undefined {
@@ -159,4 +170,25 @@ function vaultErrorStatusCode(error: unknown): number | undefined {
   }
   const statusCode = error.response.statusCode;
   return typeof statusCode === "number" ? statusCode : undefined;
+}
+
+function vaultErrorMessages(error: unknown): string[] {
+  if (
+    !error ||
+    typeof error !== "object" ||
+    !("response" in error) ||
+    !error.response ||
+    typeof error.response !== "object" ||
+    !("body" in error.response)
+  ) {
+    return [];
+  }
+  const body = error.response.body;
+  if (!body || typeof body !== "object" || !("errors" in body)) {
+    return [];
+  }
+  const errors = body.errors;
+  return Array.isArray(errors)
+    ? errors.filter((message): message is string => typeof message === "string")
+    : [];
 }

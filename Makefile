@@ -172,6 +172,12 @@ migrate: $(ENV_FILE)
 	@set -a; . ./$(ENV_FILE); set +a; \
 	$(COMPOSE) exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < db/runtime-grants.sql
 
+## author a Prisma migration with the existing Vault migration lease (NAME is required)
+migrate-dev: $(ENV_FILE)
+	@test -n "$(NAME)" || (echo "Usage: make migrate-dev NAME=lowercase-migration-name" >&2; exit 1)
+	$(COMPOSE) --profile tools run --rm -e PRISMA_MIGRATION_NAME="$(NAME)" \
+		migration npx tsx scripts/vault-migrate-dev.ts
+
 ## start Prisma Studio from the backend container
 prisma-studio:
 	$(COMPOSE) exec backend npx prisma studio --browser none
@@ -349,6 +355,6 @@ help:
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate prisma-studio install seed \
+        migrate migrate-dev prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
         check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell
