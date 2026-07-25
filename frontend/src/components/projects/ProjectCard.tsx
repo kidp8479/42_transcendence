@@ -115,7 +115,7 @@ interface ProjectCardProps {
   project: ProjectCardData;
   canManageProject: boolean;
   onManageMembers?: () => void;
-  onDeleteProject?: () => void;
+  onDeleteProject?: () => Promise<boolean>;
 }
 
 export function ProjectCard({
@@ -126,6 +126,7 @@ export function ProjectCard({
 }: ProjectCardProps) {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const confirmInputId = useId();
 
   function handleCancelDelete() {
@@ -133,10 +134,18 @@ export function ProjectCard({
     setConfirmText("");
   }
 
-  function handleConfirmDelete() {
-    onDeleteProject?.();
-    setIsConfirmingDelete(false);
-    setConfirmText("");
+  async function handleConfirmDelete() {
+    if (!onDeleteProject) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      if (await onDeleteProject()) {
+        handleCancelDelete();
+      }
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   const status = STATUS_META[project.status];
@@ -185,7 +194,10 @@ export function ProjectCard({
         <div className="flex flex-1 flex-col justify-center gap-3">
           <p className="text-sm text-text-secondary">
             Type{" "}
-            <span className="font-semibold text-text-primary">
+            <span
+              title={project.name}
+              className="inline-block max-w-full truncate align-bottom font-semibold text-text-primary"
+            >
               {project.name}
             </span>{" "}
             to confirm deletion. This cannot be undone.
@@ -208,14 +220,15 @@ export function ProjectCard({
           <Button
             type="button"
             onClick={handleConfirmDelete}
-            disabled={!canConfirmDelete}
+            disabled={!canConfirmDelete || isDeleting}
             className="flex-1 bg-control-error text-white! hover:bg-red-700 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-red-300 dark:bg-control-error dark:hover:bg-red-700 dark:focus:ring-red-800"
           >
-            Delete
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
           <Button
             type="button"
             onClick={handleCancelDelete}
+            disabled={isDeleting}
             className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40"
           >
             Cancel
@@ -289,7 +302,7 @@ export function ProjectCard({
               >
                 <DropdownItem
                   icon={HiOutlineUserGroup}
-                  theme={roundedDropdownItemTheme}make down
+                  theme={roundedDropdownItemTheme}
                   onClick={() => onManageMembers?.()}
                 >
                   Manage members

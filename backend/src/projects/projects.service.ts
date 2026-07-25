@@ -8,7 +8,8 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { ProjectMember } from "@prisma/client";
+import { Prisma, ProjectMember } from "@prisma/client";
+import { maxProjectsPerUser } from "./projects.constants";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
 
@@ -111,38 +112,37 @@ export class ProjectsService {
     };
   }
 
-  // The creator becomes ADMIN by design (see the ProjectMemberRole comment in
-  // schema.prisma) - there's no other way to get an ADMIN row on a brand-new project.
-  // Note: unlike findAll/findById, this returns the raw Prisma row - no role/progress/
-  // memberCount. Harmless today since every caller re-fetches via router.invalidate()
-  // instead of reading this response directly, but keep that in mind before doing so.
   async create(dto: CreateProjectDto, userId: string) {
-    // Cap how many projects a single user can belong to (created or invited to),
-    // so one account can't spam an unbounded number of projects.
-    const membershipCount = await this.prisma.projectMember.count({
-      where: { userId },
-    });
-    if (membershipCount >= 50) {
-      throw new BadRequestException(
-        "You've reached the maximum of 50 projects."
-      );
-    }
+    return this.prisma.transaction(
+      async (database) => {
+        const membershipCount = await database.projectMember.count({
+          where: { userId },
+        });
+        if (membershipCount >= maxProjectsPerUser) {
+          throw new BadRequestException(
+            `You've reached the maximum of ${maxProjectsPerUser} projects.`
+          );
+        }
 
-    return this.prisma.project.create({
-      data: {
-        name: dto.name,
-        description: dto.description,
-        deadline: dto.deadline,
-        status: dto.status ?? "IN_PROGRESS",
-        isArchived: dto.isArchived ?? false,
-        members: {
-          create: {
-            userId,
-            role: "ADMIN",
+        const project = await database.project.create({
+          data: {
+            name: dto.name,
+            description: dto.description,
+            deadline: dto.deadline,
+            status: dto.status ?? "IN_PROGRESS",
+            isArchived: dto.isArchived ?? false,
+            members: {
+              create: {
+                userId,
+                role: "ADMIN",
+              },
+            },
           },
-        },
+        });
+        return this.findProjectForUser(database, project.id, userId);
       },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
   }
 
   // NOTE ON ROLES: deleting the project is a team-affecting, hard-to-undo action -
@@ -163,9 +163,6 @@ export class ProjectsService {
     await this.prisma.project.delete({ where: { id } });
   }
 
-  // Same ADMIN-only rationale as remove above (see TR-66).
-  // Note: like create above, this returns the raw Prisma row, not the
-  // role/progress/memberCount-enriched shape findAll/findById return.
   async update(id: string, dto: UpdateProjectDto, userId: string) {
     const member = await this.assertMembership(id, userId);
     if (member.role !== "ADMIN") {
@@ -174,6 +171,44 @@ export class ProjectsService {
       );
     }
 
-    return this.prisma.project.update({ where: { id }, data: dto });
+    await this.prisma.project.update({ where: { id }, data: dto });
+    return this.findById(id, userId);
+  }
+
+  private async findProjectForUser(
+    database: Pick<Prisma.TransactionClient, "project">,
+    id: string,
+    userId: string
+  ) {
+    const project = await database.project.findFirst({
+      where: { id, members: { some: { userId } } },
+      include: {
+        members: {
+          where: { userId },
+          select: { role: true },
+        },
+        evaluationChecklistItems: {
+          select: { isChecked: true },
+        },
+        _count: {
+          select: { members: true },
+        },
+      },
+    });
+    if (!project) {
+      throw new NotFoundException("Project not found");
+    }
+
+    const { members, evaluationChecklistItems, _count, ...rest } = project;
+    const total = evaluationChecklistItems.length;
+    const validated = evaluationChecklistItems.filter(
+      (item) => item.isChecked
+    ).length;
+    return {
+      ...rest,
+      role: members[0].role,
+      progress: total === 0 ? 0 : Math.round((validated / total) * 100),
+      memberCount: _count.members,
+    };
   }
 }

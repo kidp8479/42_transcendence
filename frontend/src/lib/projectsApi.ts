@@ -1,5 +1,8 @@
 import { apiClient } from "./apiClient";
 
+export const maxProjectNameLength = 100;
+export const maxProjectDescriptionLength = 1000;
+
 export type ProjectStatus = "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 
 export interface Project {
@@ -20,17 +23,19 @@ export interface Project {
 
 // GET /projects => every project the authenticated user is a member of
 export function listProjects() {
-  return apiClient<Project[]>("/projects");
+  return apiClient<unknown>("/projects").then(parseProjects);
 }
 
 // GET /projects/:id => one project, only if the caller is a member of it
 export function getProject(id: string) {
-  return apiClient<Project>(`/projects/${id}`);
+  return apiClient<unknown>(`/projects/${id}`).then(parseProject);
 }
 
 // POST /projects => create a project; the caller becomes its first member
 export function createProject(input: { name: string; description?: string }) {
-  return apiClient<Project>("/projects", { method: "POST", body: input });
+  return apiClient<unknown>("/projects", { method: "POST", body: input }).then(
+    parseProject
+  );
 }
 
 // DELETE /projects/:id => remove a project; caller must be ADMIN (see projects.service)
@@ -49,8 +54,53 @@ export function updateProject(
     deadline?: string | null;
   }
 ) {
-  return apiClient<Project>(`/projects/${id}`, {
+  return apiClient<unknown>(`/projects/${id}`, {
     method: "PATCH",
     body: input,
-  });
+  }).then(parseProject);
+}
+
+function parseProjects(value: unknown): Project[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Projects API returned an invalid response");
+  }
+  return value.map(parseProject);
+}
+
+function parseProject(value: unknown): Project {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    typeof value.name !== "string" ||
+    !isProjectStatus(value.status) ||
+    (value.description !== null && typeof value.description !== "string") ||
+    (value.deadline !== null && typeof value.deadline !== "string") ||
+    !isProjectMemberRole(value.role) ||
+    typeof value.progress !== "number" ||
+    typeof value.memberCount !== "number"
+  ) {
+    throw new Error("Projects API returned an invalid project");
+  }
+  return {
+    id: value.id,
+    name: value.name,
+    status: value.status,
+    description: value.description,
+    deadline: value.deadline,
+    role: value.role,
+    progress: value.progress,
+    memberCount: value.memberCount,
+  };
+}
+
+function isProjectStatus(value: unknown): value is ProjectStatus {
+  return value === "IN_PROGRESS" || value === "REVIEW" || value === "COMPLETED";
+}
+
+function isProjectMemberRole(value: unknown): value is Project["role"] {
+  return value === "ADMIN" || value === "MEMBER";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

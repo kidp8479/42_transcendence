@@ -14,6 +14,12 @@ export type ApplicationDatabaseTransaction = Pick<
   | "discoveryBlockItem"
 >;
 
+type TransactionOptions = {
+  isolationLevel?: Prisma.TransactionIsolationLevel;
+  maxWait?: number;
+  timeout?: number;
+};
+
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private client?: PrismaClient;
@@ -47,10 +53,14 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   async transaction<T>(
-    operation: (database: ApplicationDatabaseTransaction) => Promise<T>
+    operation: (database: ApplicationDatabaseTransaction) => Promise<T>,
+    options?: TransactionOptions
   ): Promise<T> {
     const client = this.currentClient();
-    return client.$transaction((transaction) => operation(transaction));
+    return client.$transaction(
+      (transaction) => operation(transaction),
+      options
+    );
   }
 
   async onModuleInit(): Promise<void> {
