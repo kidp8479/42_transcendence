@@ -3,7 +3,7 @@
 // cell for an inline creation form (name + optional description) instead of
 // opening a separate route or the global auth-style modal (see useModal).
 import { Button, TextInput } from "flowbite-react";
-import { useId, useState, type SubmitEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { HiOutlinePlus, HiOutlineXMark } from "react-icons/hi2";
 import {
   maxProjectDescriptionLength,
@@ -46,7 +46,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
     setDescription("");
   }
 
-  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
