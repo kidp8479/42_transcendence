@@ -20,6 +20,7 @@ import { HiArrowLeft, HiX, HiPlus, HiCheck } from "react-icons/hi";
 import {
   darkSurfaceFieldClassName,
   darkSurfaceTextInputTheme,
+  buildCategoryCheckboxTheme,
 } from "@/lib/flowbite";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import {
@@ -85,20 +86,10 @@ function DiscoveryBlockEditPage() {
   const SelectedDiscoveryBlockIcon =
     DISCOVERY_BLOCK_ICON[selectedIcon] ?? DISCOVERY_BLOCK_DEFAULT_ICON;
 
-  // checkbox theme built from the block's own color (all 3 classes below
-  // are literal strings already fully spelled out in categoryColorPalette.ts
-  // - Tailwind's scanner needs to see them whole somewhere in the source,
-  // which is why they're read from the palette rather than built by
-  // concatenating a color name at runtime, see that file's own comment)
-  const checklistCheckboxTheme = {
-    base: "border-surface-border dark:border-surface-border bg-surface-overlay dark:bg-surface-overlay",
-    color: {
-      // no separate dark: variant needed - category-N tokens (index.css)
-      // aren't redefined per theme, so the same literal class works in both
-      default:
-        discoveryBlockColor.text + " focus:ring-2 " + discoveryBlockColor.ring,
-    },
-  };
+  // same tinted checkbox as discovery.tsx's cards - shared builder now,
+  // was duplicated as an inline object here before
+  const checklistCheckboxTheme =
+    buildCategoryCheckboxTheme(discoveryBlockColor);
 
   const itemsDoneCount = items.filter((item) => item.isChecked).length;
   const itemsTotalCount = items.length;
@@ -283,8 +274,11 @@ function DiscoveryBlockEditPage() {
     <div className="flex flex-col gap-6">
       {/* header: Back link (left) + title (center-left) + Save button (right) -
         matches Figma's edit screen header, replacing the old bottom-of-page
-        Save button */}
-      <div className="flex items-center justify-between">
+        Save button. flex-wrap + gap-3 (not just justify-between): on narrow
+        screens "Back | Edit Category" plus the button no longer fit on one
+        line, this lets the button wrap to its own row instead of
+        overflowing/clipping. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link
             to="/$projectId/discovery"
@@ -487,6 +481,7 @@ function DiscoveryBlockEditPage() {
                     theme={checklistCheckboxTheme}
                     checked={item.isChecked}
                     onChange={() => void handleToggleItem(item)}
+                    aria-label={item.label}
                   />
                   {/* min-w-0 + truncate: same overflow fix as ProjectCard.tsx
                   on Carlos's PR #18 - a long, space-less label inside a flex
@@ -505,6 +500,7 @@ function DiscoveryBlockEditPage() {
                   </span>
                   <button
                     type="button"
+                    aria-label={"Remove " + item.label}
                     onClick={() => void handleRemoveItem(item.id)}
                     className="text-text-secondary hover:text-control-error"
                   >
@@ -520,6 +516,12 @@ function DiscoveryBlockEditPage() {
               <TextInput
                 theme={darkSurfaceTextInputTheme}
                 placeholder="New item..."
+                // placeholder alone isn't an accessible name (it disappears
+                // once text is typed, and some screen readers never
+                // announce it at all) - no visible <Label> here since the
+                // "Checklist" heading above already establishes context,
+                // so aria-label carries the accessible name instead
+                aria-label="New checklist item"
                 // matches CreateDiscoveryBlockItemDto's @MaxLength - same
                 // reasoning as the Title/Description/Notes fields above
                 maxLength={DISCOVERY_BLOCK_ITEM_LABEL_MAX_LENGTH}
@@ -536,6 +538,7 @@ function DiscoveryBlockEditPage() {
               {/* focus:ring-green-300, not Flowbite's default blue ring -
               same fix already applied to the Save Changes button above */}
               <Button
+                aria-label="Add item"
                 className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
                 onClick={() => void handleAddItem()}
               >
