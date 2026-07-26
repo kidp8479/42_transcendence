@@ -14,19 +14,19 @@ export class ProjectMembersService {
   // the constructor is called automatically by NestJS at startup - never called manually
   //
   // NOTE ON ROLES: adding/removing a member changes who's on the team, so unlike most other
-  // modules, these two DO need an ADMIN check on top of assertMembership - decided with the
+  // modules, these two DO need an OWNER/ADMIN check on top of assertMembership - decided with the
   // team (see TR-66) that role checks only matter for Project + ProjectMember management,
   // not everyday content (tasks, discovery blocks, etc.)
   //
   // TODO: addMember(projectId: string, dto: AddMemberDto, requestingUserId: string)
   //       => const requester = await projectsService.assertMembership(projectId, requestingUserId)
-  //       => must also throw (ex: ForbiddenException) if requester.role !== "ADMIN"
+  //       => must also throw (ex: ForbiddenException) if requester.role is neither "OWNER" nor "ADMIN"
   //       => insert a new row in the ProjectMember table (link a user to a project)
   // TODO: findAll(projectId: string, requestingUserId: string)
   //       => call projectsService.assertMembership(projectId, requestingUserId) - no role check,
   //          any member can see the member list
   //       => fetch all members belonging to a given project
   // TODO: removeMember(projectId: string, userId: string, requestingUserId: string)
-  //       => same requester + role check as addMember (const requester = ...; if (requester.role !== "ADMIN") throw ...)
+  //       => same requester + role check as addMember (const requester = ...; if (requester.role is neither "OWNER" nor "ADMIN") throw ...)
   //       => delete the ProjectMember row that links this user to this project
 }
