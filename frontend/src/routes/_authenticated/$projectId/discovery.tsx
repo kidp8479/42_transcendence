@@ -319,7 +319,12 @@ function DiscoveryPage() {
                 projectId: discoveryBlock.projectId,
                 discoveryBlockId: discoveryBlock.id,
               }}
-              className="text-inherit no-underline"
+              // h-full: a CSS grid item stretches to the row's height by
+              // default, but that only gives Link itself the extra height -
+              // without h-full here (and again on Card below), Card still
+              // sizes to its own content, which is why cards with fewer
+              // items ended up visibly shorter than cards with more
+              className="h-full text-inherit no-underline"
             >
               <Card
                 // dark: variants written explicitly, not just the plain classes:
@@ -328,7 +333,13 @@ function DiscoveryPage() {
                 // fight in dark mode (same issue already hit on Checkbox
                 // elsewhere in the app) - our own dark: rule has to be spelled
                 // out to actually win.
-                className="bg-surface-raised border-surface-border dark:border-surface-border dark:bg-surface-raised"
+                className="h-full bg-surface-raised border-surface-border dark:border-surface-border dark:bg-surface-raised"
+                // Card's own theme vertically centers its content
+                // (justify-center) when there's extra height to fill - once
+                // Card stretches to match the tallest card in the row, that
+                // would shift shorter cards' headers down instead of keeping
+                // them pinned to the top, so it's overridden to justify-start
+                theme={{ root: { children: "justify-start" } }}
               >
                 {/* color bar: an empty div, just a colored rectangle (height set,
                 no content) */}
