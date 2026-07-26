@@ -1,11 +1,19 @@
 // DiscoveryBlockItemsService: handles all database operations for DiscoveryBlockItems
 // called by the controller, never called directly by the frontend
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { DiscoveryBlocksService } from "../discovery-blocks/discovery-blocks.service";
 import { CreateDiscoveryBlockItemDto } from "./dto/create-discovery-block-item.dto";
 import { UpdateDiscoveryBlockItemDto } from "./dto/update-discovery-block-item.dto";
+
+// see discovery-blocks.service.ts's own comment on this same convention
+const MAX_ITEMS_PER_DISCOVERY_BLOCK = 30;
 
 @Injectable()
 export class DiscoveryBlockItemsService {
@@ -49,13 +57,30 @@ export class DiscoveryBlockItemsService {
       userId
     );
 
-    const blockItem = await this.prisma.discoveryBlockItem.create({
-      data: {
-        label: dto.label,
-        order: dto.order,
-        discoveryBlockId: discoveryBlockId, // does not comes from the dto but from the url !
+    // same Serializable-transaction fix as DiscoveryBlocksService.create(),
+    // for the same count-then-create TOCTOU reason
+    const blockItem = await this.prisma.$transaction(
+      async (transactionPrisma) => {
+        const existingItemCount =
+          await transactionPrisma.discoveryBlockItem.count({
+            where: { discoveryBlockId: discoveryBlockId },
+          });
+        if (existingItemCount >= MAX_ITEMS_PER_DISCOVERY_BLOCK) {
+          throw new BadRequestException(
+            `A discovery block can have at most ${MAX_ITEMS_PER_DISCOVERY_BLOCK} items`
+          );
+        }
+
+        return transactionPrisma.discoveryBlockItem.create({
+          data: {
+            label: dto.label,
+            order: dto.order,
+            discoveryBlockId: discoveryBlockId, // does not comes from the dto but from the url !
+          },
+        });
       },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
     return blockItem;
   }
 

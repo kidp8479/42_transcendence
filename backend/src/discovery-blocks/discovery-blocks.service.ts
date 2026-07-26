@@ -1,11 +1,21 @@
 // DiscoveryBlocksService: handles all database operations for DiscoveryBlocks
 // called by the controller, never called directly by the frontend
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
 import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
+
+// named constant so the limit is easy to find/change in one place (per
+// Christophe/Andrei's feedback on Carlos's PR #18: don't bury a cap as a bare
+// number in the middle of the method, and don't be too stingy with it either)
+const MAX_DISCOVERY_BLOCKS_PER_PROJECT = 20;
 
 @Injectable()
 export class DiscoveryBlocksService {
@@ -43,16 +53,37 @@ export class DiscoveryBlocksService {
   ) {
     await this.projectsService.assertMembership(projectId, userId);
 
-    const block = await this.prisma.discoveryBlock.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        icon: dto.icon,
-        color: dto.color,
-        notes: dto.notes,
-        projectId: projectId, // does not comes from the dto but from the url !
+    // count-then-create is a TOCTOU race in general (two concurrent requests
+    // could both read a count under the cap, then both insert) - wrapped in
+    // a Serializable transaction so Postgres itself rejects the second
+    // transaction if it would have read stale data, same fix Christophe
+    // proposed for the equivalent bug on ProjectsService.create() (PR #18)
+    const block = await this.prisma.$transaction(
+      async (transactionPrisma) => {
+        const existingBlockCount = await transactionPrisma.discoveryBlock.count(
+          {
+            where: { projectId: projectId },
+          }
+        );
+        if (existingBlockCount >= MAX_DISCOVERY_BLOCKS_PER_PROJECT) {
+          throw new BadRequestException(
+            `A project can have at most ${MAX_DISCOVERY_BLOCKS_PER_PROJECT} discovery blocks`
+          );
+        }
+
+        return transactionPrisma.discoveryBlock.create({
+          data: {
+            title: dto.title,
+            description: dto.description,
+            icon: dto.icon,
+            color: dto.color,
+            notes: dto.notes,
+            projectId: projectId, // does not comes from the dto but from the url !
+          },
+        });
       },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
     return block;
   }
 
