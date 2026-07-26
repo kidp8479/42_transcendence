@@ -137,7 +137,7 @@ export function NewProjectCard({ onCreate }: NewProjectCardProps) {
         <Button
           type="submit"
           disabled={!name.trim() || isSubmitting}
-          className="flex-1 bg-brand-500 text-black! hover:bg-brand-600 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:hover:bg-brand-600 dark:focus:ring-green-800"
+          className="flex-1 bg-brand-500 !text-black hover:bg-brand-600 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:hover:bg-brand-600 dark:focus:ring-green-800"
         >
           {isSubmitting ? "Creating..." : "Create"}
         </Button>
