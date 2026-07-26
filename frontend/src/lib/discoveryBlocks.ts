@@ -2,7 +2,7 @@
 // spread) on purpose, while learning - explicit forms only, ex: `{ id: id }`
 // instead of `{ id }`, `const id = value.id` instead of `const { id } = value`.
 // Same equivalent meaning, just spelled out for now.
-import { getSession } from "@/lib/auth";
+import { apiClient } from "@/lib/apiClient";
 
 export type DiscoveryBlockStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 
@@ -35,24 +35,12 @@ export interface DiscoveryBlock {
 export async function listDiscoveryBlocks(
   projectId: string
 ): Promise<DiscoveryBlock[]> {
-  // call the backend
-  const response = await fetch(
-    import.meta.env.VITE_API_URL +
-      "/projects/" +
-      projectId +
-      "/discovery-blocks",
-    { credentials: "include" }
+  // apiClient<unknown>, not apiClient<DiscoveryBlock[]> - the generic there
+  // is just a TS-level cast, it doesn't actually check the response shape.
+  // parseDiscoveryBlock below is what does the real runtime check.
+  const payload = await apiClient<unknown>(
+    "/projects/" + projectId + "/discovery-blocks"
   );
-
-  // fail fast if the HTTP status is not 2xx
-  if (!response.ok) {
-    throw new Error(
-      await readErrorMessage(response, "Failed to load discovery blocks")
-    );
-  }
-
-  // read the body as unknown (never trust it's already a DiscoveryBlock[])
-  const payload: unknown = await response.json();
   if (!Array.isArray(payload)) {
     throw new Error("Discovery blocks response is invalid");
   }
@@ -70,24 +58,9 @@ export async function getDiscoveryBlock(
   projectId: string,
   discoveryBlockId: string
 ): Promise<DiscoveryBlock> {
-  const response = await fetch(
-    import.meta.env.VITE_API_URL +
-      "/projects/" +
-      projectId +
-      "/discovery-blocks/" +
-      discoveryBlockId,
-    { credentials: "include" }
+  const payload = await apiClient<unknown>(
+    "/projects/" + projectId + "/discovery-blocks/" + discoveryBlockId
   );
-
-  if (!response.ok) {
-    throw new Error(
-      await readErrorMessage(response, "Failed to load discovery block")
-    );
-  }
-
-  // same "don't trust it, parse it" pattern as listDiscoveryBlocks, just on
-  // a single object instead of an array - no .map()/.some() needed here
-  const payload: unknown = await response.json();
 
   const parsed = parseDiscoveryBlock(payload);
   if (parsed === null) {
@@ -97,13 +70,11 @@ export async function getDiscoveryBlock(
   return parsed;
 }
 
-// PATCH - same URL as getDiscoveryBlock (one block, identified by both ids),
-// but a different HTTP method + a request body carrying the new field
-// values. Takes one partial `updates` object (mirrors
-// updateDiscoveryBlockItem's own convention) instead of positional
-// params for every field - callers only send what they actually mean to
-// change, so autosaving color/icon on click can't accidentally overwrite an
-// unsaved Title/Description/Notes draft still sitting in the form.
+// PATCH - takes one partial `updates` object (mirrors
+// updateDiscoveryBlockItem's own convention) instead of positional params
+// for every field - callers only send what they actually mean to change, so
+// autosaving color/icon on click can't accidentally overwrite an unsaved
+// Title/Description/Notes draft still sitting in the form.
 export async function updateDiscoveryBlock(
   projectId: string,
   discoveryBlockId: string,
@@ -115,44 +86,15 @@ export async function updateDiscoveryBlock(
     icon?: string;
   }
 ): Promise<DiscoveryBlock> {
-  // mutating requests (PATCH/POST/DELETE) are rejected with a 403 by the
-  // auth service unless X-CSRF-Token is attached - see auth.guard.ts on the
-  // backend and requiresCSRF() in the Go auth service
-  const session = await getSession();
-  if (!session) {
-    throw new Error("An active session is required");
-  }
-
-  const response = await fetch(
-    import.meta.env.VITE_API_URL +
-      "/projects/" +
-      projectId +
-      "/discovery-blocks/" +
-      discoveryBlockId,
+  // apiClient attaches X-CSRF-Token automatically for mutating requests
+  // (PATCH here) and JSON-encodes `body` itself
+  const payload = await apiClient<unknown>(
+    "/projects/" + projectId + "/discovery-blocks/" + discoveryBlockId,
     {
       method: "PATCH",
-      credentials: "include",
-      // tells the backend the body is JSON, not e.g. a plain string or form data
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": session.csrfToken,
-      },
-      // fetch's body must be a string - JSON.stringify turns our object into
-      // the JSON text actually sent over the wire
-      body: JSON.stringify(updates),
+      body: updates,
     }
   );
-
-  if (!response.ok) {
-    throw new Error(
-      await readErrorMessage(response, "Failed to modify discovery block")
-    );
-  }
-
-  // backend returns the updated block - parse it the same way as
-  // getDiscoveryBlock, so the caller gets back a real DiscoveryBlock, not
-  // just "success"
-  const payload: unknown = await response.json();
 
   const parsed = parseDiscoveryBlock(payload);
   if (parsed === null) {
@@ -231,30 +173,4 @@ function parseDiscoveryBlock(value: unknown): DiscoveryBlock | null {
 // which properties exist or their types - parseDiscoveryBlock does that part.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-// reads the real backend error message out of a non-OK response instead of
-// always throwing the same generic string - same gap we flagged on
-// apiClient.ts (PR #18: "always the hardcoded API request failed (${status})
-// string, never response.json()"), same fix already used in lib/auth.ts's
-// own readErrorMessage. Falls back to the given generic message if the body
-// isn't JSON or doesn't have a `message` field.
-async function readErrorMessage(
-  response: Response,
-  fallback: string
-): Promise<string> {
-  const contentType = response.headers.get("content-type");
-  if (!contentType?.includes("application/json")) {
-    return fallback;
-  }
-
-  const payload: unknown = await response.json();
-  if (
-    isRecord(payload) &&
-    typeof payload.message === "string" &&
-    payload.message.length > 0
-  ) {
-    return payload.message;
-  }
-  return fallback;
 }

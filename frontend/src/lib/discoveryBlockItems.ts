@@ -1,6 +1,6 @@
 // Same explicit style as discoveryBlocks.ts on purpose - no destructuring,
 // no object shorthand, while learning.
-import { getSession } from "@/lib/auth";
+import { apiClient } from "@/lib/apiClient";
 
 // mirrors CreateDiscoveryBlockItemDto's @MaxLength on the backend
 // (backend/src/discovery-block-items/dto/create-discovery-block-item.dto.ts)
@@ -28,26 +28,13 @@ export async function listDiscoveryBlockItems(
   projectId: string,
   discoveryBlockId: string
 ): Promise<DiscoveryBlockItem[]> {
-  // call the backend
-  const response = await fetch(
-    import.meta.env.VITE_API_URL +
-      "/projects/" +
+  const payload = await apiClient<unknown>(
+    "/projects/" +
       projectId +
       "/discovery-blocks/" +
       discoveryBlockId +
-      "/items",
-    { credentials: "include" }
+      "/items"
   );
-
-  // fail fast if the HTTP status is not 2xx
-  if (!response.ok) {
-    throw new Error(
-      await readErrorMessage(response, "Failed to load discovery block items")
-    );
-  }
-
-  // read the body as unknown (never trust it's already a DiscoveryBlockItem[])
-  const payload: unknown = await response.json();
   if (!Array.isArray(payload)) {
     throw new Error("Discovery block items response is invalid");
   }
@@ -68,36 +55,17 @@ export async function createDiscoveryBlockItem(
   label: string,
   order: number
 ): Promise<DiscoveryBlockItem> {
-  const csrfToken = await getCsrfToken();
-
-  const response = await fetch(
-    import.meta.env.VITE_API_URL +
-      "/projects/" +
+  const payload = await apiClient<unknown>(
+    "/projects/" +
       projectId +
       "/discovery-blocks/" +
       discoveryBlockId +
       "/items",
     {
       method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify({
-        label: label,
-        order: order,
-      }),
+      body: { label: label, order: order },
     }
   );
-
-  if (!response.ok) {
-    throw new Error(
-      await readErrorMessage(response, "Failed to create discovery block item")
-    );
-  }
-
-  const payload: unknown = await response.json();
 
   const parsed = parseDiscoveryBlockItem(payload);
   if (parsed === null) {
@@ -118,11 +86,8 @@ export async function updateDiscoveryBlockItem(
   id: string,
   updates: { label?: string; order?: number; isChecked?: boolean }
 ): Promise<DiscoveryBlockItem> {
-  const csrfToken = await getCsrfToken();
-
-  const response = await fetch(
-    import.meta.env.VITE_API_URL +
-      "/projects/" +
+  const payload = await apiClient<unknown>(
+    "/projects/" +
       projectId +
       "/discovery-blocks/" +
       discoveryBlockId +
@@ -130,22 +95,9 @@ export async function updateDiscoveryBlockItem(
       id,
     {
       method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify(updates),
+      body: updates,
     }
   );
-
-  if (!response.ok) {
-    throw new Error(
-      await readErrorMessage(response, "Failed to modify discovery block item")
-    );
-  }
-
-  const payload: unknown = await response.json();
 
   const parsed = parseDiscoveryBlockItem(payload);
   if (parsed === null) {
@@ -162,30 +114,15 @@ export async function deleteDiscoveryBlockItem(
   discoveryBlockId: string,
   id: string
 ): Promise<DiscoveryBlockItem> {
-  const csrfToken = await getCsrfToken();
-
-  const response = await fetch(
-    import.meta.env.VITE_API_URL +
-      "/projects/" +
+  const payload = await apiClient<unknown>(
+    "/projects/" +
       projectId +
       "/discovery-blocks/" +
       discoveryBlockId +
       "/items/" +
       id,
-    {
-      method: "DELETE",
-      credentials: "include",
-      headers: { "X-CSRF-Token": csrfToken },
-    }
+    { method: "DELETE" }
   );
-
-  if (!response.ok) {
-    throw new Error(
-      await readErrorMessage(response, "Failed to delete discovery block item")
-    );
-  }
-
-  const payload: unknown = await response.json();
 
   const parsed = parseDiscoveryBlockItem(payload);
   if (parsed === null) {
@@ -245,42 +182,4 @@ function parseDiscoveryBlockItem(value: unknown): DiscoveryBlockItem | null {
 // so we can safely read arbitrary properties off it (value.id, value.label...)
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-// mutating requests (PATCH/POST/DELETE) are rejected with a 403 by the auth
-// service unless X-CSRF-Token is attached - see auth.guard.ts on the backend
-// and requiresCSRF() in the Go auth service. Local to this file on purpose
-// (not added to lib/auth.ts, which isn't ours - keeping the fix scoped to
-// our own files for now, coordinate with Andrei on a shared helper later).
-async function getCsrfToken(): Promise<string> {
-  const session = await getSession();
-  if (!session) {
-    throw new Error("An active session is required");
-  }
-  return session.csrfToken;
-}
-
-// reads the real backend error message out of a non-OK response - same
-// helper as discoveryBlocks.ts, see its own comment for why this exists.
-// Also matches the shape Andrei/Carlos's toast work reads (`payload.message`,
-// see feat(TR-45).../-fixes branch's apiClient.ts readErrorMessage) - useful
-// once we wire our own catches to a real showToast() call.
-async function readErrorMessage(
-  response: Response,
-  fallback: string
-): Promise<string> {
-  const contentType = response.headers.get("content-type");
-  if (!contentType?.includes("application/json")) {
-    return fallback;
-  }
-
-  const payload: unknown = await response.json();
-  if (
-    isRecord(payload) &&
-    typeof payload.message === "string" &&
-    payload.message.length > 0
-  ) {
-    return payload.message;
-  }
-  return fallback;
 }
