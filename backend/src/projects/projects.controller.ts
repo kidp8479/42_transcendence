@@ -5,9 +5,22 @@
 // req.user.id is a member of that project (ProjectMember) before returning/changing
 // anything, otherwise any authenticated user could read or modify any project by id (IDOR).
 
-import { Controller, Get, Req, Param, ParseUUIDPipe } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Req,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Body,
+  Delete,
+  Patch,
+  HttpCode,
+} from "@nestjs/common";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { ProjectsService } from "./projects.service";
+import { CreateProjectDto } from "./dto/create-project.dto";
+import { UpdateProjectDto } from "./dto/update-project.dto";
 
 @Controller("projects")
 export class ProjectsController {
@@ -30,18 +43,30 @@ export class ProjectsController {
     return this.projectsService.findById(id, request.user.id);
   }
 
-  // TODO: POST /api/projects
-  //       => create a new project
-  //       => expects a request body matching CreateProjectDto (name, description?, status?, deadline?, isArchived?)
-  //       => creator (req.user.id) should be added as a ProjectMember right after creation
+  // POST /api/projects => create a project; the caller becomes its first member (ADMIN)
+  @Post()
+  create(@Body() dto: CreateProjectDto, @Req() request: AuthenticatedRequest) {
+    return this.projectsService.create(dto, request.user.id);
+  }
 
-  // TODO: PATCH /api/projects/:id
-  //       => update an existing project (any field, all optional)
-  //       => expects a request body matching UpdateProjectDto
-  //       => must verify req.user.id is a member of this project before updating it
+  // DELETE /api/projects/:id => ADMIN-only (enforced in ProjectsService.remove)
+  // 204 No Content: nothing to return once the project (and its cascaded rows) is gone.
+  @Delete(":id")
+  @HttpCode(204)
+  delete(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectsService.remove(id, request.user.id);
+  }
 
-  // TODO: DELETE /api/projects/:id
-  //       => delete a project by its id
-  //       => must verify req.user.id is a member of this project before deleting it
-  //       => no request body needed, the id in the URL is enough (no DTO)
+  // PATCH /api/projects/:id => ADMIN-only (enforced in ProjectsService.update)
+  @Patch(":id")
+  update(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProjectDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectsService.update(id, dto, request.user.id);
+  }
 }

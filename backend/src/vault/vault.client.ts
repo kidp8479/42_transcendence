@@ -1,4 +1,17 @@
-import * as nodeVault from "node-vault";
+import * as nodeVaultModule from "node-vault";
+
+type NodeVaultFactory = typeof import("node-vault");
+
+function resolveNodeVaultFactory(): NodeVaultFactory {
+  const candidate = nodeVaultModule as unknown as { default?: unknown };
+  const factory = (candidate.default ?? candidate) as unknown;
+  if (typeof factory !== "function") {
+    throw new Error("node-vault module did not expose a callable factory");
+  }
+  return factory as NodeVaultFactory;
+}
+
+const nodeVault = resolveNodeVaultFactory();
 
 const httpStatusBadRequest = 400;
 const httpStatusUnauthorized = 401;

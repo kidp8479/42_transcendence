@@ -12,14 +12,22 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  Length,
+  MaxLength,
 } from "class-validator";
+import {
+  maxProjectDescriptionLength,
+  maxProjectNameLength,
+} from "../projects.constants";
 
 export class CreateProjectDto {
   @IsString()
+  @Length(1, maxProjectNameLength)
   name: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(maxProjectDescriptionLength)
   description?: string;
 
   @IsOptional()

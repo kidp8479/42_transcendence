@@ -175,16 +175,21 @@ migrate: $(ENV_FILE)
 ## author a Prisma migration with the existing Vault migration lease (NAME is required)
 migrate-dev: $(ENV_FILE)
 	@test -n "$(NAME)" || (echo "Usage: make migrate-dev NAME=lowercase-migration-name" >&2; exit 1)
-	$(COMPOSE) --profile tools run --rm -e PRISMA_MIGRATION_NAME="$(NAME)" \
+	$(COMPOSE) --profile tools run --rm --user "$$(id -u):$$(id -g)" -e PRISMA_MIGRATION_NAME="$(NAME)" \
 		migration npx tsx scripts/vault-migrate-dev.ts
+
+## restore host ownership after a migration authored by older tooling
+migrate-fix-permissions: $(ENV_FILE)
+	$(COMPOSE) --profile tools run --rm migration \
+		chown -R "$$(id -u):$$(id -g)" /app/prisma/migrations
 
 ## start Prisma Studio from the backend container
 prisma-studio:
 	$(COMPOSE) exec backend npx prisma studio --browser none
 
-## inject demo data into the database (run once after migrate, requires seed.ts to be implemented)
+## inject demo data using the short-lived Vault migration lease
 seed:
-	$(COMPOSE) exec backend npx prisma db seed
+	$(COMPOSE) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
 
 ## stop the database and remove its Compose-managed data volume
 # same portable mechanism as ffclean: match containers/volumes by label or
@@ -355,6 +360,6 @@ help:
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate migrate-dev prisma-studio install seed \
+        migrate migrate-dev migrate-fix-permissions prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
         check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell
