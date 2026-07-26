@@ -46,7 +46,9 @@ export async function listDiscoveryBlocks(
 
   // fail fast if the HTTP status is not 2xx
   if (!response.ok) {
-    throw new Error("Failed to load discovery blocks");
+    throw new Error(
+      await readErrorMessage(response, "Failed to load discovery blocks")
+    );
   }
 
   // read the body as unknown (never trust it's already a DiscoveryBlock[])
@@ -78,7 +80,9 @@ export async function getDiscoveryBlock(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to load discovery block");
+    throw new Error(
+      await readErrorMessage(response, "Failed to load discovery block")
+    );
   }
 
   // same "don't trust it, parse it" pattern as listDiscoveryBlocks, just on
@@ -135,7 +139,9 @@ export async function updateDiscoveryBlock(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to modify discovery block");
+    throw new Error(
+      await readErrorMessage(response, "Failed to modify discovery block")
+    );
   }
 
   // backend returns the updated block - parse it the same way as
@@ -220,4 +226,30 @@ function parseDiscoveryBlock(value: unknown): DiscoveryBlock | null {
 // which properties exist or their types - parseDiscoveryBlock does that part.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+// reads the real backend error message out of a non-OK response instead of
+// always throwing the same generic string - same gap we flagged on
+// apiClient.ts (PR #18: "always the hardcoded API request failed (${status})
+// string, never response.json()"), same fix already used in lib/auth.ts's
+// own readErrorMessage. Falls back to the given generic message if the body
+// isn't JSON or doesn't have a `message` field.
+async function readErrorMessage(
+  response: Response,
+  fallback: string
+): Promise<string> {
+  const contentType = response.headers.get("content-type");
+  if (!contentType?.includes("application/json")) {
+    return fallback;
+  }
+
+  const payload: unknown = await response.json();
+  if (
+    isRecord(payload) &&
+    typeof payload.message === "string" &&
+    payload.message.length > 0
+  ) {
+    return payload.message;
+  }
+  return fallback;
 }

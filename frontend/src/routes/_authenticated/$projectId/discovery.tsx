@@ -153,6 +153,7 @@ function DiscoveryPage() {
       );
     } catch (error) {
       console.error("Failed to update discovery block item", error);
+      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to update item" });
       // rollback: put isChecked back to what it was before the optimistic
       // update, since the PATCH never actually succeeded
       setDiscoveryBlocksWithItems((previous) =>

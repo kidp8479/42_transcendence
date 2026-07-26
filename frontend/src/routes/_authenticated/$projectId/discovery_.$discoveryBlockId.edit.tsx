@@ -91,15 +91,28 @@ function DiscoveryBlockEditPage() {
 
   // declared inside the component (not at module scope) because it reads
   // params/title/description/notes - all local to this function's own
-  // execution, not visible from outside it
+  // execution, not visible from outside it.
+  // try/catch added here (previously missing - an unhandled rejection on
+  // failure, nothing shown, nothing logged) once a real gap was found: the
+  // toast system doesn't exist on our branch yet (see
+  // feat(TR-45)/projects-list-and-create-project-fixes for Andrei/Carlos's
+  // build of it, not merged), so this only logs for now - the commented
+  // line below is the exact call to swap in once ToastProvider/useToast
+  // land on main and this route is wrapped by it.
   async function handleSave(): Promise<void> {
-    await updateDiscoveryBlock(
-      params.projectId,
-      params.discoveryBlockId,
-      title,
-      description,
-      notes
-    );
+    try {
+      await updateDiscoveryBlock(
+        params.projectId,
+        params.discoveryBlockId,
+        title,
+        description,
+        notes
+      );
+    } catch (error) {
+      console.error("Failed to save discovery block", error);
+      // const { showToast } = useToast();
+      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to save category" });
+    }
   }
 
   // creates the item on the backend first, then appends the real returned
@@ -112,23 +125,35 @@ function DiscoveryBlockEditPage() {
       return;
     }
 
-    const createdItem = await createDiscoveryBlockItem(
-      params.projectId,
-      params.discoveryBlockId,
-      label,
-      items.length
-    );
-    setItems((previousItems) => [...previousItems, createdItem]);
-    setNewItemLabel("");
+    try {
+      const createdItem = await createDiscoveryBlockItem(
+        params.projectId,
+        params.discoveryBlockId,
+        label,
+        items.length
+      );
+      setItems((previousItems) => [...previousItems, createdItem]);
+      setNewItemLabel("");
+    } catch (error) {
+      console.error("Failed to create discovery block item", error);
+      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to add item" });
+    }
   }
 
   async function handleRemoveItem(id: string): Promise<void> {
-    await deleteDiscoveryBlockItem(
-      params.projectId,
-      params.discoveryBlockId,
-      id
-    );
-    setItems((previousItems) => previousItems.filter((item) => item.id !== id));
+    try {
+      await deleteDiscoveryBlockItem(
+        params.projectId,
+        params.discoveryBlockId,
+        id
+      );
+      setItems((previousItems) =>
+        previousItems.filter((item) => item.id !== id)
+      );
+    } catch (error) {
+      console.error("Failed to delete discovery block item", error);
+      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to delete item" });
+    }
   }
 
   // same optimistic-update pattern as discovery.tsx's checkbox toggle:
@@ -156,6 +181,7 @@ function DiscoveryBlockEditPage() {
       );
     } catch (error) {
       console.error("Failed to update discovery block item", error);
+      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to update item" });
       setItems((previousItems) =>
         previousItems.map((currentItem) =>
           currentItem.id === item.id

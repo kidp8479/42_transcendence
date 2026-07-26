@@ -41,7 +41,9 @@ export async function listDiscoveryBlockItems(
 
   // fail fast if the HTTP status is not 2xx
   if (!response.ok) {
-    throw new Error("Failed to load discovery block items");
+    throw new Error(
+      await readErrorMessage(response, "Failed to load discovery block items")
+    );
   }
 
   // read the body as unknown (never trust it's already a DiscoveryBlockItem[])
@@ -90,7 +92,9 @@ export async function createDiscoveryBlockItem(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to create discovery block item");
+    throw new Error(
+      await readErrorMessage(response, "Failed to create discovery block item")
+    );
   }
 
   const payload: unknown = await response.json();
@@ -136,7 +140,9 @@ export async function updateDiscoveryBlockItem(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to modify discovery block item");
+    throw new Error(
+      await readErrorMessage(response, "Failed to modify discovery block item")
+    );
   }
 
   const payload: unknown = await response.json();
@@ -174,7 +180,9 @@ export async function deleteDiscoveryBlockItem(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to delete discovery block item");
+    throw new Error(
+      await readErrorMessage(response, "Failed to delete discovery block item")
+    );
   }
 
   const payload: unknown = await response.json();
@@ -250,4 +258,29 @@ async function getCsrfToken(): Promise<string> {
     throw new Error("An active session is required");
   }
   return session.csrfToken;
+}
+
+// reads the real backend error message out of a non-OK response - same
+// helper as discoveryBlocks.ts, see its own comment for why this exists.
+// Also matches the shape Andrei/Carlos's toast work reads (`payload.message`,
+// see feat(TR-45).../-fixes branch's apiClient.ts readErrorMessage) - useful
+// once we wire our own catches to a real showToast() call.
+async function readErrorMessage(
+  response: Response,
+  fallback: string
+): Promise<string> {
+  const contentType = response.headers.get("content-type");
+  if (!contentType?.includes("application/json")) {
+    return fallback;
+  }
+
+  const payload: unknown = await response.json();
+  if (
+    isRecord(payload) &&
+    typeof payload.message === "string" &&
+    payload.message.length > 0
+  ) {
+    return payload.message;
+  }
+  return fallback;
 }
