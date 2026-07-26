@@ -2,6 +2,12 @@
 // no object shorthand, while learning.
 import { getSession } from "@/lib/auth";
 
+// mirrors CreateDiscoveryBlockItemDto's @MaxLength on the backend
+// (backend/src/discovery-block-items/dto/create-discovery-block-item.dto.ts)
+// - see discoveryBlocks.ts's equivalent constants for why this is manually
+// kept in sync rather than imported.
+export const DISCOVERY_BLOCK_ITEM_LABEL_MAX_LENGTH = 200;
+
 // All fields here are required (unlike DiscoveryBlock, which has optional
 // description/icon/color/notes) - DiscoveryBlockItem has no optional field
 // in the Prisma schema.

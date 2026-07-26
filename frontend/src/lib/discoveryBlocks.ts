@@ -6,6 +6,16 @@ import { getSession } from "@/lib/auth";
 
 export type DiscoveryBlockStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 
+// mirrors CreateDiscoveryBlockDto's @MaxLength values on the backend
+// (backend/src/discovery-blocks/dto/create-discovery-block.dto.ts) - kept in
+// sync manually since frontend/backend are separate builds, no shared import
+// possible. Used as the edit screen's own maxLength attributes, so typing
+// past the limit is blocked in the input itself instead of failing silently
+// on save with no toast/notification system to explain why.
+export const DISCOVERY_BLOCK_TITLE_MAX_LENGTH = 100;
+export const DISCOVERY_BLOCK_DESCRIPTION_MAX_LENGTH = 500;
+export const DISCOVERY_BLOCK_NOTES_MAX_LENGTH = 2000;
+
 // shape of a DiscoveryBlock exactly as the frontend uses it - mirrors the
 // backend's Prisma model, not something we invent independently
 export interface DiscoveryBlock {
