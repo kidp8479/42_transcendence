@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 
-// Wraps router.invalidate() so a failure in IT is never mistaken for a
+// Wraps router.invalidate() so a failure in it is never mistaken for a
 // failure of the mutation that just succeeded. Call this AFTER a mutation's
 // own try/catch, never inside it - a real bug came from doing that: an
 // error from invalidate() alone rolled back an already-successful save.

@@ -36,6 +36,15 @@ const DISCOVERY_BLOCK_STATUS_BADGE_COLOR: Record<DiscoveryBlockStatus, string> =
     COMPLETED: "success",
   };
 
+// human-readable labels for the badge - discovery.tsx's own status-count
+// pills already spell these out as literal JSX text, this is the same
+// wording for the per-card badge instead of the raw enum value
+const DISCOVERY_BLOCK_STATUS_LABEL: Record<DiscoveryBlockStatus, string> = {
+  NOT_STARTED: "Not Started",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+};
+
 // same rounded-hover-item tweak as ProjectCard.tsx's own "..." menu
 const roundedDropdownItemTheme = {
   container: "mx-1",
@@ -247,7 +256,7 @@ export function DiscoveryBlockCard({
                   DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
                 }
               >
-                {discoveryBlock.status}
+                {DISCOVERY_BLOCK_STATUS_LABEL[discoveryBlock.status]}
               </Badge>
               <Dropdown
                 arrowIcon={false}

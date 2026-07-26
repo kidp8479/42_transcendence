@@ -22,22 +22,20 @@ interface DiscoveryBlockWithItems {
   items: DiscoveryBlockItem[];
 }
 
-// fetches every block, then each block's own items (for...of, not .map(),
-// since we need `await` inside the loop), combined into one array to render
+// fetches every block, then every block's own items - the items requests
+// are independent of each other, so they run in parallel (Promise.all)
+// rather than one at a time
 async function loadDiscoveryPageData(
   projectId: string
 ): Promise<DiscoveryBlockWithItems[]> {
   const discoveryBlocks = await listDiscoveryBlocks(projectId);
 
-  const discoveryBlocksWithItems: DiscoveryBlockWithItems[] = [];
-
-  for (const discoveryBlock of discoveryBlocks) {
-    const items = await listDiscoveryBlockItems(projectId, discoveryBlock.id);
-    discoveryBlocksWithItems.push({
-      discoveryBlock: discoveryBlock,
-      items: items,
-    });
-  }
+  const discoveryBlocksWithItems = await Promise.all(
+    discoveryBlocks.map(async (discoveryBlock) => {
+      const items = await listDiscoveryBlockItems(projectId, discoveryBlock.id);
+      return { discoveryBlock: discoveryBlock, items: items };
+    })
+  );
 
   return discoveryBlocksWithItems;
 }
