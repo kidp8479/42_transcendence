@@ -23,6 +23,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
 	"PasswordCredential",
 	"AuthSession",
 	"OAuthTransaction",
+	"RefreshTokenFamily",
+	"AuthRefreshToken",
+	"WebSocketTicket",
 	"AuthToken"
 TO auth_runtime;
 GRANT SELECT, INSERT, DELETE ON TABLE
@@ -50,5 +53,15 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
 TO backend_runtime;
 
 -- Defense in depth: even if a blanket grant sneaks in later, keep the
--- password store out of the application role.
-REVOKE ALL ON TABLE "PasswordCredential" FROM backend_runtime;
+-- auth/security store out of the application role.
+REVOKE ALL ON TABLE
+	"PasswordCredential",
+	"AuthIdentity",
+	"AuthSession",
+	"OAuthTransaction",
+	"RefreshTokenFamily",
+	"AuthRefreshToken",
+	"WebSocketTicket",
+	"AuthToken",
+	"AuthEvent"
+FROM backend_runtime;
