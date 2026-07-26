@@ -1,6 +1,5 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Badge, Card, Checkbox } from "flowbite-react";
 import {
   listDiscoveryBlocks,
   type DiscoveryBlock,
@@ -11,23 +10,16 @@ import {
   updateDiscoveryBlockItem,
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
-import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
-import { buildCategoryCheckboxTheme } from "@/lib/flowbite";
-import {
-  DISCOVERY_BLOCK_ICON,
-  DISCOVERY_BLOCK_DEFAULT_ICON,
-} from "@/lib/discoveryBlockIcons";
+import { DiscoveryBlockCard } from "@/components/discovery/DiscoveryBlockCard";
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 
-// bundles one DiscoveryBlock together with the items that belong to it -
-// the shape the component actually needs to render a card's checklist.
 interface DiscoveryBlockWithItems {
   discoveryBlock: DiscoveryBlock;
   items: DiscoveryBlockItem[];
 }
 
-// fetches every block, then - one block at a time (for...of, not .map(),
-// since we need `await` inside the loop) - fetches that block's own items,
-// and combines both into a single array the component can render directly.
+// fetches every block, then each block's own items (for...of, not .map(),
+// since we need `await` inside the loop), combined into one array to render
 async function loadDiscoveryPageData(
   projectId: string
 ): Promise<DiscoveryBlockWithItems[]> {
@@ -46,32 +38,15 @@ async function loadDiscoveryPageData(
   return discoveryBlocksWithItems;
 }
 
-// loader runs before the page renders - fetches this route's own data
-// (TanStack Router convention: each route loads what it needs, no parent
-// over-fetch + filter). component is what actually gets displayed once the
-// loader's promise resolves.
 export const Route = createFileRoute("/_authenticated/$projectId/discovery")({
   loader: (routeContext) =>
     loadDiscoveryPageData(routeContext.params.projectId),
   component: DiscoveryPage,
 });
 
-// Badge color per status - Flowbite's fixed set of named colors, chosen to
-// match the semantic meaning of each DiscoveryBlockStatus value.
-const DISCOVERY_BLOCK_STATUS_BADGE_COLOR: Record<DiscoveryBlockStatus, string> =
-  {
-    NOT_STARTED: "gray",
-    IN_PROGRESS: "warning",
-    COMPLETED: "success",
-  };
-
-// Pill style per status, for the status-count pills only - built from the
-// app's own status-* design tokens (index.css) rather than Flowbite's fixed
-// Badge colors, since those tokens are what the rest of the app already uses
-// for status (see TaskStatusOverview.tsx) and are a closer match to Figma's
-// thin-border/translucent-fill look than a solid-filled Badge. Every class
-// written out in full - see categoryColorPalette.ts's note on why a class
-// built at runtime by joining strings never gets picked up by Tailwind.
+// pill style for the status-count counters - built from the app's own
+// status-* tokens (index.css), not Flowbite's Badge colors, to get the
+// thin-border/translucent-fill look Figma uses (see TaskStatusOverview.tsx)
 const DISCOVERY_BLOCK_STATUS_PILL_STYLE: Record<DiscoveryBlockStatus, string> =
   {
     NOT_STARTED: "bg-status-todo/15 border-status-todo/30 text-status-todo",
@@ -81,37 +56,23 @@ const DISCOVERY_BLOCK_STATUS_PILL_STYLE: Record<DiscoveryBlockStatus, string> =
       "bg-status-completed/15 border-status-completed/30 text-status-completed",
   };
 
-// max items shown per card - keeps every card's height the same regardless
-// of how many items the block actually has
-const MAX_ITEMS_PREVIEW = 5;
-
 function DiscoveryPage() {
-  // seeded from whatever the loader returned, but now kept in useState -
-  // the loader's own result never changes after the initial render, so
-  // toggling a checkbox needs its own local, mutable copy to update.
-  // useLoaderData is itself generic (it accepts options like `select`) -
-  // calling it directly inside useState(...) makes TS fail to infer its
-  // return type (it falls back to `never`), so it's resolved to a plain
-  // local const first, then passed to useState separately.
+  // useLoaderData() is itself generic - calling it directly inside
+  // useState(...) breaks TS inference, so it's resolved to a local const first
   const loaderData = Route.useLoaderData();
   const [discoveryBlocksWithItems, setDiscoveryBlocksWithItems] =
     useState(loaderData);
-  const router = useRouter();
+  const safeInvalidateRouter = useSafeRouterInvalidate();
 
-  // re-syncs local state whenever the loader actually returns a new result
-  // (ex: router.invalidate() forced a refetch after editing a block
-  // elsewhere) - useState's initial value is a one-time seed, it never
-  // updates on its own if this component instance survives across
-  // navigations without unmounting, which is exactly what silently broke
-  // color/icon changes made on the edit screen from ever appearing here.
+  // useState's initial value only seeds the first render - without this,
+  // edits made on the edit screen (color, items, etc.) never show up here
+  // if this component survives the navigation without unmounting
   useEffect(() => {
     setDiscoveryBlocksWithItems(loaderData);
   }, [loaderData]);
 
-  // optimistic update: flips isChecked in local state immediately (so the
-  // checkbox reacts instantly, no waiting on the network), fires the PATCH
-  // in the background, and rolls the state back if the request fails -
-  // rather than waiting for the server's response before showing anything.
+  // optimistic toggle: flips isChecked locally first, PATCHes in the
+  // background, rolls back on failure
   async function handleToggleItem(
     discoveryBlock: DiscoveryBlock,
     item: DiscoveryBlockItem
@@ -145,8 +106,6 @@ function DiscoveryPage() {
     } catch (error) {
       console.error("Failed to update discovery block item", error);
       // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to update item" });
-      // rollback: put isChecked back to what it was before the optimistic
-      // update, since the PATCH never actually succeeded
       setDiscoveryBlocksWithItems((previous) =>
         previous.map((entry) => {
           if (entry.discoveryBlock.id !== discoveryBlockId) {
@@ -164,22 +123,9 @@ function DiscoveryPage() {
       );
       return;
     }
-    // keeps the edit screen's own cached loader fresh if the user
-    // navigates there next - wrapped so a failure here can never look like
-    // the PATCH itself failed and trigger the rollback above (real bug hit
-    // when this was inside the try block, see the edit screen's own
-    // safeInvalidateRouter comment for the full story)
-    try {
-      await router.invalidate();
-    } catch (error) {
-      console.error("Failed to refresh cached route data", error);
-    }
+    await safeInvalidateRouter();
   }
 
-  // status pill counts: how many blocks currently have each status. .filter()
-  // keeps only the entries matching, .length counts them - same pattern
-  // already used for itemsDoneCount below, just filtering blocks instead of
-  // items.
   const completedBlockCount = discoveryBlocksWithItems.filter(
     (entry) => entry.discoveryBlock.status === "COMPLETED"
   ).length;
@@ -190,10 +136,7 @@ function DiscoveryPage() {
     (entry) => entry.discoveryBlock.status === "NOT_STARTED"
   ).length;
 
-  // overall progress: total items done / total items, across every block.
-  // A loop nested inside another loop - the outer one visits each block
-  // entry, the inner one visits that block's own items - accumulating into
-  // two counters declared before both loops start.
+  // total items done / total items, across every block
   let overallItemsDoneCount = 0;
   let overallItemsTotalCount = 0;
   for (const entry of discoveryBlocksWithItems) {
@@ -211,8 +154,7 @@ function DiscoveryPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* intro text (left) + compact Overall Progress card (right), side by
-          side - matches Figma's layout instead of a full-width banner */}
+      {/* intro text (left) + compact Overall Progress card (right) */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <p className="max-w-2xl text-sm text-text-secondary">
           Break down the subject before you write a single line of code -
@@ -240,10 +182,7 @@ function DiscoveryPage() {
         </div>
       </div>
 
-      {/* status pills - read-only counters, not clickable filters (decided
-          explicitly: no useState needed for this brick). Plain <span>, not
-          Flowbite's <Badge> - the status-* tokens give a thin-border,
-          translucent-fill pill Badge's fixed color set can't produce. */}
+      {/* status pills - read-only counters, not clickable filters */}
       <div className="flex flex-wrap gap-2">
         <span
           className={
@@ -271,204 +210,21 @@ function DiscoveryPage() {
         </span>
       </div>
 
-      {/* capped at 2 columns (not 3) to match Figma - more width per card,
-        long titles like "PDF Project Understanding" fit on one line */}
+      {/* capped at 2 columns (not 3) to match Figma */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* .map: transforms DiscoveryBlockWithItems[] into one <Card> per
-            entry. Runs once per element - everything inside this callback is
-            computed fresh for each entry. */}
-        {discoveryBlocksWithItems.map((discoveryBlockWithItems) => {
-          const discoveryBlock = discoveryBlockWithItems.discoveryBlock;
-          const items = discoveryBlockWithItems.items;
-
-          // index into the palette by this block's own color (0-7), falling
-          // back to index 0 twice: once if color is missing (?? 0), once if
-          // the resulting index is somehow out of the palette's range
-          const discoveryBlockColor =
-            CATEGORY_COLOR_PALETTE[discoveryBlock.color ?? 0] ??
-            CATEGORY_COLOR_PALETTE[0];
-          // look up this block's icon name in the lookup table; unknown/missing
-          // names fall back to a generic folder icon instead of crashing
-          const DiscoveryBlockIcon =
-            DISCOVERY_BLOCK_ICON[discoveryBlock.icon ?? ""] ??
-            DISCOVERY_BLOCK_DEFAULT_ICON;
-          // same tinted checkbox as the edit screen's checklist, built from
-          // this specific card's own color instead of a fixed brand green
-          const checklistCheckboxTheme =
-            buildCategoryCheckboxTheme(discoveryBlockColor);
-
-          // "X/Y done" + progress percent, computed fresh from the items array
-          // on every render (no separate state to keep in sync - the items
-          // array is always the single source of truth)
-          const itemsDoneCount = items.filter(
-            (item) => item.isChecked === true
-          ).length;
-          const itemsTotalCount = items.length;
-          const itemsDonePercent =
-            itemsTotalCount === 0
-              ? 0
-              : Math.round((itemsDoneCount / itemsTotalCount) * 100);
-
-          // preview: at most MAX_ITEMS_PREVIEW rows, so card height stays
-          // fixed regardless of how many items the block actually has
-          const previewItems = items.slice(0, MAX_ITEMS_PREVIEW);
-          const hiddenItemsCount = itemsTotalCount - previewItems.length;
-
-          return (
-            // key moved to Link (the outermost element .map() produces now) -
-            // clicking anywhere on the card navigates to its edit screen.
-            // no-underline/text-inherit: Link renders as <a>, which the
-            // browser styles blue+underlined by default - overridden here
-            // since this isn't meant to read as a text link.
-            <Link
-              key={discoveryBlock.id}
-              to="/$projectId/discovery/$discoveryBlockId/edit"
-              params={{
-                projectId: discoveryBlock.projectId,
-                discoveryBlockId: discoveryBlock.id,
-              }}
-              // h-full: a CSS grid item stretches to the row's height by
-              // default, but that only gives Link itself the extra height -
-              // without h-full here (and again on Card below), Card still
-              // sizes to its own content, which is why cards with fewer
-              // items ended up visibly shorter than cards with more
-              className="h-full text-inherit no-underline"
-            >
-              <Card
-                // dark: variants written explicitly, not just the plain classes:
-                // Flowbite's own Card theme sets "dark:bg-gray-800 dark:border-
-                // gray-700" by default, and an unprefixed override loses that
-                // fight in dark mode (same issue already hit on Checkbox
-                // elsewhere in the app) - our own dark: rule has to be spelled
-                // out to actually win.
-                className="h-full bg-surface-raised border-surface-border dark:border-surface-border dark:bg-surface-raised"
-                // Card's own theme vertically centers its content
-                // (justify-center) when there's extra height to fill - once
-                // Card stretches to match the tallest card in the row, that
-                // would shift shorter cards' headers down instead of keeping
-                // them pinned to the top, so it's overridden to justify-start
-                theme={{ root: { children: "justify-start" } }}
-              >
-                {/* color bar: an empty div, just a colored rectangle (height set,
-                no content) */}
-                <div className={discoveryBlockColor.bg + " h-1.5"}></div>
-                <div className="flex items-center justify-between gap-2">
-                  {/* min-w-0: lets this flex child actually shrink below its
-                  content size so the title's truncate can take effect,
-                  otherwise it pushes the Badge outside the card - same
-                  overflow pattern already fixed on ProjectCard.tsx (PR #18)
-                  and the checklist item labels below, hit again here at
-                  tablet width (~768px) where there's less room per card */}
-                  <div className="flex min-w-0 items-center gap-2">
-                    {/* icon circle: same background color as the bar above, icon
-                    component rendered as a JSX tag (capitalized variable name
-                    required for that) */}
-                    <div
-                      className={
-                        discoveryBlockColor.bg +
-                        " flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
-                      }
-                    >
-                      <DiscoveryBlockIcon />
-                    </div>
-                    <h5
-                      className="truncate font-mono font-semibold text-text-primary"
-                      title={discoveryBlock.title}
-                    >
-                      {discoveryBlock.title}
-                    </h5>
-                  </div>
-                  {/* shrink-0: without it, a long title can still compress
-                  the Badge instead of truncating first */}
-                  <Badge
-                    className="shrink-0"
-                    color={
-                      DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
-                    }
-                  >
-                    {discoveryBlock.status}
-                  </Badge>
-                </div>
-                {/* conditional render: `x && (...)` shows the JSX only if x is
-                truthy - here, only when description actually has a value */}
-                {discoveryBlock.description && (
-                  <p className="text-text-secondary text-sm">
-                    {discoveryBlock.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-text-secondary">
-                    {itemsDoneCount}/{itemsTotalCount} done
-                  </span>
-                  <div className="h-1.5 w-full flex-1 rounded-full bg-surface-overlay">
-                    <div
-                      className={discoveryBlockColor.bg + " h-1.5 rounded-full"}
-                      style={{ width: itemsDonePercent + "%" }}
-                    ></div>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {/* previewItems, not items: caps rows at MAX_ITEMS_PREVIEW so
-                  every card has the same height regardless of item count */}
-                  {previewItems.map((item) => {
-                    return (
-                      <div key={item.id} className="flex items-center gap-2.5">
-                        {/* readOnly is a no-op on checkbox/radio inputs per
-                        the HTML spec (only text-like inputs respect it) -
-                        using it here caused a real visual bug: the browser's
-                        own native checked-toggle-on-click still fired
-                        unpredictably alongside our own state update, so the
-                        box sometimes didn't visually flip until a later
-                        render. Fixed by using a real onChange (the correct
-                        controlled-checkbox pattern) and letting the browser's
-                        native toggle happen normally - onClick's
-                        stopPropagation (not preventDefault) is enough to stop
-                        the click from bubbling into the wrapping <Link> and
-                        navigating, without blocking the checkbox's own
-                        default toggle/repaint. */}
-                        <Checkbox
-                          // h-4/w-4 already come from Flowbite's own theme,
-                          // but repeated explicitly + shrink-0 here as a
-                          // defensive fix for a real distortion bug seen on
-                          // narrow (mobile-emulated) viewports - the box
-                          // rendered stretched into a tall oval instead of a
-                          // 16x16 square, shrink-0 stops a flex child from
-                          // being compressed/stretched to fill the row
-                          className="h-4 w-4 shrink-0"
-                          theme={checklistCheckboxTheme}
-                          checked={item.isChecked}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={() =>
-                            void handleToggleItem(discoveryBlock, item)
-                          }
-                          aria-label={item.label}
-                        />
-                        {/* truncate: forces one line (ellipsis instead of
-                        wrapping) so every item row is the same height,
-                        regardless of label length - min-w-0 needed because
-                        flex items don't shrink below their content size
-                        otherwise, which would silently disable truncate */}
-                        {/* title: native browser tooltip on hover, shows the
-                        full label when it's been cut off by truncate */}
-                        <span
-                          className="min-w-0 truncate text-sm text-text-secondary"
-                          title={item.label}
-                        >
-                          {item.label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {hiddenItemsCount > 0 && (
-                    <span className="text-xs text-text-secondary">
-                      +{hiddenItemsCount} more
-                    </span>
-                  )}
-                </div>
-              </Card>
-            </Link>
-          );
-        })}
+        {discoveryBlocksWithItems.map((discoveryBlockWithItems) => (
+          <DiscoveryBlockCard
+            key={discoveryBlockWithItems.discoveryBlock.id}
+            discoveryBlock={discoveryBlockWithItems.discoveryBlock}
+            items={discoveryBlockWithItems.items}
+            onToggleItem={(item) =>
+              void handleToggleItem(
+                discoveryBlockWithItems.discoveryBlock,
+                item
+              )
+            }
+          />
+        ))}
       </div>
     </div>
   );
