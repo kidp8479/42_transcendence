@@ -1,3 +1,5 @@
+import type { CategoryColor } from "@/lib/categoryColorPalette";
+
 export const darkTextInputTheme = {
   field: {
     input: {
@@ -33,19 +35,25 @@ export const darkSurfaceTextInputTheme = {
   },
 };
 
-// brand-green border + checkmark instead of Flowbite's default gray
-// border/primary-blue checkmark. `theme` here is merged (not replaced) with
-// Checkbox's own default theme via twMerge, so only the conflicting classes
-// (border color, checkmark/focus-ring color) actually get overridden - the
-// base sizing/shape classes (h-4 w-4 rounded, etc.) are untouched.
-// checked:bg-current on the base theme is what makes color.default's
-// text-brand-500 become the checkmark's actual fill color.
-export const darkSurfaceCheckboxTheme = {
-  base: "border-surface-border dark:border-surface-border bg-surface-overlay dark:bg-surface-overlay",
-  color: {
-    default: "text-brand-500 focus:ring-brand-500 dark:focus:ring-brand-500",
-  },
-};
+// border/checkmark tinted with a CATEGORY_COLOR_PALETTE entry instead of
+// Flowbite's default gray border/primary-blue checkmark. `theme` here is
+// merged (not replaced) with Checkbox's own default theme via twMerge, so
+// only the conflicting classes (border color, checkmark/focus-ring color)
+// actually get overridden - the base sizing/shape classes (h-4 w-4 rounded,
+// etc.) are untouched. checked:bg-current on the base theme is what makes
+// color.default's text-{color} become the checkmark's actual fill color.
+// A function, not a static object: both discovery.tsx's card checkboxes and
+// the edit screen's checklist checkboxes need this tinted with THAT
+// specific block's own color, not a single fixed color - was duplicated as
+// two near-identical inline objects before this, extracted here instead.
+export function buildCategoryCheckboxTheme(color: CategoryColor) {
+  return {
+    base: "border-surface-border dark:border-surface-border bg-surface-overlay dark:bg-surface-overlay",
+    color: {
+      default: color.text + " focus:ring-2 " + color.ring,
+    },
+  };
+}
 
 export const darkAlertTheme = {
   color: {

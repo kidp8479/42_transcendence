@@ -12,7 +12,7 @@ import {
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
-import { darkSurfaceCheckboxTheme } from "@/lib/flowbite";
+import { buildCategoryCheckboxTheme } from "@/lib/flowbite";
 import {
   DISCOVERY_BLOCK_ICON,
   DISCOVERY_BLOCK_DEFAULT_ICON,
@@ -292,6 +292,10 @@ function DiscoveryPage() {
           const DiscoveryBlockIcon =
             DISCOVERY_BLOCK_ICON[discoveryBlock.icon ?? ""] ??
             DISCOVERY_BLOCK_DEFAULT_ICON;
+          // same tinted checkbox as the edit screen's checklist, built from
+          // this specific card's own color instead of a fixed brand green
+          const checklistCheckboxTheme =
+            buildCategoryCheckboxTheme(discoveryBlockColor);
 
           // "X/Y done" + progress percent, computed fresh from the items array
           // on every render (no separate state to keep in sync - the items
@@ -348,24 +352,36 @@ function DiscoveryPage() {
                 {/* color bar: an empty div, just a colored rectangle (height set,
                 no content) */}
                 <div className={discoveryBlockColor.bg + " h-1.5"}></div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  {/* min-w-0: lets this flex child actually shrink below its
+                  content size so the title's truncate can take effect,
+                  otherwise it pushes the Badge outside the card - same
+                  overflow pattern already fixed on ProjectCard.tsx (PR #18)
+                  and the checklist item labels below, hit again here at
+                  tablet width (~768px) where there's less room per card */}
+                  <div className="flex min-w-0 items-center gap-2">
                     {/* icon circle: same background color as the bar above, icon
                     component rendered as a JSX tag (capitalized variable name
                     required for that) */}
                     <div
                       className={
                         discoveryBlockColor.bg +
-                        " flex h-8 w-8 items-center justify-center rounded-full text-white"
+                        " flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
                       }
                     >
                       <DiscoveryBlockIcon />
                     </div>
-                    <h5 className="font-mono font-semibold text-text-primary">
+                    <h5
+                      className="truncate font-mono font-semibold text-text-primary"
+                      title={discoveryBlock.title}
+                    >
                       {discoveryBlock.title}
                     </h5>
                   </div>
+                  {/* shrink-0: without it, a long title can still compress
+                  the Badge instead of truncating first */}
                   <Badge
+                    className="shrink-0"
                     color={
                       DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
                     }
@@ -419,12 +435,13 @@ function DiscoveryPage() {
                           // 16x16 square, shrink-0 stops a flex child from
                           // being compressed/stretched to fill the row
                           className="h-4 w-4 shrink-0"
-                          theme={darkSurfaceCheckboxTheme}
+                          theme={checklistCheckboxTheme}
                           checked={item.isChecked}
                           onClick={(event) => event.stopPropagation()}
                           onChange={() =>
                             void handleToggleItem(discoveryBlock, item)
                           }
+                          aria-label={item.label}
                         />
                         {/* truncate: forces one line (ellipsis instead of
                         wrapping) so every item row is the same height,
