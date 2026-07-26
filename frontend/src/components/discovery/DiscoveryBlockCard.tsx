@@ -215,7 +215,12 @@ export function DiscoveryBlockCard({
       <div className="pointer-events-none relative flex h-full flex-col">
         <div className={discoveryBlockColor.bg + " h-1.5"}></div>
         <div className="flex flex-1 flex-col gap-3 p-4">
-          <div className="flex items-center justify-between gap-2">
+          {/* flex-wrap: the badge+menu group has its own natural minimum
+          width (status text + the new "..." button); on a narrow 2-column
+          card there isn't room left for both that AND the title on one
+          line, so the group wraps to its own row below instead of
+          squeezing the title down to 1-2 visible characters */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
             {/* min-w-0 + truncate on the title, shrink-0 on the badge/menu:
             without both, a long title pushes them outside the card */}
             <div className="flex min-w-0 items-center gap-2">
