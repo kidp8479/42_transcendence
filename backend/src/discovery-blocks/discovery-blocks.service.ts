@@ -36,10 +36,19 @@ export class DiscoveryBlocksService {
     // if the project doesn't exist or userId isn't a member of it
     await this.projectsService.assertMembership(projectId, userId);
 
-    // retrieve the discovery blocks after the ownership test passed
+    // retrieve the discovery blocks after the ownership test passed.
+    // orderBy is not optional here: without it, Postgres makes no ordering
+    // guarantee at all for a plain SELECT, and an UPDATE (ex: editing a
+    // block's color) can visibly change the order rows come back in on the
+    // next findMany - a real bug hit while testing the color/icon selector.
+    // No dedicated `order` field on DiscoveryBlock (unlike DiscoveryBlockItem,
+    // which has one), so createdAt is the next best stable ordering.
     const blocks = await this.prisma.discoveryBlock.findMany({
       where: {
         projectId: projectId,
+      },
+      orderBy: {
+        createdAt: "asc",
       },
     });
     return blocks;

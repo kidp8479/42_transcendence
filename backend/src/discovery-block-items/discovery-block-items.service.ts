@@ -35,9 +35,14 @@ export class DiscoveryBlockItemsService {
       discoveryBlockId,
       userId
     );
-    // where you really retrieve what you want after the guard check
+    // where you really retrieve what you want after the guard check.
+    // orderBy: without it Postgres gives no ordering guarantee at all, and
+    // the `order` field exists on this model specifically to control
+    // checklist row order - same bug as DiscoveryBlocksService.findAll(),
+    // found while testing the color/icon selector on a block with items.
     const blockItems = await this.prisma.discoveryBlockItem.findMany({
       where: { discoveryBlockId: discoveryBlockId },
+      orderBy: { order: "asc" },
     });
     // don't check for if (!blockItems) - an empty array is a valid result, not a 404
     return blockItems;
