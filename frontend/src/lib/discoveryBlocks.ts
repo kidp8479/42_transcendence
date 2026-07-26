@@ -98,13 +98,22 @@ export async function getDiscoveryBlock(
 }
 
 // PATCH - same URL as getDiscoveryBlock (one block, identified by both ids),
-// but a different HTTP method + a request body carrying the new field values.
+// but a different HTTP method + a request body carrying the new field
+// values. Takes one partial `updates` object (mirrors
+// updateDiscoveryBlockItem's own convention) instead of positional
+// params for every field - callers only send what they actually mean to
+// change, so autosaving color/icon on click can't accidentally overwrite an
+// unsaved Title/Description/Notes draft still sitting in the form.
 export async function updateDiscoveryBlock(
   projectId: string,
   discoveryBlockId: string,
-  title: string,
-  description: string,
-  notes: string
+  updates: {
+    title?: string;
+    description?: string;
+    notes?: string;
+    color?: number;
+    icon?: string;
+  }
 ): Promise<DiscoveryBlock> {
   // mutating requests (PATCH/POST/DELETE) are rejected with a 403 by the
   // auth service unless X-CSRF-Token is attached - see auth.guard.ts on the
@@ -130,11 +139,7 @@ export async function updateDiscoveryBlock(
       },
       // fetch's body must be a string - JSON.stringify turns our object into
       // the JSON text actually sent over the wire
-      body: JSON.stringify({
-        title: title,
-        description: description,
-        notes: notes,
-      }),
+      body: JSON.stringify(updates),
     }
   );
 

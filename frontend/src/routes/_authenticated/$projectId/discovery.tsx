@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Badge, Card, Checkbox } from "flowbite-react";
 import {
   listDiscoveryBlocks,
@@ -13,16 +13,10 @@ import {
 } from "@/lib/discoveryBlockItems";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import { darkSurfaceCheckboxTheme } from "@/lib/flowbite";
-import type { IconType } from "react-icons";
 import {
-  HiSearch,
-  HiCollection,
-  HiColorSwatch,
-  HiLink,
-  HiBookOpen,
-  HiCog,
-  HiOutlineFolder,
-} from "react-icons/hi";
+  DISCOVERY_BLOCK_ICON,
+  DISCOVERY_BLOCK_DEFAULT_ICON,
+} from "@/lib/discoveryBlockIcons";
 
 // bundles one DiscoveryBlock together with the items that belong to it -
 // the shape the component actually needs to render a card's checklist.
@@ -87,20 +81,6 @@ const DISCOVERY_BLOCK_STATUS_PILL_STYLE: Record<DiscoveryBlockStatus, string> =
       "bg-status-completed/15 border-status-completed/30 text-status-completed",
   };
 
-// Icon per icon name - matches the free-text names stored in seed.ts
-// ("search", "layers", ...). Not an exhaustive Record like the status table
-// above: DiscoveryBlock.icon is a free string on the backend (no fixed set
-// yet, see the DTO's own comment), so an unknown name must fall back to a
-// default icon instead of being a compile-time error.
-const DISCOVERY_BLOCK_ICON: Record<string, IconType> = {
-  search: HiSearch,
-  layers: HiCollection,
-  palette: HiColorSwatch,
-  link: HiLink,
-  notebook: HiBookOpen,
-  wheel: HiCog,
-};
-
 // max items shown per card - keeps every card's height the same regardless
 // of how many items the block actually has
 const MAX_ITEMS_PREVIEW = 5;
@@ -116,6 +96,17 @@ function DiscoveryPage() {
   const loaderData = Route.useLoaderData();
   const [discoveryBlocksWithItems, setDiscoveryBlocksWithItems] =
     useState(loaderData);
+  const router = useRouter();
+
+  // re-syncs local state whenever the loader actually returns a new result
+  // (ex: router.invalidate() forced a refetch after editing a block
+  // elsewhere) - useState's initial value is a one-time seed, it never
+  // updates on its own if this component instance survives across
+  // navigations without unmounting, which is exactly what silently broke
+  // color/icon changes made on the edit screen from ever appearing here.
+  useEffect(() => {
+    setDiscoveryBlocksWithItems(loaderData);
+  }, [loaderData]);
 
   // optimistic update: flips isChecked in local state immediately (so the
   // checkbox reacts instantly, no waiting on the network), fires the PATCH
@@ -171,6 +162,17 @@ function DiscoveryPage() {
           };
         })
       );
+      return;
+    }
+    // keeps the edit screen's own cached loader fresh if the user
+    // navigates there next - wrapped so a failure here can never look like
+    // the PATCH itself failed and trigger the rollback above (real bug hit
+    // when this was inside the try block, see the edit screen's own
+    // safeInvalidateRouter comment for the full story)
+    try {
+      await router.invalidate();
+    } catch (error) {
+      console.error("Failed to refresh cached route data", error);
     }
   }
 
@@ -288,7 +290,8 @@ function DiscoveryPage() {
           // look up this block's icon name in the lookup table; unknown/missing
           // names fall back to a generic folder icon instead of crashing
           const DiscoveryBlockIcon =
-            DISCOVERY_BLOCK_ICON[discoveryBlock.icon ?? ""] ?? HiOutlineFolder;
+            DISCOVERY_BLOCK_ICON[discoveryBlock.icon ?? ""] ??
+            DISCOVERY_BLOCK_DEFAULT_ICON;
 
           // "X/Y done" + progress percent, computed fresh from the items array
           // on every render (no separate state to keep in sync - the items
