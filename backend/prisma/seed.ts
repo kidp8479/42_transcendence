@@ -7,12 +7,8 @@
 // note: everything else (form placeholders, empty state messages, input hints)
 // is handled in the frontend with the HTML "placeholder" attribute - no DB needed for that
 import "dotenv/config";
-import {
-  PrismaClient,
-  ProjectStatus,
-  DiscoveryBlockStatus,
-  ProjectMemberRole,
-} from "@prisma/client";
+import { PrismaClient, ProjectStatus, ProjectMemberRole } from "@prisma/client";
+import { computeDiscoveryBlockStatus } from "../src/discovery-blocks/discovery-block-status.util";
 
 const prisma = new PrismaClient();
 
@@ -204,17 +200,21 @@ async function main() {
 
   for (const project of createdProjects) {
     for (const cat of discoveryCategories) {
+      // every seeded item starts unchecked, so this is always NOT_STARTED
+      // today - computed via the same function DiscoveryBlocksService uses
+      // (not hardcoded) so seeded data can't drift from the real rule
+      const seedItems = cat.items.map((label, index) => {
+        return { label: label, order: index, isChecked: false };
+      });
       await prisma.discoveryBlock.create({
         data: {
           projectId: project.id,
           title: cat.title,
           icon: cat.icon,
           color: cat.color,
-          status: DiscoveryBlockStatus.NOT_STARTED,
+          status: computeDiscoveryBlockStatus(seedItems),
           discoveryBlockItems: {
-            create: cat.items.map((label, index) => {
-              return { label: label, order: index };
-            }),
+            create: seedItems,
           },
         },
       });

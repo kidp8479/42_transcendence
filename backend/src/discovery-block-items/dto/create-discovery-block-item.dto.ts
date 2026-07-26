@@ -7,8 +7,6 @@
 
 import { IsInt, IsString, MaxLength, MinLength } from "class-validator";
 
-// same named-constant point as create-discovery-block.dto.ts - mirrored by
-// the frontend edit screen's own maxLength attribute on the "New item..." input.
 export const DISCOVERY_BLOCK_ITEM_LABEL_MAX_LENGTH = 200;
 
 export class CreateDiscoveryBlockItemDto {

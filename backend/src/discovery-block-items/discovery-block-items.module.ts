@@ -6,7 +6,7 @@ import { DiscoveryBlockItemsService } from "./discovery-block-items.service";
 import { DiscoveryBlockItemsController } from "./discovery-block-items.controller";
 
 @Module({
-  imports: [DiscoveryBlocksModule],
+  imports: [DiscoveryBlocksModule], // needed to inject DiscoveryBlocksService (findById guard, recalculateStatus) into DiscoveryBlockItemsService
   controllers: [DiscoveryBlockItemsController], // handles HTTP requests
   providers: [DiscoveryBlockItemsService], // handles database operations
   exports: [DiscoveryBlockItemsService], // expose DiscoveryBlockItemsService to other modules that may need it

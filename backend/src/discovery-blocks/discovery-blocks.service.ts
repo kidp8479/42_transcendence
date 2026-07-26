@@ -11,10 +11,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
 import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
+import { computeDiscoveryBlockStatus } from "./discovery-block-status.util";
 
-// named constant so the limit is easy to find/change in one place (per
-// Christophe/Andrei's feedback on Carlos's PR #18: don't bury a cap as a bare
-// number in the middle of the method, and don't be too stingy with it either)
 const MAX_DISCOVERY_BLOCKS_PER_PROJECT = 20;
 
 @Injectable()
@@ -40,9 +38,7 @@ export class DiscoveryBlocksService {
     // orderBy is not optional here: without it, Postgres makes no ordering
     // guarantee at all for a plain SELECT, and an UPDATE (ex: editing a
     // block's color) can visibly change the order rows come back in on the
-    // next findMany - a real bug hit while testing the color/icon selector.
-    // No dedicated `order` field on DiscoveryBlock (unlike DiscoveryBlockItem,
-    // which has one), so createdAt is the next best stable ordering.
+    // next findMany
     const blocks = await this.prisma.discoveryBlock.findMany({
       where: {
         projectId: projectId,
@@ -65,8 +61,7 @@ export class DiscoveryBlocksService {
     // count-then-create is a TOCTOU race in general (two concurrent requests
     // could both read a count under the cap, then both insert) - wrapped in
     // a Serializable transaction so Postgres itself rejects the second
-    // transaction if it would have read stale data, same fix Christophe
-    // proposed for the equivalent bug on ProjectsService.create() (PR #18)
+    // transaction if it would have read stale data
     const block = await this.prisma.transaction(
       async (transactionPrisma) => {
         const existingBlockCount = await transactionPrisma.discoveryBlock.count(
@@ -112,9 +107,24 @@ export class DiscoveryBlocksService {
     return block;
   }
 
+  // Recomputes and persists this block's status from its own checklist -
+  // called by DiscoveryBlockItemsService after every item create/update/remove,
+  // never by this service's own update() (status is never sent in that DTO,
+  // see its own comment). The actual rule lives in computeDiscoveryBlockStatus,
+  // also used by seed.ts so seeded data can never drift from it.
+  async recalculateStatus(discoveryBlockId: string): Promise<void> {
+    const items = await this.prisma.discoveryBlockItem.findMany({
+      where: { discoveryBlockId: discoveryBlockId },
+      select: { isChecked: true },
+    });
+
+    await this.prisma.discoveryBlock.update({
+      where: { id: discoveryBlockId },
+      data: { status: computeDiscoveryBlockStatus(items) },
+    });
+  }
+
   // PATCH (partial update)
-  // status is never set here - can't calculate it automatically until
-  // DiscoveryBlockItem (the checklist) is implemented, see the DTO's own comment
   async update(
     projectId: string,
     id: string,

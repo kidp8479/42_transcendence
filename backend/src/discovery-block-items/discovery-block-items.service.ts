@@ -38,8 +38,7 @@ export class DiscoveryBlockItemsService {
     // where you really retrieve what you want after the guard check.
     // orderBy: without it Postgres gives no ordering guarantee at all, and
     // the `order` field exists on this model specifically to control
-    // checklist row order - same bug as DiscoveryBlocksService.findAll(),
-    // found while testing the color/icon selector on a block with items.
+    // checklist row order
     const blockItems = await this.prisma.discoveryBlockItem.findMany({
       where: { discoveryBlockId: discoveryBlockId },
       orderBy: { order: "asc" },
@@ -86,10 +85,18 @@ export class DiscoveryBlockItemsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
+    // outside the transaction on purpose - status is a derived/display value,
+    // not a business invariant like the item cap above, so it doesn't need
+    // the same Serializable protection
+    await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
     return blockItem;
   }
 
   // GET (one)
+  // also reused by update/remove as their access guard: it already checks
+  // membership + block ownership (via discoveryBlocksService.findById) and
+  // that this item id belongs to discoveryBlockId, throwing the right
+  // NotFoundException in each case
   async findById(
     projectId: string,
     discoveryBlockId: string,
@@ -125,6 +132,10 @@ export class DiscoveryBlockItemsService {
       where: { id: id },
       data: { ...dto },
     });
+    // recomputed on every update, not just when isChecked is sent - simpler
+    // than tracking which field changed, and the total item count never
+    // changes here so a label/order-only update is a harmless no-op recompute
+    await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
     return updatedItem;
   }
 
@@ -140,6 +151,9 @@ export class DiscoveryBlockItemsService {
     const deletedItem = await this.prisma.discoveryBlockItem.delete({
       where: { id: id },
     });
+    // recalculated after the delete, so the removed item is already excluded
+    // from the count/ratio
+    await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
     return deletedItem;
   }
 }

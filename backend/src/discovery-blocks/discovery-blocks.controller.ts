@@ -1,12 +1,8 @@
 // DiscoveryBlocksController: handles all HTTP requests under /api/projects/:projectId/discovery-blocks
-// one method per route - delegates all database work to DiscoveryBlocksService
-// note: projectId always comes from the URL, never from the request body
-// note: when implementing, validate :projectId and :id with @Param(name, ParseUUIDPipe)
-// so a malformed id gets rejected with a 400 before hitting the database
-// note: :projectId alone does not prove access - every route must also confirm
-// req.user.id is a member of that project (ProjectMember) before returning/changing
-// anything, otherwise any authenticated user could read or modify any project's
-// discovery blocks just by changing the projectId in the URL (IDOR).
+// one method per route - delegates all database work to DiscoveryBlocksService.
+// Every :id param is validated with ParseUUIDPipe (malformed id => 400 before
+// hitting the database); the real access check (membership + ownership,
+// IDOR-safe) happens in the service, see its findById.
 
 import {
   Controller,
