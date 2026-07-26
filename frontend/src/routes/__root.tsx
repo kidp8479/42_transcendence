@@ -1,5 +1,6 @@
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { RootErrorComponent } from "../components/errors/RootErrorComponent";
 import { ModalLayer } from "../components/modals/ModalLayer";
 import { ModalProvider } from "../components/modals/ModalProvider";
 import { Footer } from "../components/navigation/Footer";
@@ -14,6 +15,10 @@ export const Route = createRootRouteWithContext<AppRouterContext>()({
     authState: await context.auth.resolve(),
   }),
   component: RootLayout,
+  // Falls back to this whenever a route's own loader/component throws and
+  // doesn't define its own errorComponent - covers every route in the app,
+  // not just Discovery's.
+  errorComponent: RootErrorComponent,
 });
 
 function RootLayout() {
