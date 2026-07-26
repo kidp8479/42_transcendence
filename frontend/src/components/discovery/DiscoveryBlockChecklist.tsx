@@ -57,8 +57,8 @@ export function DiscoveryBlockChecklist({
                 aria-label={item.label}
               />
               {/* min-w-0 + truncate: a long, space-less label can grow past
-              the pill's width instead of being clipped otherwise (same fix
-              as ProjectCard.tsx on PR #18) */}
+              the pill's width instead of being clipped otherwise - same
+              flex-child overflow fix as DiscoveryBlockCard.tsx's header */}
               <span
                 className={
                   "min-w-0 flex-1 truncate text-sm text-text-primary" +

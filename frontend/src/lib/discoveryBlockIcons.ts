@@ -12,11 +12,10 @@ import {
   HiOutlineFolder,
 } from "react-icons/hi";
 
-// Icon per icon name - matches the free-text names stored in seed.ts
-// ("search", "layers", ...). Not an exhaustive Record: DiscoveryBlock.icon
-// is a free string on the backend (no fixed set yet, see the DTO's own
-// comment), so an unknown/missing name falls back to DISCOVERY_BLOCK_DEFAULT_ICON
-// instead of being a compile-time error.
+// Icon per icon name - mirrors CreateDiscoveryBlockDto's DISCOVERY_BLOCK_ICON_NAMES
+// on the backend (@IsIn-validated there, kept in sync manually here). Record
+// rather than an exhaustive type: an unknown/missing name falls back to
+// DISCOVERY_BLOCK_DEFAULT_ICON instead of being a compile-time error.
 export const DISCOVERY_BLOCK_ICON: Record<string, IconType> = {
   search: HiSearch,
   layers: HiCollection,

@@ -2,10 +2,6 @@
 // no object shorthand, while learning.
 import { apiClient } from "@/lib/apiClient";
 
-// mirrors CreateDiscoveryBlockItemDto's @MaxLength on the backend
-// (backend/src/discovery-block-items/dto/create-discovery-block-item.dto.ts)
-// - see discoveryBlocks.ts's equivalent constants for why this is manually
-// kept in sync rather than imported.
 export const DISCOVERY_BLOCK_ITEM_LABEL_MAX_LENGTH = 200;
 
 // All fields here are required (unlike DiscoveryBlock, which has optional
@@ -77,9 +73,8 @@ export async function createDiscoveryBlockItem(
 // PATCH - all three fields optional (mirrors UpdateDiscoveryBlockItemDto on
 // the backend, which extends the create DTO with PartialType + adds
 // isChecked). Takes one options object instead of 3 positional params,
-// since callers only ever set one field at a time: toggling the checkbox
-// sends only isChecked, renaming sends only label, drag-to-reorder sends
-// only order.
+// since callers only ever set one field at a time - toggling the checkbox
+// sends only isChecked, renaming sends only label.
 export async function updateDiscoveryBlockItem(
   projectId: string,
   discoveryBlockId: string,

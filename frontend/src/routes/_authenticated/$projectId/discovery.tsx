@@ -163,8 +163,8 @@ function DiscoveryPage() {
       {/* intro text (left) + compact Overall Progress card (right) */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <p className="max-w-2xl text-sm text-text-secondary">
-          Break down the subject before you write a single line of code -
-          organize constraints, questions, and resources into checklists you can
+          Break down the subject before you write a single line of code.
+          Organize constraints, questions, and resources into checklists you can
           track.
         </p>
         <div className="w-full max-w-xs rounded-lg border border-surface-border bg-surface-raised p-4 dark:border-surface-border dark:bg-surface-raised">
@@ -188,7 +188,6 @@ function DiscoveryPage() {
         </div>
       </div>
 
-      {/* status pills - read-only counters, not clickable filters */}
       <div className="flex flex-wrap gap-2">
         <span
           className={
@@ -216,7 +215,6 @@ function DiscoveryPage() {
         </span>
       </div>
 
-      {/* capped at 2 columns (not 3) to match Figma */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {discoveryBlocksWithItems.map((discoveryBlockWithItems) => (
           <DiscoveryBlockCard
