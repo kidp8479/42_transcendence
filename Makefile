@@ -187,9 +187,9 @@ migrate-fix-permissions: $(ENV_FILE)
 prisma-studio:
 	$(COMPOSE) exec backend npx prisma studio --browser none
 
-## inject demo data into the database (run once after migrate, requires seed.ts to be implemented)
+## inject demo data using the short-lived Vault migration lease
 seed:
-	$(COMPOSE) exec backend npx prisma db seed
+	$(COMPOSE) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
 
 ## stop the database and remove its Compose-managed data volume
 # same portable mechanism as ffclean: match containers/volumes by label or
