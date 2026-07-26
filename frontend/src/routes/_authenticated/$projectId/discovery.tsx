@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+  createDiscoveryBlock,
+  deleteDiscoveryBlock,
   listDiscoveryBlocks,
   type DiscoveryBlock,
   type DiscoveryBlockStatus,
@@ -11,6 +13,7 @@ import {
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
 import { DiscoveryBlockCard } from "@/components/discovery/DiscoveryBlockCard";
+import { NewDiscoveryBlockCard } from "@/components/discovery/NewDiscoveryBlockCard";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 
@@ -61,6 +64,7 @@ function DiscoveryPage() {
   // useLoaderData() is itself generic - calling it directly inside
   // useState(...) breaks TS inference, so it's resolved to a local const first
   const loaderData = Route.useLoaderData();
+  const params = Route.useParams();
   const [discoveryBlocksWithItems, setDiscoveryBlocksWithItems] =
     useState(loaderData);
   const safeInvalidateRouter = useSafeRouterInvalidate();
@@ -130,6 +134,47 @@ function DiscoveryPage() {
       return;
     }
     await safeInvalidateRouter();
+  }
+
+  // not optimistic (mirrors handleAddItem on the edit screen) - the backend
+  // assigns the real id, and this card list has no local "pending" concept
+  async function handleCreateBlock(title: string): Promise<boolean> {
+    try {
+      const createdBlock = await createDiscoveryBlock(params.projectId, title);
+      setDiscoveryBlocksWithItems((previous) => [
+        ...previous,
+        { discoveryBlock: createdBlock, items: [] },
+      ]);
+    } catch (error) {
+      console.error("Failed to create discovery block", error);
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to create category",
+      });
+      return false;
+    }
+    await safeInvalidateRouter();
+    return true;
+  }
+
+  async function handleDeleteBlock(discoveryBlockId: string): Promise<boolean> {
+    try {
+      await deleteDiscoveryBlock(params.projectId, discoveryBlockId);
+      setDiscoveryBlocksWithItems((previous) =>
+        previous.filter((entry) => entry.discoveryBlock.id !== discoveryBlockId)
+      );
+    } catch (error) {
+      console.error("Failed to delete discovery block", error);
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to delete category",
+      });
+      return false;
+    }
+    await safeInvalidateRouter();
+    return true;
   }
 
   const completedBlockCount = discoveryBlocksWithItems.filter(
@@ -227,8 +272,12 @@ function DiscoveryPage() {
                 item
               )
             }
+            onDeleteBlock={() =>
+              handleDeleteBlock(discoveryBlockWithItems.discoveryBlock.id)
+            }
           />
         ))}
+        <NewDiscoveryBlockCard onCreate={handleCreateBlock} />
       </div>
     </div>
   );

@@ -68,6 +68,47 @@ export async function getDiscoveryBlock(
   return parsed;
 }
 
+// POST - creates a new category. Only `title` is required (mirrors
+// CreateDiscoveryBlockDto); description/icon/color/notes are set afterward
+// on the edit screen, not at creation time.
+export async function createDiscoveryBlock(
+  projectId: string,
+  title: string
+): Promise<DiscoveryBlock> {
+  const payload = await apiClient<unknown>(
+    "/projects/" + projectId + "/discovery-blocks",
+    {
+      method: "POST",
+      body: { title: title },
+    }
+  );
+
+  const parsed = parseDiscoveryBlock(payload);
+  if (parsed === null) {
+    throw new Error("Discovery block creation response was invalid");
+  }
+  return parsed;
+}
+
+// DELETE - deletes the whole category, cascading its items on the backend
+// (onDelete: Cascade in schema.prisma) - the backend returns the deleted
+// block's own body (200, not 204), same as deleteDiscoveryBlockItem.
+export async function deleteDiscoveryBlock(
+  projectId: string,
+  discoveryBlockId: string
+): Promise<DiscoveryBlock> {
+  const payload = await apiClient<unknown>(
+    "/projects/" + projectId + "/discovery-blocks/" + discoveryBlockId,
+    { method: "DELETE" }
+  );
+
+  const parsed = parseDiscoveryBlock(payload);
+  if (parsed === null) {
+    throw new Error("Discovery block deletion response was invalid");
+  }
+  return parsed;
+}
+
 // PATCH - takes one partial `updates` object (mirrors
 // updateDiscoveryBlockItem's own convention) instead of positional params
 // for every field - callers only send what they actually mean to change, so
