@@ -21,6 +21,8 @@ model User {
   avatarUrl        String? // if null, the frontend generates an avatar from username initials (CSS only, no DB)
   campus           String? // ex: "42 Paris" - filled via OAuth, can be updated in settings
   twoFactorEnabled Boolean            @default(false) // toggled from the Security section in Settings
+  status           AccountStatus      @default(ACTIVE)
+  globalRole       GlobalRole         @default(USER)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   projectMembers   ProjectMember[] // one User => many ProjectMember rows
@@ -30,7 +32,11 @@ model User {
   authIdentities   AuthIdentity[]
   authSessions     AuthSession[]
   authTokens       AuthToken[]
-  authEvents       AuthEvent[]
+  authEvents       AuthEvent[]           @relation("AuthEventSubject")
+  refreshFamilies  RefreshTokenFamily[]
+  initiatedOAuthTransactions OAuthTransaction[] @relation("OAuthTransactionInitiator")
+  authEventsAsActor  AuthEvent[]         @relation("AuthEventActor")
+  authEventsAsTarget AuthEvent[]         @relation("AuthEventTarget")
 }
 
 enum AuthProvider {
@@ -42,6 +48,22 @@ enum AuthProvider {
 enum AuthTokenType {
   EMAIL_VERIFICATION
   PASSWORD_RESET
+}
+
+enum AccountStatus {
+  ACTIVE
+  PENDING_APPROVAL
+  DISABLED
+}
+
+enum GlobalRole {
+  USER
+  PLATFORM_ADMIN
+}
+
+enum OAuthTransactionPurpose {
+  LOGIN
+  LINK
 }
 
 model AuthIdentity {
@@ -96,18 +118,81 @@ model AuthSession {
   @@index([absoluteExpiresAt])
 }
 
+model RefreshTokenFamily {
+  id                   String             @id @default(uuid())
+  userId               String
+  authenticationMethod AuthProvider
+  assuranceLevel       Int                @default(1)
+  csrfTokenHash        String
+  authenticatedAt      DateTime           @default(now())
+  lastUsedAt           DateTime           @default(now())
+  idleExpiresAt        DateTime
+  absoluteExpiresAt    DateTime
+  revokedAt            DateTime?
+  revokedReason        String?
+  ipHash               String?
+  userAgentHash        String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens        AuthRefreshToken[]
+  webSocketTickets     WebSocketTicket[]
+
+  @@unique([id, userId])
+  @@index([absoluteExpiresAt])
+  @@index([idleExpiresAt])
+}
+
+model AuthRefreshToken {
+  id               String             @id @default(uuid())
+  familyId         String
+  tokenHash        String             @unique
+  issuedAt         DateTime           @default(now())
+  usedAt           DateTime?
+  replacedAt       DateTime?
+  graceExpiresAt   DateTime?
+  expiresAt        DateTime
+  replacedById     String?            @unique
+  family           RefreshTokenFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  replacedBy       AuthRefreshToken?  @relation("RefreshTokenReplacement", fields: [replacedById], references: [id], onDelete: Restrict)
+  replaces         AuthRefreshToken?  @relation("RefreshTokenReplacement")
+
+  @@index([familyId, issuedAt])
+  @@index([expiresAt])
+}
+
 model OAuthTransaction {
-  id                     String       @id @default(uuid())
+  id                     String                  @id @default(uuid())
   provider               AuthProvider
-  stateHash              String       @unique
+  stateHash              String                  @unique
   codeVerifierCiphertext String?
   nonceHash              String?
   redirectUri            String
   returnTo               String
-  createdAt              DateTime     @default(now())
+  purpose                OAuthTransactionPurpose @default(LOGIN)
+  initiatingUserId       String?
+  consumedAt             DateTime?
+  createdAt              DateTime                @default(now())
   expiresAt              DateTime
+  initiatingUser         User?                   @relation("OAuthTransactionInitiator", fields: [initiatingUserId], references: [id], onDelete: SetNull)
 
   @@index([expiresAt])
+  @@index([initiatingUserId])
+}
+
+model WebSocketTicket {
+  id                   String             @id @default(uuid())
+  ticketHash           String             @unique
+  userId               String
+  refreshFamilyId      String
+  audience             String
+  issuedAt             DateTime           @default(now())
+  expiresAt            DateTime
+  consumedAt           DateTime?
+  refreshFamily        RefreshTokenFamily @relation(fields: [refreshFamilyId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([refreshFamilyId])
 }
 
 model AuthToken {
@@ -125,19 +210,28 @@ model AuthToken {
 }
 
 model AuthEvent {
-  id        String        @id @default(uuid())
-  userId    String?
-  eventType String
-  provider  AuthProvider?
-  sessionId String?
-  ipHash    String?
-  metadata  Json?
-  createdAt DateTime      @default(now())
-  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id                 String       @id @default(uuid())
+  userId             String?
+  eventType          String
+  provider           AuthProvider?
+  sessionId          String?
+  ipHash             String?
+  metadata           Json?
+  actorUserId        String?
+  targetUserId       String?
+  previousGlobalRole GlobalRole?
+  newGlobalRole      GlobalRole?
+  reason             String?
+  createdAt          DateTime     @default(now())
+  user               User?        @relation("AuthEventSubject", fields: [userId], references: [id], onDelete: SetNull)
+  actorUser          User?        @relation("AuthEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  targetUser         User?        @relation("AuthEventTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([eventType])
   @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([targetUserId, createdAt])
 }
 
 // no updatedAt: the only modification is marking as read (isRead), we don't need to track when that happened
@@ -181,6 +275,7 @@ model ProjectMember {
 enum ProjectMemberRole {
   ADMIN
   MEMBER
+  OWNER
 }
 
 enum ProjectStatus {
