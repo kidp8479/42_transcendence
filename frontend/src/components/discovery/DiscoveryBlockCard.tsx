@@ -53,7 +53,16 @@ export function DiscoveryBlockCard({
       ? 0
       : Math.round((itemsDoneCount / itemsTotalCount) * 100);
 
-  const previewItems = items.slice(0, MAX_ITEMS_PREVIEW);
+  // unchecked items first (team idea: a done item is less useful to see in
+  // a small, capped preview than one still to do) - a copy since .sort()
+  // mutates in place, and items is a prop we don't own
+  const sortedItems = [...items].sort((a, b) => {
+    if (a.isChecked === b.isChecked) {
+      return 0;
+    }
+    return a.isChecked ? 1 : -1;
+  });
+  const previewItems = sortedItems.slice(0, MAX_ITEMS_PREVIEW);
   const hiddenItemsCount = itemsTotalCount - previewItems.length;
 
   return (
@@ -89,8 +98,11 @@ export function DiscoveryBlockCard({
             >
               <DiscoveryBlockIcon />
             </div>
+            {/* text-base: matches every other card/section title's explicit
+            size convention in the app (summary/*.tsx) - this h5 had no size
+            class at all before, falling back to the browser default instead */}
             <h5
-              className="truncate font-mono font-semibold text-text-primary"
+              className="truncate font-mono text-base font-semibold text-text-primary"
               title={discoveryBlock.title}
             >
               {discoveryBlock.title}
@@ -119,6 +131,7 @@ export function DiscoveryBlockCard({
             ></div>
           </div>
         </div>
+        <div className="border-t border-surface-border"></div>
         <div className="flex flex-col gap-2">
           {previewItems.map((item) => {
             return (
