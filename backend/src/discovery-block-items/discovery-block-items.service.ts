@@ -64,7 +64,7 @@ export class DiscoveryBlockItemsService {
 
     // same Serializable-transaction fix as DiscoveryBlocksService.create(),
     // for the same count-then-create TOCTOU reason
-    const blockItem = await this.prisma.$transaction(
+    const blockItem = await this.prisma.transaction(
       async (transactionPrisma) => {
         const existingItemCount =
           await transactionPrisma.discoveryBlockItem.count({

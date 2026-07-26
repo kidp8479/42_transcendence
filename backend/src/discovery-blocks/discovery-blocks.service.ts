@@ -67,7 +67,7 @@ export class DiscoveryBlocksService {
     // a Serializable transaction so Postgres itself rejects the second
     // transaction if it would have read stale data, same fix Christophe
     // proposed for the equivalent bug on ProjectsService.create() (PR #18)
-    const block = await this.prisma.$transaction(
+    const block = await this.prisma.transaction(
       async (transactionPrisma) => {
         const existingBlockCount = await transactionPrisma.discoveryBlock.count(
           {
