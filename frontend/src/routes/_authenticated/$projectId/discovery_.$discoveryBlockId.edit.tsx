@@ -30,6 +30,7 @@ import {
 import { DiscoveryBlockAppearancePicker } from "@/components/discovery/DiscoveryBlockAppearancePicker";
 import { DiscoveryBlockChecklist } from "@/components/discovery/DiscoveryBlockChecklist";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
+import { useToast } from "@/hooks/useToast";
 
 // trailing "_" opts out of nesting under discovery.tsx (no <Outlet/> there)
 export const Route = createFileRoute(
@@ -55,6 +56,7 @@ function DiscoveryBlockEditPage() {
   const loaderData = Route.useLoaderData();
   const params = Route.useParams();
   const safeInvalidateRouter = useSafeRouterInvalidate();
+  const { showToast } = useToast();
 
   const [title, setTitle] = useState(loaderData.discoveryBlock.title);
   const [description, setDescription] = useState(
@@ -86,10 +88,6 @@ function DiscoveryBlockEditPage() {
       ? 0
       : Math.round((itemsDoneCount / itemsTotalCount) * 100);
 
-  // no toast system on our branch yet (see
-  // feat(TR-45)/projects-list-and-create-project-fixes for Andrei/Carlos's
-  // build of it, not merged) - the commented showToast lines below are the
-  // exact calls to swap in once ToastProvider/useToast land on main
   async function handleSave(): Promise<void> {
     try {
       // color/icon are autosaved separately (handleColorChange/
@@ -101,7 +99,11 @@ function DiscoveryBlockEditPage() {
       });
     } catch (error) {
       console.error("Failed to save discovery block", error);
-      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to save category" });
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to save category",
+      });
       return;
     }
     await safeInvalidateRouter();
@@ -119,7 +121,11 @@ function DiscoveryBlockEditPage() {
       });
     } catch (error) {
       console.error("Failed to save discovery block color", error);
-      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to save color" });
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to save color",
+      });
       setSelectedColorIndex(previousColorIndex);
       return;
     }
@@ -135,7 +141,10 @@ function DiscoveryBlockEditPage() {
       });
     } catch (error) {
       console.error("Failed to save discovery block icon", error);
-      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to save icon" });
+      showToast({
+        type: "error",
+        message: error instanceof Error ? error.message : "Failed to save icon",
+      });
       setSelectedIcon(previousIcon);
       return;
     }
@@ -162,7 +171,10 @@ function DiscoveryBlockEditPage() {
       setNewItemLabel("");
     } catch (error) {
       console.error("Failed to create discovery block item", error);
-      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to add item" });
+      showToast({
+        type: "error",
+        message: error instanceof Error ? error.message : "Failed to add item",
+      });
       return;
     }
     await safeInvalidateRouter();
@@ -180,7 +192,11 @@ function DiscoveryBlockEditPage() {
       );
     } catch (error) {
       console.error("Failed to delete discovery block item", error);
-      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to delete item" });
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to delete item",
+      });
       return;
     }
     await safeInvalidateRouter();
@@ -209,7 +225,11 @@ function DiscoveryBlockEditPage() {
       );
     } catch (error) {
       console.error("Failed to update discovery block item", error);
-      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to update item" });
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to update item",
+      });
       setItems((previousItems) =>
         previousItems.map((currentItem) =>
           currentItem.id === item.id

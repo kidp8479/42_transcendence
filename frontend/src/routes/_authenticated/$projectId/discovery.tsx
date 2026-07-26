@@ -12,6 +12,7 @@ import {
 } from "@/lib/discoveryBlockItems";
 import { DiscoveryBlockCard } from "@/components/discovery/DiscoveryBlockCard";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
+import { useToast } from "@/hooks/useToast";
 
 interface DiscoveryBlockWithItems {
   discoveryBlock: DiscoveryBlock;
@@ -63,6 +64,7 @@ function DiscoveryPage() {
   const [discoveryBlocksWithItems, setDiscoveryBlocksWithItems] =
     useState(loaderData);
   const safeInvalidateRouter = useSafeRouterInvalidate();
+  const { showToast } = useToast();
 
   // useState's initial value only seeds the first render - without this,
   // edits made on the edit screen (color, items, etc.) never show up here
@@ -105,7 +107,11 @@ function DiscoveryPage() {
       );
     } catch (error) {
       console.error("Failed to update discovery block item", error);
-      // showToast({ type: "error", message: error instanceof Error ? error.message : "Failed to update item" });
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to update item",
+      });
       setDiscoveryBlocksWithItems((previous) =>
         previous.map((entry) => {
           if (entry.discoveryBlock.id !== discoveryBlockId) {
