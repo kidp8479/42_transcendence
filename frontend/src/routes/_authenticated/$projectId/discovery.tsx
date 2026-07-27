@@ -4,8 +4,8 @@ import {
   createDiscoveryBlock,
   deleteDiscoveryBlock,
   listDiscoveryBlocks,
+  DISCOVERY_BLOCK_STATUS_PILL_STYLE,
   type DiscoveryBlock,
-  type DiscoveryBlockStatus,
 } from "@/lib/discoveryBlocks";
 import {
   listDiscoveryBlockItems,
@@ -45,18 +45,6 @@ export const Route = createFileRoute("/_authenticated/$projectId/discovery")({
     loadDiscoveryPageData(routeContext.params.projectId),
   component: DiscoveryPage,
 });
-
-// pill style for the status-count counters - built from the app's own
-// status-* tokens (index.css), not Flowbite's Badge colors, to get the
-// thin-border/translucent-fill look Figma uses (see TaskStatusOverview.tsx)
-const DISCOVERY_BLOCK_STATUS_PILL_STYLE: Record<DiscoveryBlockStatus, string> =
-  {
-    NOT_STARTED: "bg-status-todo/15 border-status-todo/30 text-status-todo",
-    IN_PROGRESS:
-      "bg-status-in-progress/15 border-status-in-progress/30 text-status-in-progress",
-    COMPLETED:
-      "bg-status-completed/15 border-status-completed/30 text-status-completed",
-  };
 
 function DiscoveryPage() {
   // useLoaderData() is itself generic - calling it directly inside
@@ -267,10 +255,7 @@ function DiscoveryPage() {
             discoveryBlock={discoveryBlockWithItems.discoveryBlock}
             items={discoveryBlockWithItems.items}
             onToggleItem={(item) =>
-              void handleToggleItem(
-                discoveryBlockWithItems.discoveryBlock,
-                item
-              )
+              handleToggleItem(discoveryBlockWithItems.discoveryBlock, item)
             }
             onDeleteBlock={() =>
               handleDeleteBlock(discoveryBlockWithItems.discoveryBlock.id)

@@ -6,6 +6,35 @@ import { apiClient } from "@/lib/apiClient";
 
 export type DiscoveryBlockStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 
+// shared pill style for anything showing a DiscoveryBlockStatus (the status
+// counters at the top of discovery.tsx, and the per-card badge in
+// DiscoveryBlockCard.tsx) - built from the app's own status-* tokens
+// (index.css), not Flowbite's Badge colors, to get the thin-border/
+// translucent-fill look Figma uses (see TaskStatusOverview.tsx). Kept in one
+// place so both spots always show the same colour for the same status.
+export const DISCOVERY_BLOCK_STATUS_PILL_STYLE: Record<
+  DiscoveryBlockStatus,
+  string
+> = {
+  NOT_STARTED: "bg-status-todo/15 border-status-todo/30 text-status-todo",
+  IN_PROGRESS:
+    "bg-status-in-progress/15 border-status-in-progress/30 text-status-in-progress",
+  COMPLETED:
+    "bg-status-completed/15 border-status-completed/30 text-status-completed",
+};
+
+// human-readable labels for the status - discovery.tsx's own status-count
+// pills spell these out as literal JSX text already, this is the same
+// wording for anywhere else a status needs to render as text
+export const DISCOVERY_BLOCK_STATUS_LABEL: Record<
+  DiscoveryBlockStatus,
+  string
+> = {
+  NOT_STARTED: "Not Started",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+};
+
 // mirrors CreateDiscoveryBlockDto's @MaxLength values on the backend
 // (backend/src/discovery-blocks/dto/create-discovery-block.dto.ts) - kept in
 // sync manually since frontend/backend are separate builds, no shared import

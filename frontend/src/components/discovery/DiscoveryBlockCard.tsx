@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Badge,
   Button,
   Checkbox,
   Dropdown,
@@ -13,9 +12,10 @@ import {
   HiOutlineTrash,
   HiOutlineXMark,
 } from "react-icons/hi2";
-import type {
-  DiscoveryBlock,
-  DiscoveryBlockStatus,
+import {
+  DISCOVERY_BLOCK_STATUS_LABEL,
+  DISCOVERY_BLOCK_STATUS_PILL_STYLE,
+  type DiscoveryBlock,
 } from "@/lib/discoveryBlocks";
 import type { DiscoveryBlockItem } from "@/lib/discoveryBlockItems";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
@@ -28,22 +28,6 @@ import {
 // max items shown per card - keeps every card's height the same regardless
 // of how many items the block actually has
 const MAX_ITEMS_PREVIEW = 5;
-
-const DISCOVERY_BLOCK_STATUS_BADGE_COLOR: Record<DiscoveryBlockStatus, string> =
-  {
-    NOT_STARTED: "gray",
-    IN_PROGRESS: "warning",
-    COMPLETED: "success",
-  };
-
-// human-readable labels for the badge - discovery.tsx's own status-count
-// pills already spell these out as literal JSX text, this is the same
-// wording for the per-card badge instead of the raw enum value
-const DISCOVERY_BLOCK_STATUS_LABEL: Record<DiscoveryBlockStatus, string> = {
-  NOT_STARTED: "Not Started",
-  IN_PROGRESS: "In Progress",
-  COMPLETED: "Completed",
-};
 
 // same rounded-hover-item tweak as ProjectCard.tsx's own "..." menu
 const roundedDropdownItemTheme = {
@@ -65,7 +49,7 @@ const confirmDeleteInputTheme = {
 interface DiscoveryBlockCardProps {
   discoveryBlock: DiscoveryBlock;
   items: DiscoveryBlockItem[];
-  onToggleItem: (item: DiscoveryBlockItem) => void;
+  onToggleItem: (item: DiscoveryBlockItem) => Promise<void>;
   onDeleteBlock: () => Promise<boolean>;
 }
 
@@ -93,6 +77,23 @@ export function DiscoveryBlockCard({
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const confirmInputId = useId();
+
+  // guards against a real race: onToggleItem updates isChecked optimistically
+  // then PATCHes in the background - navigating into the edit screen while
+  // that PATCH is still in flight can land its GET before the PATCH commits,
+  // showing the pre-toggle state there. Counts rather than a boolean since
+  // several items can be toggled in quick succession.
+  const [pendingToggleCount, setPendingToggleCount] = useState(0);
+  const hasPendingToggle = pendingToggleCount > 0;
+
+  async function handleToggleItemClick(item: DiscoveryBlockItem) {
+    setPendingToggleCount((count) => count + 1);
+    try {
+      await onToggleItem(item);
+    } finally {
+      setPendingToggleCount((count) => count - 1);
+    }
+  }
 
   const discoveryBlockColor =
     CATEGORY_COLOR_PALETTE[discoveryBlock.color ?? 0] ??
@@ -236,15 +237,32 @@ export function DiscoveryBlockCard({
           card-wide Link and misfire a navigation instead of toggling the
           item, since the checkbox's real hit area is only 16x16px. */}
           <div className="relative flex flex-col gap-3">
-            <Link
-              to="/$projectId/discovery/$discoveryBlockId/edit"
-              params={{
-                projectId: discoveryBlock.projectId,
-                discoveryBlockId: discoveryBlock.id,
-              }}
-              aria-label={`Open ${discoveryBlock.title}`}
-              className="absolute inset-0 pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
-            />
+            {/* not rendered at all while a checkbox toggle is still saving -
+            lets the edit screen's own fetch always run after the toggle's
+            PATCH commits, instead of racing it and sometimes reading stale
+            data. Link's own `disabled` prop does NOT work for this: it only
+            skips the SPA navigate() call, the element is still a real
+            <a href> underneath, so the browser follows it natively anyway.
+            Swapping in a plain non-interactive div is the only way to
+            actually block the click. cursor-wait signals why nothing
+            happens, rather than looking broken. */}
+            {hasPendingToggle ? (
+              <div
+                aria-label={`Open ${discoveryBlock.title}`}
+                aria-disabled="true"
+                className="absolute inset-0 pointer-events-auto cursor-wait"
+              />
+            ) : (
+              <Link
+                to="/$projectId/discovery/$discoveryBlockId/edit"
+                params={{
+                  projectId: discoveryBlock.projectId,
+                  discoveryBlockId: discoveryBlock.id,
+                }}
+                aria-label={`Open ${discoveryBlock.title}`}
+                className="absolute inset-0 pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+              />
+            )}
             {/* relative (like the card-wide wrapper this pattern is copied
             from): a later positioned sibling paints above the Link
             regardless of DOM order, so this whole block sits visually on
@@ -284,13 +302,14 @@ export function DiscoveryBlockCard({
                   </h5>
                 </div>
                 <div className="pointer-events-auto flex shrink-0 items-center gap-1">
-                  <Badge
-                    color={
-                      DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
+                  <span
+                    className={
+                      "rounded-full border px-2.5 py-0.5 text-xs font-medium " +
+                      DISCOVERY_BLOCK_STATUS_PILL_STYLE[discoveryBlock.status]
                     }
                   >
                     {DISCOVERY_BLOCK_STATUS_LABEL[discoveryBlock.status]}
-                  </Badge>
+                  </span>
                   <Dropdown
                     arrowIcon={false}
                     inline
@@ -356,7 +375,7 @@ export function DiscoveryBlockCard({
                     className="pointer-events-auto h-4 w-4 shrink-0"
                     theme={checklistCheckboxTheme}
                     checked={item.isChecked}
-                    onChange={() => onToggleItem(item)}
+                    onChange={() => void handleToggleItemClick(item)}
                     aria-label={item.label}
                   />
                   {/* pointer-events-auto: no navigation Link behind this
