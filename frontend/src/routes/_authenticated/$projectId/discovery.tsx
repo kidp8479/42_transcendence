@@ -255,7 +255,10 @@ function DiscoveryPage() {
             discoveryBlock={discoveryBlockWithItems.discoveryBlock}
             items={discoveryBlockWithItems.items}
             onToggleItem={(item) =>
-              handleToggleItem(discoveryBlockWithItems.discoveryBlock, item)
+              void handleToggleItem(
+                discoveryBlockWithItems.discoveryBlock,
+                item
+              )
             }
             onDeleteBlock={() =>
               handleDeleteBlock(discoveryBlockWithItems.discoveryBlock.id)

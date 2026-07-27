@@ -49,7 +49,7 @@ const confirmDeleteInputTheme = {
 interface DiscoveryBlockCardProps {
   discoveryBlock: DiscoveryBlock;
   items: DiscoveryBlockItem[];
-  onToggleItem: (item: DiscoveryBlockItem) => Promise<void>;
+  onToggleItem: (item: DiscoveryBlockItem) => void;
   onDeleteBlock: () => Promise<boolean>;
 }
 
@@ -77,23 +77,6 @@ export function DiscoveryBlockCard({
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const confirmInputId = useId();
-
-  // guards against a real race: onToggleItem updates isChecked optimistically
-  // then PATCHes in the background - navigating into the edit screen while
-  // that PATCH is still in flight can land its GET before the PATCH commits,
-  // showing the pre-toggle state there. Counts rather than a boolean since
-  // several items can be toggled in quick succession.
-  const [pendingToggleCount, setPendingToggleCount] = useState(0);
-  const hasPendingToggle = pendingToggleCount > 0;
-
-  async function handleToggleItemClick(item: DiscoveryBlockItem) {
-    setPendingToggleCount((count) => count + 1);
-    try {
-      await onToggleItem(item);
-    } finally {
-      setPendingToggleCount((count) => count - 1);
-    }
-  }
 
   const discoveryBlockColor =
     CATEGORY_COLOR_PALETTE[discoveryBlock.color ?? 0] ??
@@ -237,32 +220,15 @@ export function DiscoveryBlockCard({
           card-wide Link and misfire a navigation instead of toggling the
           item, since the checkbox's real hit area is only 16x16px. */}
           <div className="relative flex flex-col gap-3">
-            {/* not rendered at all while a checkbox toggle is still saving -
-            lets the edit screen's own fetch always run after the toggle's
-            PATCH commits, instead of racing it and sometimes reading stale
-            data. Link's own `disabled` prop does NOT work for this: it only
-            skips the SPA navigate() call, the element is still a real
-            <a href> underneath, so the browser follows it natively anyway.
-            Swapping in a plain non-interactive div is the only way to
-            actually block the click. cursor-wait signals why nothing
-            happens, rather than looking broken. */}
-            {hasPendingToggle ? (
-              <div
-                aria-label={`Open ${discoveryBlock.title}`}
-                aria-disabled="true"
-                className="absolute inset-0 pointer-events-auto cursor-wait"
-              />
-            ) : (
-              <Link
-                to="/$projectId/discovery/$discoveryBlockId/edit"
-                params={{
-                  projectId: discoveryBlock.projectId,
-                  discoveryBlockId: discoveryBlock.id,
-                }}
-                aria-label={`Open ${discoveryBlock.title}`}
-                className="absolute inset-0 pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
-              />
-            )}
+            <Link
+              to="/$projectId/discovery/$discoveryBlockId/edit"
+              params={{
+                projectId: discoveryBlock.projectId,
+                discoveryBlockId: discoveryBlock.id,
+              }}
+              aria-label={`Open ${discoveryBlock.title}`}
+              className="absolute inset-0 pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+            />
             {/* relative (like the card-wide wrapper this pattern is copied
             from): a later positioned sibling paints above the Link
             regardless of DOM order, so this whole block sits visually on
@@ -375,7 +341,7 @@ export function DiscoveryBlockCard({
                     className="pointer-events-auto h-4 w-4 shrink-0"
                     theme={checklistCheckboxTheme}
                     checked={item.isChecked}
-                    onChange={() => void handleToggleItemClick(item)}
+                    onChange={() => void onToggleItem(item)}
                     aria-label={item.label}
                   />
                   {/* pointer-events-auto: no navigation Link behind this

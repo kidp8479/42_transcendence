@@ -59,18 +59,10 @@ function DiscoveryBlockEditPage() {
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
-  // same race as discovery.tsx's card: handleToggleItem below flips
-  // isChecked optimistically then PATCHes in the background - leaving this
-  // screen (Back or Escape) while that PATCH is still in flight can let the
-  // list's own GET land before the PATCH commits, showing the pre-toggle
-  // state there
-  const [pendingToggleCount, setPendingToggleCount] = useState(0);
-  const hasPendingToggle = pendingToggleCount > 0;
-
   // Escape goes back to the Discovery list, same target as the Back link
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !hasPendingToggle) {
+      if (event.key === "Escape") {
         void navigate({
           to: "/$projectId/discovery",
           params: { projectId: params.projectId },
@@ -79,7 +71,7 @@ function DiscoveryBlockEditPage() {
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, params.projectId, hasPendingToggle]);
+  }, [navigate, params.projectId]);
 
   const [title, setTitle] = useState(loaderData.discoveryBlock.title);
   const [description, setDescription] = useState(
@@ -279,43 +271,20 @@ function DiscoveryBlockEditPage() {
     await safeInvalidateRouter();
   }
 
-  async function handleToggleItemClick(item: DiscoveryBlockItem) {
-    setPendingToggleCount((count) => count + 1);
-    try {
-      await handleToggleItem(item);
-    } finally {
-      setPendingToggleCount((count) => count - 1);
-    }
-  }
-
   return (
     <div className="flex flex-col gap-6">
       {/* flex-wrap: on narrow screens "Back | Edit Category" + the button
       no longer fit on one line, lets the button wrap instead of overflowing */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          {/* not a real <Link> while a toggle is still saving - Link's own
-          `disabled` prop doesn't block anything, it's still a real <a href>
-          underneath that the browser follows natively regardless (see
-          DiscoveryBlockCard.tsx's own fix for the same issue) */}
-          {hasPendingToggle ? (
-            <span
-              aria-disabled="true"
-              className="flex cursor-wait items-center gap-1 text-sm text-text-secondary"
-            >
-              <HiArrowLeft />
-              Back
-            </span>
-          ) : (
-            <Link
-              to="/$projectId/discovery"
-              params={{ projectId: params.projectId }}
-              className="flex items-center gap-1 text-sm text-text-secondary no-underline hover:text-text-primary"
-            >
-              <HiArrowLeft />
-              Back
-            </Link>
-          )}
+          <Link
+            to="/$projectId/discovery"
+            params={{ projectId: params.projectId }}
+            className="flex items-center gap-1 text-sm text-text-secondary no-underline hover:text-text-primary"
+          >
+            <HiArrowLeft />
+            Back
+          </Link>
           <span className="text-surface-border">|</span>
           <div className="flex items-center gap-2">
             {/* renders the currently *selected* icon (state), not just the
@@ -425,7 +394,7 @@ function DiscoveryBlockEditPage() {
             checklistCheckboxTheme={checklistCheckboxTheme}
             newItemLabel={newItemLabel}
             onNewItemLabelChange={setNewItemLabel}
-            onToggleItem={(item) => void handleToggleItemClick(item)}
+            onToggleItem={(item) => void handleToggleItem(item)}
             onRemoveItem={(id) => void handleRemoveItem(id)}
             onAddItem={() => void handleAddItem()}
           />
