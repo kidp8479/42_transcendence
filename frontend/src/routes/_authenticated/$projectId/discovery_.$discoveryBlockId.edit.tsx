@@ -80,6 +80,21 @@ function DiscoveryBlockEditPage() {
   const [notes, setNotes] = useState(loaderData.discoveryBlock.notes ?? "");
   const [items, setItems] = useState<DiscoveryBlockItem[]>(loaderData.items);
   const [newItemLabel, setNewItemLabel] = useState("");
+
+  // useState's initial value only seeds the first mount - if this route's
+  // component instance gets reused across visits (ex: navigating away and
+  // back without a full page reload) instead of remounting, items would
+  // otherwise stay stuck on whatever it was the very first time, even
+  // though the loader keeps re-fetching real, current data every visit.
+  // Confirmed happening for real: the network correctly returned fresh data
+  // seconds before the screen still showed the old checklist state. Same
+  // pattern as discovery.tsx's own loaderData sync, scoped to items only -
+  // title/description/notes are excluded here on purpose, an unrelated
+  // invalidate (ex: toggling a checkbox) must not blow away unsaved text
+  // typed into those fields before Save Changes is clicked.
+  useEffect(() => {
+    setItems(loaderData.items);
+  }, [loaderData]);
   const [selectedColorIndex, setSelectedColorIndex] = useState(
     loaderData.discoveryBlock.color ?? 0
   );
