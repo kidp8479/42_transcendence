@@ -158,10 +158,10 @@ export function DiscoveryBlockCard({
         <div className="flex flex-1 flex-col justify-center gap-3">
           <p className="text-sm text-text-secondary">
             Type{" "}
-            <span
-              title={discoveryBlock.title}
-              className="inline-block max-w-full truncate align-bottom font-semibold text-text-primary"
-            >
+            {/* not truncated here on purpose - the user needs to read the
+            exact text to retype it, unlike everywhere else this title is
+            just displayed */}
+            <span className="font-semibold break-words text-text-primary">
               {discoveryBlock.title}
             </span>{" "}
             to confirm deletion. This also deletes its checklist. This cannot be
@@ -207,107 +207,128 @@ export function DiscoveryBlockCard({
     // h-full: makes this grid item stretch to match the tallest card in its
     // row - relative: anchors the absolute Link overlay below
     <div className="relative h-full overflow-hidden rounded-lg border border-surface-border bg-surface-raised">
-      <Link
-        to="/$projectId/discovery/$discoveryBlockId/edit"
-        params={{
-          projectId: discoveryBlock.projectId,
-          discoveryBlockId: discoveryBlock.id,
-        }}
-        aria-label={`Open ${discoveryBlock.title}`}
-        className="absolute inset-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
-      />
-
       {/* pointer-events-none lets clicks on plain content (title, description,
-      progress, checklist labels...) fall through to the Link behind it -
-      checkboxes and the "..." menu opt back in with pointer-events-auto,
-      the only actually-interactive spots here */}
+      progress, checklist labels...) fall through to the navigation Link
+      behind it - checkboxes and the "..." menu opt back in with
+      pointer-events-auto, the only actually-interactive spots here */}
       <div className="pointer-events-none relative flex h-full flex-col">
         <div className={discoveryBlockColor.bg + " h-1.5"}></div>
         <div className="flex flex-1 flex-col gap-3 p-4">
-          {/* flex-wrap: the badge+menu group has its own natural minimum
-          width (status text + the new "..." button); on a narrow 2-column
-          card there isn't room left for both that AND the title on one
-          line, so the group wraps to its own row below instead of
-          squeezing the title down to 1-2 visible characters */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {/* min-w-0 + truncate on the title, shrink-0 on the badge/menu:
-            without both, a long title pushes them outside the card */}
-            <div className="flex min-w-0 items-center gap-2">
-              <div
-                className={
-                  discoveryBlockColor.bg +
-                  " flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
-                }
-              >
-                <DiscoveryBlockIcon />
-              </div>
-              {/* text-base: matches every other card/section title's explicit
-              size convention in the app (summary/*.tsx) */}
-              <h5
-                className="truncate font-mono text-base font-semibold text-text-primary"
-                title={discoveryBlock.title}
-              >
-                {discoveryBlock.title}
-              </h5>
-            </div>
-            <div className="pointer-events-auto flex shrink-0 items-center gap-1">
-              <Badge
-                color={
-                  DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
-                }
-              >
-                {DISCOVERY_BLOCK_STATUS_LABEL[discoveryBlock.status]}
-              </Badge>
-              <Dropdown
-                arrowIcon={false}
-                inline
-                placement="bottom-end"
-                theme={darkDropdownTheme}
-                // see ProjectCard.tsx's own comment on this exact class -
-                // Flowbite's default theme silently drops the border-style
-                // darkDropdownTheme sets otherwise
-                className="border-solid dark:border-solid"
-                renderTrigger={() => (
-                  <button
-                    type="button"
-                    aria-label={`Open actions for ${discoveryBlock.title}`}
-                    className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          {/* The navigation Link only covers this header block (icon/title/
+          badge/menu/description/progress), not the checklist below - an
+          imprecise click near a checkbox used to fall through to a
+          card-wide Link and misfire a navigation instead of toggling the
+          item, since the checkbox's real hit area is only 16x16px. */}
+          <div className="relative flex flex-col gap-3">
+            <Link
+              to="/$projectId/discovery/$discoveryBlockId/edit"
+              params={{
+                projectId: discoveryBlock.projectId,
+                discoveryBlockId: discoveryBlock.id,
+              }}
+              aria-label={`Open ${discoveryBlock.title}`}
+              className="absolute inset-0 pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+            />
+            {/* relative (like the card-wide wrapper this pattern is copied
+            from): a later positioned sibling paints above the Link
+            regardless of DOM order, so this whole block sits visually on
+            top of it - pointer-events-none then lets plain content (title,
+            description, progress) fall through to the Link beneath, while
+            the badge/menu opts back in with pointer-events-auto and, being
+            already on top, receives its clicks directly instead of the
+            Link intercepting them */}
+            <div className="pointer-events-none relative flex flex-col gap-3">
+              {/* flex-wrap: the badge+menu group has its own natural minimum
+            width (status text + the new "..." button); on a narrow 2-column
+            card there isn't room left for both that AND the title on one
+            line, so the group wraps to its own row below instead of
+            squeezing the title down to 1-2 visible characters */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {/* min-w-0 + truncate on the title, shrink-0 on the badge/menu:
+              without both, a long title pushes them outside the card */}
+                <div className="flex min-w-0 items-center gap-2">
+                  <div
+                    className={
+                      discoveryBlockColor.bg +
+                      " flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
+                    }
                   >
-                    <HiOutlineCog6Tooth className="h-5 w-5" />
-                  </button>
-                )}
-              >
-                <DropdownItem
-                  icon={HiOutlineTrash}
-                  theme={roundedDropdownItemTheme}
-                  className="text-control-error! dark:text-control-error!"
-                  onClick={() => setIsConfirmingDelete(true)}
+                    <DiscoveryBlockIcon />
+                  </div>
+                  {/* text-base: matches every other card/section title's explicit
+                size convention in the app (summary/*.tsx). pointer-events-auto:
+                enables the title= tooltip on hover - trades away
+                click-to-navigate on this exact text (the rest of the header
+                still navigates) */}
+                  <h5
+                    className="pointer-events-auto truncate font-mono text-base font-semibold text-text-primary"
+                    title={discoveryBlock.title}
+                  >
+                    {discoveryBlock.title}
+                  </h5>
+                </div>
+                <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+                  <Badge
+                    color={
+                      DISCOVERY_BLOCK_STATUS_BADGE_COLOR[discoveryBlock.status]
+                    }
+                  >
+                    {DISCOVERY_BLOCK_STATUS_LABEL[discoveryBlock.status]}
+                  </Badge>
+                  <Dropdown
+                    arrowIcon={false}
+                    inline
+                    placement="bottom-end"
+                    theme={darkDropdownTheme}
+                    // see ProjectCard.tsx's own comment on this exact class -
+                    // Flowbite's default theme silently drops the border-style
+                    // darkDropdownTheme sets otherwise
+                    className="border-solid dark:border-solid"
+                    renderTrigger={() => (
+                      <button
+                        type="button"
+                        aria-label={`Open actions for ${discoveryBlock.title}`}
+                        className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                      >
+                        <HiOutlineCog6Tooth className="h-5 w-5" />
+                      </button>
+                    )}
+                  >
+                    <DropdownItem
+                      icon={HiOutlineTrash}
+                      theme={roundedDropdownItemTheme}
+                      className="text-control-error! dark:text-control-error!"
+                      onClick={() => setIsConfirmingDelete(true)}
+                    >
+                      Delete category
+                    </DropdownItem>
+                  </Dropdown>
+                </div>
+              </div>
+              {discoveryBlock.description && (
+                // line-clamp-2: an unbounded description balloons this card's
+                // height, and every other card sharing its grid row along with
+                // it (h-full above stretches every card in a row to the tallest
+                // one). pointer-events-auto: same title= tooltip tradeoff as
+                // the title h5 above
+                <p
+                  className="pointer-events-auto line-clamp-2 text-text-secondary text-sm"
+                  title={discoveryBlock.description}
                 >
-                  Delete category
-                </DropdownItem>
-              </Dropdown>
-            </div>
-          </div>
-          {discoveryBlock.description && (
-            // line-clamp-2: an unbounded description balloons this card's
-            // height, and every other card sharing its grid row along with it
-            // (h-full above stretches every card in a row to the tallest one)
-            <p
-              className="line-clamp-2 text-text-secondary text-sm"
-              title={discoveryBlock.description}
-            >
-              {discoveryBlock.description}
-            </p>
-          )}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-text-secondary">
-              {itemsDoneCount}/{itemsTotalCount} done
-            </span>
-            <div className="h-1.5 w-full flex-1 rounded-full bg-surface-overlay">
-              <div
-                className={discoveryBlockColor.bg + " h-1.5 rounded-full"}
-                style={{ width: itemsDonePercent + "%" }}
-              ></div>
+                  {discoveryBlock.description}
+                </p>
+              )}
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-text-secondary">
+                  {itemsDoneCount}/{itemsTotalCount} done
+                </span>
+                <div className="h-1.5 w-full flex-1 rounded-full bg-surface-overlay">
+                  <div
+                    className={discoveryBlockColor.bg + " h-1.5 rounded-full"}
+                    style={{ width: itemsDonePercent + "%" }}
+                  ></div>
+                </div>
+              </div>
             </div>
           </div>
           <div className="border-t border-surface-border"></div>
@@ -315,10 +336,6 @@ export function DiscoveryBlockCard({
             {previewItems.map((item) => {
               return (
                 <div key={item.id} className="flex items-center gap-2.5">
-                  {/* pointer-events-auto on the checkbox only, not the whole
-                  row: clicking the label or surrounding whitespace should
-                  still fall through to the card's Link and navigate, same
-                  as before this card's overlay-Link rework */}
                   <Checkbox
                     className="pointer-events-auto h-4 w-4 shrink-0"
                     theme={checklistCheckboxTheme}
@@ -326,8 +343,13 @@ export function DiscoveryBlockCard({
                     onChange={() => onToggleItem(item)}
                     aria-label={item.label}
                   />
+                  {/* pointer-events-auto: no navigation Link behind this
+                  section anymore (see the header block above), so this
+                  only enables the native title= tooltip on hover for
+                  truncated labels - doesn't make the label do anything
+                  on click, it has no handler */}
                   <span
-                    className="min-w-0 truncate text-sm text-text-secondary"
+                    className="pointer-events-auto min-w-0 truncate text-sm text-text-secondary"
                     title={item.label}
                   >
                     {item.label}
