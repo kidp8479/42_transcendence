@@ -1,11 +1,17 @@
 // EvaluationChecklistItemsService: handles all database operations for EvaluationChecklistItems
 // called by the controller, never called directly by the frontend
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { CreateEvaluationChecklistItemDto } from "./dto/create-evaluation-checklist-item.dto";
 import { UpdateEvaluationChecklistItemDto } from "./dto/update-evaluation-checklist-item.dto";
+import { EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION } from "./evaluation-checklist-items.constants";
 
 @Injectable()
 export class EvaluationChecklistItemsService {
@@ -63,15 +69,34 @@ export class EvaluationChecklistItemsService {
     // membership check, will throw if failed
     await this.projectsService.assertMembership(projectId, userId);
 
-    // query database
-    const item = await this.prisma.evaluationChecklistItem.create({
-      data: {
-        label: dto.label,
-        section: dto.section,
-        order: dto.order,
-        project: { connect: { id: projectId } },
+    // count-then-create is a TOCTOU race in general (two concurrent requests
+    // could both read a count under the cap, then both insert) - wrapped in
+    // a Serializable transaction so Postgres itself rejects the second
+    // transaction if it would have read stale data. Same pattern as
+    // ProjectsService.create() and DiscoveryBlocksService.create().
+    const item = await this.prisma.transaction(
+      async (transactionPrisma) => {
+        const existingItemCount =
+          await transactionPrisma.evaluationChecklistItem.count({
+            where: { projectId: projectId, section: dto.section },
+          });
+        if (existingItemCount >= EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION) {
+          throw new BadRequestException(
+            `A section can have at most ${EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION} checklist items`
+          );
+        }
+
+        return transactionPrisma.evaluationChecklistItem.create({
+          data: {
+            label: dto.label,
+            section: dto.section,
+            order: dto.order,
+            project: { connect: { id: projectId } },
+          },
+        });
       },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
     return item;
   }
 
