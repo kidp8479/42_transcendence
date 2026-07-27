@@ -7,7 +7,7 @@ import {
   DropdownItem,
   TextInput,
 } from "flowbite-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   HiOutlineCog6Tooth,
   HiOutlineTrash,
@@ -126,6 +126,22 @@ export function DiscoveryBlockCard({
     setIsConfirmingDelete(false);
     setConfirmText("");
   }
+
+  // Escape closes the delete confirmation, same as clicking Cancel/X -
+  // document-level because the confirmation isn't a real <dialog>/modal,
+  // just conditionally-rendered content, so there's no native ESC handling
+  useEffect(() => {
+    if (!isConfirmingDelete) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        handleCancelDelete();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isConfirmingDelete]);
 
   async function handleConfirmDelete() {
     setIsDeleting(true);
