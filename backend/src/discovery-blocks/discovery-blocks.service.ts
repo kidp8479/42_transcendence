@@ -112,16 +112,27 @@ export class DiscoveryBlocksService {
   // never by this service's own update() (status is never sent in that DTO,
   // see its own comment). The actual rule lives in computeDiscoveryBlockStatus,
   // also used by seed.ts so seeded data can never drift from it.
+  //
+  // read-then-write is a TOCTOU race like create()'s cap check above - two
+  // near-simultaneous toggles on the same block (two tabs, two teammates)
+  // could otherwise interleave and leave `status` reflecting neither
+  // toggle's final state. Same Serializable-transaction fix, so Postgres
+  // rejects whichever transaction read stale data instead of letting it commit.
   async recalculateStatus(discoveryBlockId: string): Promise<void> {
-    const items = await this.prisma.discoveryBlockItem.findMany({
-      where: { discoveryBlockId: discoveryBlockId },
-      select: { isChecked: true },
-    });
+    await this.prisma.transaction(
+      async (transactionPrisma) => {
+        const items = await transactionPrisma.discoveryBlockItem.findMany({
+          where: { discoveryBlockId: discoveryBlockId },
+          select: { isChecked: true },
+        });
 
-    await this.prisma.discoveryBlock.update({
-      where: { id: discoveryBlockId },
-      data: { status: computeDiscoveryBlockStatus(items) },
-    });
+        await transactionPrisma.discoveryBlock.update({
+          where: { id: discoveryBlockId },
+          data: { status: computeDiscoveryBlockStatus(items) },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
   }
 
   // PATCH (partial update)

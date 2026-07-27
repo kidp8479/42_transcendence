@@ -111,6 +111,19 @@ function DiscoveryBlockEditPage() {
       ? 0
       : Math.round((itemsDoneCount / itemsTotalCount) * 100);
 
+  // same "unchecked items first" sort as the card preview (DiscoveryBlockCard.tsx)
+  // - the two screens showed items in different orders (this one by creation
+  // order, the card by check state), so toggling an item then comparing "the
+  // same visual position" between the two could look at two different items.
+  // A copy since .sort() mutates in place, and handleAddItem below relies on
+  // items.length (creation order) for the new item's position - not sortedItems
+  const sortedItems = [...items].sort((a, b) => {
+    if (a.isChecked === b.isChecked) {
+      return 0;
+    }
+    return a.isChecked ? 1 : -1;
+  });
+
   async function handleSave(): Promise<void> {
     try {
       // color/icon are autosaved separately (handleColorChange/
@@ -407,7 +420,7 @@ function DiscoveryBlockEditPage() {
           </div>
 
           <DiscoveryBlockChecklist
-            items={items}
+            items={sortedItems}
             discoveryBlockColor={discoveryBlockColor}
             checklistCheckboxTheme={checklistCheckboxTheme}
             newItemLabel={newItemLabel}

@@ -85,9 +85,11 @@ export class DiscoveryBlockItemsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
-    // outside the transaction on purpose - status is a derived/display value,
-    // not a business invariant like the item cap above, so it doesn't need
-    // the same Serializable protection
+    // outside this create's own transaction on purpose - status is a
+    // derived/display value, not a business invariant like the item cap
+    // above, so it doesn't need to be atomic with the item insert itself.
+    // recalculateStatus still protects its own read-then-write internally
+    // (see its own comment), just as a separate transaction.
     await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
     return blockItem;
   }

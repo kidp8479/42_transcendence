@@ -5,7 +5,7 @@
 // isChecked is not here: it is always false at creation, handled by @default(false) in the database schema.
 // order: the frontend sends the initial position of the item in the list (0-based index).
 
-import { IsInt, IsString, MaxLength, MinLength } from "class-validator";
+import { IsInt, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { Transform } from "class-transformer";
 
 export const DISCOVERY_BLOCK_ITEM_LABEL_MAX_LENGTH = 200;
@@ -21,5 +21,6 @@ export class CreateDiscoveryBlockItemDto {
   label: string;
 
   @IsInt()
+  @Min(0)
   order: number;
 }
