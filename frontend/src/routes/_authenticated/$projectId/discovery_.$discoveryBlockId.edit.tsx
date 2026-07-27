@@ -107,6 +107,7 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
+    showToast({ type: "success", message: "Changes saved" });
   }
 
   // color/icon autosave on click, same optimistic pattern as the checkbox
@@ -130,6 +131,7 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
+    showToast({ type: "success", message: "Color updated" });
   }
 
   async function handleIconChange(newIcon: string): Promise<void> {
@@ -149,6 +151,7 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
+    showToast({ type: "success", message: "Icon updated" });
   }
 
   // creates on the backend first, then appends the real returned item (with
@@ -178,6 +181,7 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
+    showToast({ type: "success", message: "Item added" });
   }
 
   async function handleRemoveItem(id: string): Promise<void> {
@@ -200,6 +204,7 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
+    showToast({ type: "success", message: "Item removed" });
   }
 
   // optimistic toggle, same pattern as discovery.tsx's card checkbox -

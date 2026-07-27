@@ -153,6 +153,7 @@ function DiscoveryPage() {
       return false;
     }
     await safeInvalidateRouter();
+    showToast({ type: "success", message: "Category created" });
     return true;
   }
 
@@ -172,6 +173,7 @@ function DiscoveryPage() {
       return false;
     }
     await safeInvalidateRouter();
+    showToast({ type: "success", message: "Category deleted" });
     return true;
   }
 
