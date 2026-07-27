@@ -289,7 +289,13 @@ export function DiscoveryBlockCard({
             </div>
           </div>
           {discoveryBlock.description && (
-            <p className="text-text-secondary text-sm">
+            // line-clamp-2: an unbounded description balloons this card's
+            // height, and every other card sharing its grid row along with it
+            // (h-full above stretches every card in a row to the tallest one)
+            <p
+              className="line-clamp-2 text-text-secondary text-sm"
+              title={discoveryBlock.description}
+            >
               {discoveryBlock.description}
             </p>
           )}
