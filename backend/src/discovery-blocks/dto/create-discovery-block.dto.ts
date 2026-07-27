@@ -13,6 +13,7 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
+import { Transform } from "class-transformer";
 
 export const DISCOVERY_BLOCK_TITLE_MAX_LENGTH = 100;
 export const DISCOVERY_BLOCK_DESCRIPTION_MAX_LENGTH = 500;
@@ -30,6 +31,9 @@ export const DISCOVERY_BLOCK_ICON_NAMES = [
 export const DISCOVERY_BLOCK_COLOR_INDICES = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 
 export class CreateDiscoveryBlockDto {
+  // same reasoning as CreateDiscoveryBlockItemDto.label - trims before
+  // MinLength so a whitespace-only title can't pass as real content
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @MinLength(1)
   @MaxLength(DISCOVERY_BLOCK_TITLE_MAX_LENGTH)

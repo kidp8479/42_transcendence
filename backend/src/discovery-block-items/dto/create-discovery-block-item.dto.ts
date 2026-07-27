@@ -6,10 +6,15 @@
 // order: the frontend sends the initial position of the item in the list (0-based index).
 
 import { IsInt, IsString, MaxLength, MinLength } from "class-validator";
+import { Transform } from "class-transformer";
 
 export const DISCOVERY_BLOCK_ITEM_LABEL_MAX_LENGTH = 200;
 
 export class CreateDiscoveryBlockItemDto {
+  // trims before MinLength runs, so a whitespace-only label (ex: " ") can't
+  // pass validation as if it were real content - the frontend already trims
+  // before submitting, this is the same guarantee enforced server-side
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @MinLength(1)
   @MaxLength(DISCOVERY_BLOCK_ITEM_LABEL_MAX_LENGTH)
