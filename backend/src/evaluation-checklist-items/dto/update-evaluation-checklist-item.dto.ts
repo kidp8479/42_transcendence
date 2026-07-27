@@ -9,12 +9,12 @@ import {
   IsBoolean,
   IsString,
   IsOptional,
+  Min,
+  MinLength,
   MaxLength,
 } from "class-validator";
-import {
-  CreateEvaluationChecklistItemDto,
-  EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH,
-} from "./create-evaluation-checklist-item.dto";
+import { CreateEvaluationChecklistItemDto } from "./create-evaluation-checklist-item.dto";
+import { EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH } from "../evaluation-checklist-items.constants";
 
 // Reuses CreateEvaluationChecklistItemDto's fields and validation decorators (label, section, order), makes them optional for PATCH.
 // isChecked is added manually below: PartialType only knows about fields that already exist in the create DTO.
@@ -23,6 +23,7 @@ export class UpdateEvaluationChecklistItemDto extends PartialType(
 ) {
   @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH)
   label?: string;
 
@@ -31,6 +32,7 @@ export class UpdateEvaluationChecklistItemDto extends PartialType(
   isChecked?: boolean;
 
   @IsOptional()
+  @Min(0)
   @IsInt()
   order?: number;
 }

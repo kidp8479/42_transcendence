@@ -95,7 +95,7 @@ const customTheme = createTheme({
   },
 });
 
-export const EVALUATION_CHECKLIST_ITEM_MAX_LENGTH = 350;
+export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
 export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
 
 // Presentation-only metadata per category (icon/color/description), kept
@@ -478,7 +478,7 @@ function EvaluationChecklistPage() {
             ) as HTMLInputElement;
             if (
               input.value.trim().length > 0 &&
-              input.value.length <= EVALUATION_CHECKLIST_ITEM_MAX_LENGTH
+              input.value.length <= EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
             )
               createItem({
                 label: input.value,
@@ -554,14 +554,14 @@ function EvaluationChecklistPage() {
                             - commit new text on ENTER or click out of the box                    */}
                           {editingId === c.id ? (
                             <TextInput
-                              maxLength={EVALUATION_CHECKLIST_ITEM_MAX_LENGTH}
+                              maxLength={EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH}
                               className="w-full px-2 text-sm"
                               defaultValue={c.label}
                               autoFocus
                               onBlur={(e) => {
                                 if (
                                   e.currentTarget.value.length <=
-                                  EVALUATION_CHECKLIST_ITEM_MAX_LENGTH
+                                  EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
                                 )
                                   commitLabel(e.currentTarget.value);
                               }}
@@ -569,7 +569,7 @@ function EvaluationChecklistPage() {
                                 if (e.key === "Enter") {
                                   if (
                                     e.currentTarget.value.length <=
-                                    EVALUATION_CHECKLIST_ITEM_MAX_LENGTH
+                                    EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
                                   )
                                     commitLabel(e.currentTarget.value);
                                 }
