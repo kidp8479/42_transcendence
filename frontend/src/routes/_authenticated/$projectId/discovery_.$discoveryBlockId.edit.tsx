@@ -59,10 +59,18 @@ function DiscoveryBlockEditPage() {
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
+  // same race as discovery.tsx's card: handleToggleItem below flips
+  // isChecked optimistically then PATCHes in the background - leaving this
+  // screen (Back or Escape) while that PATCH is still in flight can let the
+  // list's own GET land before the PATCH commits, showing the pre-toggle
+  // state there
+  const [pendingToggleCount, setPendingToggleCount] = useState(0);
+  const hasPendingToggle = pendingToggleCount > 0;
+
   // Escape goes back to the Discovery list, same target as the Back link
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !hasPendingToggle) {
         void navigate({
           to: "/$projectId/discovery",
           params: { projectId: params.projectId },
@@ -71,7 +79,7 @@ function DiscoveryBlockEditPage() {
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, params.projectId]);
+  }, [navigate, params.projectId, hasPendingToggle]);
 
   const [title, setTitle] = useState(loaderData.discoveryBlock.title);
   const [description, setDescription] = useState(
@@ -146,7 +154,6 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
-    showToast({ type: "success", message: "Color updated" });
   }
 
   async function handleIconChange(newIcon: string): Promise<void> {
@@ -166,7 +173,6 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
-    showToast({ type: "success", message: "Icon updated" });
   }
 
   // creates on the backend first, then appends the real returned item (with
@@ -196,7 +202,6 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
-    showToast({ type: "success", message: "Item added" });
   }
 
   async function handleRemoveItem(id: string): Promise<void> {
@@ -219,7 +224,6 @@ function DiscoveryBlockEditPage() {
       return;
     }
     await safeInvalidateRouter();
-    showToast({ type: "success", message: "Item removed" });
   }
 
   // optimistic toggle, same pattern as discovery.tsx's card checkbox -
@@ -262,20 +266,43 @@ function DiscoveryBlockEditPage() {
     await safeInvalidateRouter();
   }
 
+  async function handleToggleItemClick(item: DiscoveryBlockItem) {
+    setPendingToggleCount((count) => count + 1);
+    try {
+      await handleToggleItem(item);
+    } finally {
+      setPendingToggleCount((count) => count - 1);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* flex-wrap: on narrow screens "Back | Edit Category" + the button
       no longer fit on one line, lets the button wrap instead of overflowing */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link
-            to="/$projectId/discovery"
-            params={{ projectId: params.projectId }}
-            className="flex items-center gap-1 text-sm text-text-secondary no-underline hover:text-text-primary"
-          >
-            <HiArrowLeft />
-            Back
-          </Link>
+          {/* not a real <Link> while a toggle is still saving - Link's own
+          `disabled` prop doesn't block anything, it's still a real <a href>
+          underneath that the browser follows natively regardless (see
+          DiscoveryBlockCard.tsx's own fix for the same issue) */}
+          {hasPendingToggle ? (
+            <span
+              aria-disabled="true"
+              className="flex cursor-wait items-center gap-1 text-sm text-text-secondary"
+            >
+              <HiArrowLeft />
+              Back
+            </span>
+          ) : (
+            <Link
+              to="/$projectId/discovery"
+              params={{ projectId: params.projectId }}
+              className="flex items-center gap-1 text-sm text-text-secondary no-underline hover:text-text-primary"
+            >
+              <HiArrowLeft />
+              Back
+            </Link>
+          )}
           <span className="text-surface-border">|</span>
           <div className="flex items-center gap-2">
             {/* renders the currently *selected* icon (state), not just the
@@ -385,7 +412,7 @@ function DiscoveryBlockEditPage() {
             checklistCheckboxTheme={checklistCheckboxTheme}
             newItemLabel={newItemLabel}
             onNewItemLabelChange={setNewItemLabel}
-            onToggleItem={(item) => void handleToggleItem(item)}
+            onToggleItem={(item) => void handleToggleItemClick(item)}
             onRemoveItem={(id) => void handleRemoveItem(id)}
             onAddItem={() => void handleAddItem()}
           />
