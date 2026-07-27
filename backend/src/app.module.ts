@@ -37,12 +37,15 @@ import { CalendarCategoriesModule } from "./calendar-categories/calendar-categor
       validationSchema: envValidationSchema,
     }),
     VaultModule,
-    // global rate limit: max 100 requests per 60s per IP, applied to every route
-    // via the APP_GUARD below - protects against brute-force and basic spam/DoS
+    // global rate limit: max 300 requests per 60s per IP, applied to every route
+    // via the APP_GUARD below - protects against brute-force and basic spam/DoS.
+    // Was 100: too low for normal use - toggling one Discovery checklist item
+    // is 1 PATCH + a full route reload (1 GET + 1 per block, ~8 requests with
+    // the default 6 blocks), so a few seconds of real checkbox-clicking hit it.
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 100,
+        limit: 300,
       },
     ]),
     PrismaModule, // registers all modules, NestJS starts them in order at boot
