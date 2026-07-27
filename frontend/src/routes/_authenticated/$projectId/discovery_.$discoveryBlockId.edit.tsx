@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   getDiscoveryBlock,
   updateDiscoveryBlock,
@@ -13,7 +13,7 @@ import {
   deleteDiscoveryBlockItem,
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Label, TextInput, Textarea, Button } from "flowbite-react";
 import { HiArrowLeft } from "react-icons/hi";
 import {
@@ -55,8 +55,23 @@ function DiscoveryBlockEditPage() {
   // Route.useLoaderData() directly inside useState(...) breaks TS inference
   const loaderData = Route.useLoaderData();
   const params = Route.useParams();
+  const navigate = useNavigate();
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
+
+  // Escape goes back to the Discovery list, same target as the Back link
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        void navigate({
+          to: "/$projectId/discovery",
+          params: { projectId: params.projectId },
+        });
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [navigate, params.projectId]);
 
   const [title, setTitle] = useState(loaderData.discoveryBlock.title);
   const [description, setDescription] = useState(
