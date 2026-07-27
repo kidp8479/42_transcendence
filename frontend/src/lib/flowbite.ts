@@ -14,14 +14,10 @@ export const darkTextInputTheme = {
 
 // surface-* tokens (dark neutral) instead of control-* (lighter blue-gray,
 // meant for auth forms) - for form fields on darker pages like Discovery.
-// !important needed: Flowbite's own default classes apply alongside these
-// and would otherwise win the CSS conflict.
-//
-// Textarea applies its `className` prop directly on the real <textarea>
-// element, so this plain class string is enough there. TextInput does NOT -
-// its className only reaches an outer wrapper <div>, the actual <input>'s
-// background comes from a separate `theme.field.input.colors` path that only
-// the `theme` prop can reach - see darkSurfaceTextInputTheme below for that.
+// !important overrides Flowbite's own default classes. Works as a plain
+// className on Textarea, but TextInput's className only reaches an outer
+// wrapper div - its actual <input> background needs the `theme` prop instead
+// (see darkSurfaceTextInputTheme below).
 export const darkSurfaceFieldClassName =
   "!border-surface-border !bg-surface-overlay text-text-primary dark:!border-surface-border dark:!bg-surface-overlay focus:!border-brand-500 focus:!ring-2 focus:!ring-green-500/40 focus-visible:!outline-none";
 
@@ -37,23 +33,16 @@ export const darkSurfaceTextInputTheme = {
 
 // border/checkmark tinted with a CATEGORY_COLOR_PALETTE entry instead of
 // Flowbite's default gray border/primary-blue checkmark. `theme` here is
-// merged (not replaced) with Checkbox's own default theme via twMerge, so
-// only the conflicting classes (border color, checkmark/focus-ring color)
-// actually get overridden - the base sizing/shape classes (h-4 w-4 rounded,
-// etc.) are untouched. checked:bg-current on the base theme is what makes
-// color.default's text-{color} become the checkmark's actual fill color.
-// A function, not a static object: both discovery.tsx's card checkboxes and
-// the edit screen's checklist checkboxes need this tinted with THAT
-// specific block's own color, not a single fixed color - was duplicated as
-// two near-identical inline objects before this, extracted here instead.
+// merged with Checkbox's own default theme via twMerge, so only the
+// conflicting classes are overridden - checked:bg-current on the base theme
+// is what makes color.default's text-{color} become the checkmark's fill.
+// A function rather than a static object: the card and the edit screen each
+// need this tinted with their own block's color, not one fixed color.
 export function buildCategoryCheckboxTheme(color: CategoryColor) {
   return {
     base: "border-surface-border dark:border-surface-border bg-surface-overlay dark:bg-surface-overlay",
-    // focus:ring-{color} AND dark:focus:ring-{color}, not a bare ring-{color}:
-    // Flowbite's own default Checkbox theme sets both focus:ring-primary-600
-    // and dark:focus:ring-primary-600 (blue) - matching same-specificity,
-    // same-prefixed classes are needed to actually override them, an
-    // unprefixed one loses to Flowbite's more specific :focus/dark:focus rules
+    // needs both focus: and dark:focus: prefixes to actually beat Flowbite's
+    // own same-specificity focus:ring-primary-600 / dark:focus:ring-primary-600
     color: {
       default:
         color.text +

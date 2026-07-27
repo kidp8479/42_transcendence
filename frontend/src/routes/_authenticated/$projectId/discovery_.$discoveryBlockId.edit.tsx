@@ -82,16 +82,11 @@ function DiscoveryBlockEditPage() {
   const [newItemLabel, setNewItemLabel] = useState("");
 
   // useState's initial value only seeds the first mount - if this route's
-  // component instance gets reused across visits (ex: navigating away and
-  // back without a full page reload) instead of remounting, items would
-  // otherwise stay stuck on whatever it was the very first time, even
-  // though the loader keeps re-fetching real, current data every visit.
-  // Confirmed happening for real: the network correctly returned fresh data
-  // seconds before the screen still showed the old checklist state. Same
-  // pattern as discovery.tsx's own loaderData sync, scoped to items only -
-  // title/description/notes are excluded here on purpose, an unrelated
-  // invalidate (ex: toggling a checkbox) must not blow away unsaved text
-  // typed into those fields before Save Changes is clicked.
+  // component survives a visit without remounting, items would otherwise
+  // stay stuck on stale data even though the loader keeps re-fetching.
+  // Same pattern as discovery.tsx's own loaderData sync, scoped to items
+  // only: title/description/notes are excluded so an unrelated invalidate
+  // (toggling a checkbox) can't blow away unsaved text in those fields.
   useEffect(() => {
     setItems(loaderData.items);
   }, [loaderData]);
@@ -118,12 +113,10 @@ function DiscoveryBlockEditPage() {
       ? 0
       : Math.round((itemsDoneCount / itemsTotalCount) * 100);
 
-  // same "unchecked items first" sort as the card preview (DiscoveryBlockCard.tsx)
-  // - the two screens showed items in different orders (this one by creation
-  // order, the card by check state), so toggling an item then comparing "the
-  // same visual position" between the two could look at two different items.
-  // A copy since .sort() mutates in place, and handleAddItem below relies on
-  // items.length (creation order) for the new item's position - not sortedItems
+  // same "unchecked items first" sort as the card preview (DiscoveryBlockCard.tsx),
+  // so both screens show items in the same order. A copy since .sort() mutates
+  // in place, and handleAddItem below relies on items.length (creation order)
+  // for the new item's position - not sortedItems
   const sortedItems = [...items].sort((a, b) => {
     if (a.isChecked === b.isChecked) {
       return 0;

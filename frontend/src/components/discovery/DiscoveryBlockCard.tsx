@@ -59,15 +59,13 @@ interface DiscoveryBlockCardProps {
 //
 // Same click-through pattern as ProjectCard.tsx: an absolutely-positioned
 // <Link> covers the whole card, plain content sits in a pointer-events-none
-// wrapper so clicks fall through to it, and the actually-interactive spots
-// (checkboxes, "..." menu) opt back in with pointer-events-auto - avoids
-// nesting a <button>/checkbox inside an <a>, which stopPropagation alone
-// can't fully fix (invalid HTML, and dropdown click-outside logic gets
-// unreliable nested in an anchor).
+// wrapper so clicks fall through to it, and interactive spots (checkboxes,
+// "..." menu) opt back in with pointer-events-auto - avoids nesting a
+// <button>/checkbox inside an <a>, which is invalid HTML and breaks
+// dropdown click-outside logic.
 //
-// "Delete category" doesn't call onDeleteBlock right away - it swaps the
-// whole card for an inline "type the title to confirm" view first, same
-// idea as ProjectCard.tsx's "Delete project".
+// "Delete category" swaps the whole card for an inline "type the title to
+// confirm" view first, same as ProjectCard.tsx's "Delete project".
 export function DiscoveryBlockCard({
   discoveryBlock,
   items,
