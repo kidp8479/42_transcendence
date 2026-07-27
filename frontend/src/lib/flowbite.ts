@@ -49,8 +49,18 @@ export const darkSurfaceTextInputTheme = {
 export function buildCategoryCheckboxTheme(color: CategoryColor) {
   return {
     base: "border-surface-border dark:border-surface-border bg-surface-overlay dark:bg-surface-overlay",
+    // focus:ring-{color} AND dark:focus:ring-{color}, not a bare ring-{color}:
+    // Flowbite's own default Checkbox theme sets both focus:ring-primary-600
+    // and dark:focus:ring-primary-600 (blue) - matching same-specificity,
+    // same-prefixed classes are needed to actually override them, an
+    // unprefixed one loses to Flowbite's more specific :focus/dark:focus rules
     color: {
-      default: color.text + " focus:ring-2 " + color.ring,
+      default:
+        color.text +
+        " focus:ring-2 focus:" +
+        color.ring +
+        " dark:focus:" +
+        color.ring,
     },
   };
 }
