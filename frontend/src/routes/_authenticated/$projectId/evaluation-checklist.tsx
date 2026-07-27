@@ -468,7 +468,10 @@ function EvaluationChecklistPage() {
             item.contents.length >= EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY;
 
           function addChecklistItem() {
-            if (item.contents.length >= EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY)
+            if (
+              item.contents.length >=
+              EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY
+            )
               return;
             const input = document.getElementById(
               `textinput-${i}`

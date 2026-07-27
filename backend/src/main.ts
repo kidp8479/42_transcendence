@@ -65,12 +65,5 @@ async function bootstrap() {
     process.exit(1);
   });
   await app.listen(configService.get<number>("PORT")!);
-
-  const vaultRuntime = app.get(VaultRuntimeService);
-  void vaultRuntime.waitForFatal().catch(async (error: Error) => {
-    console.error(error.message);
-    await app.close();
-    process.exitCode = 1;
-  });
 }
 bootstrap();
