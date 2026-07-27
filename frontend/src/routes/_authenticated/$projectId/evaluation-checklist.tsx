@@ -18,11 +18,16 @@ import { RiDeleteBackFill } from "react-icons/ri";
 import {
   createEvaluationChecklistItem,
   deleteEvaluationChecklistItem,
-  EvaluationChecklistItem,
-  EvaluationChecklistSection,
   fetchEvaluationChecklistItems,
   updateEvaluationChecklistItem,
 } from "@/lib/evaluationChecklist";
+import type {
+  EvaluationChecklistItem,
+  EvaluationChecklistSection,
+} from "@/lib/evaluationChecklist";
+
+export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
+export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -95,11 +100,8 @@ const customTheme = createTheme({
   },
 });
 
-export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
-export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
-
-// Presentation-only metadata per category (icon/color/description), kept
-// separate from mockData since none of this is real backend data yet.
+// Presentation-only metadata per category (icon/color/description) - the
+// checklist items themselves come from the backend, this is purely display.
 const CATEGORY_STYLE: Record<
   string,
   {
@@ -166,31 +168,34 @@ const CATEGORY_STYLE: Record<
   },
 };
 
-export interface ItemCount {
+interface ItemCount {
   currentValue: number;
   completeAt: number;
-  percent?: number | null;
+  percent?: number;
 }
 
-export interface AccordionItemData {
+interface AccordionItemData {
   title: string;
   contents: EvaluationChecklistItem[];
   count: ItemCount;
 }
 
-enum ChecklistItemSortOption {
-  SORT_ON_ID,
-  SORT_ON_LABEL,
-  SORT_ON_ISCHECKED,
-  SORT_ON_ORDER,
-  SORT_ON_SECTION,
-}
+// Fixed [Mandatory, Bonus, Supplemental] order - CATEGORY_STYLE, sectionByIndex
+// below, and every consumer of this function's result all rely on that same
+// order, so it's seeded once here rather than derived.
+const SECTION_TO_ACCORDION_INDEX: Record<EvaluationChecklistSection, number> = {
+  MANDATORY: 0,
+  BONUS: 1,
+  SUPPLEMENTAL: 2,
+};
 
+// Groups items by section and sorts each group by its own `order` - the
+// only sort this page ever needs (checklist rows are manually ordered by
+// the user, not by id/label/checked state).
 function categorizeChecklistItems(
-  items: EvaluationChecklistItem[],
-  sortOn?: ChecklistItemSortOption | null
-) {
-  let accordionItemData: AccordionItemData[] = [
+  items: EvaluationChecklistItem[]
+): AccordionItemData[] {
+  const accordionItemData: AccordionItemData[] = [
     {
       title: "Mandatory Part",
       contents: [],
@@ -209,74 +214,26 @@ function categorizeChecklistItems(
   ];
 
   for (const item of items) {
-    if (item.section === "MANDATORY") {
-      accordionItemData[0].contents.push(item);
-      ++accordionItemData[0].count.completeAt;
-      if (item.isChecked) {
-        ++accordionItemData[0].count.currentValue;
-      }
-    } else if (item.section === "BONUS") {
-      accordionItemData[1].contents.push(item);
-      ++accordionItemData[1].count.completeAt;
-      if (item.isChecked) {
-        ++accordionItemData[1].count.currentValue;
-      }
-    } else {
-      accordionItemData[2].contents.push(item);
-      ++accordionItemData[2].count.completeAt;
-      if (item.isChecked) {
-        ++accordionItemData[2].count.currentValue;
-      }
+    const data = accordionItemData[SECTION_TO_ACCORDION_INDEX[item.section]];
+    data.contents.push(item);
+    data.count.completeAt += 1;
+    if (item.isChecked) {
+      data.count.currentValue += 1;
     }
   }
 
-  switch (sortOn) {
-    case ChecklistItemSortOption.SORT_ON_ID:
-      for (const item of accordionItemData)
-        item.contents.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-      break;
-
-    case ChecklistItemSortOption.SORT_ON_LABEL:
-      for (const item of accordionItemData)
-        item.contents.sort((a, b) =>
-          a.label < b.label ? -1 : a.label > b.label ? 1 : 0
-        );
-      break;
-
-    case ChecklistItemSortOption.SORT_ON_ISCHECKED:
-      for (const item of accordionItemData)
-        item.contents.sort((a, b) =>
-          a.isChecked < b.isChecked ? -1 : a.isChecked > b.isChecked ? 1 : 0
-        );
-      break;
-
-    case ChecklistItemSortOption.SORT_ON_ORDER:
-      for (const item of accordionItemData)
-        item.contents.sort((a, b) =>
-          a.order < b.order ? -1 : a.order > b.order ? 1 : 0
-        );
-      break;
-
-    case ChecklistItemSortOption.SORT_ON_SECTION:
-      for (const item of accordionItemData)
-        item.contents.sort((a, b) =>
-          a.section < b.section ? -1 : a.section > b.section ? 1 : 0
-        );
-      break;
+  for (const data of accordionItemData) {
+    data.contents.sort((a, b) => a.order - b.order);
   }
 
   return accordionItemData;
 }
 
 function EvaluationChecklistPage() {
-  const { session } = Route.useRouteContext();
   const { projectId } = Route.useParams();
   const checklistItems = Route.useLoaderData();
   const [items, setItems] = useState<EvaluationChecklistItem[]>(checklistItems);
-  const accordionItemData = categorizeChecklistItems(
-    items,
-    ChecklistItemSortOption.SORT_ON_ORDER
-  );
+  const accordionItemData = categorizeChecklistItems(items);
 
   function categoryPercent(data: AccordionItemData): number {
     return data.count.completeAt === 0
@@ -323,6 +280,16 @@ function EvaluationChecklistPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // One draft label per category (index-aligned with accordionItemData /
+  // sectionByIndex below), for the "Add a defense checkpoint..." input.
+  const [newItemLabels, setNewItemLabels] = useState<string[]>(["", "", ""]);
+
+  function setNewItemLabel(index: number, value: string) {
+    setNewItemLabels((previous) =>
+      previous.map((label, i) => (i === index ? value : label))
+    );
+  }
+
   const sectionByIndex: EvaluationChecklistSection[] = [
     "MANDATORY",
     "BONUS",
@@ -335,11 +302,7 @@ function EvaluationChecklistPage() {
     order: number;
   }) {
     try {
-      const created = await createEvaluationChecklistItem(
-        projectId,
-        dto,
-        session.csrfToken
-      );
+      const created = await createEvaluationChecklistItem(projectId, dto);
       setItems((prevItems) => [...prevItems, created]);
     } catch {
       return;
@@ -360,12 +323,7 @@ function EvaluationChecklistPage() {
     );
 
     try {
-      await updateEvaluationChecklistItem(
-        projectId,
-        id,
-        changes,
-        session.csrfToken
-      );
+      await updateEvaluationChecklistItem(projectId, id, changes);
     } catch {
       setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
     }
@@ -378,7 +336,7 @@ function EvaluationChecklistPage() {
     setItems((prevItems) => prevItems.filter((it) => it.id !== id));
 
     try {
-      await deleteEvaluationChecklistItem(projectId, id, session.csrfToken);
+      await deleteEvaluationChecklistItem(projectId, id);
     } catch {
       setItems((prevItems) => [...prevItems, previousItem]);
     }
@@ -468,24 +426,20 @@ function EvaluationChecklistPage() {
             item.contents.length >= EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY;
 
           function addChecklistItem() {
+            const label = newItemLabels[i].trim();
             if (
+              label.length === 0 ||
               item.contents.length >=
-              EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY
-            )
+                EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY
+            ) {
               return;
-            const input = document.getElementById(
-              `textinput-${i}`
-            ) as HTMLInputElement;
-            if (
-              input.value.trim().length > 0 &&
-              input.value.length <= EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-            )
-              createItem({
-                label: input.value,
-                order: item.contents.length,
-                section: sectionByIndex[i],
-              });
-            input.value = "";
+            }
+            createItem({
+              label,
+              order: item.contents.length,
+              section: sectionByIndex[i],
+            });
+            setNewItemLabel(i, "");
           }
           return (
             <ThemeProvider key={item.title} theme={customTheme}>
@@ -526,7 +480,7 @@ function EvaluationChecklistPage() {
                   </AccordionTitle>
 
                   <AccordionContent>
-                    {item.contents.map((c, j) => {
+                    {item.contents.map((c) => {
                       function commitLabel(newValue: string) {
                         if (newValue.trim().length && newValue !== c.label) {
                           updateItem(c.id, { label: newValue });
@@ -536,7 +490,7 @@ function EvaluationChecklistPage() {
 
                       return (
                         <div
-                          key={j}
+                          key={c.id}
                           className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border"
                         >
                           {/* checked:bg-current uses this text color as the
@@ -554,7 +508,9 @@ function EvaluationChecklistPage() {
                             - commit new text on ENTER or click out of the box                    */}
                           {editingId === c.id ? (
                             <TextInput
-                              maxLength={EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH}
+                              maxLength={
+                                EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
+                              }
                               className="w-full px-2 text-sm"
                               defaultValue={c.label}
                               autoFocus
@@ -590,7 +546,7 @@ function EvaluationChecklistPage() {
                           <button
                             type="button"
                             className="opacity-0 transition-opacity group-hover:opacity-50"
-                            aria-label="delete a project requirement"
+                            aria-label={`Delete "${c.label}"`}
                             onClick={() => deleteItem(c.id)}
                           >
                             <RiDeleteBackFill className="h-5 w-5" />
@@ -601,7 +557,6 @@ function EvaluationChecklistPage() {
                     <div className="mt-5 flex items-center gap-3">
                       <TextInput
                         className="flex-1"
-                        id={`textinput-${i}`}
                         type="text"
                         placeholder={
                           isCategoryFull
@@ -610,6 +565,9 @@ function EvaluationChecklistPage() {
                         }
                         required
                         disabled={isCategoryFull}
+                        maxLength={EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH}
+                        value={newItemLabels[i]}
+                        onChange={(e) => setNewItemLabel(i, e.target.value)}
                         // className only reaches TextInput's outer wrapper, not the
                         // <input> itself, so the per-category hover/focus border has
                         // to go through the theme prop (merged onto field.input.colors.gray).
@@ -625,10 +583,10 @@ function EvaluationChecklistPage() {
                       <Button
                         color="gray"
                         className={style.addButtonHover}
-                        disabled={isCategoryFull}
-                        onClick={() => {
-                          addChecklistItem();
-                        }}
+                        disabled={
+                          isCategoryFull || newItemLabels[i].trim().length === 0
+                        }
+                        onClick={addChecklistItem}
                       >
                         <HiPlus className="mr-1 h-4 w-4" />
                         Add

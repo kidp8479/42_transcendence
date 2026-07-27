@@ -1,3 +1,5 @@
+import { apiClient } from "./apiClient";
+
 export type EvaluationChecklistSection = "MANDATORY" | "BONUS" | "SUPPLEMENTAL";
 
 export interface EvaluationChecklistItem {
@@ -8,13 +10,6 @@ export interface EvaluationChecklistItem {
   section: EvaluationChecklistSection;
 }
 
-export class EvaluationChecklistUnauthorizedError extends Error {
-  constructor() {
-    super("Authentication is required to load checklist items");
-    this.name = "EvaluationChecklistUnauthorizedError";
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -23,16 +18,6 @@ function isEvaluationChecklistSection(
   value: unknown
 ): value is EvaluationChecklistSection {
   return value === "MANDATORY" || value === "BONUS" || value === "SUPPLEMENTAL";
-}
-
-function throwIfFailedResponse(value: Response, message: string) {
-  if (value.status === 401) {
-    throw new EvaluationChecklistUnauthorizedError();
-  }
-
-  if (!value.ok) {
-    throw new Error(message);
-  }
 }
 
 function parseEvaluationChecklistItem(
@@ -56,59 +41,47 @@ function parseEvaluationChecklistItem(
   return { id, label, isChecked, order, section };
 }
 
-export async function fetchEvaluationChecklistItems(
-  projectId: string
-): Promise<EvaluationChecklistItem[]> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/evaluation-checklist-items`,
-    { credentials: "include" }
-  );
-
-  throwIfFailedResponse(response, "Failed to load checklist items");
-
-  const payload: unknown = await response.json();
-  if (!Array.isArray(payload)) {
+function parseEvaluationChecklistItems(
+  value: unknown
+): EvaluationChecklistItem[] {
+  if (!Array.isArray(value)) {
     throw new Error("Items response is invalid");
   }
-
-  const parsed = payload.map(parseEvaluationChecklistItem);
-  if (parsed.some((project) => project === null)) {
+  const parsed = value.map(parseEvaluationChecklistItem);
+  if (parsed.some((item) => item === null)) {
     throw new Error("Items response contains invalid items");
   }
-
   return parsed as EvaluationChecklistItem[];
 }
 
-export async function createEvaluationChecklistItem(
-  projectId: string,
-  dto: { label: string; section: EvaluationChecklistSection; order: number },
-  csrfToken: string
-): Promise<EvaluationChecklistItem> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/evaluation-checklist-items`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify(dto),
-    }
-  );
-
-  throwIfFailedResponse(response, "Failed to create checklist item");
-
-  const payload: unknown = await response.json();
-  const parsed = parseEvaluationChecklistItem(payload);
-  if (parsed === null) {
-    throw new Error("Item response is invalid");
-  }
-
-  return parsed;
+// GET /projects/:projectId/evaluation-checklist-items
+export function fetchEvaluationChecklistItems(
+  projectId: string
+): Promise<EvaluationChecklistItem[]> {
+  return apiClient<unknown>(
+    `/projects/${projectId}/evaluation-checklist-items`
+  ).then(parseEvaluationChecklistItems);
 }
 
-export async function updateEvaluationChecklistItem(
+// POST /projects/:projectId/evaluation-checklist-items
+export function createEvaluationChecklistItem(
+  projectId: string,
+  dto: { label: string; section: EvaluationChecklistSection; order: number }
+): Promise<EvaluationChecklistItem> {
+  return apiClient<unknown>(
+    `/projects/${projectId}/evaluation-checklist-items`,
+    { method: "POST", body: dto }
+  ).then((payload) => {
+    const parsed = parseEvaluationChecklistItem(payload);
+    if (parsed === null) {
+      throw new Error("Item response is invalid");
+    }
+    return parsed;
+  });
+}
+
+// PATCH /projects/:projectId/evaluation-checklist-items/:id
+export function updateEvaluationChecklistItem(
   projectId: string,
   id: string,
   dto: Partial<{
@@ -116,48 +89,36 @@ export async function updateEvaluationChecklistItem(
     isChecked: boolean;
     order: number;
     section: EvaluationChecklistSection;
-  }>,
-  csrfToken: string
+  }>
 ): Promise<EvaluationChecklistItem> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/evaluation-checklist-items/${id}`,
-    {
-      method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify(dto),
+  return apiClient<unknown>(
+    `/projects/${projectId}/evaluation-checklist-items/${id}`,
+    { method: "PATCH", body: dto }
+  ).then((payload) => {
+    const parsed = parseEvaluationChecklistItem(payload);
+    if (parsed === null) {
+      throw new Error("Item response is invalid");
     }
-  );
-
-  throwIfFailedResponse(response, "Failed to update checklist item");
-
-  const payload: unknown = await response.json();
-  const parsed = parseEvaluationChecklistItem(payload);
-  if (parsed === null) {
-    throw new Error("Item response is invalid");
-  }
-
-  return parsed;
+    return parsed;
+  });
 }
 
-export async function deleteEvaluationChecklistItem(
+// DELETE /projects/:projectId/evaluation-checklist-items/:id => the backend
+// returns the deleted item's own body (200, not 204 - no @HttpCode override
+// on this route, unlike deleteProject), so this parses and returns it
+// instead of assuming an empty response.
+export function deleteEvaluationChecklistItem(
   projectId: string,
-  id: string,
-  csrfToken: string
-): Promise<void> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/evaluation-checklist-items/${id}`,
-    {
-      method: "DELETE",
-      credentials: "include",
-      headers: {
-        "X-CSRF-Token": csrfToken,
-      },
+  id: string
+): Promise<EvaluationChecklistItem> {
+  return apiClient<unknown>(
+    `/projects/${projectId}/evaluation-checklist-items/${id}`,
+    { method: "DELETE" }
+  ).then((payload) => {
+    const parsed = parseEvaluationChecklistItem(payload);
+    if (parsed === null) {
+      throw new Error("Item response is invalid");
     }
-  );
-
-  throwIfFailedResponse(response, "Failed to delete checklist item");
+    return parsed;
+  });
 }
