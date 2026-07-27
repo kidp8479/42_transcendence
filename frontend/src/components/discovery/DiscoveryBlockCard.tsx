@@ -15,6 +15,7 @@ import {
 import {
   DISCOVERY_BLOCK_STATUS_LABEL,
   DISCOVERY_BLOCK_STATUS_PILL_STYLE,
+  DISCOVERY_BLOCK_TITLE_MAX_LENGTH,
   type DiscoveryBlock,
 } from "@/lib/discoveryBlocks";
 import type { DiscoveryBlockItem } from "@/lib/discoveryBlockItems";
@@ -174,6 +175,7 @@ export function DiscoveryBlockCard({
           <TextInput
             id={confirmInputId}
             autoFocus
+            maxLength={DISCOVERY_BLOCK_TITLE_MAX_LENGTH}
             onChange={(event) => setConfirmText(event.target.value)}
             placeholder={discoveryBlock.title}
             theme={confirmDeleteInputTheme}
@@ -307,13 +309,12 @@ export function DiscoveryBlockCard({
                 </div>
               </div>
               {discoveryBlock.description && (
-                // line-clamp-2: an unbounded description balloons this card's
-                // height, and every other card sharing its grid row along with
-                // it (h-full above stretches every card in a row to the tallest
-                // one). pointer-events-auto: same title= tooltip tradeoff as
-                // the title h5 above
+                // line-clamp-2 only inserts an ellipsis at a line break, and
+                // a single word with no spaces has nowhere to break by
+                // default - break-words allows breaking mid-word so the
+                // clamp/ellipsis still works on that case
                 <p
-                  className="pointer-events-auto line-clamp-2 text-text-secondary text-sm"
+                  className="pointer-events-auto line-clamp-2 text-text-secondary text-sm break-words"
                   title={discoveryBlock.description}
                 >
                   {discoveryBlock.description}
