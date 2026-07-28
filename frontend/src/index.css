@@ -90,8 +90,9 @@ input[data-auth-field]:-webkit-autofill:focus {
 }
 
 /*
- * Thin, theme-colored scrollbar for horizontally-scrolling UI (ex: ProjectTabs
- * on narrow screens, where 7 tabs don't fit and overflow-x-auto kicks in).
+ * Thin, theme-colored scrollbar for scrolling UI, on either axis: ProjectTabs
+ * on narrow screens (7 tabs don't fit, overflow-x-auto kicks in), the Kanban
+ * board's horizontal column row, and each Kanban column's own vertical list.
  * Without this, the browser falls back to its bulky default OS scrollbar,
  * which looks out of place against the dark surface palette. Two separate
  * rule sets are needed: scrollbar-width/scrollbar-color for Firefox, the
@@ -103,6 +104,9 @@ input[data-auth-field]:-webkit-autofill:focus {
   scrollbar-color: var(--color-surface-border) transparent;
 }
 .scrollbar-thin-surface::-webkit-scrollbar {
+  /* width applies to vertical scrollers, height to horizontal ones - a
+     scroller can be either, so both are set. */
+  width: 6px;
   height: 6px;
 }
 .scrollbar-thin-surface::-webkit-scrollbar-track {

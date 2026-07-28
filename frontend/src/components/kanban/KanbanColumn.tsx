@@ -6,6 +6,10 @@
 // the sortable card list, and a bottom "Add task" button. Receives its tasks
 // already filtered and rank-sorted (selectColumnTasks in the route) - this
 // component does no data shaping of its own.
+//
+// The column is a bounded flex box: the header and the "Add task" footer stay
+// put while the card list scrolls between them. That's the min-h-0 + flex-1 +
+// overflow-y-auto trio below.
 import { HiPlus } from "react-icons/hi";
 import { useDroppable } from "@dnd-kit/core";
 import {
@@ -25,7 +29,9 @@ interface KanbanColumnProps {
   categoriesById: Map<string, TaskCategory>;
   onAddTask: () => void;
   onOpenTask: (taskId: string) => void;
-  onDeleteTask: (taskId: string) => void;
+  // resolves to true once the task is really gone (the card's inline confirm
+  // stays open otherwise)
+  onDeleteTask: (taskId: string) => Promise<boolean>;
 }
 
 export function KanbanColumn({
@@ -47,9 +53,9 @@ export function KanbanColumn({
   return (
     <section
       aria-labelledby={heading_id}
-      className={`flex min-h-64 flex-col gap-3 rounded-lg border p-3 ${status_style.columnContainer}`}
+      className={`flex min-h-0 min-w-72 flex-1 flex-col gap-3 rounded-lg border p-3 ${status_style.columnContainer}`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <status_style.icon
           className={status_style.headerText}
           aria-hidden="true"
@@ -69,7 +75,7 @@ export function KanbanColumn({
           type="button"
           onClick={onAddTask}
           aria-label={`Add task in ${status_style.label}`}
-          className="ml-auto rounded p-1 text-text-secondary hover:bg-surface-overlay hover:text-text-primary"
+          className={`ml-auto rounded-md p-1 text-text-secondary transition-colors focus:ring-2 focus:ring-brand-500/40 focus:outline-none ${status_style.addTaskHover}`}
         >
           <HiPlus aria-hidden="true" />
         </button>
@@ -79,7 +85,13 @@ export function KanbanColumn({
         items={tasks.map((task) => task.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div ref={setNodeRef} className="flex flex-1 flex-col gap-2">
+        {/* The scroller. Deliberately NOT `relative`: a positioned scroller
+            would become the containing block for the cards' "..." menus
+            (flowbite renders them inline, not in a portal) and clip them. */}
+        <div
+          ref={setNodeRef}
+          className="scrollbar-thin-surface flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+        >
           {tasks.length === 0 ? (
             <EmptyColumnState />
           ) : (
@@ -100,7 +112,10 @@ export function KanbanColumn({
         </div>
       </SortableContext>
 
-      <AddTaskButton onClick={onAddTask} />
+      <AddTaskButton
+        onClick={onAddTask}
+        hoverClassName={status_style.addTaskHover}
+      />
     </section>
   );
 }

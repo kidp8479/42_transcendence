@@ -1,10 +1,15 @@
 // See DefenseReadiness.tsx (components/summary) for an explanation of the
 // pattern every component here follows.
 //
-// The kanban board: the outer contour around all four status columns, and
-// the single DndContext coordinating drag-and-drop between them. All state
-// changes go up through callbacks (the route owns the data) - this component
-// only translates dnd-kit events into "move task X to status S at index I".
+// The kanban board: the single DndContext coordinating drag-and-drop between
+// the four status columns. All state changes go up through callbacks (the
+// route owns the data) - this component only translates dnd-kit events into
+// "move task X to status S at index I".
+//
+// The board is a horizontally-scrolling row, not a responsive grid: it fills
+// a bounded tab area (see ProjectLayout), where stacking the columns at narrow
+// widths would leave all but the first one unreachable. Scrolling sideways is
+// also what Trello/Jira do.
 import { useMemo, useState } from "react";
 import {
   DndContext,
@@ -34,7 +39,9 @@ interface KanbanBoardProps {
   onMoveTask: (taskId: string, toStatus: TaskStatus, toIndex: number) => void;
   onAddTask: (status: TaskStatus) => void;
   onOpenTask: (taskId: string) => void;
-  onDeleteTask: (taskId: string) => void;
+  // resolves to true once the task is really gone (the card's inline confirm
+  // stays open otherwise)
+  onDeleteTask: (taskId: string) => Promise<boolean>;
 }
 
 export function KanbanBoard({
@@ -141,28 +148,29 @@ export function KanbanBoard({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveTaskId(null)}
     >
-      {/* Layer 1 of the board's colors: a neutral contour around all columns
-          (layers 2 and 3 - column and card tints - live in
-          lib/taskStatusStyles.ts). */}
-      <div className="rounded-xl border border-surface-border bg-surface-raised/50 p-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {STATUS_ORDER.map((status) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              tasks={selectColumnTasks(tasks, status)}
-              categoriesById={categories_by_id}
-              onAddTask={() => onAddTask(status)}
-              onOpenTask={onOpenTask}
-              onDeleteTask={onDeleteTask}
-            />
-          ))}
-        </div>
+      {/* min-h-0 is what hands a definite height down to the columns (without
+          it a flex child refuses to shrink below its content). pb-2 keeps the
+          horizontal scrollbar off the columns' bottom edge. dnd-kit
+          auto-scrolls this container when a dragged card reaches its edge. */}
+      <div className="scrollbar-thin-surface flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2">
+        {STATUS_ORDER.map((status) => (
+          <KanbanColumn
+            key={status}
+            status={status}
+            tasks={selectColumnTasks(tasks, status)}
+            categoriesById={categories_by_id}
+            onAddTask={() => onAddTask(status)}
+            onOpenTask={onOpenTask}
+            onDeleteTask={onDeleteTask}
+          />
+        ))}
       </div>
 
       {/* Floating copy of the dragged card. Cards have translucent status
           tints, so the overlay adds a solid surface behind - a see-through
-          card floating over other columns would be unreadable. */}
+          card floating over other columns would be unreadable. DragOverlay
+          renders into its own position:fixed wrapper, so neither the row's
+          overflow nor the workspace's stacking context affect it. */}
       <DragOverlay>
         {active_task !== null && (
           <div className="rounded-lg bg-surface-overlay shadow-2xl">
@@ -174,7 +182,7 @@ export function KanbanBoard({
                   : null
               }
               onOpen={() => {}}
-              onDelete={() => {}}
+              onDelete={() => Promise.resolve(false)}
               isOverlay
             />
           </div>

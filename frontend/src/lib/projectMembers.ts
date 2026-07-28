@@ -2,14 +2,15 @@
 //
 // TODO: not wired yet - the Kanban tab runs on in-memory mock state (see
 // routes/_authenticated/$projectId/kanban.tsx). The backend controller exists
-// but ProjectMembersService is still TODO. Switch the route to this fetcher
-// once GET /api/projects/:projectId/members is implemented.
+// but has no route decorators. Switch the route to this function once
+// GET /api/projects/:projectId/members is implemented.
 //
-// The response shape is TBD (the controller is a comment stub and nothing
-// commits to including the user relation yet). The UI needs username +
-// avatarUrl, so the validator below accepts either a flattened user or a
-// ProjectMember row with an included user ({ user: { id, username, ... } }) -
-// same tolerance as parseAssignees in lib/tasks.ts.
+// The response shape is TBD (nothing commits to including the user relation
+// yet). The UI needs username + avatarUrl, so the validator below accepts
+// either a flattened user or a ProjectMember row with an included user
+// ({ user: { id, username, ... } }) - same tolerance as parseAssignees in
+// lib/tasks.ts.
+import { apiClient } from "@/lib/apiClient";
 
 export interface ProjectMemberUser {
   id: string;
@@ -17,31 +18,10 @@ export interface ProjectMemberUser {
   avatarUrl: string | null;
 }
 
-export class ProjectMembersUnauthorizedError extends Error {
-  constructor() {
-    super("Authentication is required to load project members");
-    this.name = "ProjectMembersUnauthorizedError";
-  }
-}
-
-export async function fetchProjectMembers(
+export async function listProjectMembers(
   projectId: string
 ): Promise<ProjectMemberUser[]> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/members`,
-    { credentials: "include" }
-  );
-
-  if (response.status === 401) {
-    throw new ProjectMembersUnauthorizedError();
-  }
-
-  if (!response.ok) {
-    throw new Error(`Failed to load members for project ${projectId}`);
-  }
-
-  // Parse as unknown first, then validate each item to keep runtime safety.
-  const payload: unknown = await response.json();
+  const payload = await apiClient<unknown>(`/projects/${projectId}/members`);
   if (!Array.isArray(payload)) {
     throw new Error("Project members response is invalid");
   }
@@ -50,7 +30,6 @@ export async function fetchProjectMembers(
   if (parsed.some((member) => member === null)) {
     throw new Error("Project members response contains invalid items");
   }
-
   return parsed as ProjectMemberUser[];
 }
 

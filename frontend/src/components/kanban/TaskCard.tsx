@@ -6,15 +6,32 @@
 // body opens the detail drawer; dragging it is told apart from clicking by
 // the board's PointerSensor activation distance (see KanbanBoard).
 //
+// Deleting swaps the card for an inline confirmation, the same house pattern
+// as ProjectCard/DiscoveryBlockCard - deliberately lighter than theirs
+// though: no "type the title to confirm". A project is a whole workspace; a
+// task is one row among dozens, cheap to recreate, and retyping a title for
+// each one would be hostile.
+//
+// Keyboard note: the card can't be opened with Enter, because dnd-kit's
+// sortable attributes claim Enter/Space for picking a card up. The "..."
+// menu's Edit item is the keyboard path to the drawer.
+//
 // The same component renders the floating copy inside the board's
 // DragOverlay (isOverlay): that copy must not register itself as a sortable
 // (it would collide with the real card, which keeps its place in the column
 // at reduced opacity while the overlay follows the pointer).
-import { Dropdown, DropdownItem } from "flowbite-react";
+import { useEffect, useState } from "react";
+import {
+  Button,
+  Dropdown,
+  DropdownDivider,
+  DropdownItem,
+} from "flowbite-react";
 import {
   HiDotsHorizontal,
   HiOutlinePencil,
   HiOutlineTrash,
+  HiOutlineX,
 } from "react-icons/hi";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -31,9 +48,18 @@ interface TaskCardProps {
   // resolved by the parent from task.categoryId (the route owns data joining)
   category: TaskCategory | null;
   onOpen: () => void;
-  onDelete: () => void;
+  // resolves to true once the task is really gone - the card only leaves its
+  // confirmation state then, so a failed delete keeps the confirm open
+  onDelete: () => Promise<boolean>;
   isOverlay?: boolean;
 }
+
+// Rounds the item hover highlight, which darkDropdownTheme leaves
+// rectangular. Same local override as ProjectCard/DiscoveryBlockCard.
+const roundedDropdownItemTheme = {
+  container: "mx-1",
+  base: "rounded-md",
+};
 
 export function TaskCard({
   task,
@@ -42,8 +68,12 @@ export function TaskCard({
   onDelete,
   isOverlay = false,
 }: TaskCardProps) {
+  const [is_confirming_delete, setIsConfirmingDelete] = useState(false);
+  const [is_deleting, setIsDeleting] = useState(false);
+
   // Hooks can't be conditional, so the overlay copy calls useSortable too but
   // disabled - it then registers nothing with the surrounding DndContext.
+  // Confirming also disables it: a card being deleted shouldn't be draggable.
   const {
     attributes,
     listeners,
@@ -51,24 +81,108 @@ export function TaskCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id, disabled: isOverlay });
+  } = useSortable({
+    id: task.id,
+    disabled: isOverlay || is_confirming_delete,
+  });
+
+  // Escape cancels the confirmation, same as DiscoveryBlockCard's.
+  useEffect(() => {
+    if (!is_confirming_delete) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsConfirmingDelete(false);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [is_confirming_delete]);
 
   const status_style = STATUS_STYLES[task.status];
+
+  // dnd-kit's transform/transition: inline is the standard wiring for
+  // per-frame values (same exception as progress-bar widths).
+  const sortable_style = isOverlay
+    ? undefined
+    : { transform: CSS.Transform.toString(transform), transition };
+
+  async function handleConfirmDelete() {
+    setIsDeleting(true);
+    try {
+      if (await onDelete()) {
+        setIsConfirmingDelete(false);
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  if (is_confirming_delete) {
+    return (
+      // Keeps setNodeRef so the id stays registered with the surrounding
+      // SortableContext (dnd-kit warns about missing nodes otherwise), but
+      // spreads no listeners/attributes and takes no onClick: while
+      // confirming, the card is neither draggable nor click-to-open.
+      <div
+        ref={isOverlay ? undefined : setNodeRef}
+        style={sortable_style}
+        className="flex flex-col gap-3 rounded-lg border border-control-error bg-surface-raised p-3"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-semibold text-text-primary">
+            Delete task?
+          </p>
+          <button
+            type="button"
+            aria-label="Cancel delete task"
+            onClick={() => setIsConfirmingDelete(false)}
+            className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:ring-2 focus:ring-brand-500/40 focus:outline-none"
+          >
+            <HiOutlineX className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <p
+          className="line-clamp-2 text-xs text-text-secondary"
+          title={task.title}
+        >
+          {task.title}
+        </p>
+
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="xs"
+            onClick={handleConfirmDelete}
+            disabled={is_deleting}
+            className="flex-1 bg-control-error !text-white hover:bg-red-700 focus:ring-4 focus:ring-red-300 focus:outline-none focus-visible:outline-none dark:bg-control-error dark:hover:bg-red-700 dark:focus:ring-red-800"
+          >
+            {is_deleting ? "Deleting..." : "Delete"}
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            onClick={() => setIsConfirmingDelete(false)}
+            disabled={is_deleting}
+            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:ring-2 focus:ring-brand-500/40 focus:outline-none! focus-visible:outline-none"
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       ref={isOverlay ? undefined : setNodeRef}
-      // Inline transform/transition is the standard dnd-kit wiring (dynamic
-      // per-frame values, same exception as progress-bar widths).
-      style={
-        isOverlay
-          ? undefined
-          : { transform: CSS.Transform.toString(transform), transition }
-      }
+      style={sortable_style}
       {...(isOverlay ? {} : attributes)}
       {...(isOverlay ? {} : listeners)}
       onClick={onOpen}
-      className={`flex cursor-grab flex-col gap-2 rounded-lg border p-3 ${status_style.card} ${status_style.cardHover} ${isDragging ? "opacity-40" : ""}`}
+      className={`flex cursor-grab flex-col gap-2 rounded-lg border p-3 transition-colors ${status_style.card} ${status_style.cardHover} ${isDragging ? "opacity-40" : ""}`}
     >
       <div className="flex items-center gap-2">
         <TaskCategoryBadge category={category} />
@@ -87,20 +201,35 @@ export function TaskCard({
                 inline
                 placement="bottom-end"
                 theme={darkDropdownTheme}
+                // Load-bearing: flowbite's own default theme sets
+                // dark:border-none, which silently deletes the border-style
+                // darkDropdownTheme sets. See the long explanation in
+                // ProjectCard.tsx - border-solid specifically is what beats it.
+                className="border-solid dark:border-solid"
                 renderTrigger={() => (
                   <button
                     type="button"
                     aria-label={`Open menu for task "${task.title}"`}
-                    className="rounded p-0.5 text-text-secondary hover:bg-surface-overlay hover:text-text-primary"
+                    className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:ring-2 focus:ring-brand-500/40 focus:outline-none"
                   >
-                    <HiDotsHorizontal aria-hidden="true" />
+                    <HiDotsHorizontal className="h-5 w-5" aria-hidden="true" />
                   </button>
                 )}
               >
-                <DropdownItem icon={HiOutlinePencil} onClick={onOpen}>
+                <DropdownItem
+                  icon={HiOutlinePencil}
+                  theme={roundedDropdownItemTheme}
+                  onClick={onOpen}
+                >
                   Edit
                 </DropdownItem>
-                <DropdownItem icon={HiOutlineTrash} onClick={onDelete}>
+                <DropdownDivider />
+                <DropdownItem
+                  icon={HiOutlineTrash}
+                  theme={roundedDropdownItemTheme}
+                  className="text-control-error! dark:text-control-error!"
+                  onClick={() => setIsConfirmingDelete(true)}
+                >
                   Delete
                 </DropdownItem>
               </Dropdown>

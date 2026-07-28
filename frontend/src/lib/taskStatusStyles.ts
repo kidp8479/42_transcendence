@@ -4,11 +4,13 @@
 // components/summary/TaskStatusOverview.tsx so status reads the same across
 // tabs.
 //
-// The board colors statuses in three layers, from the outside in:
-// 1. the board itself is a neutral raised container (see KanbanBoard),
-// 2. each column is outlined + tinted with its status color (columnContainer),
-// 3. each card carries a further diluted tint of the same color (card) that
+// The board colors statuses in two layers, from the outside in:
+// 1. each column is outlined + tinted with its status color (columnContainer),
+// 2. each card carries a further diluted tint of the same color (card) that
 //    stacks over the column tint - deliberate "same hue, fading inward" look.
+// There used to be a third, outermost layer (a neutral raised container around
+// all four columns, rendered by KanbanBoard). Dropped: against the page
+// background it read as a box inside a box.
 //
 // Every class below is written out in full, character for character, even the
 // "/5" and "/40" opacity variants. Tailwind only generates CSS for a class it
@@ -44,6 +46,11 @@ interface TaskStatusStyle {
   // card border + diluted bg tint
   card: string;
   cardHover: string;
+  // hover state for the column's two "add" affordances (the header "+" and the
+  // bottom "Add task" button): both rest neutral and pick up the status color
+  // on hover. One key covers both - the border-* part is simply inert on the
+  // header "+", which has no border.
+  addTaskHover: string;
 }
 
 export const STATUS_STYLES: Record<TaskStatus, TaskStatusStyle> = {
@@ -55,6 +62,8 @@ export const STATUS_STYLES: Record<TaskStatus, TaskStatusStyle> = {
     countBadge: "border-status-todo/30 bg-status-todo/15 text-status-todo",
     card: "border-status-todo/25 bg-status-todo/10",
     cardHover: "hover:border-status-todo/50",
+    addTaskHover:
+      "hover:border-status-todo/50 hover:bg-status-todo/15 hover:text-status-todo",
   },
   IN_PROGRESS: {
     label: "In Progress",
@@ -65,6 +74,8 @@ export const STATUS_STYLES: Record<TaskStatus, TaskStatusStyle> = {
       "border-status-in-progress/30 bg-status-in-progress/15 text-status-in-progress",
     card: "border-status-in-progress/25 bg-status-in-progress/10",
     cardHover: "hover:border-status-in-progress/50",
+    addTaskHover:
+      "hover:border-status-in-progress/50 hover:bg-status-in-progress/15 hover:text-status-in-progress",
   },
   REVIEW: {
     label: "Review",
@@ -75,6 +86,8 @@ export const STATUS_STYLES: Record<TaskStatus, TaskStatusStyle> = {
       "border-status-review/30 bg-status-review/15 text-status-review",
     card: "border-status-review/25 bg-status-review/10",
     cardHover: "hover:border-status-review/50",
+    addTaskHover:
+      "hover:border-status-review/50 hover:bg-status-review/15 hover:text-status-review",
   },
   COMPLETED: {
     label: "Completed",
@@ -85,5 +98,7 @@ export const STATUS_STYLES: Record<TaskStatus, TaskStatusStyle> = {
       "border-status-completed/30 bg-status-completed/15 text-status-completed",
     card: "border-status-completed/25 bg-status-completed/10",
     cardHover: "hover:border-status-completed/50",
+    addTaskHover:
+      "hover:border-status-completed/50 hover:bg-status-completed/15 hover:text-status-completed",
   },
 };

@@ -1,8 +1,10 @@
 // Detail drawer for a kanban card.
 // Opens when the user clicks a card on the Kanban board (edit mode) or one of
 // the board's "+" buttons (create mode, preset to that column's status).
-// Renders its content inside DrawerShell (which owns backdrop/Escape/slide-in)
-// and owns the fullscreen toggle state the shell needs.
+// Renders its content inside DrawerShell (which owns the click-catcher,
+// Escape, slide-in and resizing) and owns the fullscreen toggle state the
+// shell needs. Both the drawer and its fullscreen mode are confined to the
+// Kanban work area - see DrawerShell's own header.
 //
 // Displays and edits the task fields the board shows: title, status,
 // category, priority, members, notes. The component is a controlled form over
@@ -13,10 +15,11 @@
 // Fields intentionally NOT here yet (absent from the design mockup):
 // startAt/endAt, description, onCalendar - the route fills create defaults
 // and preserves those fields on edit. Revisit with the Calendar tab.
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { Button, Label, Textarea } from "flowbite-react";
 import { HiOutlineArrowsExpand, HiOutlineX } from "react-icons/hi";
-import { LuBold, LuCode, LuItalic, LuList } from "react-icons/lu";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
+import { darkSurfaceFieldClassName } from "@/lib/flowbite";
 import {
   PRIORITY_ORDER,
   PRIORITY_SEGMENT_INACTIVE,
@@ -51,9 +54,22 @@ interface KanBanCardDrawerProps {
   members: ProjectMemberUser[];
   onClose: () => void;
   onSubmit: (draft: TaskDraft) => void;
+  // panel width, owned by the route so it survives this component's remounts
+  width: number;
+  minWidth: number;
+  maxWidth: number;
+  onWidthChange: (width: number) => void;
 }
 
 const DRAWER_HEADING_ID = "kanban-card-drawer-heading";
+
+// Field labels: same uppercase micro-label as the Discovery edit screen, with
+// the column width this drawer's two-column rows need.
+const FIELD_LABEL_CLASS =
+  "w-24 shrink-0 text-xs font-semibold tracking-wide text-text-secondary uppercase";
+
+const ICON_BUTTON_CLASS =
+  "rounded-md p-1.5 text-text-secondary hover:bg-surface-overlay hover:text-text-primary focus:ring-2 focus:ring-brand-500/40 focus:outline-none";
 
 export function KanBanCardDrawer({
   mode,
@@ -63,12 +79,15 @@ export function KanBanCardDrawer({
   members,
   onClose,
   onSubmit,
+  width,
+  minWidth,
+  maxWidth,
+  onWidthChange,
 }: KanBanCardDrawerProps) {
   const [is_fullscreen, setIsFullscreen] = useState(false);
   // Validation messages only appear after a failed submit attempt, not while
   // the user is still filling the form in.
   const [show_errors, setShowErrors] = useState(false);
-  const notes_textarea_ref = useRef<HTMLTextAreaElement>(null);
 
   const [form_draft, setFormDraft] = useState<TaskDraft>(() =>
     task !== null
@@ -122,45 +141,15 @@ export function KanBanCardDrawer({
     }));
   }
 
-  // Wraps the textarea's current selection in a markdown marker pair (list is
-  // prefix-only), then puts the caret back where it was. Plain insertion, no
-  // preview - rendering the notes as markdown is a follow-up.
-  function applyNotesFormat(prefix: string, suffix: string) {
-    const textarea = notes_textarea_ref.current;
-    if (textarea === null) {
-      return;
-    }
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const notes = form_draft.notes;
-    setFormDraft((draft) => ({
-      ...draft,
-      notes:
-        notes.slice(0, start) +
-        prefix +
-        notes.slice(start, end) +
-        suffix +
-        notes.slice(end),
-    }));
-    // Restore focus + selection once React has re-rendered the new value.
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, end + prefix.length);
-    });
-  }
-
-  const notes_toolbar = [
-    { label: "Bold", icon: LuBold, prefix: "**", suffix: "**" },
-    { label: "Italic", icon: LuItalic, prefix: "*", suffix: "*" },
-    { label: "Code", icon: LuCode, prefix: "`", suffix: "`" },
-    { label: "List item", icon: LuList, prefix: "- ", suffix: "" },
-  ];
-
   return (
     <DrawerShell
       onClose={onClose}
       isFullscreen={is_fullscreen}
       labelledBy={DRAWER_HEADING_ID}
+      width={width}
+      minWidth={minWidth}
+      maxWidth={maxWidth}
+      onWidthChange={onWidthChange}
     >
       <h2 id={DRAWER_HEADING_ID} className="sr-only">
         {mode === "create" ? "Create task" : `Edit task ${task?.title ?? ""}`}
@@ -172,7 +161,7 @@ export function KanBanCardDrawer({
         className={`h-1 w-full shrink-0 ${selected_category_color !== null ? selected_category_color.bg : "bg-surface-border"}`}
       />
 
-      <div className="flex items-center gap-2 border-b border-surface-border p-4">
+      <div className="flex shrink-0 items-center gap-2 border-b border-surface-border p-4">
         <TaskCategoryBadge category={selected_category} />
         <TaskPriorityDot priority={form_draft.priority} />
         {/* Cosmetic reference only: tasks have no human-readable number, so
@@ -187,10 +176,12 @@ export function KanBanCardDrawer({
           <button
             type="button"
             onClick={() => setIsFullscreen((previous) => !previous)}
+            aria-pressed={is_fullscreen}
             aria-label={
               is_fullscreen ? "Exit fullscreen" : "Expand to fullscreen"
             }
-            className="rounded p-1.5 text-text-secondary hover:bg-surface-overlay hover:text-text-primary"
+            title={is_fullscreen ? "Exit fullscreen" : "Expand to fullscreen"}
+            className={ICON_BUTTON_CLASS}
           >
             <HiOutlineArrowsExpand aria-hidden="true" />
           </button>
@@ -198,7 +189,8 @@ export function KanBanCardDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close drawer"
-            className="rounded p-1.5 text-text-secondary hover:bg-surface-overlay hover:text-text-primary"
+            title="Close drawer"
+            className={ICON_BUTTON_CLASS}
           >
             <HiOutlineX aria-hidden="true" />
           </button>
@@ -223,14 +215,12 @@ export function KanBanCardDrawer({
         </div>
 
         <div className="flex items-center gap-4">
-          <label
-            htmlFor="kanban-drawer-status"
-            className="w-24 shrink-0 text-sm text-text-secondary"
-          >
+          <Label htmlFor="kanban-drawer-status" className={FIELD_LABEL_CLASS}>
             Status
-          </label>
-          {/* Tinted with the selected status color - same literals as the
-              column count pills. */}
+          </Label>
+          {/* Native selects here on purpose: their whole point is carrying the
+              live status/category tint, which a Flowbite Select theme would
+              fight. Tinted with the same literals as the column count pills. */}
           <select
             id="kanban-drawer-status"
             value={form_draft.status}
@@ -255,12 +245,9 @@ export function KanBanCardDrawer({
         </div>
 
         <div className="flex items-center gap-4">
-          <label
-            htmlFor="kanban-drawer-category"
-            className="w-24 shrink-0 text-sm text-text-secondary"
-          >
+          <Label htmlFor="kanban-drawer-category" className={FIELD_LABEL_CLASS}>
             Category
-          </label>
+          </Label>
           <div>
             <select
               id="kanban-drawer-category"
@@ -275,7 +262,7 @@ export function KanBanCardDrawer({
               className={
                 selected_category_color !== null
                   ? `rounded-lg border px-3 py-1.5 text-sm ${selected_category_color.badgeBg} ${selected_category_color.badgeBorder} ${selected_category_color.text}`
-                  : "rounded-lg border border-control-border bg-control-bg px-3 py-1.5 text-sm text-text-primary"
+                  : "rounded-lg border border-surface-border bg-surface-overlay px-3 py-1.5 text-sm text-text-primary"
               }
             >
               <option value="" className="bg-surface-raised text-text-primary">
@@ -300,10 +287,7 @@ export function KanBanCardDrawer({
         </div>
 
         <div className="flex items-center gap-4">
-          <span
-            id="kanban-drawer-priority-label"
-            className="w-24 shrink-0 text-sm text-text-secondary"
-          >
+          <span id="kanban-drawer-priority-label" className={FIELD_LABEL_CLASS}>
             Priority
           </span>
           <div
@@ -320,7 +304,7 @@ export function KanBanCardDrawer({
                 onClick={() =>
                   setFormDraft((draft) => ({ ...draft, priority }))
                 }
-                className={`rounded-lg border px-3 py-1.5 text-sm ${form_draft.priority === priority ? PRIORITY_STYLES[priority].segmentActive : PRIORITY_SEGMENT_INACTIVE}`}
+                className={`rounded-lg border px-3 py-1.5 text-sm transition-colors focus:ring-2 focus:ring-brand-500/40 focus:outline-none ${form_draft.priority === priority ? PRIORITY_STYLES[priority].segmentActive : PRIORITY_SEGMENT_INACTIVE}`}
               >
                 {PRIORITY_STYLES[priority].label}
               </button>
@@ -329,13 +313,11 @@ export function KanBanCardDrawer({
         </div>
 
         <div className="flex items-center gap-4">
-          <span
-            id="kanban-drawer-members-label"
-            className="w-24 shrink-0 text-sm text-text-secondary"
-          >
+          <span id="kanban-drawer-members-label" className={FIELD_LABEL_CLASS}>
             Members
           </span>
           <div
+            role="group"
             aria-labelledby="kanban-drawer-members-label"
             className="flex flex-wrap gap-2"
           >
@@ -350,8 +332,8 @@ export function KanBanCardDrawer({
                   title={member.username}
                   className={
                     is_assigned
-                      ? "rounded-full ring-2 ring-brand-500"
-                      : "rounded-full opacity-50 hover:opacity-100"
+                      ? "rounded-full ring-2 ring-brand-500 focus:ring-2 focus:ring-brand-500/40 focus:outline-none"
+                      : "rounded-full opacity-50 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-brand-500/40 focus:outline-none"
                   }
                 >
                   {member.avatarUrl !== null ? (
@@ -375,30 +357,14 @@ export function KanBanCardDrawer({
         </div>
 
         <div className="flex flex-1 flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <label
-              htmlFor="kanban-drawer-notes"
-              className="text-sm text-text-secondary"
-            >
-              Notes
-            </label>
-            <div className="ml-auto flex gap-1">
-              {notes_toolbar.map((tool) => (
-                <button
-                  key={tool.label}
-                  type="button"
-                  onClick={() => applyNotesFormat(tool.prefix, tool.suffix)}
-                  aria-label={`Insert ${tool.label.toLowerCase()} markdown`}
-                  className="rounded p-1.5 text-text-secondary hover:bg-surface-overlay hover:text-text-primary"
-                >
-                  <tool.icon aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-          </div>
-          <textarea
+          <Label
+            htmlFor="kanban-drawer-notes"
+            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
+          >
+            Notes
+          </Label>
+          <Textarea
             id="kanban-drawer-notes"
-            ref={notes_textarea_ref}
             value={form_draft.notes}
             onChange={(event) =>
               setFormDraft((draft) => ({ ...draft, notes: event.target.value }))
@@ -406,26 +372,30 @@ export function KanBanCardDrawer({
             placeholder={
               "## Notes\n\n- Implementation details\n- Blockers\n- References"
             }
-            className="min-h-40 flex-1 resize-y rounded-lg border border-control-border bg-control-bg p-3 font-mono text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+            // surface-* tokens, not the lighter control-* ones meant for auth
+            // forms. placeholder: is spelled out because
+            // darkSurfaceFieldClassName sets no placeholder color and
+            // Flowbite's own default would win.
+            className={`min-h-40 flex-1 resize-y font-mono text-sm placeholder:!text-text-muted ${darkSurfaceFieldClassName}`}
           />
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-surface-border p-4">
-        <button
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-surface-border p-4">
+        <Button
           type="button"
           onClick={onClose}
-          className="mr-auto rounded-lg border border-surface-border px-4 py-2 text-sm text-text-secondary hover:bg-surface-overlay hover:text-text-primary"
+          className="mr-auto border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:ring-2 focus:ring-brand-500/40 focus:outline-none! focus-visible:outline-none"
         >
           Discard
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleSubmit}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+          className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
         >
           {mode === "create" ? "Create" : "Save"}
-        </button>
+        </Button>
       </div>
     </DrawerShell>
   );
