@@ -85,6 +85,7 @@ export class RealtimeGateway
     for (const project of projects) {
       await client.join(`project:${project.id}`);
     }
+    await client.join(`user:${result.userId}`);
   }
 
   handleDisconnect(): void {

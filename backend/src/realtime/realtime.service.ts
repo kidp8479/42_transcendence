@@ -8,4 +8,8 @@ export class RealtimeService {
   emitToProject(projectId: string, event: string, payload: unknown): void {
     this.gateway.server.to(`project:${projectId}`).emit(event, payload);
   }
+
+  emitToUser(userId: string, event: string, payload: unknown): void {
+    this.gateway.server.to(`user:${userId}`).emit(event, payload);
+  }
 }
