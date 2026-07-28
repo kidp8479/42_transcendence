@@ -589,7 +589,16 @@ function EvaluationChecklistPage() {
                           ) : (
                             <p
                               className="w-full px-2 text-sm"
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Edit \"${c.label}\"`}
                               onDoubleClick={() => setEditingId(c.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setEditingId(c.id);
+                                }
+                              }}
                             >
                               {c.label}
                             </p>
@@ -597,7 +606,7 @@ function EvaluationChecklistPage() {
 
                           <button
                             type="button"
-                            className="opacity-0 transition-opacity group-hover:opacity-50"
+                            className="opacity-0 transition-opacity group-hover:opacity-50 group-focus-within:opacity-50 focus:opacity-100"
                             aria-label={`Delete "${c.label}"`}
                             onClick={() => handleDelete(c.id)}
                           >
