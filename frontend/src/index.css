@@ -41,6 +41,13 @@
   --color-status-review: #f59e0b;
   --color-status-completed: #10b981;
 
+  /* Task priority (LOW/MEDIUM/HIGH), used for the kanban/list priority dot and
+     the drawer's priority selector. Low is deliberately NOT green: green
+     already means brand + "completed", a green priority would read as "done". */
+  --color-priority-high: #ef4444;
+  --color-priority-medium: #f59e0b;
+  --color-priority-low: #7a8aa8;
+
   /* Category palette - unnamed/numbered, not tied to specific category names since
      TaskCategory is created freely per-project. Matches the Figma prototype's
      STATIC_CATEGORIES colors (Planning..Documentation, in that order). Index 1
@@ -104,6 +111,24 @@ input[data-auth-field]:-webkit-autofill:focus {
 .scrollbar-thin-surface::-webkit-scrollbar-thumb {
   background-color: var(--color-surface-border);
   border-radius: 9999px;
+}
+
+/*
+ * Slide-in for right-anchored drawers (DrawerShell). Raw CSS because Tailwind
+ * has no built-in slide keyframes and arbitrary values are banned. Entry only:
+ * the drawer unmounts on close (so its form state resets) - an exit animation
+ * would need the panel to outlive its state, not worth it for now.
+ */
+@keyframes drawer-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.drawer-slide-in {
+  animation: drawer-slide-in 300ms ease-out;
 }
 
 /*
