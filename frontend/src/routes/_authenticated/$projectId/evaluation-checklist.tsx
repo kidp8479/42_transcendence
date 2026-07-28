@@ -25,6 +25,8 @@ import type {
   EvaluationChecklistItem,
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
+
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 
 export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
@@ -240,6 +242,7 @@ function EvaluationChecklistPage() {
   const checklistItems = Route.useLoaderData();
   const [items, setItems] = useState<EvaluationChecklistItem[]>(checklistItems);
   const accordionItemData = categorizeChecklistItems(items);
+  const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
   function categoryPercent(data: AccordionItemData): number {
@@ -303,7 +306,7 @@ function EvaluationChecklistPage() {
     "SUPPLEMENTAL",
   ];
 
-  async function createItem(dto: {
+  async function handleCreate(dto: {
     label: string;
     section: EvaluationChecklistSection;
     order: number;
@@ -315,9 +318,10 @@ function EvaluationChecklistPage() {
       showToast({ type: "error", message: errorMessage("created") });
       return;
     }
+    await safeInvalidateRouter();
   }
 
-  async function updateItem(
+  async function handleUpdate(
     id: string,
     changes: Partial<EvaluationChecklistItem>
   ) {
@@ -336,9 +340,10 @@ function EvaluationChecklistPage() {
       showToast({ type: "error", message: errorMessage("updated") });
       setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
     }
+    await safeInvalidateRouter();
   }
 
-  async function deleteItem(id: string) {
+  async function handleDelete(id: string) {
     const previousItem = items.find((it) => it.id === id);
     if (!previousItem) return;
 
@@ -350,6 +355,7 @@ function EvaluationChecklistPage() {
       showToast({ type: "error", message: errorMessage("deleted") });
       setItems((prevItems) => [...prevItems, previousItem]);
     }
+    await safeInvalidateRouter();
   }
 
   const readinessLabel =
@@ -446,7 +452,7 @@ function EvaluationChecklistPage() {
             ) {
               return;
             }
-            createItem({
+            handleCreate({
               label,
               order: item.contents.length,
               section: sectionByIndex[i],
@@ -495,7 +501,7 @@ function EvaluationChecklistPage() {
                     {item.contents.map((c) => {
                       function commitLabel(newValue: string) {
                         if (newValue.trim().length && newValue !== c.label) {
-                          updateItem(c.id, { label: newValue });
+                          handleUpdate(c.id, { label: newValue });
                         }
                         setEditingId(null);
                       }
@@ -511,7 +517,7 @@ function EvaluationChecklistPage() {
                             className={style.checkedColor}
                             checked={c.isChecked}
                             onChange={() =>
-                              updateItem(c.id, { isChecked: !c.isChecked })
+                              handleUpdate(c.id, { isChecked: !c.isChecked })
                             }
                           />
 
@@ -559,7 +565,7 @@ function EvaluationChecklistPage() {
                             type="button"
                             className="opacity-0 transition-opacity group-hover:opacity-50"
                             aria-label={`Delete "${c.label}"`}
-                            onClick={() => deleteItem(c.id)}
+                            onClick={() => handleDelete(c.id)}
                           >
                             <RiDeleteBackFill className="h-5 w-5" />
                           </button>
