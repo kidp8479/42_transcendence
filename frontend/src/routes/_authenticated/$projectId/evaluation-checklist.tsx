@@ -337,8 +337,9 @@ function EvaluationChecklistPage() {
     try {
       await updateEvaluationChecklistItem(projectId, id, changes);
     } catch {
-      showToast({ type: "error", message: errorMessage("updated") });
       setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
+      showToast({ type: "error", message: errorMessage("updated") });
+      return;
     }
     await safeInvalidateRouter();
   }
@@ -352,8 +353,9 @@ function EvaluationChecklistPage() {
     try {
       await deleteEvaluationChecklistItem(projectId, id);
     } catch {
-      showToast({ type: "error", message: errorMessage("deleted") });
       setItems((prevItems) => [...prevItems, previousItem]);
+      showToast({ type: "error", message: errorMessage("deleted") });
+      return;
     }
     await safeInvalidateRouter();
   }

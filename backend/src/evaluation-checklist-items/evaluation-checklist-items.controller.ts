@@ -67,6 +67,7 @@ export class EvaluationChecklistItemsController {
   }
 
   // PATCH
+  @ApiSecurity("csrf")
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -83,6 +84,7 @@ export class EvaluationChecklistItemsController {
   }
 
   // DELETE
+  @ApiSecurity("csrf")
   @Delete(":id")
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,

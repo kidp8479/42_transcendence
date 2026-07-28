@@ -281,10 +281,6 @@ async function main() {
     }
   }
   
-function getRandomInt(max) {
-  return Math.floor(Math.random() * max) + 1;
-}
-
   // 5. Demo project: dogfooding this planner to build the actual 42 subject.
   // A separate section rather than folded into the generic loops above -
   // this project's Discovery/Kanban content is specific to it (pulled from
