@@ -15,12 +15,13 @@ import {
   MinLength,
   MaxLength,
 } from "class-validator";
+import { Transform } from "class-transformer"
 import { EvaluationChecklistItemSection } from "@prisma/client";
 import { EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH } from "../evaluation-checklist-items.constants";
 
 export class CreateEvaluationChecklistItemDto {
-  // MinLength(1) rejects an empty/whitespace-stripped label; MaxLength keeps
-  // it aligned with the column size and with the frontend's own maxLength.
+  // Trims before MinLength runs, so whitespace-only labels can't pass validation.
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value ))
   @IsString()
   @MinLength(1)
   @MaxLength(EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH)

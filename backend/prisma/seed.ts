@@ -85,7 +85,7 @@ async function main() {
     { username: "christophe", campus: "42 Paris" },
     { username: "diana", campus: "42 Paris" },
     { username: "pauline", campus: "42 Paris" },
-    { username: "emptyuser", campus: "42 Void"}
+    { username: "emptyuser", campus: "42 Void" }
   ];
 
   const createdUsers: Record<

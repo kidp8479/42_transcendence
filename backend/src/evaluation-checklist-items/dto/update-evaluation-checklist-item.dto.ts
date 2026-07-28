@@ -16,6 +16,7 @@ import {
   MinLength,
   MaxLength,
 } from "class-validator";
+import { Transform } from "class-transformer"
 import { CreateEvaluationChecklistItemDto } from "./create-evaluation-checklist-item.dto";
 import { EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH } from "../evaluation-checklist-items.constants";
 
@@ -26,6 +27,7 @@ export class UpdateEvaluationChecklistItemDto extends PartialType(
   OmitType(CreateEvaluationChecklistItemDto, ["section"] as const)
 ) {
   // Same constraints as create's label, just optional here.
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value ))
   @IsOptional()
   @IsString()
   @MinLength(1)
