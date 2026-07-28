@@ -24,7 +24,9 @@ export function Footer() {
   return (
     <FlowbiteFooter
       container
-      className="w-full !rounded-none !bg-surface-base !p-0 !shadow-none border-t border-surface-border"
+      // shrink-0: same reason as HeaderShell - the bounded app shell column
+      // would otherwise squash the footer instead of the flex-1 middle area.
+      className="w-full shrink-0 !rounded-none !bg-surface-base !p-0 !shadow-none border-t border-surface-border"
     >
       <LayoutContainer className="flex w-full flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
         <FooterCopyright

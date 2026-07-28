@@ -55,6 +55,19 @@ export function DrawerShell({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onEscape]);
 
+  // Moving focus into the panel on open makes Escape work without a click
+  // first, and gets the dialog announced by screen readers.
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
+
+  const isResizable =
+    !isFullscreen &&
+    width !== undefined &&
+    minWidth !== undefined &&
+    maxWidth !== undefined &&
+    onWidthChange !== undefined;
+
   return (
     <div
       className={
@@ -73,6 +86,7 @@ export function DrawerShell({
         aria-hidden="true"
       ></div>
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -83,6 +97,14 @@ export function DrawerShell({
           (isOpen ? "translate-x-0" : "translate-x-full")
         }
       >
+        {isResizable && (
+          <DrawerResizeHandle
+            width={width}
+            minWidth={minWidth}
+            maxWidth={maxWidth}
+            onWidthChange={onWidthChange}
+          />
+        )}
         {children}
       </div>
     </div>

@@ -2,14 +2,19 @@
 //
 // TODO: not wired yet - the Kanban tab runs on in-memory mock state (see
 // routes/_authenticated/$projectId/kanban.tsx). The backend controller exists
-// but TasksService is still TODO. Switch the route to these fetchers once
-// GET/POST/PATCH/DELETE /api/projects/:projectId/tasks are implemented.
+// but has no route decorators and TasksService is an empty class. Switch the
+// route to these functions once GET/POST/PATCH/DELETE
+// /api/projects/:projectId/tasks are implemented.
 //
 // Why this file exists:
 // - keeps network + parsing logic out of route files/components
 // - gives a single typed contract mirroring the backend DTOs
 //   (backend/src/tasks/dto/create-task.dto.ts, update-task.dto.ts)
-// - centralizes unauthorized handling semantics
+//
+// apiClient handles the /api prefix, the session cookie, the X-CSRF-Token
+// header on mutations, and turns any non-OK response into an ApiError that
+// carries `status` - so there's no bespoke Unauthorized error class here:
+// callers that care check `error instanceof ApiError && error.status === 401`.
 //
 // Known contract gaps to resolve backend-side before wiring:
 // 1. UpdateTaskDto has no assigneeIds field, and the global ValidationPipe
@@ -19,6 +24,7 @@
 // 2. CreateTaskDto documents rank as the position "in its category column",
 //    but the Kanban board groups by STATUS. The frontend treats rank as the
 //    0-based position within the task's status column - to confirm backend-side.
+import { apiClient } from "@/lib/apiClient";
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
@@ -80,29 +86,10 @@ export interface UpdateTaskBody {
   onCalendar?: boolean;
 }
 
-export class TasksUnauthorizedError extends Error {
-  constructor() {
-    super("Authentication is required to load tasks");
-    this.name = "TasksUnauthorizedError";
-  }
-}
-
-export async function fetchProjectTasks(projectId: string): Promise<Task[]> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/tasks`,
-    { credentials: "include" }
-  );
-
-  if (response.status === 401) {
-    throw new TasksUnauthorizedError();
-  }
-
-  if (!response.ok) {
-    throw new Error(`Failed to load tasks for project ${projectId}`);
-  }
-
-  // Parse as unknown first, then validate each item to keep runtime safety.
-  const payload: unknown = await response.json();
+export async function listTasks(projectId: string): Promise<Task[]> {
+  // apiClient<unknown>, not apiClient<Task[]>: that generic is only a
+  // TS-level cast, it doesn't check the response shape. parseTask does.
+  const payload = await apiClient<unknown>(`/projects/${projectId}/tasks`);
   if (!Array.isArray(payload)) {
     throw new Error("Tasks response is invalid");
   }
@@ -111,91 +98,17 @@ export async function fetchProjectTasks(projectId: string): Promise<Task[]> {
   if (parsed.some((task) => task === null)) {
     throw new Error("Tasks response contains invalid task items");
   }
-
   return parsed as Task[];
 }
 
-// Mutations require the CSRF token from the current auth session
-// (getSession() in lib/auth.ts returns it) - the auth service rejects any
-// POST/PATCH/DELETE without a valid X-CSRF-Token header.
-export async function createTask(
+export async function getTask(
   projectId: string,
-  body: CreateTaskBody,
-  csrfToken: string
+  taskId: string
 ): Promise<Task> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/tasks`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: mutationHeaders(csrfToken),
-      body: JSON.stringify(body),
-    }
+  const payload = await apiClient<unknown>(
+    `/projects/${projectId}/tasks/${taskId}`
   );
 
-  return parseTaskResponse(response);
-}
-
-export async function updateTask(
-  projectId: string,
-  taskId: string,
-  changes: UpdateTaskBody,
-  csrfToken: string
-): Promise<Task> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/tasks/${taskId}`,
-    {
-      method: "PATCH",
-      credentials: "include",
-      headers: mutationHeaders(csrfToken),
-      body: JSON.stringify(changes),
-    }
-  );
-
-  return parseTaskResponse(response);
-}
-
-export async function deleteTask(
-  projectId: string,
-  taskId: string,
-  csrfToken: string
-): Promise<void> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/tasks/${taskId}`,
-    {
-      method: "DELETE",
-      credentials: "include",
-      headers: mutationHeaders(csrfToken),
-    }
-  );
-
-  if (response.status === 401) {
-    throw new TasksUnauthorizedError();
-  }
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete task ${taskId}`);
-  }
-}
-
-function mutationHeaders(csrfToken: string): Record<string, string> {
-  return {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    "X-CSRF-Token": csrfToken,
-  };
-}
-
-async function parseTaskResponse(response: Response): Promise<Task> {
-  if (response.status === 401) {
-    throw new TasksUnauthorizedError();
-  }
-
-  if (!response.ok) {
-    throw new Error(`Task request failed (${response.status})`);
-  }
-
-  const payload: unknown = await response.json();
   const parsed = parseTask(payload);
   if (parsed === null) {
     throw new Error("Task response is invalid");
@@ -203,6 +116,57 @@ async function parseTaskResponse(response: Response): Promise<Task> {
   return parsed;
 }
 
+export async function createTask(
+  projectId: string,
+  body: CreateTaskBody
+): Promise<Task> {
+  const payload = await apiClient<unknown>(`/projects/${projectId}/tasks`, {
+    method: "POST",
+    body: body,
+  });
+
+  const parsed = parseTask(payload);
+  if (parsed === null) {
+    throw new Error("Task creation response was invalid");
+  }
+  return parsed;
+}
+
+// PATCH takes one partial `updates` object rather than positional params, so
+// a caller only ever sends what it means to change - dragging a card sends
+// { status, rank } and can't clobber an unsaved title elsewhere.
+export async function updateTask(
+  projectId: string,
+  taskId: string,
+  updates: UpdateTaskBody
+): Promise<Task> {
+  const payload = await apiClient<unknown>(
+    `/projects/${projectId}/tasks/${taskId}`,
+    { method: "PATCH", body: updates }
+  );
+
+  const parsed = parseTask(payload);
+  if (parsed === null) {
+    throw new Error("Task modification response was invalid");
+  }
+  return parsed;
+}
+
+// Returns nothing: the controller's comments promise no body, and the reducer
+// only needs the id it already has. If Tasks ends up returning the deleted row
+// like Discovery does, widening this to Promise<Task> is a one-line change.
+export async function deleteTask(
+  projectId: string,
+  taskId: string
+): Promise<void> {
+  await apiClient<unknown>(`/projects/${projectId}/tasks/${taskId}`, {
+    method: "DELETE",
+  });
+}
+
+// Converts an untrusted JSON value into a real Task, or null if it doesn't
+// match the shape we expect. Never trust a response body's type just because
+// a TS annotation says so.
 function parseTask(value: unknown): Task | null {
   if (!isRecord(value)) {
     return null;

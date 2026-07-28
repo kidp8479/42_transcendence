@@ -7,14 +7,18 @@ import { HiPlus } from "react-icons/hi";
 
 interface AddTaskButtonProps {
   onClick: () => void;
+  // STATUS_STYLES[status].addTaskHover - the whole class string is passed in
+  // and never rebuilt here: Tailwind only compiles classes it can see written
+  // out in full (see lib/categoryColorPalette.ts).
+  hoverClassName: string;
 }
 
-export function AddTaskButton({ onClick }: AddTaskButtonProps) {
+export function AddTaskButton({ onClick, hoverClassName }: AddTaskButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-surface-border p-2 text-sm text-text-secondary hover:bg-surface-overlay hover:text-text-primary"
+      className={`flex w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-dashed border-surface-border p-2 text-sm text-text-secondary transition-colors ${hoverClassName}`}
     >
       <HiPlus aria-hidden="true" />
       Add task

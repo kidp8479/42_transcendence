@@ -2,8 +2,14 @@
 //
 // TODO: not wired yet - the Kanban tab runs on in-memory mock state (see
 // routes/_authenticated/$projectId/kanban.tsx). The backend controller exists
-// but TaskCategoriesService is still TODO. Switch the route to this fetcher
-// once GET /api/projects/:projectId/task-categories is implemented.
+// but has no route decorators and TaskCategoriesService is empty. Switch the
+// route to this function once GET /api/projects/:projectId/task-categories is
+// implemented.
+//
+// Read-only for now: the controller documents full CRUD, but the Kanban only
+// ever lists categories. create/update/delete get added alongside the UI that
+// needs them, rather than shipping three unused exports.
+import { apiClient } from "@/lib/apiClient";
 
 export interface TaskCategory {
   id: string;
@@ -13,31 +19,12 @@ export interface TaskCategory {
   color: number;
 }
 
-export class TaskCategoriesUnauthorizedError extends Error {
-  constructor() {
-    super("Authentication is required to load task categories");
-    this.name = "TaskCategoriesUnauthorizedError";
-  }
-}
-
-export async function fetchTaskCategories(
+export async function listTaskCategories(
   projectId: string
 ): Promise<TaskCategory[]> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/projects/${projectId}/task-categories`,
-    { credentials: "include" }
+  const payload = await apiClient<unknown>(
+    `/projects/${projectId}/task-categories`
   );
-
-  if (response.status === 401) {
-    throw new TaskCategoriesUnauthorizedError();
-  }
-
-  if (!response.ok) {
-    throw new Error(`Failed to load task categories for project ${projectId}`);
-  }
-
-  // Parse as unknown first, then validate each item to keep runtime safety.
-  const payload: unknown = await response.json();
   if (!Array.isArray(payload)) {
     throw new Error("Task categories response is invalid");
   }
@@ -46,7 +33,6 @@ export async function fetchTaskCategories(
   if (parsed.some((category) => category === null)) {
     throw new Error("Task categories response contains invalid items");
   }
-
   return parsed as TaskCategory[];
 }
 
@@ -63,7 +49,6 @@ function parseTaskCategory(value: unknown): TaskCategory | null {
   ) {
     return null;
   }
-
   return { id, name, color };
 }
 
