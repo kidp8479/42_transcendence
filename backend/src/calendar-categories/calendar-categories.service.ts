@@ -1,29 +1,71 @@
 // CalendarCategoriesService: handles all database operations for CalendarCategories
 // called by the controller, never called directly by the frontend
 
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { ProjectsService } from "../projects/projects.service";
+import { CreateCalendarCategoryDto } from "./dto/create-calendar-category.dto";
+import { UpdateCalendarCategoryDto } from "./dto/update-calendar-category.dto";
 
 @Injectable()
 export class CalendarCategoriesService {
-  // all methods below will use PrismaService to query the database
-  // none of these are called directly by the frontend - always via the controller
-  // TODO: inject PrismaService here via constructor
-  // the constructor is called automatically by NestJS at startup - never called manually
-  // TODO: inject ProjectsService here via constructor (for assertMembership below)
-  // TODO: create(projectId: string, dto: CreateCalendarCategoryDto, userId: string)
-  //       => call projectsService.assertMembership(projectId, userId) first (shared check,
-  //          throws NotFoundException if not a member - no role required, any member can do this)
-  //       => insert a new calendar category in the database, linked to projectId from the URL
-  // TODO: findAll(projectId: string, userId: string)
-  //       => same assertMembership call as create
-  //       => fetch all calendar categories belonging to a given project
-  // TODO: findById(id: string, projectId: string, userId: string)
-  //       => same assertMembership call as create, then fetch with where: { id, projectId }
-  //          (see DiscoveryBlocksService.findById for a full example of this pattern)
-  // TODO: update(id: string, dto: UpdateCalendarCategoryDto, projectId: string, userId: string)
-  //       => same membership check as findById
-  //       => update a category (name or color)
-  // TODO: remove(id: string, projectId: string, userId: string)
-  //       => same membership check as findById
-  //       => permanently delete a calendar category
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectsService: ProjectsService
+  ) {}
+
+  async create(
+    projectId: string,
+    dto: CreateCalendarCategoryDto,
+    userId: string
+  ) {
+    await this.projectsService.assertMembership(projectId, userId);
+    return this.prisma.calendarCategory.create({
+      data: {
+        name: dto.name,
+        color: dto.color,
+        projectId: projectId, // does not come from the dto but from the url
+      },
+    });
+  }
+
+  async findAll(projectId: string, userId: string) {
+    await this.projectsService.assertMembership(projectId, userId);
+    return this.prisma.calendarCategory.findMany({
+      where: { projectId: projectId },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  // also reused by update/remove as their access guard: it already checks both
+  // "is userId a member of projectId" and "does this id belong to projectId",
+  // and throws the right NotFoundException in each case
+  async findById(id: string, projectId: string, userId: string) {
+    await this.projectsService.assertMembership(projectId, userId);
+    const category = await this.prisma.calendarCategory.findFirst({
+      where: { id: id, projectId: projectId },
+    });
+    if (!category) {
+      throw new NotFoundException("Calendar category not found");
+    }
+    return category;
+  }
+
+  async update(
+    id: string,
+    dto: UpdateCalendarCategoryDto,
+    projectId: string,
+    userId: string
+  ) {
+    await this.findById(id, projectId, userId); // access guard, see findById's own comment
+    return this.prisma.calendarCategory.update({
+      where: { id: id },
+      data: { ...dto },
+    });
+  }
+
+  async remove(id: string, projectId: string, userId: string) {
+    await this.findById(id, projectId, userId); // access guard, see findById's own comment
+    return this.prisma.calendarCategory.delete({ where: { id: id } });
+  }
 }
