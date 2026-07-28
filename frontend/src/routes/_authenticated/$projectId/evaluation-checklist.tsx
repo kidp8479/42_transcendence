@@ -32,7 +32,6 @@ import type {
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
-import { it } from "node:test";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -482,7 +481,8 @@ function EvaluationChecklistPage() {
             }
 
             const nextOrder =
-              item.contents.reduce((max, it) => Math.max(max, it.order), -1) + 1;
+              item.contents.reduce((max, it) => Math.max(max, it.order), -1) +
+              1;
 
             handleCreate({
               label,
@@ -591,7 +591,7 @@ function EvaluationChecklistPage() {
                               className="w-full px-2 text-sm"
                               role="button"
                               tabIndex={0}
-                              aria-label={`Edit \"${c.label}\"`}
+                              aria-label={`Edit "${c.label}"`}
                               onDoubleClick={() => setEditingId(c.id)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
