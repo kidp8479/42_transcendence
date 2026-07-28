@@ -16,6 +16,7 @@ import {
   EvaluationChecklistItemSection,
 } from "@prisma/client";
 import { computeDiscoveryBlockStatus } from "../src/discovery-blocks/discovery-block-status.util";
+import { DEFAULT_CALENDAR_CATEGORIES } from "../src/calendar-categories/default-calendar-categories";
 
 const prisma = new PrismaClient();
 
@@ -273,6 +274,25 @@ async function main() {
   for (const project of createdProjects) {
     for (const cat of taskCategories) {
       await prisma.taskCategory.create({
+        data: {
+          projectId: project.id,
+          name: cat.name,
+          color: cat.color,
+        },
+      });
+    }
+  }
+
+  // 4b. Calendar categories ("labels") - unlike taskCategories above, this
+  // is NOT a TODO for someone else: ProjectsService.create() already inserts
+  // DEFAULT_CALENDAR_CATEGORIES for every real project created through the
+  // app. This dev-only seed still needs its own loop because the fake demo
+  // projects above were created with a raw prisma.project.create() call,
+  // bypassing ProjectsService entirely - importing the same constant instead
+  // of duplicating the list keeps the two from ever drifting apart.
+  for (const project of createdProjects) {
+    for (const cat of DEFAULT_CALENDAR_CATEGORIES) {
+      await prisma.calendarCategory.create({
         data: {
           projectId: project.id,
           name: cat.name,
@@ -610,6 +630,18 @@ function getRandomGoal() {
   > = {};
   for (const cat of taskCategories) {
     demoTaskCategories[cat.name] = await prisma.taskCategory.create({
+      data: {
+        projectId: demoProject.id,
+        name: cat.name,
+        color: cat.color,
+      },
+    });
+  }
+
+  // demo project also gets the same default calendar labels as every other
+  // seeded project (see DEFAULT_CALENDAR_CATEGORIES above)
+  for (const cat of DEFAULT_CALENDAR_CATEGORIES) {
+    await prisma.calendarCategory.create({
       data: {
         projectId: demoProject.id,
         name: cat.name,
