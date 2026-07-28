@@ -3,11 +3,12 @@
 import { Module } from "@nestjs/common";
 import { RealtimeGateway } from "./realtime.gateway";
 import { ProjectsModule } from "../projects/projects.module";
+import { RealtimeService } from "./realtime.service";
 
 @Module({
   imports: [ProjectsModule],
   controllers: [],
-  providers: [RealtimeGateway],
-  exports: [],
+  providers: [RealtimeGateway, RealtimeService],
+  exports: [RealtimeService],
 })
 export class RealtimeModule {}

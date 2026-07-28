@@ -2,9 +2,10 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   WebSocketGateway,
+  WebSocketServer,
 } from "@nestjs/websockets";
 import { ConfigService } from "@nestjs/config";
-import { Socket } from "socket.io";
+import { Socket, Server } from "socket.io";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import { ProjectsService } from "../projects/projects.service";
 
@@ -22,6 +23,8 @@ export class RealtimeGateway
     private readonly vaultRuntime: VaultRuntimeService,
     private readonly projectsService: ProjectsService
   ) {}
+
+  @WebSocketServer() server: Server;
 
   async handleConnection(client: Socket): Promise<void> {
     const sessionCookieName = this.configService.getOrThrow<string>(
