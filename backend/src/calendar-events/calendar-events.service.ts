@@ -2,6 +2,7 @@
 // called by the controller, never called directly by the frontend
 
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { CalendarAssigneeService } from "./calendar-assignee.service";
@@ -22,6 +23,21 @@ const calendarEventInclude = {
     },
   },
 };
+
+type CalendarEventWithRelations = Prisma.CalendarEventGetPayload<{
+  include: typeof calendarEventInclude;
+}>;
+
+// Prisma's assignees include returns the CalendarAssignee join row itself
+// (id = the join row's own id, userId/calId, nested user object) - the
+// frontend only cares about "which users are assigned", so this flattens
+// each row down to just its user info before the response leaves the API.
+function mapCalendarEvent(event: CalendarEventWithRelations) {
+  return {
+    ...event,
+    assignees: event.assignees.map((assignee) => assignee.user),
+  };
+}
 
 @Injectable()
 export class CalendarEventsService {
@@ -58,11 +74,12 @@ export class CalendarEventsService {
 
   async findAll(projectId: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
-    return this.prisma.calendarEvent.findMany({
+    const events = await this.prisma.calendarEvent.findMany({
       where: { projectId: projectId },
       include: calendarEventInclude,
       orderBy: { startAt: "asc" },
     });
+    return events.map(mapCalendarEvent);
   }
 
   // also reused by update/remove as their access guard: it already checks both
@@ -77,7 +94,7 @@ export class CalendarEventsService {
     if (!event) {
       throw new NotFoundException("Calendar event not found");
     }
-    return event;
+    return mapCalendarEvent(event);
   }
 
   async update(
@@ -114,6 +131,14 @@ export class CalendarEventsService {
 
   async remove(id: string, projectId: string, userId: string) {
     await this.findById(id, projectId, userId); // access guard, see findById's own comment
-    return this.prisma.calendarEvent.delete({ where: { id: id } });
+    // include + mapCalendarEvent: same full shape as every other read path -
+    // without it, calendarEvent.delete() returns raw scalar fields only (no
+    // category/assignees), and the frontend's response parser rejects it as
+    // invalid even though the delete itself succeeded.
+    const event = await this.prisma.calendarEvent.delete({
+      where: { id: id },
+      include: calendarEventInclude,
+    });
+    return mapCalendarEvent(event);
   }
 }
