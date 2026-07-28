@@ -12,6 +12,9 @@ export type ApplicationDatabaseTransaction = Pick<
   | "evaluationChecklistItem"
   | "discoveryBlock"
   | "discoveryBlockItem"
+  | "calendarEvent"
+  | "calendarCategory"
+  | "calendarAssignee"
 >;
 
 type TransactionOptions = {
@@ -50,6 +53,18 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get discoveryBlockItem(): PrismaClient["discoveryBlockItem"] {
     return this.currentClient().discoveryBlockItem;
+  }
+
+  get calendarEvent(): PrismaClient["calendarEvent"] {
+    return this.currentClient().calendarEvent;
+  }
+
+  get calendarCategory(): PrismaClient["calendarCategory"] {
+    return this.currentClient().calendarCategory;
+  }
+
+  get calendarAssignee(): PrismaClient["calendarAssignee"] {
+    return this.currentClient().calendarAssignee;
   }
 
   async transaction<T>(
