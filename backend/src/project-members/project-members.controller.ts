@@ -11,21 +11,30 @@
 // anything, otherwise any authenticated user could list or modify another project's
 // members just by changing the projectId in the URL (IDOR).
 
-import { Controller } from "@nestjs/common";
+import { Controller, Get, Param, ParseUUIDPipe, Req } from "@nestjs/common";
+import type { AuthenticatedRequest } from "../auth/authenticated-request";
+import { ProjectMembersService } from "./project-members.service";
 
 @Controller("projects/:projectId/members")
 export class ProjectMembersController {
-  // TODO: inject ProjectMembersService here via constructor
-  // the constructor is called automatically by NestJS at startup - never called manually
-  // ENDPOINTS:
-  // POST   /api/projects/:projectId/members
-  //        => add a user to a project
-  //        => expects a request body matching AddMemberDto (userId)
-  //        => projectId comes from the URL, not the body
-  // GET    /api/projects/:projectId/members
-  //        => list all members of a project
-  //        => :projectId is a placeholder filled by the frontend (no request body, no DTO)
-  // DELETE /api/projects/:projectId/members/:userId
-  //        => remove a user from a project
-  //        => no request body needed, both ids come from the URL (no DTO)
+  constructor(private readonly projectMembersService: ProjectMembersService) {}
+
+  // TODO: POST /api/projects/:projectId/members
+  //       => add a user to a project
+  //       => expects a request body matching AddMemberDto (userId)
+  //       => projectId comes from the URL, not the body
+
+  // GET /api/projects/:projectId/members => list all members of a project
+  // only route implemented for now - see ProjectMembersService for why
+  @Get()
+  findAll(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectMembersService.findAll(projectId, request.user.id);
+  }
+
+  // TODO: DELETE /api/projects/:projectId/members/:userId
+  //       => remove a user from a project
+  //       => no request body needed, both ids come from the URL (no DTO)
 }
