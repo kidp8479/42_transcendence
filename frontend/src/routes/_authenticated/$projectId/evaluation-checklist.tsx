@@ -26,7 +26,6 @@ import type {
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
 import { useToast } from "@/hooks/useToast";
-import { error } from "console";
 
 export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
 export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
@@ -232,7 +231,7 @@ function categorizeChecklistItems(
 }
 
 function errorMessage(arg: string) {
-  return "Item could not be " + arg + ". Please retry."
+  return "Item could not be " + arg + ". Please retry.";
 }
 
 function EvaluationChecklistPage() {
@@ -312,7 +311,7 @@ function EvaluationChecklistPage() {
       const created = await createEvaluationChecklistItem(projectId, dto);
       setItems((prevItems) => [...prevItems, created]);
     } catch {
-      showToast({ type: "error", message: errorMessage("created")});
+      showToast({ type: "error", message: errorMessage("created") });
       return;
     }
   }
@@ -333,7 +332,7 @@ function EvaluationChecklistPage() {
     try {
       await updateEvaluationChecklistItem(projectId, id, changes);
     } catch {
-      showToast({ type: "error", message: errorMessage("updated")});
+      showToast({ type: "error", message: errorMessage("updated") });
       setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
     }
   }
@@ -347,7 +346,7 @@ function EvaluationChecklistPage() {
     try {
       await deleteEvaluationChecklistItem(projectId, id);
     } catch {
-      showToast({ type: "error", message: errorMessage("deleted")});
+      showToast({ type: "error", message: errorMessage("deleted") });
       setItems((prevItems) => [...prevItems, previousItem]);
     }
   }
