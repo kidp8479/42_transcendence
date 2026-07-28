@@ -5,11 +5,26 @@
 // UpdateCalendarEventDto, never their own standalone endpoint (unlike ProjectMember, which
 // needs one - see project-members module)
 import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class CalendarAssigneeService {
-  // TODO: inject PrismaService here via constructor
-  // TODO: replaceAssignees(calId: string, userIds: string[])
-  //       => called by CalendarEventsService on create/update: deletes existing
-  //          CalendarAssignee rows for this event, then inserts one row per userId in the new list
+  constructor(private readonly prisma: PrismaService) {}
+
+  // called by CalendarEventsService on create/update: deletes existing CalendarAssignee
+  // rows for this event, then inserts one row per userId in the new list. Wrapped in a
+  // transaction so a crash mid-way never leaves the event with only some of its
+  // assignees replaced.
+  async replaceAssignees(calId: string, userIds: string[]): Promise<void> {
+    await this.prisma.transaction(async (transactionPrisma) => {
+      await transactionPrisma.calendarAssignee.deleteMany({
+        where: { calId: calId },
+      });
+      if (userIds.length > 0) {
+        await transactionPrisma.calendarAssignee.createMany({
+          data: userIds.map((userId) => ({ userId: userId, calId: calId })),
+        });
+      }
+    });
+  }
 }

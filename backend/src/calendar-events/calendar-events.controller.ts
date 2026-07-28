@@ -9,30 +9,84 @@
 // anything, otherwise any authenticated user could read or modify any project's
 // calendar events just by changing the projectId in the URL (IDOR).
 
-import { Controller } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  ParseUUIDPipe,
+  Req,
+} from "@nestjs/common";
+import { ApiSecurity } from "@nestjs/swagger";
+import type { AuthenticatedRequest } from "../auth/authenticated-request";
+import { CalendarEventsService } from "./calendar-events.service";
+import { CreateCalendarEventDto } from "./dto/create-calendar-event.dto";
+import { UpdateCalendarEventDto } from "./dto/update-calendar-event.dto";
 
 @Controller("projects/:projectId/calendar-events")
 export class CalendarEventsController {
-  // TODO: inject CalendarEventsService here via constructor
-  // the constructor is called automatically by NestJS at startup - never called manually
-  // ENDPOINTS:
-  // POST   /api/projects/:projectId/calendar-events
-  //        => create a new calendar event
-  //        => expects a request body matching CreateCalendarEventDto (title, categoryId, startAt,
-  //           endAt, description?, notes?, assigneeIds?)
-  //        => projectId comes from the URL, not the body
-  //        => categoryId stays in the body (it's a relation, not the parent scope)
-  //        => assigneeIds, if provided, are handled internally via CalendarAssigneeService
-  // GET    /api/projects/:projectId/calendar-events
-  //        => get all events for a project
-  //        => :projectId is a placeholder filled by the frontend (no request body, no DTO)
-  // GET    /api/projects/:projectId/calendar-events/:id
-  //        => get one event by its id
-  //        => :id is a placeholder filled by the frontend (no request body, no DTO)
-  // PATCH  /api/projects/:projectId/calendar-events/:id
-  //        => update an existing event (any field, all optional)
-  //        => expects a request body matching UpdateCalendarEventDto
-  // DELETE /api/projects/:projectId/calendar-events/:id
-  //        => delete an event by its id
-  //        => no request body needed, the ids in the URL are enough (no DTO)
+  constructor(private readonly calendarEventsService: CalendarEventsService) {}
+
+  // POST /api/projects/:projectId/calendar-events => create a new event
+  @ApiSecurity("csrf")
+  @Post()
+  create(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: CreateCalendarEventDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.calendarEventsService.create(projectId, dto, request.user.id);
+  }
+
+  // GET /api/projects/:projectId/calendar-events => all events for a project
+  @Get()
+  findAll(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.calendarEventsService.findAll(projectId, request.user.id);
+  }
+
+  // GET /api/projects/:projectId/calendar-events/:id => one event by id
+  @Get(":id")
+  findById(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.calendarEventsService.findById(id, projectId, request.user.id);
+  }
+
+  // PATCH /api/projects/:projectId/calendar-events/:id => update an existing event
+  @ApiSecurity("csrf")
+  @Patch(":id")
+  update(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: UpdateCalendarEventDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.calendarEventsService.update(
+      id,
+      dto,
+      projectId,
+      request.user.id
+    );
+  }
+
+  // DELETE /api/projects/:projectId/calendar-events/:id => delete an event
+  // returns the deleted event's own body (200, not 204), same convention as
+  // DiscoveryBlocksController's delete
+  @ApiSecurity("csrf")
+  @Delete(":id")
+  delete(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.calendarEventsService.remove(id, projectId, request.user.id);
+  }
 }
