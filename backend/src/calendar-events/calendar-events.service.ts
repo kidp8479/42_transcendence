@@ -1,7 +1,11 @@
 // CalendarEventsService: handles all database operations for CalendarEvents
 // called by the controller, never called directly by the frontend
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
@@ -49,6 +53,10 @@ export class CalendarEventsService {
 
   async create(projectId: string, dto: CreateCalendarEventDto, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
+    await this.assertCategoryBelongsToProject(projectId, dto.categoryId);
+    if (dto.assigneeIds) {
+      await this.assertAssigneesAreProjectMembers(projectId, dto.assigneeIds);
+    }
 
     const event = await this.prisma.calendarEvent.create({
       data: {
@@ -104,10 +112,16 @@ export class CalendarEventsService {
     userId: string
   ) {
     await this.findById(id, projectId, userId); // access guard, see findById's own comment
+    if (dto.categoryId) {
+      await this.assertCategoryBelongsToProject(projectId, dto.categoryId);
+    }
 
     // destructure assigneeIds out: it is not a column on CalendarEvent, it is
     // handled separately below via CalendarAssigneeService
     const assigneeIds = dto.assigneeIds;
+    if (assigneeIds) {
+      await this.assertAssigneesAreProjectMembers(projectId, assigneeIds);
+    }
     const eventFields = {
       title: dto.title,
       categoryId: dto.categoryId,
@@ -140,5 +154,46 @@ export class CalendarEventsService {
       include: calendarEventInclude,
     });
     return mapCalendarEvent(event);
+  }
+
+  // categoryId is a body field, not a URL param, so nothing else stops a
+  // member of projectId from passing a categoryId that belongs to a
+  // different project - without this check the event would still save (the
+  // FK just needs any valid CalendarCategory row) and every read path would
+  // then leak that other project's category name/color to this project's
+  // members.
+  private async assertCategoryBelongsToProject(
+    projectId: string,
+    categoryId: string
+  ): Promise<void> {
+    const category = await this.prisma.calendarCategory.findFirst({
+      where: { id: categoryId, projectId: projectId },
+    });
+    if (!category) {
+      throw new BadRequestException(
+        "categoryId does not belong to this project"
+      );
+    }
+  }
+
+  // same reasoning as assertCategoryBelongsToProject: assigneeIds are plain
+  // user ids, nothing stops a caller from assigning a user who was never a
+  // member of this project (or never existed) - CreateCalendarEventDto only
+  // validates each id is a UUID, not that it maps to a real member.
+  private async assertAssigneesAreProjectMembers(
+    projectId: string,
+    userIds: string[]
+  ): Promise<void> {
+    if (userIds.length === 0) {
+      return;
+    }
+    const memberCount = await this.prisma.projectMember.count({
+      where: { projectId: projectId, userId: { in: userIds } },
+    });
+    if (memberCount !== userIds.length) {
+      throw new BadRequestException(
+        "assigneeIds must all be members of this project"
+      );
+    }
   }
 }
