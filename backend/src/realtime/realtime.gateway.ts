@@ -6,6 +6,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { Socket } from "socket.io";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
+import { ProjectsService } from "../projects/projects.service";
 
 // TEMPORARY auth: validates the socket using the same session cookie +
 // introspection endpoint as AuthGuard (backend/src/auth/auth.guard.ts),
@@ -18,7 +19,8 @@ export class RealtimeGateway
 {
   constructor(
     private readonly configService: ConfigService,
-    private readonly vaultRuntime: VaultRuntimeService
+    private readonly vaultRuntime: VaultRuntimeService,
+    private readonly projectsService: ProjectsService
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
@@ -70,12 +72,21 @@ export class RealtimeGateway
       return;
     }
 
-    // stored for brick 3 (joining project rooms based on this user's memberships)
     client.data.userId = result.userId;
+
+    // WS-specific logic starts here: auth above is just "who is this",
+    // this part is "what should this connection receive". Joining a room
+    // per project means we can later broadcast to everyone on a project
+    // (client.join is the same Socket.io method any future feature will use).
+    const projects = await this.projectsService.findAll(result.userId);
+    for (const project of projects) {
+      await client.join(`project:${project.id}`);
+    }
   }
 
   handleDisconnect(): void {
-    // nothing required yet, room cleanup is handled by brick 3
+    // nothing to do here - Socket.io removes a disconnected socket from
+    // every room it had joined automatically.
   }
 }
 

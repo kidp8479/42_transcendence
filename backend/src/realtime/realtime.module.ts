@@ -2,8 +2,10 @@
 // NestJS will not know it exists until it is declared here
 import { Module } from "@nestjs/common";
 import { RealtimeGateway } from "./realtime.gateway";
+import { ProjectsModule } from "../projects/projects.module";
 
 @Module({
+  imports: [ProjectsModule],
   controllers: [],
   providers: [RealtimeGateway],
   exports: [],
