@@ -1,6 +1,14 @@
 import { apiClient } from "./apiClient";
 
 export type EvaluationChecklistSection = "MANDATORY" | "BONUS" | "SUPPLEMENTAL";
+export const EVALUATION_CHECKLIST_CATEGORY_LABELS: Record<
+  EvaluationChecklistSection,
+  string
+> = {
+  MANDATORY: "Mandatory Part",
+  BONUS: "Bonus Part",
+  SUPPLEMENTAL: "Supplemental Goals",
+};
 
 export interface EvaluationChecklistItem {
   id: string;

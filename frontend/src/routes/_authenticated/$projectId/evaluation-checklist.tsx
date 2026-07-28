@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/useToast";
 
 export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
 export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
+import { EVALUATION_CHECKLIST_CATEGORY_LABELS } from "@/lib/evaluationChecklist";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -131,7 +132,7 @@ const CATEGORY_STYLE: Record<
     description?: string;
   }
 > = {
-  "Mandatory Part": {
+  [EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY]: {
     icon: HiOutlineShieldCheck,
     iconBg: "bg-status-in-progress/15",
     iconText: "text-status-in-progress",
@@ -143,7 +144,7 @@ const CATEGORY_STYLE: Record<
     checkedColor: "!text-status-in-progress dark:!text-status-in-progress",
     borderColor: "border-status-in-progress dark:border-status-in-progress",
   },
-  Bonus: {
+  [EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS]: {
     icon: HiOutlineGift,
     iconBg: "bg-brand-500/15",
     iconText: "text-brand-500",
@@ -154,7 +155,7 @@ const CATEGORY_STYLE: Record<
     checkedColor: "!text-brand-500 dark:!text-brand-500",
     borderColor: "border-brand-500 dark:border-brand-500",
   },
-  "Supplemental Goals": {
+  [EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL]: {
     icon: FaRegStar,
     iconBg: "bg-status-review/15",
     iconText: "text-status-review",
@@ -198,17 +199,17 @@ function categorizeChecklistItems(
 ): AccordionItemData[] {
   const accordionItemData: AccordionItemData[] = [
     {
-      title: "Mandatory Part",
+      title: EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY,
       contents: [],
       count: { currentValue: 0, completeAt: 0 },
     },
     {
-      title: "Bonus",
+      title: EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS,
       contents: [],
       count: { currentValue: 0, completeAt: 0 },
     },
     {
-      title: "Supplemental Goals",
+      title: EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL,
       contents: [],
       count: { currentValue: 0, completeAt: 0 },
     },
@@ -363,11 +364,13 @@ function EvaluationChecklistPage() {
   // Each milestone borrows the color of the category that unlocked it.
   const readinessColor =
     totalProgress.percent >= 150
-      ? CATEGORY_STYLE["Supplemental Goals"].iconText
+      ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL]
+          .iconText
       : totalProgress.percent >= 125
-        ? CATEGORY_STYLE["Bonus"].iconText
+        ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS].iconText
         : totalProgress.percent >= 100
-          ? CATEGORY_STYLE["Mandatory Part"].iconText
+          ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY]
+              .iconText
           : "text-text-secondary";
 
   return (
