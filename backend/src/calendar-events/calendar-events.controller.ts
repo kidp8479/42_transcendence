@@ -1,13 +1,8 @@
-// CalendarEventsController: handles all HTTP requests under /api/projects/:projectId/calendar-events
-// one method per route - delegates all database work to CalendarEventsService
-// note: projectId always comes from the URL, never from the request body
-// note: categoryId and assigneeIds stay in the body (they are relations, not the parent scope)
-// note: when implementing, validate :projectId and :id with @Param(name, ParseUUIDPipe)
-// so a malformed id gets rejected with a 400 before hitting the database
-// note: :projectId alone does not prove access - every route must also confirm
-// req.user.id is a member of that project (ProjectMember) before returning/changing
-// anything, otherwise any authenticated user could read or modify any project's
-// calendar events just by changing the projectId in the URL (IDOR).
+// HTTP routes for a project's calendar events. projectId always comes from
+// the URL; categoryId/assigneeIds stay in the body since they're relations,
+// not the parent scope. Every route checks membership in the service before
+// touching data, so switching :projectId in the URL can't leak or edit
+// another project's events (IDOR).
 
 import {
   Controller,
@@ -30,7 +25,7 @@ import { UpdateCalendarEventDto } from "./dto/update-calendar-event.dto";
 export class CalendarEventsController {
   constructor(private readonly calendarEventsService: CalendarEventsService) {}
 
-  // POST /api/projects/:projectId/calendar-events => create a new event
+  // create a new event
   @ApiSecurity("csrf")
   @Post()
   create(
@@ -41,7 +36,7 @@ export class CalendarEventsController {
     return this.calendarEventsService.create(projectId, dto, request.user.id);
   }
 
-  // GET /api/projects/:projectId/calendar-events => all events for a project
+  // list this project's events
   @Get()
   findAll(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -50,7 +45,7 @@ export class CalendarEventsController {
     return this.calendarEventsService.findAll(projectId, request.user.id);
   }
 
-  // GET /api/projects/:projectId/calendar-events/:id => one event by id
+  // get one event
   @Get(":id")
   findById(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -60,7 +55,7 @@ export class CalendarEventsController {
     return this.calendarEventsService.findById(id, projectId, request.user.id);
   }
 
-  // PATCH /api/projects/:projectId/calendar-events/:id => update an existing event
+  // update an existing event
   @ApiSecurity("csrf")
   @Patch(":id")
   update(
@@ -77,9 +72,7 @@ export class CalendarEventsController {
     );
   }
 
-  // DELETE /api/projects/:projectId/calendar-events/:id => delete an event
-  // returns the deleted event's own body (200, not 204), same convention as
-  // DiscoveryBlocksController's delete
+  // delete an event (returns the deleted row, so 200 not 204)
   @ApiSecurity("csrf")
   @Delete(":id")
   delete(

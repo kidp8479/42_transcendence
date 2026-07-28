@@ -1,12 +1,9 @@
-// Calendar tab (/:projectId/calendar) - v0 is a simple month view, no link
-// to the Kanban board (decided with the team: Task and CalendarEvent are
-// separate, unconnected tables).
+// Calendar tab (/:projectId/calendar) - a simple month view, no link to the
+// Kanban board: Task and CalendarEvent are separate, unconnected tables.
 //
-// Loads the project's calendar events, categories, and members once at the
-// route boundary (loader), then all month navigation is client-side: the
-// backend has no date-range filter yet (CalendarEventsService.findAll
-// returns every event for the project), so switching months just changes
-// which already-loaded events get rendered instead of re-fetching.
+// Loads events/categories/members once in the route loader. Month
+// navigation is then purely client-side (no date-range filter on the
+// backend yet), just re-rendering already-loaded events for the new month.
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -52,9 +49,7 @@ type DrawerState =
   | { mode: "closed" }
   | { mode: "create"; day: Dayjs }
   | { mode: "edit"; event: CalendarEvent }
-  // compact viewports only (see useIsCompactCalendar) - a day's events shown
-  // as a plain list, tapping one switches to "edit", "+ Add event" switches
-  // to "create" for the same day
+  // compact viewports only: a day's events shown as a plain list
   | { mode: "day-list"; day: Dayjs; events: CalendarEvent[] };
 
 export const Route = createFileRoute("/_authenticated/$projectId/calendar")({

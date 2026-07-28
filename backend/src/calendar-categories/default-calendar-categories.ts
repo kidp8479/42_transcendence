@@ -1,9 +1,6 @@
-// Default calendar labels every new project gets automatically, inserted by
-// ProjectsService.create() in the same transaction as the project itself.
-// Matches the Figma prototype's Label dropdown (Eval/Dev/Deadline/Review/
-// Meeting/Other), plus Unavailabilities so members can flag when they're not
-// available. Also the source of truth prisma/seed.ts copies for the fake
-// demo projects, so the two can never drift apart.
+// Default labels every new project gets, inserted by ProjectsService.create().
+// prisma/seed.ts imports this same list for the demo projects instead of
+// duplicating it.
 export const DEFAULT_CALENDAR_CATEGORIES: { name: string; color: number }[] = [
   { name: "Eval", color: 1 },
   { name: "Dev", color: 3 },

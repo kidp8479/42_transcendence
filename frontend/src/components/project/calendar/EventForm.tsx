@@ -1,13 +1,9 @@
-// Create/edit form for a calendar event, rendered inside CalendarEventDrawer
-// (not a standalone page). Title, start/end date, start/end time, label
-// (category) dropdown, members, description, notes.
-//
-// The date and time inputs are separate in the UI but combine into the
-// single startAt/endAt DateTime fields the backend expects (see handleSave).
+// Create/edit form for a calendar event, rendered inside CalendarEventDrawer.
+// Date and time are separate inputs in the UI but combine into a single
+// startAt/endAt before saving (see handleSave).
 //
 // No label creation/color editing here: labels are a fixed, pre-seeded set
-// per project (see backend/prisma/seed.ts) - managing them is a Project
-// Settings concern, not something this event-level form exposes.
+// per project - managing them belongs to Project Settings, not this form.
 import { useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import {

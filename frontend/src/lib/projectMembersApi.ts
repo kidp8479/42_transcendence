@@ -1,9 +1,7 @@
-// Same explicit style as discoveryBlocks.ts on purpose - no destructuring,
-// no object shorthand, while learning.
+// explicit style on purpose (no destructuring/shorthand), same as discoveryBlocks.ts
 import { apiClient } from "@/lib/apiClient";
 
-// shape of a ProjectMember exactly as the frontend uses it - mirrors
-// ProjectMembersService.findAll's include (the member row + its user info)
+// mirrors ProjectMembersService.findAll's include: the member row + its user info
 export interface ProjectMember {
   id: string;
   userId: string;
@@ -13,9 +11,8 @@ export interface ProjectMember {
   avatarUrl: string | null;
 }
 
-// GET all - only findAll is implemented on the backend for now (TR-51 needs
-// it for the Calendar assignee picker; add/remove member management belongs
-// to the Project Settings ticket, still TODO there)
+// GET all - only findAll is implemented on the backend for now; add/remove
+// member management belongs to the Project Settings ticket
 export async function listProjectMembers(
   projectId: string
 ): Promise<ProjectMember[]> {

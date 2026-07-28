@@ -1,12 +1,9 @@
-// Same explicit style as discoveryBlocks.ts on purpose - no destructuring,
-// no object shorthand, while learning.
+// explicit style on purpose (no destructuring/shorthand), same as discoveryBlocks.ts
 import { apiClient } from "@/lib/apiClient";
 import type { CalendarCategory } from "@/lib/calendarCategoriesApi";
 
-// mirrors CreateCalendarEventDto's @MaxLength values on the backend
-// (backend/src/calendar-events/dto/create-calendar-event.dto.ts) - kept in
-// sync manually since frontend/backend are separate builds, no shared import
-// possible.
+// mirrors CreateCalendarEventDto's @MaxLength values on the backend - kept
+// in sync by hand, frontend and backend are separate builds
 export const CALENDAR_EVENT_TITLE_MAX_LENGTH = 100;
 export const CALENDAR_EVENT_DESCRIPTION_MAX_LENGTH = 500;
 export const CALENDAR_EVENT_NOTES_MAX_LENGTH = 2000;
@@ -17,9 +14,8 @@ export interface CalendarEventAssignee {
   avatarUrl: string | null;
 }
 
-// shape of a CalendarEvent exactly as the frontend uses it - mirrors what
-// CalendarEventsService returns (event fields + its category + its
-// assignees' user info), not something we invent independently
+// mirrors what CalendarEventsService returns: event fields + its category +
+// its assignees' user info
 export interface CalendarEvent {
   id: string;
   projectId: string;
@@ -33,9 +29,8 @@ export interface CalendarEvent {
   assignees: CalendarEventAssignee[];
 }
 
-// GET all - one call for the whole visible month, filtered client-side by
-// day (see calendar.tsx) rather than one request per month range, since the
-// backend has no date-range filter yet (see CalendarEventsService.findAll)
+// GET all - fetches every event once, filtered client-side by day in
+// calendar.tsx (the backend has no date-range filter yet)
 export async function listCalendarEvents(
   projectId: string
 ): Promise<CalendarEvent[]> {

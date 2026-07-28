@@ -1,45 +1,31 @@
-// Base container for all drawers.
-// A drawer is a slide-in panel from the right side of the screen, used to show
-// the detail view of an item (kanban card, list task, calendar event) without
-// navigating away from the current page.
+// Base container for all drawers - a slide-in side panel used to show the
+// detail view of an item (kanban card, list task, calendar event) without
+// leaving the current page.
 //
-// DrawerShell handles the shared visual structure:
-// - Slide-in animation from the right
-// - Overlay/backdrop behind the panel
-// - Click-outside-to-close and Escape-to-close behavior
-// - Scroll area for long content
+// Handles the shared structure: slide-in animation, backdrop, click-outside
+// and Escape to close, scroll area. It does NOT render its own close button
+// or know what content it displays - each drawer (KanBanCardDrawer,
+// CalendarEventDrawer...) renders its own header and passes children in.
 //
-// It does NOT know what content it displays, and it does NOT render a visible
-// close button itself - each specific drawer's own header (KanBanCardDrawer,
-// ListItemDrawer, CalendarEventDrawer...) renders its own close icon and calls
-// the onClose prop, since header layout differs per drawer.
+// Similar to ModalLayer, but anchored to the side instead of centered, and
+// stays mounted (just translated off-screen) so the close animation can play.
 //
-// Similar in concept to ModalLayer, but a drawer anchors to the side rather
-// than centering on screen, and stays mounted (translated off-screen) instead
-// of unmounting on close, so the slide-out transition can play.
-//
-// "absolute inset-0", not "fixed inset-0": bounds itself to the nearest
-// positioned ancestor (the root layout's content wrapper, see __root.tsx)
-// instead of the whole viewport, so the panel slides in between the header
-// and footer rather than covering them (matches the Figma mockup).
+// "absolute inset-0" (not "fixed"): bounds the drawer to the layout's
+// content area instead of the whole viewport, so it slides in between the
+// header and sidebar rather than covering them.
 import { useEffect, type ReactNode } from "react";
 
 interface DrawerShellProps {
   isOpen: boolean;
-  // always a full close - backdrop click and the drawer's own close icon
-  // both use this.
   onClose: () => void;
   children: ReactNode;
-  // "max-w-md" (narrow side panel) by default - callers with an expand/
-  // collapse affordance (ex: CalendarEventDrawer) can widen this.
+  // narrow side panel by default - callers with an expand/collapse
+  // affordance (ex: CalendarEventDrawer) can widen this
   widthClassName?: string;
-  // Escape key handler, defaults to onClose. Callers with an expand/collapse
-  // affordance can stage it instead: collapse back to the side panel on the
-  // first Escape, only close on a second one while already collapsed.
+  // defaults to onClose - callers with an expand/collapse affordance can
+  // stage it instead: collapse on the first Escape, close on the second
   onEscape?: () => void;
-  // id of the element that names this dialog (ex: the header title), wired
-  // to aria-labelledby - a role="dialog" with no accessible name fails
-  // WCAG 4.1.2 (confirmed by axe's aria-dialog-name rule).
+  // id of the element that names this dialog, wired to aria-labelledby
   titleId?: string;
 }
 
@@ -72,12 +58,8 @@ export function DrawerShell({
           ? "pointer-events-auto opacity-100"
           : "pointer-events-none opacity-0")
       }
-      // inert, not aria-hidden: aria-hidden only hides content from screen
-      // readers, it does not remove it from the tab order - a closed drawer
-      // still had its header buttons focusable while aria-hidden, which
-      // browsers now actively warn about ("Blocked aria-hidden on an element
-      // because its descendant retained focus"). inert removes focusability
-      // too while the panel is closed/translated off-screen.
+      // inert (not aria-hidden): also removes the closed drawer's buttons
+      // from the tab order, not just from screen readers
       inert={!isOpen}
     >
       <div

@@ -1,14 +1,10 @@
-// Detail drawer for a calendar event.
-// Opens when the user clicks an event block in the Calendar view, or clicks
-// an empty day to create a new one.
-// Renders inside DrawerShell - does not handle slide-in animation or backdrop.
+// Detail drawer for a calendar event - opens when clicking an event, or an
+// empty day to create one. Renders inside DrawerShell for the slide-in/
+// backdrop behavior; this component just handles the event-specific header
+// and form.
 //
-// Displays event details: title, date, time, label, color, assignees,
-// description, notes. Allows inline editing without leaving the Calendar view.
-//
-// No linked-task field: v0 decided (confirmed with the team) that Task
-// (Kanban/List) and CalendarEvent are separate, unconnected tables - a
-// calendar event never links back to a Kanban task.
+// No linked-task field: Task (Kanban/List) and CalendarEvent are separate,
+// unconnected tables in this app - an event never links back to a task.
 import { useId, useState } from "react";
 import type { Dayjs } from "dayjs";
 import {
@@ -50,19 +46,15 @@ export function CalendarEventDrawer({
   onSave,
   onDelete,
 }: CalendarEventDrawerProps) {
-  // expand/collapse: widens the panel from a narrow side column to (almost)
-  // the full content area, matching the Figma mockup's expand icon - not a
-  // separate route, the drawer stays the same component either way.
+  // expand/collapse: widens the panel to fill the content area instead of
+  // navigating to a separate route
   const [isExpanded, setIsExpanded] = useState(false);
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
   const titleId = useId();
 
-  // Staged Escape: sidebar open first (its own listener in SideBarCmp.tsx
-  // closes it on this same keystroke) -> collapse the expanded panel next
-  // -> only then close the drawer entirely. Without the sidebar check, both
-  // listeners fired together on one Escape (sidebar closed AND panel
-  // collapsed at once), which felt like two actions happening for one key
-  // press.
+  // staged Escape: collapse the expanded panel first, only close on a
+  // second press - and defer to the sidebar's own Escape listener while
+  // it's open, so one key press doesn't trigger two actions at once
   function handleEscape() {
     if (isExpanded && !isSidebarCollapsed) {
       return;

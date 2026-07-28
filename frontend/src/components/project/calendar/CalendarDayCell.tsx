@@ -8,19 +8,16 @@ interface CalendarDayCellProps {
   isCurrentMonth: boolean;
   isToday: boolean;
   events: CalendarEvent[];
-  // below the "sm" breakpoint (see useIsCompactCalendar) there isn't enough
-  // room per column for a legible pill - shows colored dots instead, and a
-  // tap always goes through onDayClick (list-or-create is decided by the
-  // parent, CalendarMonthGrid) rather than opening individual events directly
+  // below the "sm" breakpoint (see useIsCompactCalendar), shows dots instead
+  // of pills - tapping always goes through onDayClick, list-or-create is
+  // decided by the parent (CalendarMonthGrid)
   isCompact: boolean;
   onDayClick: (day: Dayjs) => void;
   onSelectEvent: (event: CalendarEvent) => void;
 }
 
-// one day in the month grid: date number, its events (EventPills, or plain
-// dots in compact mode), click-to-create/click-to-list. Days from the
-// previous/next month are dimmed (isCurrentMonth=false) but still
-// clickable/still show their own events, same as any other day.
+// one day in the month grid: date number, its events, click-to-create or
+// click-to-list. Adjacent-month days are just dimmed, still fully usable.
 export function CalendarDayCell({
   day,
   isCurrentMonth,
@@ -35,10 +32,9 @@ export function CalendarDayCell({
       ? "View " + events.length + " events on " + day.format("MMMM D, YYYY")
       : "Add event on " + day.format("MMMM D, YYYY");
 
-  // a <div role="button">, not a real <button>, since this cell contains
-  // EventPill's own <button>s inside it - nesting interactive elements
-  // (button inside button) is invalid HTML and breaks their individual click
-  // targets. Keyboard users still get Enter/Space activation via onKeyDown.
+  // div, not a real button: EventPill renders its own buttons inside this
+  // cell, and buttons can't be nested. onKeyDown restores Enter/Space
+  // activation for keyboard users.
   return (
     <div
       role="button"

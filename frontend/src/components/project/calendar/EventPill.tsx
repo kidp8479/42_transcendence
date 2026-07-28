@@ -7,10 +7,9 @@ interface EventPillProps {
   onSelect: (event: CalendarEvent) => void;
 }
 
-// one event pill inside a day cell: colored dot (from the event's label/
-// CalendarCategory.color), start time, title. Clicking opens
-// CalendarEventDrawer in edit mode - stopPropagation so the click doesn't
-// also bubble up to the day cell's own "create a new event" handler.
+// one event pill inside a day cell: colored dot, start time, title.
+// stopPropagation so clicking it doesn't also trigger the day cell's own
+// "create a new event" handler.
 export function EventPill({ event, onSelect }: EventPillProps) {
   const eventColor =
     CATEGORY_COLOR_PALETTE[event.category?.color ?? 0] ??
@@ -35,11 +34,8 @@ export function EventPill({ event, onSelect }: EventPillProps) {
         className={"h-1.5 w-1.5 shrink-0 rounded-full " + eventColor.bg}
         aria-hidden="true"
       ></span>
-      {/* hidden below sm: on very narrow day columns (ex: 375px mobile,
-      ~50px per column) there isn't room for dot + time + title all at once
-      - the title truncating with an ellipsis is more useful there than a
-      half-cut-off time ("00" instead of "00:00") pushing the title out
-      entirely */}
+      {/* hidden below sm: not enough room for dot + time + title on mobile,
+      and a truncated title is more useful than a half-cut-off time */}
       <span className="hidden shrink-0 font-medium text-text-secondary sm:inline">
         {dayjs(event.startAt).format("HH:mm")}
       </span>

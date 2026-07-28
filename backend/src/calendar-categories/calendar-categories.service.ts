@@ -37,9 +37,8 @@ export class CalendarCategoriesService {
     });
   }
 
-  // also reused by update/remove as their access guard: it already checks both
-  // "is userId a member of projectId" and "does this id belong to projectId",
-  // and throws the right NotFoundException in each case
+  // also used by update/remove as an access guard: confirms membership and
+  // that this category belongs to this project, 404s otherwise
   async findById(id: string, projectId: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
     const category = await this.prisma.calendarCategory.findFirst({
@@ -57,7 +56,7 @@ export class CalendarCategoriesService {
     projectId: string,
     userId: string
   ) {
-    await this.findById(id, projectId, userId); // access guard, see findById's own comment
+    await this.findById(id, projectId, userId); // access guard
     return this.prisma.calendarCategory.update({
       where: { id: id },
       data: { ...dto },
@@ -65,7 +64,7 @@ export class CalendarCategoriesService {
   }
 
   async remove(id: string, projectId: string, userId: string) {
-    await this.findById(id, projectId, userId); // access guard, see findById's own comment
+    await this.findById(id, projectId, userId); // access guard
     return this.prisma.calendarCategory.delete({ where: { id: id } });
   }
 }

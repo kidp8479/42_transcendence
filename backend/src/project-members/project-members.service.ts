@@ -1,6 +1,4 @@
-// ProjectMembersService: handles all database operations for ProjectMembers
-// called by the controller, never called directly by the frontend
-// ProjectMember is a join table: each row = one user belonging to one project (many-to-many relation)
+// ProjectMember is a join table: each row links one user to one project.
 
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
@@ -14,14 +12,12 @@ export class ProjectMembersService {
   ) {}
 
 
-  // TODO: addMember(projectId: string, dto: AddMemberDto, requestingUserId: string)
-  //       => const requester = await projectsService.assertMembership(projectId, requestingUserId)
-  //       => must also throw (ex: ForbiddenException) if requester.role is neither "OWNER" nor "ADMIN"
-  //       => insert a new row in the ProjectMember table (link a user to a project)
+  // TODO: addMember - assertMembership, require requester.role is "OWNER" or "ADMIN",
+  // then insert a new ProjectMember row
 
-  // only findAll is implemented for now, needed by the Calendar tab's assignee
-  // picker (TR-51) - no role check, any member can see the member list.
-  // addMember/removeMember stay TODO, left for the Project Settings ticket.
+  // only findAll is implemented for now, needed by the Calendar tab's
+  // assignee picker - any member can see the member list, no role check.
+  // addMember/removeMember are for the Project Settings ticket.
   async findAll(projectId: string, requestingUserId: string) {
     await this.projectsService.assertMembership(projectId, requestingUserId);
     return this.prisma.projectMember.findMany({
@@ -34,7 +30,6 @@ export class ProjectMembersService {
     });
   }
 
-  // TODO: removeMember(projectId: string, userId: string, requestingUserId: string)
-  //       => same requester + role check as addMember (const requester = ...; if (requester.role is neither "OWNER" nor "ADMIN") throw ...)
-  //       => delete the ProjectMember row that links this user to this project
+  // TODO: removeMember - same requester + OWNER/ADMIN check as addMember, then
+  // delete the matching ProjectMember row
 }

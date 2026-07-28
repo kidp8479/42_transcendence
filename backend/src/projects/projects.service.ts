@@ -171,10 +171,7 @@ export class ProjectsService {
           },
         });
 
-        // every project gets the same default calendar labels the Calendar
-        // tab's Label dropdown expects (see DEFAULT_CALENDAR_CATEGORIES) -
-        // without this, a brand new project would have none and creating a
-        // calendar event (categoryId is required) would be impossible
+        // every event needs a label, so seed the default set here too
         for (const category of DEFAULT_CALENDAR_CATEGORIES) {
           await database.calendarCategory.create({
             data: {

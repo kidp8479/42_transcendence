@@ -283,13 +283,10 @@ async function main() {
     }
   }
 
-  // 4b. Calendar categories ("labels") - unlike taskCategories above, this
-  // is NOT a TODO for someone else: ProjectsService.create() already inserts
-  // DEFAULT_CALENDAR_CATEGORIES for every real project created through the
-  // app. This dev-only seed still needs its own loop because the fake demo
-  // projects above were created with a raw prisma.project.create() call,
-  // bypassing ProjectsService entirely - importing the same constant instead
-  // of duplicating the list keeps the two from ever drifting apart.
+  // 4b. Calendar categories ("labels"). These fake projects were created
+  // with a raw prisma.project.create(), which skips ProjectsService.create()
+  // (the code that normally seeds these for real projects) - so add them
+  // here too, importing the same list rather than duplicating it.
   for (const project of createdProjects) {
     for (const cat of DEFAULT_CALENDAR_CATEGORIES) {
       await prisma.calendarCategory.create({
@@ -638,8 +635,7 @@ function getRandomGoal() {
     });
   }
 
-  // demo project also gets the same default calendar labels as every other
-  // seeded project (see DEFAULT_CALENDAR_CATEGORIES above)
+  // demo project needs the same default labels as every other seeded project
   for (const cat of DEFAULT_CALENDAR_CATEGORIES) {
     await prisma.calendarCategory.create({
       data: {

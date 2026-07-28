@@ -1,9 +1,7 @@
-// Same explicit style as discoveryBlocks.ts on purpose - no destructuring,
-// no object shorthand, while learning.
+// explicit style on purpose (no destructuring/shorthand), same as discoveryBlocks.ts
 import { apiClient } from "@/lib/apiClient";
 
-// shape of a CalendarCategory exactly as the frontend uses it - mirrors the
-// backend's Prisma model (name, color; both required, unlike DiscoveryBlock)
+// mirrors the backend's CalendarCategory model
 export interface CalendarCategory {
   id: string;
   projectId: string;

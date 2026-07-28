@@ -5,9 +5,8 @@ import type { CalendarEvent } from "@/lib/calendarEventsApi";
 
 export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// One row per week, weeks starting Monday, always full 7-day rows - includes
-// the dimmed lead-in/lead-out days from the previous/next month so every
-// week row has exactly 7 cells (see CalendarDayCell's isCurrentMonth prop).
+// One row per week, weeks starting Monday, always full 7-day rows - fills in
+// the lead-in/lead-out days from adjacent months so every row has 7 cells.
 export function buildMonthGrid(monthAnchor: Dayjs): Dayjs[][] {
   const startOfMonth = monthAnchor.startOf("month");
   const endOfMonth = monthAnchor.endOf("month");
@@ -36,10 +35,9 @@ export function buildMonthGrid(monthAnchor: Dayjs): Dayjs[][] {
   return weeks;
 }
 
-// True if `day` falls anywhere within the event's [startAt, endAt] date
-// range (inclusive, compared by calendar day, not exact time) - decided with
-// the team that a multi-day event renders on every day it spans, not just
-// its start day.
+// True if `day` falls within the event's [startAt, endAt] range (compared
+// by calendar day, not exact time) - a multi-day event renders on every day
+// it spans, not just its start day.
 export function eventCoversDay(event: CalendarEvent, day: Dayjs): boolean {
   const start = dayjs(event.startAt).startOf("day");
   const end = dayjs(event.endAt).startOf("day");

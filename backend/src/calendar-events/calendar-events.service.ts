@@ -1,5 +1,4 @@
-// CalendarEventsService: handles all database operations for CalendarEvents
-// called by the controller, never called directly by the frontend
+// Database operations for CalendarEvents, called by the controller.
 
 import {
   BadRequestException,
@@ -13,10 +12,8 @@ import { CalendarAssigneeService } from "./calendar-assignee.service";
 import { CreateCalendarEventDto } from "./dto/create-calendar-event.dto";
 import { UpdateCalendarEventDto } from "./dto/update-calendar-event.dto";
 
-// shared include so every read path (findAll/findById, and the object returned
-// by create/update) sends back the same shape: the category (for the Label
-// dropdown/pill color) and each assignee's user info (for avatars) - never
-// raw foreign keys alone, the frontend never re-fetches these separately.
+// shared include so every read path returns the same shape: the category
+// (for the label/color) and each assignee's user info (for avatars)
 const calendarEventInclude = {
   category: true,
   assignees: {
@@ -32,10 +29,8 @@ type CalendarEventWithRelations = Prisma.CalendarEventGetPayload<{
   include: typeof calendarEventInclude;
 }>;
 
-// Prisma's assignees include returns the CalendarAssignee join row itself
-// (id = the join row's own id, userId/calId, nested user object) - the
-// frontend only cares about "which users are assigned", so this flattens
-// each row down to just its user info before the response leaves the API.
+// Prisma returns the CalendarAssignee join rows, not the users directly -
+// flatten each row down to its nested user before sending the response.
 function mapCalendarEvent(event: CalendarEventWithRelations) {
   return {
     ...event,
@@ -66,7 +61,7 @@ export class CalendarEventsService {
         endAt: dto.endAt,
         description: dto.description,
         notes: dto.notes,
-        projectId: projectId, // does not come from the dto but from the url
+        projectId: projectId, // from the url, not the dto
       },
     });
 
@@ -90,9 +85,8 @@ export class CalendarEventsService {
     return events.map(mapCalendarEvent);
   }
 
-  // also reused by update/remove as their access guard: it already checks both
-  // "is userId a member of projectId" and "does this id belong to projectId",
-  // and throws the right NotFoundException in each case
+  // also used by update/remove as an access guard: confirms membership and
+  // that this event belongs to this project, 404s otherwise
   async findById(id: string, projectId: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
     const event = await this.prisma.calendarEvent.findFirst({
@@ -111,13 +105,12 @@ export class CalendarEventsService {
     projectId: string,
     userId: string
   ) {
-    await this.findById(id, projectId, userId); // access guard, see findById's own comment
+    await this.findById(id, projectId, userId); // access guard
     if (dto.categoryId) {
       await this.assertCategoryBelongsToProject(projectId, dto.categoryId);
     }
 
-    // destructure assigneeIds out: it is not a column on CalendarEvent, it is
-    // handled separately below via CalendarAssigneeService
+    // assigneeIds isn't a column on CalendarEvent, handle it separately below
     const assigneeIds = dto.assigneeIds;
     if (assigneeIds) {
       await this.assertAssigneesAreProjectMembers(projectId, assigneeIds);
@@ -144,11 +137,9 @@ export class CalendarEventsService {
   }
 
   async remove(id: string, projectId: string, userId: string) {
-    await this.findById(id, projectId, userId); // access guard, see findById's own comment
-    // include + mapCalendarEvent: same full shape as every other read path -
-    // without it, calendarEvent.delete() returns raw scalar fields only (no
-    // category/assignees), and the frontend's response parser rejects it as
-    // invalid even though the delete itself succeeded.
+    await this.findById(id, projectId, userId); // access guard
+    // same include as every other read path - without it the response is
+    // missing category/assignees and the frontend rejects it as invalid
     const event = await this.prisma.calendarEvent.delete({
       where: { id: id },
       include: calendarEventInclude,
@@ -156,12 +147,8 @@ export class CalendarEventsService {
     return mapCalendarEvent(event);
   }
 
-  // categoryId is a body field, not a URL param, so nothing else stops a
-  // member of projectId from passing a categoryId that belongs to a
-  // different project - without this check the event would still save (the
-  // FK just needs any valid CalendarCategory row) and every read path would
-  // then leak that other project's category name/color to this project's
-  // members.
+  // categoryId comes from the body, so it could point at a category from a
+  // different project - check it belongs here before using it
   private async assertCategoryBelongsToProject(
     projectId: string,
     categoryId: string
@@ -176,10 +163,8 @@ export class CalendarEventsService {
     }
   }
 
-  // same reasoning as assertCategoryBelongsToProject: assigneeIds are plain
-  // user ids, nothing stops a caller from assigning a user who was never a
-  // member of this project (or never existed) - CreateCalendarEventDto only
-  // validates each id is a UUID, not that it maps to a real member.
+  // same idea for assignees: the DTO only checks each id is a UUID, not that
+  // it belongs to a real member of this project
   private async assertAssigneesAreProjectMembers(
     projectId: string,
     userIds: string[]

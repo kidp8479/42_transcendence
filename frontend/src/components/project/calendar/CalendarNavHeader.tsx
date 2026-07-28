@@ -8,9 +8,8 @@ interface CalendarNavHeaderProps {
   onToday: () => void;
 }
 
-// header row above the month grid: prev/next arrows, current month + year
-// label, a Today button, and a hint on the right - triggers a refetch for
-// the newly visible month via the onPrevMonth/onNextMonth/onToday callbacks.
+// header row above the month grid: prev/next arrows, month + year label, a
+// Today button, and a hint on the right
 export function CalendarNavHeader({
   monthAnchor,
   onPrevMonth,

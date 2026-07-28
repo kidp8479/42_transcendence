@@ -1,12 +1,7 @@
-// CalendarCategoriesController: handles all HTTP requests under /api/projects/:projectId/calendar-categories
-// one method per route - delegates all database work to CalendarCategoriesService
-// note: projectId always comes from the URL, never from the request body
-// note: when implementing, validate :projectId and :id with @Param(name, ParseUUIDPipe)
-// so a malformed id gets rejected with a 400 before hitting the database
-// note: :projectId alone does not prove access - every route must also confirm
-// req.user.id is a member of that project (ProjectMember) before returning/changing
-// anything, otherwise any authenticated user could read or modify any project's
-// calendar categories just by changing the projectId in the URL (IDOR).
+// HTTP routes for a project's calendar labels ("categories"). projectId
+// always comes from the URL, never the body. Every route checks membership
+// in the service before touching data, so switching :projectId in the URL
+// can't leak or edit another project's labels (IDOR).
 
 import {
   Controller,
@@ -31,7 +26,7 @@ export class CalendarCategoriesController {
     private readonly calendarCategoriesService: CalendarCategoriesService
   ) {}
 
-  // POST /api/projects/:projectId/calendar-categories => create a label for this project
+  // create a label for this project
   @ApiSecurity("csrf")
   @Post()
   create(
@@ -46,7 +41,7 @@ export class CalendarCategoriesController {
     );
   }
 
-  // GET /api/projects/:projectId/calendar-categories => all labels for a project
+  // list this project's labels
   @Get()
   findAll(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -55,7 +50,7 @@ export class CalendarCategoriesController {
     return this.calendarCategoriesService.findAll(projectId, request.user.id);
   }
 
-  // GET /api/projects/:projectId/calendar-categories/:id => one label by id
+  // get one label
   @Get(":id")
   findById(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -69,7 +64,7 @@ export class CalendarCategoriesController {
     );
   }
 
-  // PATCH /api/projects/:projectId/calendar-categories/:id => update a label's name or color
+  // rename or recolor a label
   @ApiSecurity("csrf")
   @Patch(":id")
   update(
@@ -86,9 +81,7 @@ export class CalendarCategoriesController {
     );
   }
 
-  // DELETE /api/projects/:projectId/calendar-categories/:id => delete a label
-  // returns the deleted category's own body (200, not 204), same convention as
-  // DiscoveryBlocksController's delete
+  // delete a label (returns the deleted row, so 200 not 204)
   @ApiSecurity("csrf")
   @Delete(":id")
   delete(

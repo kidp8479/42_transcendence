@@ -1,9 +1,7 @@
-// Compact-mode fallback for a day's events (see useIsCompactCalendar).
-// Below the "sm" breakpoint, CalendarDayCell shows colored dots only - not
-// enough room for a legible pill - so tapping a day with events opens this
-// list instead of jumping straight into the create drawer. Picking an event
-// opens CalendarEventDrawer in edit mode; "+ Add event" opens it in create
-// mode for this same day.
+// Compact-mode fallback for a day's events (see useIsCompactCalendar): below
+// the "sm" breakpoint there's no room for a legible pill, so tapping a day
+// with events opens this list instead. Picking an event opens
+// CalendarEventDrawer in edit mode; "+ Add event" opens it in create mode.
 import { useId } from "react";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";

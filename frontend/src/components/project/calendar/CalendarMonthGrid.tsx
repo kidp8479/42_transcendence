@@ -14,9 +14,7 @@ interface CalendarMonthGridProps {
   events: CalendarEvent[];
   onCreateEvent: (day: Dayjs) => void;
   onSelectEvent: (event: CalendarEvent) => void;
-  // compact mode (see useIsCompactCalendar) can't show a day's events
-  // individually (colored dots only, no title), so tapping a day with at
-  // least one event opens a list instead of going straight to create
+  // compact mode: tapping a day with events opens a list instead of create
   onOpenDayList: (day: Dayjs, events: CalendarEvent[]) => void;
 }
 
