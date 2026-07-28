@@ -319,7 +319,7 @@ async function main() {
         create: demoTeamUsers.map((u, index) => ({
           userId: u.id,
           role:
-            index === 0 ? ProjectMemberRole.ADMIN : ProjectMemberRole.MEMBER,
+            index === 0 ? ProjectMemberRole.OWNER : ProjectMemberRole.MEMBER,
         })),
       },
     },

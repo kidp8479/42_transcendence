@@ -1,21 +1,46 @@
+-- Projects without any member cannot receive an owner deterministically.
+DO $$
+BEGIN
+	IF EXISTS (
+		SELECT 1
+		FROM "Project" AS project
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM "ProjectMember" AS member
+			WHERE member."projectId" = project.id
+		)
+	) THEN
+		RAISE EXCEPTION 'Cannot assign an OWNER to a project with no members';
+	END IF;
+END $$;
+
 -- Backfill
-WITH ranked_admins AS (
+-- Prefer the oldest ADMIN; if none exists, use the oldest member.
+WITH ranked_members AS (
 	SELECT
-		id,
+		member.id,
+		member."projectId",
 		ROW_NUMBER() OVER (
-			PARTITION BY "projectId"
-			ORDER BY "createdAt" ASC, id ASC
+			PARTITION BY member."projectId"
+			ORDER BY
+				CASE WHEN member.role = 'ADMIN' THEN 0 ELSE 1 END,
+				member."createdAt" ASC,
+				member.id ASC
 		) AS rank_in_project
-	FROM "ProjectMember"
-	WHERE role = 'ADMIN'
+	FROM "ProjectMember" AS member
+	WHERE member.role <> 'OWNER'
 )
-UPDATE "ProjectMember"
+UPDATE "ProjectMember" AS member
 SET role = 'OWNER'
-WHERE id IN (
-	SELECT id
-	FROM ranked_admins
-	WHERE rank_in_project = 1
-);
+FROM ranked_members
+WHERE member.id = ranked_members.id
+	AND ranked_members.rank_in_project = 1
+	AND NOT EXISTS (
+		SELECT 1
+		FROM "ProjectMember" AS owner
+		WHERE owner."projectId" = ranked_members."projectId"
+			AND owner.role = 'OWNER'
+	);
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ProjectMember_projectId_owner_unique"
