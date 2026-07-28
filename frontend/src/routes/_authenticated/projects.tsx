@@ -10,7 +10,6 @@
 import {
   createFileRoute,
   useLoaderData,
-  useRouter,
   useNavigate,
 } from "@tanstack/react-router";
 import {
