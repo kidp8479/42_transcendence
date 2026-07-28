@@ -19,14 +19,20 @@ import { EvaluationChecklistItemSection } from "@prisma/client";
 import { EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH } from "../evaluation-checklist-items.constants";
 
 export class CreateEvaluationChecklistItemDto {
+  // MinLength(1) rejects an empty/whitespace-stripped label; MaxLength keeps
+  // it aligned with the column size and with the frontend's own maxLength.
   @IsString()
   @MinLength(1)
   @MaxLength(EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH)
   label: string;
 
+  // Must be one of the Prisma enum's own values (MANDATORY/BONUS/SUPPLEMENTAL) -
+  // rejects any other string instead of silently accepting garbage.
   @IsEnum(EvaluationChecklistItemSection)
   section: EvaluationChecklistItemSection;
 
+  // 0-based position within its section, set by the frontend from the
+  // current list length - Min(0) just guards against a negative value.
   @Min(0)
   @IsInt()
   order: number;

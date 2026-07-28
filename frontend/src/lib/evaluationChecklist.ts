@@ -24,6 +24,7 @@ export const EVALUATION_CHECKLIST_CATEGORY_LABELS: Record<
   SUPPLEMENTAL: "Supplemental Goals",
 };
 
+// Shape of a checklist item as returned by the backend.
 export interface EvaluationChecklistItem {
   id: string;
   label: string;
@@ -32,10 +33,15 @@ export interface EvaluationChecklistItem {
   section: EvaluationChecklistSection;
 }
 
+// Narrows `unknown` (e.g. a parsed JSON response) to a plain object, before
+// it's safe to read arbitrary keys off it below.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+// Type guard used by parseEvaluationChecklistItem to validate the `section`
+// field against the known set instead of trusting whatever string the API
+// sent back.
 function isEvaluationChecklistSection(
   value: unknown
 ): value is EvaluationChecklistSection {
@@ -44,6 +50,10 @@ function isEvaluationChecklistSection(
   );
 }
 
+// Validates and narrows an unknown API payload into a real
+// EvaluationChecklistItem, or null if any field is missing/mistyped -
+// callers turn a null into a thrown Error since the app can't render a
+// checklist item it can't trust the shape of.
 function parseEvaluationChecklistItem(
   value: unknown
 ): EvaluationChecklistItem | null {
@@ -65,6 +75,7 @@ function parseEvaluationChecklistItem(
   return { id, label, isChecked, order, section };
 }
 
+// Same validation as parseEvaluationChecklistItem, for the GET (all) response.
 function parseEvaluationChecklistItems(
   value: unknown
 ): EvaluationChecklistItem[] {

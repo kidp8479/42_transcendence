@@ -25,16 +25,20 @@ import { EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH } from "../evaluation-checkl
 export class UpdateEvaluationChecklistItemDto extends PartialType(
   OmitType(CreateEvaluationChecklistItemDto, ["section"] as const)
 ) {
+  // Same constraints as create's label, just optional here.
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH)
   label?: string;
 
+  // Toggling the checkbox - the main thing this route is used for.
   @IsOptional()
   @IsBoolean()
   isChecked?: boolean;
 
+  // Reorder within the same section (drag-and-drop) - see the note above on
+  // why section itself can't change alongside it.
   @IsOptional()
   @Min(0)
   @IsInt()

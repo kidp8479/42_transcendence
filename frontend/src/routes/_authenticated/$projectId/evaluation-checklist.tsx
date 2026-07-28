@@ -232,6 +232,8 @@ function categorizeChecklistItems(
   return accordionItemData;
 }
 
+// Generic failure toast text for the three mutations below, e.g.
+// errorMessage("created") -> "Item could not be created. Please retry."
 function errorMessage(arg: string) {
   return "Item could not be " + arg + ". Please retry.";
 }
@@ -254,6 +256,8 @@ function EvaluationChecklistPage() {
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
+  // Plain per-category completion percent (no gating, unlike totalProgress
+  // below) - used for each accordion's own progress bar.
   function categoryPercent(data: AccordionItemData): number {
     return data.count.completeAt === 0
       ? 0
@@ -313,6 +317,8 @@ function EvaluationChecklistPage() {
   const sectionByIndex: readonly EvaluationChecklistSection[] =
     EVALUATION_CHECKLIST_SECTIONS;
 
+  // Not optimistic: the backend assigns the real id, so the new item is only
+  // added to local state once the POST actually succeeds.
   async function handleCreate(dto: {
     label: string;
     section: EvaluationChecklistSection;
@@ -323,6 +329,7 @@ function EvaluationChecklistPage() {
       setItems((prevItems) => [...prevItems, created]);
     } catch {
       showToast({ type: "error", message: errorMessage("created") });
+      // invalidate is skipped on failure - see handleUpdate/handleDelete below.
       return;
     }
     await safeInvalidateRouter();
@@ -351,6 +358,11 @@ function EvaluationChecklistPage() {
     await safeInvalidateRouter();
   }
 
+  // Optimistic delete: removed from the list immediately, re-inserted on
+  // failure. previousItem also carries the item's own position, so
+  // re-appending it doesn't guarantee its original spot in the list - fine
+  // here since a failed delete is rare and the list gets re-sorted by
+  // `order` on the next render anyway.
   async function handleDelete(id: string) {
     const previousItem = items.find((it) => it.id === id);
     if (!previousItem) return;
@@ -367,6 +379,8 @@ function EvaluationChecklistPage() {
     await safeInvalidateRouter();
   }
 
+  // "Ready"/"Super Ready"/"Extra Ready" badge shown at the top of the page,
+  // one tier per READINESS_THRESHOLD crossed.
   const readinessLabel =
     totalProgress.percent >= READINESS_THRESHOLD.EXTRA_READY
       ? "Extra Ready"
@@ -452,6 +466,10 @@ function EvaluationChecklistPage() {
           const isCategoryFull =
             item.contents.length >= EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY;
 
+          // Reads this category's draft label, submits it as a new item, then
+          // clears the draft - order is just "append at the end" (current
+          // length), the cap is re-checked defensively even though the "Add"
+          // button is already disabled once isCategoryFull is true.
           function addChecklistItem() {
             const label = newItemLabels[i].trim();
             if (
@@ -508,6 +526,8 @@ function EvaluationChecklistPage() {
 
                   <AccordionContent>
                     {item.contents.map((c) => {
+                      // Only fires the PATCH if the label actually changed
+                      // and isn't blank - either way, exits edit mode.
                       function commitLabel(newValue: string) {
                         if (newValue.trim().length && newValue !== c.label) {
                           handleUpdate(c.id, { label: newValue });

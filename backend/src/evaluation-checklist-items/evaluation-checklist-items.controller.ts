@@ -32,7 +32,8 @@ export class EvaluationChecklistItemsController {
     this.evaluationChecklistItem = evaluationChecklistItem;
   }
 
-  // GET (all)
+  // GET (all) - lists every checklist item for the project, all three
+  // sections mixed together (the frontend groups them by section itself).
   @Get()
   findAll(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -41,7 +42,8 @@ export class EvaluationChecklistItemsController {
     return this.evaluationChecklistItem.findAll(projectId, request.user.id);
   }
 
-  // GET (one)
+  // GET (one) - fetches a single item; also the pattern reused as the
+  // ownership guard by update/remove (see findById in the service).
   @Get(":id")
   findById(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -55,7 +57,8 @@ export class EvaluationChecklistItemsController {
     );
   }
 
-  // POST
+  // POST - creates a new item in the given section, rejected once that
+  // section already has EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION items.
   @ApiSecurity("csrf")
   @Post()
   create(
@@ -66,7 +69,8 @@ export class EvaluationChecklistItemsController {
     return this.evaluationChecklistItem.create(projectId, dto, request.user.id);
   }
 
-  // PATCH
+  // PATCH - partial update (label, isChecked, or order); section can't be
+  // changed here, see UpdateEvaluationChecklistItemDto.
   @ApiSecurity("csrf")
   @Patch(":id")
   update(
@@ -83,7 +87,7 @@ export class EvaluationChecklistItemsController {
     );
   }
 
-  // DELETE
+  // DELETE - permanently removes the item.
   @ApiSecurity("csrf")
   @Delete(":id")
   remove(

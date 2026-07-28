@@ -106,10 +106,15 @@ export class EvaluationChecklistItemsService {
     dto: UpdateEvaluationChecklistItemDto,
     userId: string
   ) {
-    // membership check, will throw if failed
+    // ownership check via findById, will throw if failed: confirms both that
+    // userId is a member of projectId AND that id actually belongs to
+    // projectId - without the second check, a member of any project could
+    // PATCH any other project's item just by pairing their own projectId
+    // (to pass the membership half) with a foreign item id (IDOR).
     await this.findById(projectId, id, userId);
 
-    // query database
+    // safe to update by id alone now - findById already proved it belongs
+    // to projectId.
     return await this.prisma.evaluationChecklistItem.update({
       where: { id: id },
       data: { ...dto },
