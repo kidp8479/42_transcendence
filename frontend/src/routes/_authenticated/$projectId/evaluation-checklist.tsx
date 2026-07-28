@@ -20,6 +20,10 @@ import {
   deleteEvaluationChecklistItem,
   fetchEvaluationChecklistItems,
   updateEvaluationChecklistItem,
+  EVALUATION_CHECKLIST_SECTIONS,
+  EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH,
+  EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY,
+  EVALUATION_CHECKLIST_CATEGORY_LABELS,
 } from "@/lib/evaluationChecklist";
 import type {
   EvaluationChecklistItem,
@@ -28,10 +32,6 @@ import type {
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
-
-export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
-export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
-import { EVALUATION_CHECKLIST_CATEGORY_LABELS } from "@/lib/evaluationChecklist";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -186,12 +186,11 @@ interface AccordionItemData {
 
 // Fixed [Mandatory, Bonus, Supplemental] order - CATEGORY_STYLE, sectionByIndex
 // below, and every consumer of this function's result all rely on that same
-// order, so it's seeded once here rather than derived.
-const SECTION_TO_ACCORDION_INDEX: Record<EvaluationChecklistSection, number> = {
-  MANDATORY: 0,
-  BONUS: 1,
-  SUPPLEMENTAL: 2,
-};
+// order. Derived from EVALUATION_CHECKLIST_SECTIONS (the single source of
+// truth for section order) instead of being repeated here.
+const SECTION_TO_ACCORDION_INDEX = Object.fromEntries(
+  EVALUATION_CHECKLIST_SECTIONS.map((section, index) => [section, index])
+) as Record<EvaluationChecklistSection, number>;
 
 // Groups items by section and sorts each group by its own `order` - the
 // only sort this page ever needs (checklist rows are manually ordered by
@@ -237,6 +236,16 @@ function errorMessage(arg: string) {
   return "Item could not be " + arg + ". Please retry.";
 }
 
+// Mandatory alone carries the first 100 points (READY). Bonus and Supplemental
+// each unlock CATEGORY_WEIGHT further points once the previous category is
+// fully done, topping the score out at EXTRA_READY.
+const CATEGORY_WEIGHT = 25;
+const READINESS_THRESHOLD = {
+  READY: 100,
+  SUPER_READY: 125,
+  EXTRA_READY: 150,
+} as const;
+
 function EvaluationChecklistPage() {
   const { projectId } = Route.useParams();
   const checklistItems = Route.useLoaderData();
@@ -257,8 +266,8 @@ function EvaluationChecklistPage() {
   const categoryPercents = accordionItemData.map(categoryPercent);
   const [mandatoryPercent, bonusPercent, supplementalPercent] =
     categoryPercents;
-  const mandatoryComplete = mandatoryPercent >= 100;
-  const bonusComplete = bonusPercent >= 100;
+  const mandatoryComplete = mandatoryPercent >= READINESS_THRESHOLD.READY;
+  const bonusComplete = bonusPercent >= READINESS_THRESHOLD.READY;
 
   // Same gating as the percent below: a category's items only join the
   // overall "X / Y" count once the previous category is fully done.
@@ -275,15 +284,14 @@ function EvaluationChecklistPage() {
     }
   }
 
-  // Mandatory alone carries the first 100 points. Bonus only starts counting
-  // once Mandatory is done (worth up to another 25), and Supplemental only
-  // once both Mandatory and Bonus are done (worth a final 25) - so the score
-  // tops out at 150.
+  // Bonus only starts counting once Mandatory is done, and Supplemental only
+  // once both Mandatory and Bonus are done - see READINESS_THRESHOLD/
+  // CATEGORY_WEIGHT above for what each stage is worth.
   let overallPercent = mandatoryPercent;
   if (mandatoryComplete) {
-    overallPercent += (bonusPercent / 100) * 25;
+    overallPercent += (bonusPercent / 100) * CATEGORY_WEIGHT;
     if (bonusComplete) {
-      overallPercent += (supplementalPercent / 100) * 25;
+      overallPercent += (supplementalPercent / 100) * CATEGORY_WEIGHT;
     }
   }
   totalProgress.percent = Math.round(overallPercent);
@@ -292,7 +300,9 @@ function EvaluationChecklistPage() {
 
   // One draft label per category (index-aligned with accordionItemData /
   // sectionByIndex below), for the "Add a defense checkpoint..." input.
-  const [newItemLabels, setNewItemLabels] = useState<string[]>(["", "", ""]);
+  const [newItemLabels, setNewItemLabels] = useState<string[]>(
+    EVALUATION_CHECKLIST_SECTIONS.map(() => "")
+  );
 
   function setNewItemLabel(index: number, value: string) {
     setNewItemLabels((previous) =>
@@ -300,11 +310,8 @@ function EvaluationChecklistPage() {
     );
   }
 
-  const sectionByIndex: EvaluationChecklistSection[] = [
-    "MANDATORY",
-    "BONUS",
-    "SUPPLEMENTAL",
-  ];
+  const sectionByIndex: readonly EvaluationChecklistSection[] =
+    EVALUATION_CHECKLIST_SECTIONS;
 
   async function handleCreate(dto: {
     label: string;
@@ -361,22 +368,22 @@ function EvaluationChecklistPage() {
   }
 
   const readinessLabel =
-    totalProgress.percent >= 150
+    totalProgress.percent >= READINESS_THRESHOLD.EXTRA_READY
       ? "Extra Ready"
-      : totalProgress.percent >= 125
+      : totalProgress.percent >= READINESS_THRESHOLD.SUPER_READY
         ? "Super Ready"
-        : totalProgress.percent >= 100
+        : totalProgress.percent >= READINESS_THRESHOLD.READY
           ? "Ready"
           : "Not ready yet";
 
   // Each milestone borrows the color of the category that unlocked it.
   const readinessColor =
-    totalProgress.percent >= 150
+    totalProgress.percent >= READINESS_THRESHOLD.EXTRA_READY
       ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL]
           .iconText
-      : totalProgress.percent >= 125
+      : totalProgress.percent >= READINESS_THRESHOLD.SUPER_READY
         ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS].iconText
-        : totalProgress.percent >= 100
+        : totalProgress.percent >= READINESS_THRESHOLD.READY
           ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY]
               .iconText
           : "text-text-secondary";
@@ -422,13 +429,13 @@ function EvaluationChecklistPage() {
           role="progressbar"
           aria-valuenow={totalProgress.percent}
           aria-valuemin={0}
-          aria-valuemax={150}
+          aria-valuemax={READINESS_THRESHOLD.EXTRA_READY}
           aria-labelledby="overall-progress-heading"
         >
           <div
             className="h-2 rounded-full bg-brand-500"
             style={{
-              width: `${Math.min((totalProgress.percent / 150) * 100, 100)}%`,
+              width: `${Math.min((totalProgress.percent / READINESS_THRESHOLD.EXTRA_READY) * 100, 100)}%`,
             }}
           />
         </div>

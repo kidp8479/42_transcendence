@@ -1,6 +1,20 @@
 import { apiClient } from "./apiClient";
 
-export type EvaluationChecklistSection = "MANDATORY" | "BONUS" | "SUPPLEMENTAL";
+// Single source of truth for the section set and its display order - every
+// consumer (SECTION_TO_ACCORDION_INDEX, sectionByIndex, categorizeChecklistItems
+// in the route file) derives from this instead of repeating the three names.
+export const EVALUATION_CHECKLIST_SECTIONS = [
+  "MANDATORY",
+  "BONUS",
+  "SUPPLEMENTAL",
+] as const;
+
+export type EvaluationChecklistSection =
+  (typeof EVALUATION_CHECKLIST_SECTIONS)[number];
+
+export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
+export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
+
 export const EVALUATION_CHECKLIST_CATEGORY_LABELS: Record<
   EvaluationChecklistSection,
   string
@@ -25,7 +39,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isEvaluationChecklistSection(
   value: unknown
 ): value is EvaluationChecklistSection {
-  return value === "MANDATORY" || value === "BONUS" || value === "SUPPLEMENTAL";
+  return EVALUATION_CHECKLIST_SECTIONS.includes(
+    value as EvaluationChecklistSection
+  );
 }
 
 function parseEvaluationChecklistItem(
