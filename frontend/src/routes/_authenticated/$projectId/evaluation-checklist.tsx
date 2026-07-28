@@ -25,6 +25,8 @@ import type {
   EvaluationChecklistItem,
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
+import { useToast } from "@/hooks/useToast";
+import { error } from "console";
 
 export const EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH = 350;
 export const EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY = 50;
@@ -229,11 +231,16 @@ function categorizeChecklistItems(
   return accordionItemData;
 }
 
+function errorMessage(arg: string) {
+  return "Item could not be " + arg + ". Please retry."
+}
+
 function EvaluationChecklistPage() {
   const { projectId } = Route.useParams();
   const checklistItems = Route.useLoaderData();
   const [items, setItems] = useState<EvaluationChecklistItem[]>(checklistItems);
   const accordionItemData = categorizeChecklistItems(items);
+  const { showToast } = useToast();
 
   function categoryPercent(data: AccordionItemData): number {
     return data.count.completeAt === 0
@@ -305,6 +312,7 @@ function EvaluationChecklistPage() {
       const created = await createEvaluationChecklistItem(projectId, dto);
       setItems((prevItems) => [...prevItems, created]);
     } catch {
+      showToast({ type: "error", message: errorMessage("created")});
       return;
     }
   }
@@ -325,6 +333,7 @@ function EvaluationChecklistPage() {
     try {
       await updateEvaluationChecklistItem(projectId, id, changes);
     } catch {
+      showToast({ type: "error", message: errorMessage("updated")});
       setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
     }
   }
@@ -338,6 +347,7 @@ function EvaluationChecklistPage() {
     try {
       await deleteEvaluationChecklistItem(projectId, id);
     } catch {
+      showToast({ type: "error", message: errorMessage("deleted")});
       setItems((prevItems) => [...prevItems, previousItem]);
     }
   }
