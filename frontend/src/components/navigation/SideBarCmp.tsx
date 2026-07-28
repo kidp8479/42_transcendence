@@ -16,6 +16,17 @@ interface NavigationItem {
   icon: IconType;
 }
 
+// md:z-50 (not md:z-auto): AuthenticatedLayout's <main> became a positioned
+// element (position: relative, needed by CalendarEventDrawer) - two sibling
+// positioned elements with z-index:auto paint in DOM order, so without an
+// explicit z-index here, main (later in the DOM) would paint over the
+// collapse/expand toggle button below, which pokes out past the sidebar's
+// own right edge (right-0 translate-x-full) into main's area. Needs to beat
+// DrawerShell's own z-40 too (CalendarEventDrawer's expanded "w-full" state
+// starts right where the sidebar ends, exactly under that poking-out
+// button), a child can never out-stack an ancestor's sibling that has a
+// higher z-index, so this has to be raised on the sidebar's own positioned
+// container, not just the button.
 const sidebarContainerClasses =
   "fixed inset-y-0 left-0 z-40 w-full transition-transform duration-300";
 const sidebarInnerClasses = "font-mono relative h-full w-full overflow-hidden";
@@ -143,7 +154,7 @@ export function SideBarCmp() {
         className={`
           ${sidebarContainerClasses}
           ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
-          md:sticky md:top-0 md:h-screen md:z-auto md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
+          md:sticky md:top-0 md:h-screen md:z-50 md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
           ${isCollapsed ? "md:w-0" : "md:w-64"}
         `}
       >
