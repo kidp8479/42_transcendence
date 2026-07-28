@@ -90,7 +90,7 @@ function parseEvaluationChecklistItems(
 }
 
 // GET /projects/:projectId/evaluation-checklist-items
-export function fetchEvaluationChecklistItems(
+export async function fetchEvaluationChecklistItems(
   projectId: string
 ): Promise<EvaluationChecklistItem[]> {
   return apiClient<unknown>(
@@ -99,7 +99,7 @@ export function fetchEvaluationChecklistItems(
 }
 
 // POST /projects/:projectId/evaluation-checklist-items
-export function createEvaluationChecklistItem(
+export async function createEvaluationChecklistItem(
   projectId: string,
   dto: { label: string; section: EvaluationChecklistSection; order: number }
 ): Promise<EvaluationChecklistItem> {
@@ -116,7 +116,7 @@ export function createEvaluationChecklistItem(
 }
 
 // PATCH /projects/:projectId/evaluation-checklist-items/:id
-export function updateEvaluationChecklistItem(
+export async function updateEvaluationChecklistItem(
   projectId: string,
   id: string,
   dto: Partial<{
@@ -142,7 +142,7 @@ export function updateEvaluationChecklistItem(
 // returns the deleted item's own body (200, not 204 - no @HttpCode override
 // on this route, unlike deleteProject), so this parses and returns it
 // instead of assuming an empty response.
-export function deleteEvaluationChecklistItem(
+export async function deleteEvaluationChecklistItem(
   projectId: string,
   id: string
 ): Promise<EvaluationChecklistItem> {
