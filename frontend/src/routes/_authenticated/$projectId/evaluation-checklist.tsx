@@ -32,6 +32,7 @@ import type {
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
+import { it } from "node:test";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -479,9 +480,13 @@ function EvaluationChecklistPage() {
             ) {
               return;
             }
+
+            const nextOrder =
+              item.contents.reduce((max, it) => Math.max(max, it.order), -1) + 1;
+
             handleCreate({
               label,
-              order: item.contents.length,
+              order: nextOrder,
               section: sectionByIndex[i],
             });
             setNewItemLabel(i, "");
