@@ -1,12 +1,12 @@
-/*
-  Warnings:
-
-  - Changed the type of `section` on the `EvaluationChecklistItem` table. No cast exists, the column would be dropped and recreated, which cannot be done if there is data, since the column is required.
-
-*/
 -- CreateEnum
 CREATE TYPE "EvaluationChecklistItemSection" AS ENUM ('MANDATORY', 'BONUS', 'SUPPLEMENTAL');
 
 -- AlterTable
-ALTER TABLE "EvaluationChecklistItem" DROP COLUMN "section",
-ADD COLUMN     "section" "EvaluationChecklistItemSection" NOT NULL;
+-- Prisma's default output here is `DROP COLUMN` + `ADD COLUMN`, which fails
+-- (or silently loses data) on any table that already has rows, since the old
+-- `section` was a plain TEXT column. The existing values already match the
+-- enum's own labels one-for-one, so a direct cast via USING converts them
+-- in place instead of discarding them.
+ALTER TABLE "EvaluationChecklistItem"
+  ALTER COLUMN "section" TYPE "EvaluationChecklistItemSection"
+  USING ("section"::"EvaluationChecklistItemSection");
