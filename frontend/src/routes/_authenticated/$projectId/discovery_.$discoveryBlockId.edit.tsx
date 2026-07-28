@@ -125,11 +125,15 @@ function DiscoveryBlockEditPage() {
   });
 
   async function handleSave(): Promise<void> {
+    // the backend trims title server-side (CreateDiscoveryBlockDto's
+    // @Transform) - trimmed here too so the input reflects what actually
+    // got saved, since title isn't resynced from loaderData after invalidate
+    const trimmedTitle = title.trim();
     try {
       // color/icon are autosaved separately (handleColorChange/
       // handleIconChange below) - not sent again here
       await updateDiscoveryBlock(params.projectId, params.discoveryBlockId, {
-        title: title,
+        title: trimmedTitle,
         description: description,
         notes: notes,
       });
@@ -142,6 +146,7 @@ function DiscoveryBlockEditPage() {
       });
       return;
     }
+    setTitle(trimmedTitle);
     await safeInvalidateRouter();
     showToast({ type: "success", message: "Changes saved" });
   }
