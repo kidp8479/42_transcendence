@@ -8,6 +8,12 @@ import {
 
 const toastDurationMs = 5000;
 
+// team decision (Discord, ui-components, 2026-07-27): stacking every toast
+// unbounded "can quickly start to look a bit of a mess" (Carlos) - cap how
+// many show at once, oldest collapses out first when a new one arrives
+// past the limit (Andrei)
+const maxVisibleToasts = 5;
+
 export type ToastType = "error" | "success";
 
 interface Toast {
@@ -32,7 +38,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
   const showToast = useCallback(
     ({ message, type }: Omit<Toast, "id">) => {
       const id = Date.now();
-      setToasts((current) => [...current, { id, message, type }]);
+      // slice from the end: clicking past the limit drops the oldest
+      // toast(s) immediately rather than waiting out their own 5s timer,
+      // so at most maxVisibleToasts ever show at once
+      setToasts((current) =>
+        [...current, { id, message, type }].slice(-maxVisibleToasts)
+      );
       window.setTimeout(() => dismissToast(id), toastDurationMs);
     },
     [dismissToast]
