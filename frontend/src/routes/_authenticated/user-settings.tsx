@@ -27,10 +27,12 @@ const rowUploadButtonClass = `
   dark:text-xs
   hover:ring-1
   hover:ring-surface-border
-  focus:ring-0
+  focus:ring-1
+  focus:ring-brand-500
   dark:hover:ring-1
   dark:hover:ring-surface-border
-  dark:focus:ring-0
+  dark:focus:ring-1
+  dark:focus:ring-brand-500
 `;
 
 function UserSettingsPage() {
@@ -79,12 +81,6 @@ function UserSettingsPage() {
             </section>
           </section>
 
-          <p className="text-xs text-text-secondary -mt-2 pb-4 border-b border-surface-border">
-            You can upload a custom photo. If none is set, your avatar will
-            display your initials on a colored background — no action
-            required.
-          </p>
-
           <section className={rowClass} aria-labelledby="displayed-name-area">
             <Label className="font-semibold text-text-primary shrink-0">
               Display name
@@ -114,7 +110,7 @@ function UserSettingsPage() {
 
           <div>
             <Button
-              className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
+              className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-1 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
               onClick={(e) => {
                 e.currentTarget.blur();
               }}
@@ -152,7 +148,7 @@ function UserSettingsPage() {
             </Button>
           </section>
 
-          <section className={rowClass} aria-labelledby="two-factor-area">
+          {/* <section className={rowClass} aria-labelledby="two-factor-area">
             <div>
               <Label className="font-semibold text-text-primary">
                 Two-factor authentication
@@ -162,7 +158,7 @@ function UserSettingsPage() {
               </p>
             </div>
             <ToggleSwitch checked={switch2FA} onChange={setSwitch2FA} />
-          </section>
+          </section> */}
         </section>
 
         <section
@@ -183,8 +179,9 @@ function UserSettingsPage() {
               </p>
             </div>
             <Button
+              className="focus:ring-1 darkfocus:ring-1"
               size="sm"
-              color="failure"
+              color="red"
               outline
               onClick={(e) => {
                 e.currentTarget.blur();
