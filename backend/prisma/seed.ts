@@ -30,7 +30,7 @@ const SEED_PASSWORD = "SeedPassword123!";
 // seeding more than that in a tight loop trips it, so this pauses just past
 // the window once the limit is reached instead of registering all seed
 // users in one burst
-const REGISTER_REQUESTS_PER_MINUTE = 5;
+const REGISTER_REQUESTS_PER_MINUTE = 20;
 let registrationsInCurrentWindow = 0;
 
 function sleep(ms: number): Promise<void> {
