@@ -33,8 +33,13 @@ export function CalendarMonthGrid({
   const isCompact = useIsCompactCalendar();
 
   return (
-    <div className="overflow-hidden rounded-lg border-t border-l border-surface-border">
-      <div className="grid grid-cols-7 border-b border-surface-border bg-surface-overlay">
+    // flex-1 + flex-col: this grid grows to fill whatever height
+    // ProjectLayout's content area has available (see its own comment) -
+    // the header row stays a fixed height (shrink-0) and the weeks share
+    // the remaining space evenly (flex-1 each), so a short month doesn't
+    // leave empty space below it on a tall viewport.
+    <div className="flex h-full flex-1 flex-col overflow-hidden rounded-lg border-t border-l border-surface-border">
+      <div className="grid shrink-0 grid-cols-7 border-b border-surface-border bg-surface-overlay">
         {WEEKDAY_LABELS.map((label) => (
           <div
             key={label}
@@ -45,7 +50,10 @@ export function CalendarMonthGrid({
         ))}
       </div>
       {weeks.map((week) => (
-        <div key={week[0].format("YYYY-MM-DD")} className="grid grid-cols-7">
+        <div
+          key={week[0].format("YYYY-MM-DD")}
+          className="grid flex-1 grid-cols-7"
+        >
           {week.map((day) => {
             const dayEvents = events
               .filter((event) => eventCoversDay(event, day))

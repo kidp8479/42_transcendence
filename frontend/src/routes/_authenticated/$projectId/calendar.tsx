@@ -132,7 +132,7 @@ function CalendarPage() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex h-full flex-col gap-2">
       <CalendarNavHeader
         monthAnchor={monthAnchor}
         onPrevMonth={() =>
