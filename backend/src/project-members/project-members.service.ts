@@ -110,6 +110,14 @@ export class ProjectMembersService {
     if (memberToRemove.role === "OWNER") {
       throw new ForbiddenException("Cannot remove the project owner");
     }
+    // an ADMIN can remove a MEMBER, but not a fellow ADMIN - only the OWNER
+    // can remove an ADMIN (flagged in TR-80's cross-branch review: without
+    // this, any two admins could remove each other)
+    if (memberToRemove.role === "ADMIN" && requester.role !== "OWNER") {
+      throw new ForbiddenException(
+        "Only the project owner can remove an admin"
+      );
+    }
     return this.prisma.projectMember.delete({
       where: {
         userId_projectId: {
