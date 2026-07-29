@@ -15,6 +15,7 @@ export type ApplicationDatabaseTransaction = Pick<
   | "calendarEvent"
   | "calendarCategory"
   | "calendarAssignee"
+  | "notification"
 >;
 
 type TransactionOptions = {
@@ -65,6 +66,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get calendarAssignee(): PrismaClient["calendarAssignee"] {
     return this.currentClient().calendarAssignee;
+  }
+
+  get notification(): PrismaClient["notification"] {
+    return this.currentClient().notification;
   }
 
   async transaction<T>(
