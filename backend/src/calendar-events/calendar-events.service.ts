@@ -52,6 +52,7 @@ export class CalendarEventsService {
     if (dto.assigneeIds) {
       await this.assertAssigneesAreProjectMembers(projectId, dto.assigneeIds);
     }
+    this.assertValidDateRange(dto.startAt, dto.endAt);
 
     const event = await this.prisma.calendarEvent.create({
       data: {
@@ -105,7 +106,7 @@ export class CalendarEventsService {
     projectId: string,
     userId: string
   ) {
-    await this.findById(id, projectId, userId); // access guard
+    const existingEvent = await this.findById(id, projectId, userId); // access guard
     if (dto.categoryId) {
       await this.assertCategoryBelongsToProject(projectId, dto.categoryId);
     }
@@ -115,6 +116,12 @@ export class CalendarEventsService {
     if (assigneeIds) {
       await this.assertAssigneesAreProjectMembers(projectId, assigneeIds);
     }
+    // a PATCH can send only one of startAt/endAt - validate the pair as it
+    // will actually end up in the database, not just the field(s) sent
+    this.assertValidDateRange(
+      dto.startAt ?? existingEvent.startAt.toISOString(),
+      dto.endAt ?? existingEvent.endAt.toISOString()
+    );
     const eventFields = {
       title: dto.title,
       categoryId: dto.categoryId,
@@ -145,6 +152,14 @@ export class CalendarEventsService {
       include: calendarEventInclude,
     });
     return mapCalendarEvent(event);
+  }
+
+  // the frontend already blocks this in the form, but nothing stops a direct
+  // API call from skipping it - enforce it here too
+  private assertValidDateRange(startAt: string, endAt: string): void {
+    if (new Date(endAt) < new Date(startAt)) {
+      throw new BadRequestException("endAt must not be before startAt");
+    }
   }
 
   // categoryId comes from the body, so it could point at a category from a
