@@ -20,7 +20,7 @@ export class NotificationsService {
   //
   // after inserting the row, pushes it straight to that user's browser over
   // WebSocket (personal room "user:{userId}", see RealtimeGateway) - the first
-  // real end-to-end use of the whole realtime layer built in bricks 1-4
+  // real end-to-end use of the whole realtime layer built so far
   async create(userId: string, message: string, link?: string) {
     const notification = await this.prisma.notification.create({
       data: { userId: userId, message: message, link: link },
