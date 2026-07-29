@@ -20,10 +20,10 @@ import {
   darkSurfaceFieldClassName,
   darkSurfaceTextInputTheme,
 } from "@/lib/flowbite";
+import { DateInput } from "@/components/project/calendar/DateInput";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import type { CalendarCategory } from "@/lib/calendarCategoriesApi";
 import {
-  CALENDAR_EVENT_DESCRIPTION_MAX_LENGTH,
   CALENDAR_EVENT_NOTES_MAX_LENGTH,
   CALENDAR_EVENT_TITLE_MAX_LENGTH,
   type CalendarEvent,
@@ -63,7 +63,6 @@ export function EventForm({
   const [categoryId, setCategoryId] = useState(
     event?.categoryId ?? categories[0]?.id ?? ""
   );
-  const [description, setDescription] = useState(event?.description ?? "");
   const [notes, setNotes] = useState(event?.notes ?? "");
   const [assigneeIds, setAssigneeIds] = useState<string[]>(
     event?.assignees.map((assignee) => assignee.id) ?? []
@@ -110,8 +109,7 @@ export function EventForm({
         categoryId: categoryId,
         startAt: startAt.toISOString(),
         endAt: endAt.toISOString(),
-        description:
-          description.trim().length > 0 ? description.trim() : undefined,
+        description: event?.description ?? undefined,
         notes: notes.trim().length > 0 ? notes.trim() : undefined,
         assigneeIds: assigneeIds,
       });
@@ -136,7 +134,7 @@ export function EventForm({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-5">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-10 p-6">
       <div>
         <Label
           htmlFor="event-title"
@@ -153,81 +151,6 @@ export function EventForm({
           theme={darkSurfaceTextInputTheme}
           placeholder="Event title"
         />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label
-            htmlFor="event-start-date"
-            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
-          >
-            Start date
-          </Label>
-          <input
-            id="event-start-date"
-            type="date"
-            value={startDate}
-            onChange={(changeEvent) => setStartDate(changeEvent.target.value)}
-            className={
-              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
-              darkSurfaceFieldClassName
-            }
-          />
-        </div>
-        <div>
-          <Label
-            htmlFor="event-end-date"
-            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
-          >
-            End date
-          </Label>
-          <input
-            id="event-end-date"
-            type="date"
-            value={endDate}
-            onChange={(changeEvent) => setEndDate(changeEvent.target.value)}
-            className={
-              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
-              darkSurfaceFieldClassName
-            }
-          />
-        </div>
-        <div>
-          <Label
-            htmlFor="event-start-time"
-            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
-          >
-            Start time
-          </Label>
-          <input
-            id="event-start-time"
-            type="time"
-            value={startTime}
-            onChange={(changeEvent) => setStartTime(changeEvent.target.value)}
-            className={
-              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
-              darkSurfaceFieldClassName
-            }
-          />
-        </div>
-        <div>
-          <Label
-            htmlFor="event-end-time"
-            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
-          >
-            End time
-          </Label>
-          <input
-            id="event-end-time"
-            type="time"
-            value={endTime}
-            onChange={(changeEvent) => setEndTime(changeEvent.target.value)}
-            className={
-              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
-              darkSurfaceFieldClassName
-            }
-          />
-        </div>
       </div>
 
       <div>
@@ -288,6 +211,79 @@ export function EventForm({
         </Dropdown>
       </div>
 
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <Label
+            htmlFor="event-start-date"
+            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
+          >
+            Start date
+          </Label>
+          <DateInput
+            id="event-start-date"
+            value={startDate}
+            onChange={setStartDate}
+            className={
+              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
+              darkSurfaceFieldClassName
+            }
+          />
+        </div>
+        <div>
+          <Label
+            htmlFor="event-end-date"
+            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
+          >
+            End date
+          </Label>
+          <DateInput
+            id="event-end-date"
+            value={endDate}
+            onChange={setEndDate}
+            className={
+              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
+              darkSurfaceFieldClassName
+            }
+          />
+        </div>
+        <div>
+          <Label
+            htmlFor="event-start-time"
+            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
+          >
+            Start time
+          </Label>
+          <input
+            id="event-start-time"
+            type="time"
+            value={startTime}
+            onChange={(changeEvent) => setStartTime(changeEvent.target.value)}
+            className={
+              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
+              darkSurfaceFieldClassName
+            }
+          />
+        </div>
+        <div>
+          <Label
+            htmlFor="event-end-time"
+            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
+          >
+            End time
+          </Label>
+          <input
+            id="event-end-time"
+            type="time"
+            value={endTime}
+            onChange={(changeEvent) => setEndTime(changeEvent.target.value)}
+            className={
+              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
+              darkSurfaceFieldClassName
+            }
+          />
+        </div>
+      </div>
+
       <div>
         <Label className="text-xs font-semibold tracking-wide text-text-secondary uppercase">
           Members
@@ -314,24 +310,6 @@ export function EventForm({
             );
           })}
         </div>
-      </div>
-
-      <div>
-        <Label
-          htmlFor="event-description"
-          className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
-        >
-          Description
-        </Label>
-        <Textarea
-          id="event-description"
-          rows={2}
-          maxLength={CALENDAR_EVENT_DESCRIPTION_MAX_LENGTH}
-          value={description}
-          onChange={(changeEvent) => setDescription(changeEvent.target.value)}
-          className={darkSurfaceFieldClassName}
-          placeholder="Short description..."
-        />
       </div>
 
       <div>
