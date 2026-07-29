@@ -225,6 +225,7 @@ export function EventForm({
           <Datepicker
             id="event-start-date"
             weekStart={WeekStart.Monday}
+            showClearButton={false}
             value={dayjs(startDate).toDate()}
             onChange={(date) => {
               if (date) {
@@ -248,6 +249,7 @@ export function EventForm({
           <Datepicker
             id="event-end-date"
             weekStart={WeekStart.Monday}
+            showClearButton={false}
             value={dayjs(endDate).toDate()}
             onChange={(date) => {
               if (date) {
