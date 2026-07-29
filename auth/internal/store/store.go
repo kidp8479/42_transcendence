@@ -109,11 +109,12 @@ func (s *Store) CreateLocalAccount(
 	_, err = tx.Exec(
 		ctx,
 		`INSERT INTO "User"
-			("id", "email", "emailVerified", "username", "twoFactorEnabled", "createdAt", "updatedAt")
-		 VALUES ($1, $2, false, $3, false, $4, $4)`,
+			("id", "email", "emailVerified", "username", "twoFactorEnabled", "status", "createdAt", "updatedAt")
+		 VALUES ($1, $2, false, $3, false, CAST($4 AS "AccountStatus"), $5, $5)`,
 		user.ID,
 		user.Email,
 		user.Username,
+		string(user.Status),
 		now,
 	)
 	if err != nil {
@@ -282,7 +283,6 @@ func (s *Store) IntrospectSession(
 			u."username",
 			u."avatarUrl",
 			u."campus",
-			u."status"::text,
 			s."authenticationMethod"::text,
 			s."assuranceLevel",
 			s."authenticatedAt",
@@ -299,7 +299,6 @@ func (s *Store) IntrospectSession(
 		&session.User.Username,
 		&session.User.AvatarURL,
 		&session.User.Campus,
-		&session.User.Status,
 		&session.AuthenticationMethod,
 		&session.AssuranceLevel,
 		&session.AuthenticatedAt,

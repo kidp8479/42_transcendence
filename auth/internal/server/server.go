@@ -307,11 +307,6 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Internal Server Error", "logout could not be completed")
 		return
 	}
-	if session.User.Status != store.AccountStatusActive {
-		s.clearSessionCookies(w)
-		writeError(w, http.StatusUnauthorized, "Unauthorized", "active session required")
-		return
-	}
 	if !store.VerifyTokenHash(csrfToken, session.CSRFTokenHash) {
 		writeError(w, http.StatusForbidden, "Forbidden", "CSRF validation failed")
 		return
@@ -344,11 +339,6 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("get session: %v", err)
 		writeError(w, http.StatusInternalServerError, "Internal Server Error", "session could not be loaded")
-		return
-	}
-	if session.User.Status != store.AccountStatusActive {
-		s.clearSessionCookies(w)
-		writeError(w, http.StatusUnauthorized, "Unauthorized", "active session required")
 		return
 	}
 	if !store.VerifyTokenHash(csrfToken, session.CSRFTokenHash) {
@@ -409,17 +399,6 @@ func (s *Server) handleIntrospect(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Internal Server Error", "session could not be introspected")
 		return
 	}
-	if session.User.Status != store.AccountStatusActive {
-		writeErrorCode(
-			w,
-			http.StatusUnauthorized,
-			"Unauthorized",
-			"session is inactive",
-			"SESSION_INACTIVE",
-		)
-		return
-	}
-
 	if requiresCSRF(request.RequestMethod) {
 		if request.Origin == nil || !s.validOrigin(*request.Origin) ||
 			request.CSRFToken == nil ||

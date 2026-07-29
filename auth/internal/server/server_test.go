@@ -17,6 +17,7 @@ import (
 type testAuthStore struct {
 	credential           store.LocalCredential
 	introspectionSession store.Session
+	introspectionErr     error
 	createSessionCalls   int
 }
 
@@ -51,7 +52,7 @@ func (s *testAuthStore) CreateSession(
 }
 
 func (s *testAuthStore) IntrospectSession(context.Context, string, time.Duration) (store.Session, error) {
-	return s.introspectionSession, nil
+	return s.introspectionSession, s.introspectionErr
 }
 
 func (s *testAuthStore) RevokeSession(context.Context, string) error {
@@ -151,13 +152,13 @@ func TestHandleLoginRequiresActiveAccount(t *testing.T) {
 
 func TestHandleIntrospectRejectsInactiveAccount(t *testing.T) {
 	tests := []struct {
-		name   string
-		status store.AccountStatus
-		want   int
+		name             string
+		introspectionErr error
+		want             int
 	}{
-		{name: "active account", status: store.AccountStatusActive, want: http.StatusOK},
-		{name: "pending approval account", status: store.AccountStatusPendingApproval, want: http.StatusUnauthorized},
-		{name: "disabled account", status: store.AccountStatusDisabled, want: http.StatusUnauthorized},
+		{name: "active account", want: http.StatusOK},
+		{name: "pending approval account", introspectionErr: store.ErrNotFound, want: http.StatusUnauthorized},
+		{name: "disabled account", introspectionErr: store.ErrNotFound, want: http.StatusUnauthorized},
 	}
 
 	for _, test := range tests {
@@ -166,10 +167,10 @@ func TestHandleIntrospectRejectsInactiveAccount(t *testing.T) {
 				introspectionSession: store.Session{
 					ID: "session-id",
 					User: store.User{
-						ID:     "user-id",
-						Status: test.status,
+						ID: "user-id",
 					},
 				},
+				introspectionErr: test.introspectionErr,
 			}
 			server := &Server{
 				cfg: config.Config{
