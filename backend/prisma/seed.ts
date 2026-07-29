@@ -13,6 +13,7 @@ import {
   ProjectMemberRole,
   TaskStatus,
   TaskPriority,
+  EvaluationChecklistItemSection,
 } from "@prisma/client";
 import { computeDiscoveryBlockStatus } from "../src/discovery-blocks/discovery-block-status.util";
 
@@ -280,8 +281,144 @@ async function main() {
       });
     }
   }
+
+// 5. Evaluation checklist items - hardcoded lorem-ipsum-style goals, picked
+// at random for each seeded checklist item, not real evaluation criteria,
+// just placeholder text
+function getRandomInt(max: number): number {
+  return Math.floor(Math.random() * max) + 1;
+}
+
+const GOALS = [
+  "Explain the purpose of the project clearly",
+  "Demonstrate a working build from a clean clone",
+  "Handle edge cases without crashing",
+  "Justify the chosen architecture",
+  "Show proper error handling throughout",
+  "Respect the mandatory coding norm",
+  "Provide a clear and complete README",
+  "Answer questions about any part of the code",
+  "Demonstrate memory is properly freed",
+  "Show that the program compiles without warnings",
+  "Walk through the main data structures used",
+  "Prove the program handles invalid input gracefully",
+  "Explain any tradeoffs made during development",
+  "Demonstrate the feature works end to end",
+  "Show test coverage for critical paths",
+  "Justify third-party libraries used, if any",
+  "Explain how concurrency issues were avoided",
+  "Demonstrate the UI matches the requested behavior",
+  "Show that the program does not leak file descriptors",
+  "Explain the git history and commit structure",
+  "Demonstrate recovery from a simulated failure",
+  "Show that inputs are properly validated",
+  "Explain how the team split the workload",
+  "Demonstrate the bonus feature in action",
+  "Justify any deviation from the subject",
+  "Show the program respects the given constraints",
+  "Explain the algorithm complexity where relevant",
+  "Demonstrate proper use of version control branches",
+  "Show that secrets are never committed to the repo",
+  "Explain how the project could be extended further",
+  "Demonstrate the CI pipeline runs on every push",
+  "Explain the database schema and its relationships",
+  "Show that migrations run cleanly on a fresh database",
+  "Justify the choice of framework or language",
+  "Demonstrate graceful shutdown of all services",
+  "Explain how logging is structured and where logs go",
+  "Show that rate limiting is enforced where needed",
+  "Demonstrate the app works without an internet connection, if applicable",
+  "Explain how configuration and environment variables are managed",
+  "Show that the app respects the required container setup",
+  "Demonstrate horizontal scaling of a given service",
+  "Explain the authentication and authorization flow",
+  "Show that passwords are never stored in plaintext",
+  "Demonstrate input sanitization against injection attacks",
+  "Explain how sessions are managed and invalidated",
+  "Show that the app handles network failures gracefully",
+  "Demonstrate the retry/backoff strategy for external calls",
+  "Explain the caching strategy and its invalidation rules",
+  "Show that the API is documented and up to date",
+  "Demonstrate backward compatibility of the API",
+  "Explain how errors are reported and monitored in production",
+  "Show that the test suite runs in CI without flakiness",
+  "Demonstrate unit tests cover the critical business logic",
+  "Explain the integration test strategy",
+  "Show that the code follows the team's style guide",
+  "Demonstrate a code review process was followed",
+  "Explain how technical debt was tracked and addressed",
+  "Show that the project meets accessibility requirements",
+  "Demonstrate responsive design across screen sizes",
+  "Explain how internationalization is handled, if applicable",
+  "Show that the app degrades gracefully under high load",
+  "Demonstrate proper handling of concurrent writes",
+  "Explain the chosen data consistency model",
+  "Show that backups and restores work correctly",
+  "Demonstrate the disaster recovery plan",
+  "Explain how secrets and credentials are rotated",
+  "Show that dependencies are kept up to date",
+  "Demonstrate a security audit was performed",
+  "Explain the threat model considered during design",
+  "Show that the app logs security-relevant events",
+  "Demonstrate two-factor authentication, if implemented",
+  "Explain how user data privacy is protected",
+  "Show that the project complies with the subject's mandatory part",
+  "Demonstrate at least one bonus module in action",
+  "Explain the reasoning behind the chosen bonus modules",
+  "Show that the defense demo covers all major features",
+  "Demonstrate the team can answer questions on any teammate's code",
+  "Explain how work was distributed and tracked across the team",
+  "Show that the project builds reproducibly on another machine",
+  "Demonstrate the app handles simultaneous multi-user sessions",
+];
+
+function getRandomGoal() {
+  return GOALS[getRandomInt(GOALS.length) - 1];
+}
+
+  for (const project of createdProjects) {
+
+    let s: EvaluationChecklistItemSection = EvaluationChecklistItemSection.MANDATORY;
+    let iterations = getRandomInt(8);
+    for (let i = 0; i < iterations; ++i) {
+      await prisma.evaluationChecklistItem.create({
+        data: {
+          projectId: project.id,
+          section: s,
+          label: getRandomGoal(),
+          order: i
+        }
+      });
+    }
+
+    s = EvaluationChecklistItemSection.BONUS;
+    iterations = getRandomInt(8);
+    for (let i = 0; i < iterations; ++i) {
+      await prisma.evaluationChecklistItem.create({
+        data: {
+          projectId: project.id,
+          section: s,
+          label: getRandomGoal(),
+          order: i
+        }
+      });
+    }
+
+    s = EvaluationChecklistItemSection.SUPPLEMENTAL;
+    iterations = getRandomInt(8);
+    for (let i = 0; i < iterations; ++i) {
+      await prisma.evaluationChecklistItem.create({
+        data: {
+          projectId: project.id,
+          section: s,
+          label: getRandomGoal(),
+          order: i
+        }
+      });
+    }
+  }
   
-  // 5. Demo project: dogfooding this planner to build the actual 42 subject.
+  // 6. Demo project: dogfooding this planner to build the actual 42 subject.
   // A separate section rather than folded into the generic loops above -
   // this project's Discovery/Kanban content is specific to it (pulled from
   // the real subject, en.subject.pdf v21.1), not the same placeholder

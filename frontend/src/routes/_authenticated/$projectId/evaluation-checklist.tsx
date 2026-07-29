@@ -136,6 +136,17 @@ const CATEGORY_STYLE: Record<
 > = {
   [EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY]: {
     icon: HiOutlineShieldCheck,
+    iconBg: "bg-brand-500/15",
+    iconText: "text-brand-500",
+    barBg: "bg-brand-500",
+    addButtonHover:
+      "hover:border-brand-500 hover:text-brand-500 dark:hover:border-brand-500 dark:hover:text-brand-500",
+    inputBorder: "hover:border-brand-500 dark:hover:border-brand-500",
+    checkedColor: "!text-brand-500 dark:!text-brand-500",
+    borderColor: "border-brand-500 dark:border-brand-500",
+  },
+  [EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS]: {
+    icon: HiOutlineGift,
     iconBg: "bg-status-in-progress/15",
     iconText: "text-status-in-progress",
     barBg: "bg-status-in-progress",
@@ -145,17 +156,6 @@ const CATEGORY_STYLE: Record<
       "hover:border-status-in-progress dark:hover:border-status-in-progress",
     checkedColor: "!text-status-in-progress dark:!text-status-in-progress",
     borderColor: "border-status-in-progress dark:border-status-in-progress",
-  },
-  [EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS]: {
-    icon: HiOutlineGift,
-    iconBg: "bg-brand-500/15",
-    iconText: "text-brand-500",
-    barBg: "bg-brand-500",
-    addButtonHover:
-      "hover:border-brand-500 hover:text-brand-500 dark:hover:border-brand-500 dark:hover:text-brand-500",
-    inputBorder: "hover:border-brand-500 dark:hover:border-brand-500",
-    checkedColor: "!text-brand-500 dark:!text-brand-500",
-    borderColor: "border-brand-500 dark:border-brand-500",
   },
   [EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL]: {
     icon: FaRegStar,
@@ -402,6 +402,28 @@ function EvaluationChecklistPage() {
               .iconText
           : "text-text-secondary";
 
+  // Overall progress bar: solid mandatory color up to 100%, bonus color from
+  // 100% to 125%, supplemental color beyond that - same tiers as
+  // readinessLabel/readinessColor above, just applied to the fill itself
+  // instead of the badge.
+  const overallBarBg =
+    totalProgress.percent > READINESS_THRESHOLD.SUPER_READY
+      ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL].barBg
+      : totalProgress.percent > READINESS_THRESHOLD.READY
+        ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS].barBg
+        : CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY].barBg;
+
+  // Same tiers as overallBarBg, applied to the "X / Y — Z%" stat text next to
+  // the "Overall progress" heading so it always matches the bar's color.
+  const overallTextColor =
+    totalProgress.percent > READINESS_THRESHOLD.SUPER_READY
+      ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL]
+          .iconText
+      : totalProgress.percent > READINESS_THRESHOLD.READY
+        ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS].iconText
+        : CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY]
+            .iconText;
+
   return (
     <div className="w-full space-y-6">
       <section className="flex flex-wrap items-center justify-between gap-4">
@@ -410,7 +432,10 @@ function EvaluationChecklistPage() {
           before the correction.
         </p>
         <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-sm font-medium">
-          <HiOutlineShieldCheck className={`h-5 w-5 ${readinessColor}`} />
+          <HiOutlineShieldCheck
+            aria-hidden="true"
+            className={`h-5 w-5 ${readinessColor}`}
+          />
           <span className={readinessColor}>{readinessLabel}</span>
         </div>
       </section>
@@ -426,20 +451,20 @@ function EvaluationChecklistPage() {
             Overall progress
           </h2>
           <span className="text-sm">
-            <span className="font-bold text-brand-500">
+            <span className={`font-bold ${overallTextColor}`}>
               {totalProgress.currentValue}
             </span>
             <span className="text-text-secondary">
               {" "}
               / {totalProgress.completeAt} —{" "}
             </span>
-            <span className="font-bold text-brand-500">
+            <span className={`font-bold ${overallTextColor}`}>
               {totalProgress.percent}%
             </span>
           </span>
         </div>
         <div
-          className="h-2 w-full rounded-full bg-surface-overlay"
+          className="relative h-2 w-full rounded-full bg-surface-overlay"
           role="progressbar"
           aria-valuenow={totalProgress.percent}
           aria-valuemin={0}
@@ -447,15 +472,45 @@ function EvaluationChecklistPage() {
           aria-labelledby="overall-progress-heading"
         >
           <div
-            className="h-2 rounded-full bg-brand-500"
+            className={`h-2 rounded-full transition-colors ${overallBarBg}`}
             style={{
               width: `${Math.min((totalProgress.percent / READINESS_THRESHOLD.EXTRA_READY) * 100, 100)}%`,
             }}
           />
+          {/* Tick marks for the 100/125% readiness thresholds only - 150% gets
+          a label below but no tick line here, it's the bar's own max, not an
+          in-between mark. Plain UI gray, they don't track which category is
+          currently active (the fill color already does that). Their labels
+          live in the row below instead of right under the tick, so they line
+          up with "Defense day". */}
+          {[READINESS_THRESHOLD.READY, READINESS_THRESHOLD.SUPER_READY].map(
+            (threshold) => (
+              <div
+                key={threshold}
+                className="absolute top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-text-muted/60"
+                style={{
+                  left: `${(threshold / READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
+                }}
+              />
+            )
+          )}
         </div>
-        <div className="mt-2 flex items-center justify-between text-xs text-text-muted">
-          <span>{totalProgress.percent}%</span>
-          <span>Defense day</span>
+        <div className="relative mt-2 flex items-center justify-between text-xs text-text-muted">
+          {[
+            READINESS_THRESHOLD.READY,
+            READINESS_THRESHOLD.SUPER_READY,
+            READINESS_THRESHOLD.EXTRA_READY,
+          ].map((threshold) => (
+            <span
+              key={threshold}
+              className="absolute -translate-x-1/2 text-text-muted/70"
+              style={{
+                left: `${(threshold / READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
+              }}
+            >
+              {threshold}%
+            </span>
+          ))}
         </div>
       </section>
       <div className="space-y-4">
@@ -503,7 +558,10 @@ function EvaluationChecklistPage() {
                         <span
                           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${style.iconBg}`}
                         >
-                          <style.icon className={`h-5 w-5 ${style.iconText}`} />
+                          <style.icon
+                            aria-hidden="true"
+                            className={`h-5 w-5 ${style.iconText}`}
+                          />
                         </span>
                         <span className="text-left">
                           <span className="block font-mono text-base font-semibold text-text-primary">
@@ -516,7 +574,14 @@ function EvaluationChecklistPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="h-1.5 w-24 rounded-full bg-surface-overlay">
+                        <div
+                          className="h-1.5 w-24 rounded-full bg-surface-overlay"
+                          role="progressbar"
+                          aria-valuenow={categoryPercent}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={`${item.title} progress`}
+                        >
                           <div
                             className={`h-1.5 rounded-full ${style.barBg}`}
                             style={{ width: `${categoryPercent}%` }}
@@ -530,95 +595,102 @@ function EvaluationChecklistPage() {
                   </AccordionTitle>
 
                   <AccordionContent>
-                    {item.contents.map((c) => {
-                      // Only fires the PATCH if the label actually changed
-                      // and isn't blank - either way, exits edit mode.
-                      function commitLabel(newValue: string) {
-                        if (newValue.trim().length && newValue !== c.label) {
-                          handleUpdate(c.id, { label: newValue });
+                    <ul>
+                      {item.contents.map((c) => {
+                        // Only fires the PATCH if the label actually changed
+                        // and isn't blank - either way, exits edit mode.
+                        function commitLabel(newValue: string) {
+                          if (newValue.trim().length && newValue !== c.label) {
+                            handleUpdate(c.id, { label: newValue });
+                          }
+                          setEditingId(null);
                         }
-                        setEditingId(null);
-                      }
 
-                      return (
-                        <div
-                          key={c.id}
-                          className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border"
-                        >
-                          {/* checked:bg-current uses this text color as the
+                        return (
+                          <li
+                            key={c.id}
+                            className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border"
+                          >
+                            {/* checked:bg-current uses this text color as the
                           checkmark fill. */}
-                          <Checkbox
-                            className={style.checkedColor}
-                            checked={c.isChecked}
-                            onChange={() =>
-                              handleUpdate(c.id, { isChecked: !c.isChecked })
-                            }
-                          />
+                            <Checkbox
+                              className={style.checkedColor}
+                              aria-label={c.label}
+                              checked={c.isChecked}
+                              onChange={() =>
+                                handleUpdate(c.id, { isChecked: !c.isChecked })
+                              }
+                            />
 
-                          {/* This edits the text:
+                            {/* This edits the text:
                             - cancel on ESCAPE
                             - commit new text on ENTER or click out of the box                    */}
-                          {editingId === c.id ? (
-                            <TextInput
-                              maxLength={
-                                EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-                              }
-                              className="w-full px-2 text-sm"
-                              defaultValue={c.label}
-                              autoFocus
-                              onBlur={(e) => {
-                                if (
-                                  e.currentTarget.value.length <=
+                            {editingId === c.id ? (
+                              <TextInput
+                                maxLength={
                                   EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-                                )
-                                  commitLabel(e.currentTarget.value);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
+                                }
+                                className="w-full px-2 text-sm"
+                                aria-label={`Edit "${c.label}"`}
+                                defaultValue={c.label}
+                                autoFocus
+                                onBlur={(e) => {
                                   if (
                                     e.currentTarget.value.length <=
                                     EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
                                   )
                                     commitLabel(e.currentTarget.value);
-                                }
-                                if (e.key === "Escape") {
-                                  setEditingId(null);
-                                }
-                              }}
-                            />
-                          ) : (
-                            <p
-                              className="w-full px-2 text-sm"
-                              role="button"
-                              tabIndex={0}
-                              aria-label={`Edit "${c.label}"`}
-                              onDoubleClick={() => setEditingId(c.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  setEditingId(c.id);
-                                }
-                              }}
-                            >
-                              {c.label}
-                            </p>
-                          )}
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    if (
+                                      e.currentTarget.value.length <=
+                                      EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
+                                    )
+                                      commitLabel(e.currentTarget.value);
+                                  }
+                                  if (e.key === "Escape") {
+                                    setEditingId(null);
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                className="w-full min-w-0 wrap-break-word px-2 text-left text-sm"
+                                aria-label={`Edit "${c.label}"`}
+                                onDoubleClick={() => setEditingId(c.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setEditingId(c.id);
+                                  }
+                                }}
+                              >
+                                {c.label}
+                              </button>
+                            )}
 
-                          <button
-                            type="button"
-                            className="opacity-0 transition-opacity group-hover:opacity-50 group-focus-within:opacity-50 focus:opacity-100"
-                            aria-label={`Delete "${c.label}"`}
-                            onClick={() => handleDelete(c.id)}
-                          >
-                            <RiDeleteBackFill className="h-5 w-5" />
-                          </button>
-                        </div>
-                      );
-                    })}
+                            <button
+                              type="button"
+                              className="opacity-0 transition-opacity group-hover:opacity-50 group-focus-within:opacity-50 focus:opacity-100"
+                              aria-label={`Delete "${c.label}"`}
+                              onClick={() => handleDelete(c.id)}
+                            >
+                              <RiDeleteBackFill
+                                aria-hidden="true"
+                                className="h-5 w-5"
+                              />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
                     <div className="mt-5 flex items-center gap-3">
                       <TextInput
                         className="flex-1"
                         type="text"
+                        aria-label={`Add a defense checkpoint to ${item.title}`}
                         placeholder={
                           isCategoryFull
                             ? `Limit of ${EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY} items reached`
@@ -649,7 +721,7 @@ function EvaluationChecklistPage() {
                         }
                         onClick={addChecklistItem}
                       >
-                        <HiPlus className="mr-1 h-4 w-4" />
+                        <HiPlus aria-hidden="true" className="mr-1 h-4 w-4" />
                         Add
                       </Button>
                     </div>
@@ -669,7 +741,10 @@ function EvaluationChecklistPage() {
             key={item.title}
             className="flex items-start gap-2 rounded-lg border border-surface-border bg-surface-raised p-4 text-sm text-text-secondary"
           >
-            <FaRegStar className="mt-0.5 h-4 w-4 shrink-0 text-status-review" />
+            <FaRegStar
+              aria-hidden="true"
+              className="mt-0.5 h-4 w-4 shrink-0 text-status-review"
+            />
             <p>
               <span className="font-semibold text-text-primary">
                 {item.title}

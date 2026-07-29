@@ -8,11 +8,9 @@
 
 import { PartialType, OmitType } from "@nestjs/mapped-types";
 import {
-  IsInt,
   IsBoolean,
   IsString,
   IsOptional,
-  Min,
   MinLength,
   MaxLength,
 } from "class-validator";
@@ -38,11 +36,4 @@ export class UpdateEvaluationChecklistItemDto extends PartialType(
   @IsOptional()
   @IsBoolean()
   isChecked?: boolean;
-
-  // Reorder within the same section (drag-and-drop) - see the note above on
-  // why section itself can't change alongside it.
-  @IsOptional()
-  @Min(0)
-  @IsInt()
-  order?: number;
 }
