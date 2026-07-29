@@ -10,7 +10,6 @@
 import {
   createFileRoute,
   useLoaderData,
-  useRouter,
   useNavigate,
 } from "@tanstack/react-router";
 import {
@@ -19,6 +18,7 @@ import {
 } from "@/components/projects/NewProjectCard";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { createProject, deleteProject, type Project } from "@/lib/projectsApi";
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 
 export const Route = createFileRoute("/_authenticated/projects")({
@@ -31,8 +31,8 @@ function ProjectsPage() {
   // reused here instead of inventing ids, so every card's link resolves to
   // a real project (see ProjectRow in components/navigation/SideBarCmp.tsx).
   const projects = useLoaderData({ from: "/_authenticated" });
-  const router = useRouter();
   const navigate = useNavigate();
+  const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
   async function handleCreateProject(values: NewProjectFormValues) {
@@ -41,25 +41,25 @@ function ProjectsPage() {
       // The list this page (and the sidebar) reads comes from the
       // /_authenticated loader, cached by the router - invalidate() re-runs
       // it so the new project shows up without a full page reload.
-      await router.invalidate();
       showToast({ type: "success", message: "Project created" });
-      return true;
     } catch (error) {
       showToast({ type: "error", message: errorMessage(error) });
       return false;
     }
+    await safeInvalidateRouter();
+    return true;
   }
 
   async function handleDeleteProject(project: Project) {
     try {
       await deleteProject(project.id);
-      await router.invalidate();
       showToast({ type: "success", message: "Project deleted" });
-      return true;
     } catch (error) {
       showToast({ type: "error", message: errorMessage(error) });
       return false;
     }
+    await safeInvalidateRouter();
+    return true;
   }
 
   return (

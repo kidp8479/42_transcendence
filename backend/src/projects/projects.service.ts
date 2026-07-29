@@ -8,10 +8,50 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { Prisma, ProjectMember } from "@prisma/client";
+import {
+  Prisma,
+  ProjectMember,
+  EvaluationChecklistItemSection,
+} from "@prisma/client";
 import { maxProjectsPerUser } from "./projects.constants";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
+
+// Mirrors the weighted, gated score computed client-side in
+// evaluation-checklist.tsx (totalProgress.percent / READINESS_THRESHOLD /
+// CATEGORY_WEIGHT) - kept in sync manually since backend and frontend don't
+// share a package. Mandatory alone carries the first 100 points; Bonus only
+// counts (+25) once Mandatory is fully done, Supplemental only counts (+25)
+// once Bonus is too - so the raw score tops out at 150. Capped to 100 here
+// because ProjectCard's progress bar (aria-valuemax=100, uncapped width%)
+// isn't built to display past 100%, unlike the checklist page's own bar.
+function computeProjectProgress(
+  items: { section: EvaluationChecklistItemSection; isChecked: boolean }[]
+): number {
+  function sectionPercent(section: EvaluationChecklistItemSection): number {
+    const sectionItems = items.filter((item) => item.section === section);
+    if (sectionItems.length === 0) {
+      return 0;
+    }
+    const checked = sectionItems.filter((item) => item.isChecked).length;
+    return Math.round((checked / sectionItems.length) * 100);
+  }
+
+  const mandatoryPercent = sectionPercent("MANDATORY");
+  const bonusPercent = sectionPercent("BONUS");
+  const supplementalPercent = sectionPercent("SUPPLEMENTAL");
+  const mandatoryComplete = mandatoryPercent >= 100;
+  const bonusComplete = bonusPercent >= 100;
+
+  let overallPercent = mandatoryPercent;
+  if (mandatoryComplete) {
+    overallPercent += (bonusPercent / 100) * 25;
+    if (bonusComplete) {
+      overallPercent += (supplementalPercent / 100) * 25;
+    }
+  }
+  return Math.min(Math.round(overallPercent), 100);
+}
 
 @Injectable()
 export class ProjectsService {
@@ -53,7 +93,7 @@ export class ProjectsService {
           select: { role: true },
         },
         evaluationChecklistItems: {
-          select: { isChecked: true },
+          select: { section: true, isChecked: true },
         },
         _count: {
           select: { members: true },
@@ -62,18 +102,12 @@ export class ProjectsService {
     });
 
     return projects.map(
-      ({ members, evaluationChecklistItems, _count, ...project }) => {
-        const total = evaluationChecklistItems.length;
-        const validated = evaluationChecklistItems.filter(
-          (i) => i.isChecked
-        ).length;
-        return {
-          ...project,
-          role: members[0].role,
-          progress: total === 0 ? 0 : Math.round((validated / total) * 100),
-          memberCount: _count.members,
-        };
-      }
+      ({ members, evaluationChecklistItems, _count, ...project }) => ({
+        ...project,
+        role: members[0].role,
+        progress: computeProjectProgress(evaluationChecklistItems),
+        memberCount: _count.members,
+      })
     );
   }
 
@@ -88,7 +122,7 @@ export class ProjectsService {
       where: { id },
       include: {
         evaluationChecklistItems: {
-          select: { isChecked: true },
+          select: { section: true, isChecked: true },
         },
         _count: {
           select: { members: true },
@@ -100,14 +134,10 @@ export class ProjectsService {
     }
 
     const { evaluationChecklistItems, _count, ...rest } = project;
-    const total = evaluationChecklistItems.length;
-    const validated = evaluationChecklistItems.filter(
-      (i: { isChecked: boolean }) => i.isChecked
-    ).length;
     return {
       ...rest,
       role: member.role,
-      progress: total === 0 ? 0 : Math.round((validated / total) * 100),
+      progress: computeProjectProgress(evaluationChecklistItems),
       memberCount: _count.members,
     };
   }
@@ -188,7 +218,7 @@ export class ProjectsService {
           select: { role: true },
         },
         evaluationChecklistItems: {
-          select: { isChecked: true },
+          select: { section: true, isChecked: true },
         },
         _count: {
           select: { members: true },
@@ -200,14 +230,10 @@ export class ProjectsService {
     }
 
     const { members, evaluationChecklistItems, _count, ...rest } = project;
-    const total = evaluationChecklistItems.length;
-    const validated = evaluationChecklistItems.filter(
-      (item) => item.isChecked
-    ).length;
     return {
       ...rest,
       role: members[0].role,
-      progress: total === 0 ? 0 : Math.round((validated / total) * 100),
+      progress: computeProjectProgress(evaluationChecklistItems),
       memberCount: _count.members,
     };
   }
