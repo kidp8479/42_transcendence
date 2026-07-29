@@ -90,6 +90,7 @@ components:
       - execute the Google OIDC authorization-code flow with PKCE and nonce
       - normalize and link external identities
       - create, rotate, introspect, and revoke browser sessions
+      - require active accounts for local login and session introspection
       - issue and validate CSRF tokens
       - hash local passwords and one-time tokens
       - emit authentication audit events
@@ -246,6 +247,7 @@ security_requirements:
   - store-only-sha256-hashes-of-session-and-one-time-tokens
   - use-constant-time-secret-comparisons
   - revoke-all-sessions-after-password-reset
+  - require-active-account-for-local-login-and-session-introspection
   - rotate-session-after-account-link-or-assurance-change
   - reject-unverified-email-for-automatic-linking
   - apply-object-level-authorization-to-every-project-resource

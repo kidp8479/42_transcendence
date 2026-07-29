@@ -2,7 +2,7 @@
 
 **Status:** Accepted target architecture
 **Scope:** ft_transcendence local credentials, 42 OAuth2, Google OIDC, browser/API authentication, authorization, WebSockets, and secret management.
-**Implementation status:** 7.1 (Vault and runtime secrets) is delivered. 7.2 persistence is partially delivered; TR-80 / 7.2.1 next enforces `ACTIVE` account status in the current local-login and opaque-session path. It is the first safety slice of target Phase 1 (account and authorization data model). The JWT/refresh cutover begins only after the remaining 7.2 runtime invariants are complete.
+**Implementation status:** 7.1 (Vault and runtime secrets) is delivered. 7.2 persistence is partially delivered; TR-80 / 7.2.1 is in progress to enforce `ACTIVE` account status in the current local-login and opaque-session path. It is the first safety slice of target Phase 1 (account and authorization data model). The JWT/refresh cutover begins only after the remaining 7.2 runtime invariants are complete.
 
 > This is the approved target architecture. `docs/architecture/authentication-authorization.yaml` and `docs/contracts/auth-service.openapi.yaml` remain the current opaque-session runtime contracts until the JWT/refresh cutover. Any interim change to the opaque path, including TR-80, must update the relevant legacy contract in its implementation PR rather than replacing it with this target design early.
 

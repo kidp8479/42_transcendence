@@ -22,6 +22,14 @@ var (
 	ErrNotFound = errors.New("auth record not found")
 )
 
+type AccountStatus string
+
+const (
+	AccountStatusActive          AccountStatus = "ACTIVE"
+	AccountStatusPendingApproval AccountStatus = "PENDING_APPROVAL"
+	AccountStatusDisabled        AccountStatus = "DISABLED"
+)
+
 type Store struct {
 	pool atomic.Pointer[pgxpool.Pool]
 }
@@ -33,6 +41,8 @@ type User struct {
 	Username      string  `json:"username"`
 	AvatarURL     *string `json:"avatarUrl"`
 	Campus        *string `json:"campus"`
+	// Status controls authentication eligibility and is not profile response data.
+	Status AccountStatus `json:"-"`
 }
 
 type LocalCredential struct {
@@ -91,6 +101,7 @@ func (s *Store) CreateLocalAccount(
 		ID:       uuid.NewString(),
 		Email:    email,
 		Username: username,
+		Status:   AccountStatusActive,
 	}
 	identityID := uuid.NewString()
 	credentialID := uuid.NewString()
@@ -154,6 +165,7 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 			u."username",
 			u."avatarUrl",
 			u."campus",
+			u."status"::text,
 			pc."passwordHash"
 		 FROM "AuthIdentity" ai
 		 JOIN "User" u ON u."id" = ai."userId"
@@ -168,6 +180,7 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 		&credential.Username,
 		&credential.AvatarURL,
 		&credential.Campus,
+		&credential.Status,
 		&credential.PasswordHash,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -260,6 +273,7 @@ func (s *Store) IntrospectSession(
 		   AND s."revokedAt" IS NULL
 		   AND s."idleExpiresAt" > CURRENT_TIMESTAMP
 		   AND s."absoluteExpiresAt" > CURRENT_TIMESTAMP
+		   AND u."status" = CAST('ACTIVE' AS "AccountStatus")
 		 RETURNING
 			s."id",
 			u."id",
@@ -268,6 +282,7 @@ func (s *Store) IntrospectSession(
 			u."username",
 			u."avatarUrl",
 			u."campus",
+			u."status"::text,
 			s."authenticationMethod"::text,
 			s."assuranceLevel",
 			s."authenticatedAt",
@@ -284,6 +299,7 @@ func (s *Store) IntrospectSession(
 		&session.User.Username,
 		&session.User.AvatarURL,
 		&session.User.Campus,
+		&session.User.Status,
 		&session.AuthenticationMethod,
 		&session.AssuranceLevel,
 		&session.AuthenticatedAt,

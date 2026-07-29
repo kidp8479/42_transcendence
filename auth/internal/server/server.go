@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -34,7 +35,7 @@ var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{3,32}$`)
 
 type Server struct {
 	cfg                 config.Config
-	store               *store.Store
+	store               authStore
 	passwords           *password.Hasher
 	registerIPLimiter   *middleware.FixedWindowLimiter
 	loginIPLimiter      *middleware.FixedWindowLimiter
@@ -42,6 +43,15 @@ type Server struct {
 	passwordSlots       chan struct{}
 	decoyPasswordHash   string
 	ready               func() bool
+}
+
+type authStore interface {
+	CreateLocalAccount(context.Context, string, string, string) (store.User, error)
+	FindLocalCredential(context.Context, string) (store.LocalCredential, error)
+	CreateSession(context.Context, store.User, string, time.Duration, time.Duration, *string, *string) (store.CreatedSession, error)
+	IntrospectSession(context.Context, string, time.Duration) (store.Session, error)
+	RevokeSession(context.Context, string) error
+	RecordEvent(context.Context, *string, string, *string, *string, *string) error
 }
 
 type registerRequest struct {
@@ -253,7 +263,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Internal Server Error", "login could not be completed")
 		return
 	}
-	if !found || !valid {
+	if !found || !valid || credential.Status != store.AccountStatusActive {
 		var userID *string
 		if found {
 			userID = &credential.ID
@@ -297,6 +307,11 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Internal Server Error", "logout could not be completed")
 		return
 	}
+	if session.User.Status != store.AccountStatusActive {
+		s.clearSessionCookies(w)
+		writeError(w, http.StatusUnauthorized, "Unauthorized", "active session required")
+		return
+	}
 	if !store.VerifyTokenHash(csrfToken, session.CSRFTokenHash) {
 		writeError(w, http.StatusForbidden, "Forbidden", "CSRF validation failed")
 		return
@@ -329,6 +344,11 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("get session: %v", err)
 		writeError(w, http.StatusInternalServerError, "Internal Server Error", "session could not be loaded")
+		return
+	}
+	if session.User.Status != store.AccountStatusActive {
+		s.clearSessionCookies(w)
+		writeError(w, http.StatusUnauthorized, "Unauthorized", "active session required")
 		return
 	}
 	if !store.VerifyTokenHash(csrfToken, session.CSRFTokenHash) {
@@ -387,6 +407,16 @@ func (s *Server) handleIntrospect(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("internal session introspection: %v", err)
 		writeError(w, http.StatusInternalServerError, "Internal Server Error", "session could not be introspected")
+		return
+	}
+	if session.User.Status != store.AccountStatusActive {
+		writeErrorCode(
+			w,
+			http.StatusUnauthorized,
+			"Unauthorized",
+			"session is inactive",
+			"SESSION_INACTIVE",
+		)
 		return
 	}
 
