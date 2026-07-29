@@ -8,19 +8,22 @@ import { useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import {
   Button,
+  Datepicker,
   Dropdown,
   DropdownItem,
   Label,
   TextInput,
   Textarea,
+  WeekStart,
 } from "flowbite-react";
 import { HiChevronDown, HiOutlineTrash } from "react-icons/hi";
 import {
+  darkDatepickerTheme,
+  darkDatepickerThemeAlignRight,
   darkDropdownTheme,
   darkSurfaceFieldClassName,
   darkSurfaceTextInputTheme,
 } from "@/lib/flowbite";
-import { DateInput } from "@/components/project/calendar/DateInput";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import type { CalendarCategory } from "@/lib/calendarCategoriesApi";
 import {
@@ -219,14 +222,20 @@ export function EventForm({
           >
             Start date
           </Label>
-          <DateInput
+          <Datepicker
             id="event-start-date"
-            value={startDate}
-            onChange={setStartDate}
-            className={
-              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
-              darkSurfaceFieldClassName
-            }
+            weekStart={WeekStart.Monday}
+            value={dayjs(startDate).toDate()}
+            onChange={(date) => {
+              if (date) {
+                setStartDate(dayjs(date).format("YYYY-MM-DD"));
+              }
+            }}
+            theme={{
+              ...darkDatepickerTheme,
+              root: { input: darkSurfaceTextInputTheme },
+            }}
+            className="mt-1"
           />
         </div>
         <div>
@@ -236,14 +245,20 @@ export function EventForm({
           >
             End date
           </Label>
-          <DateInput
+          <Datepicker
             id="event-end-date"
-            value={endDate}
-            onChange={setEndDate}
-            className={
-              "mt-1 block w-full rounded-lg border p-2.5 text-sm " +
-              darkSurfaceFieldClassName
-            }
+            weekStart={WeekStart.Monday}
+            value={dayjs(endDate).toDate()}
+            onChange={(date) => {
+              if (date) {
+                setEndDate(dayjs(date).format("YYYY-MM-DD"));
+              }
+            }}
+            theme={{
+              ...darkDatepickerThemeAlignRight,
+              root: { input: darkSurfaceTextInputTheme },
+            }}
+            className="mt-1"
           />
         </div>
         <div>
