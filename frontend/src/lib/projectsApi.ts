@@ -14,7 +14,7 @@ export interface Project {
   // handle null rather than assume every project has one.
   description: string | null;
   deadline: string | null;
-  role: "ADMIN" | "MEMBER"; // the role of the authenticated user in this project
+  role: "OWNER" | "ADMIN" | "MEMBER"; // the role of the authenticated user in this project
   // 0-100, computed backend-side from EvaluationChecklistItem.isChecked.
   progress: number;
   // count of ProjectMember rows for this project.
@@ -98,7 +98,7 @@ function isProjectStatus(value: unknown): value is ProjectStatus {
 }
 
 function isProjectMemberRole(value: unknown): value is Project["role"] {
-  return value === "ADMIN" || value === "MEMBER";
+  return value === "OWNER" || value === "ADMIN" || value === "MEMBER";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -158,11 +158,11 @@ async function main() {
         description: p.description,
         status: p.status,
         members: {
-          // first member of each project = ADMIN (arbitrary "creator" convention for seed
-          // data only - real assignment logic belongs in ProjectsService.create, not written yet)
+          // first member of each project = OWNER (arbitrary "creator" convention for seed
+          // data only, matching ProjectsService.create's creator assignment)
           create: p.members.map((u, index) => ({
             userId: u.id,
-            role: index === 0 ? ProjectMemberRole.ADMIN : ProjectMemberRole.MEMBER,
+            role: index === 0 ? ProjectMemberRole.OWNER : ProjectMemberRole.MEMBER,
           })),
         },
       },
@@ -319,7 +319,7 @@ async function main() {
         create: demoTeamUsers.map((u, index) => ({
           userId: u.id,
           role:
-            index === 0 ? ProjectMemberRole.ADMIN : ProjectMemberRole.MEMBER,
+            index === 0 ? ProjectMemberRole.OWNER : ProjectMemberRole.MEMBER,
         })),
       },
     },

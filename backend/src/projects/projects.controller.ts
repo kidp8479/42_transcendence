@@ -43,13 +43,13 @@ export class ProjectsController {
     return this.projectsService.findById(id, request.user.id);
   }
 
-  // POST /api/projects => create a project; the caller becomes its first member (ADMIN)
+  // POST /api/projects => create a project; the caller becomes its first member (OWNER)
   @Post()
   create(@Body() dto: CreateProjectDto, @Req() request: AuthenticatedRequest) {
     return this.projectsService.create(dto, request.user.id);
   }
 
-  // DELETE /api/projects/:id => ADMIN-only (enforced in ProjectsService.remove)
+  // DELETE /api/projects/:id => OWNER/ADMIN-only (enforced in ProjectsService.remove)
   // 204 No Content: nothing to return once the project (and its cascaded rows) is gone.
   @Delete(":id")
   @HttpCode(204)
@@ -60,7 +60,7 @@ export class ProjectsController {
     return this.projectsService.remove(id, request.user.id);
   }
 
-  // PATCH /api/projects/:id => ADMIN-only (enforced in ProjectsService.update)
+  // PATCH /api/projects/:id => OWNER/ADMIN-only (enforced in ProjectsService.update)
   @Patch(":id")
   update(
     @Param("id", ParseUUIDPipe) id: string,

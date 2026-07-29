@@ -81,7 +81,9 @@ function ProjectsPage() {
                 ...project,
                 description: project.description ?? "No description yet.",
               }}
-              canManageProject={project.role === "ADMIN"}
+              canManageProject={
+                project.role === "OWNER" || project.role === "ADMIN"
+              }
               onManageMembers={() =>
                 navigate({
                   to: "/$projectId/project-settings",

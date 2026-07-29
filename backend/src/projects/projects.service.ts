@@ -21,7 +21,7 @@ export class ProjectsService {
   // "is userId allowed to access projectId" (discovery-blocks, tasks, calendar-events, etc.)
   // instead of each module writing its own membership query.
   // Returns the ProjectMember row itself (not void) so callers who need the role later
-  // (ex: only ADMIN can delete/update, see remove/update below) can read `.role` off
+  // (ex: only OWNER/ADMIN can delete/update, see remove/update below) can read `.role` off
   // it without this method's signature ever having to change.
   // Always throws NotFoundException (never Forbidden) whether the project doesn't exist
   // or userId just isn't a member of it - deliberately not revealing which, to avoid
@@ -134,7 +134,7 @@ export class ProjectsService {
             members: {
               create: {
                 userId,
-                role: "ADMIN",
+                role: "OWNER",
               },
             },
           },
@@ -146,13 +146,13 @@ export class ProjectsService {
   }
 
   // NOTE ON ROLES: deleting the project is a team-affecting, hard-to-undo action -
-  // decided with the team (see TR-66) that this needs an ADMIN check, unlike most
+  // decided with the team (see TR-66) that this needs an OWNER/ADMIN check, unlike most
   // other modules where any member can act freely (tasks, discovery blocks, etc.).
   async remove(id: string, userId: string) {
     const member = await this.assertMembership(id, userId);
-    if (member.role !== "ADMIN") {
+    if (member.role !== "OWNER" && member.role !== "ADMIN") {
       throw new ForbiddenException(
-        "Only the project admin can delete this project"
+        "Only the project owner or admin can delete this project"
       );
     }
 
@@ -165,9 +165,9 @@ export class ProjectsService {
 
   async update(id: string, dto: UpdateProjectDto, userId: string) {
     const member = await this.assertMembership(id, userId);
-    if (member.role !== "ADMIN") {
+    if (member.role !== "OWNER" && member.role !== "ADMIN") {
       throw new ForbiddenException(
-        "Only the project admin can update this project"
+        "Only the project owner or admin can update this project"
       );
     }
 
