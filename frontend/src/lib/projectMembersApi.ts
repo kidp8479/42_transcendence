@@ -18,7 +18,7 @@ export interface ProjectMember {
   id: string;
   userId: string;
   projectId: string;
-  role: "ADMIN" | "MEMBER";
+  role: "ADMIN" | "MEMBER" | "OWNER";
   user: {
     id: string;
     username: string;
@@ -81,7 +81,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isProjectMemberRole(value: unknown): value is ProjectMember["role"] {
-  return value === "ADMIN" || value === "MEMBER";
+  return value === "ADMIN" || value === "MEMBER" || value === "OWNER";
 }
 
 // POST   /api/projects/:projectId/members
