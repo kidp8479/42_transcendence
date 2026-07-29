@@ -16,3 +16,10 @@ and open `http://127.0.0.1:5173/`, but use it as a frontend-only convenience loo
 - Prefer `make up`, `make ps`, and service logs when checking the integrated stack.
 - Use `cd frontend && npm run build` to validate frontend TypeScript and Vite changes.
 - Keep changes scoped and avoid resetting Docker volumes unless the user explicitly asks for a clean reset.
+
+## Git workflow
+
+- Begin work from current `main`: `git checkout main` followed by `git pull --ff-only origin main`.
+- Name branches `feature/<TR-KEY>-<short-kebab-description>` for features. Use `bugfix/`, `hotfix/`, or `chore/` only when they better describe the work.
+- Use Conventional Commits: `<type>[optional scope]: <concise description>`. Use `feat` and `fix` primarily; use `docs`, `style`, `refactor`, `test`, or `chore` when appropriate. Include the Task Rabbit key as the scope when one exists, for example `docs(TR-80): document account-status enforcement`.
+- Never add a `Co-authored-by: Copilot` trailer to a commit.

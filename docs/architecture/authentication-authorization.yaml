@@ -1,3 +1,6 @@
+# Current opaque-session runtime contract. The approved staged target architecture is
+# documented in authentication-authorization.md; keep this file current until its
+# JWT/refresh cutover replaces these runtime semantics.
 schema_version: "1.0"
 status: accepted
 last_updated: "2026-07-13"
