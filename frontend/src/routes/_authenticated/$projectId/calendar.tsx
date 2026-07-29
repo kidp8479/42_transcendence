@@ -23,10 +23,7 @@ import {
   listCalendarCategories,
   type CalendarCategory,
 } from "@/lib/calendarCategoriesApi";
-import {
-  listProjectMembers,
-  type ProjectMember,
-} from "@/lib/projectMembersApi";
+import { getMembers, type ProjectMember } from "@/lib/projectMembersApi";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 
@@ -41,7 +38,7 @@ async function loadCalendarPageData(
 ): Promise<CalendarPageData> {
   const events = await listCalendarEvents(projectId);
   const categories = await listCalendarCategories(projectId);
-  const members = await listProjectMembers(projectId);
+  const members = await getMembers(projectId);
   return { events: events, categories: categories, members: members };
 }
 
