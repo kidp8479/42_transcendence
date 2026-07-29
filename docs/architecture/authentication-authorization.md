@@ -55,18 +55,14 @@
 ### 3.1 Local registration
 
 1. Browser submits email, username, and password through the shared frontend `apiClient`.
-2. Go validates exact Origin, input size, campus-domain eligibility, username, password policy, and registration rate limits.
-3. Go normalizes the email and checks the hard-coded initial campus allowlist:
-   - `student.42.fr`
-   - `student.42london.com`
-   - `student.42belgium.be`
-   - `student.42heilbronn.de`
-4. Go creates `User` with `ACTIVE` status, `LOCAL` identity, and Argon2id password credential transactionally.
-5. Local email verification is deferred. Eligible local accounts receive full initial access, including project creation and joining.
+2. Go validates exact Origin, input size, username, password policy, and registration rate limits.
+3. Go creates `User` with `ACTIVE` status, `LOCAL` identity, and Argon2id password credential transactionally. Seeded users use this same registration path and therefore receive the same status.
+4. Local email verification is deferred. Until that milestone, local accounts receive full initial access, including project creation and joining.
+5. When email verification is introduced, an account becomes `ACTIVE` only after the email is confirmed and either its domain is on the campus allowlist or a `PLATFORM_ADMIN` activates it. Until then, `PENDING_APPROVAL` is expected only for Google OIDC identities; `DISABLED` denies every provider.
 6. Go creates a refresh-token family, CSRF token, and 15-minute access JWT. It sets the refresh and CSRF cookies and returns the access JWT only in the response body.
 7. The frontend keeps the access JWT only in memory.
 
-**Tradeoff:** allowing unverified but allowlisted local accounts makes first use simple, but accepts the risk that a registrant may not control the supplied mailbox until the verification milestone.
+**Tradeoff:** allowing all local registrations to start active makes first use and local seeding simple, but accepts the risk that a registrant may not control the supplied mailbox until the verification milestone.
 
 ### 3.2 Local login
 
@@ -99,11 +95,11 @@
 
 1. Go reads trusted OIDC endpoints from Google discovery and creates a single-use 15-minute transaction with random state, PKCE S256 verifier/challenge, and nonce.
 2. It requests `openid email profile`.
-3. On callback, Go validates state, authorization-code exchange, ID-token signature, issuer, audience, expiry, nonce, and `email_verified`.
+3. On callback, Go validates state, authorization-code exchange, ID-token signature, issuer, audience, expiry, nonce, and reads the `email_verified` assertion.
 4. It identifies the account by issuer plus immutable `sub`, never email or display name.
-5. It evaluates the normalized verified email against the campus-domain allowlist. Google `hd` is a UX hint only, never an authorization proof.
-6. An eligible identity can authenticate normally. A verified but out-of-domain identity creates `PENDING_APPROVAL` without any app tokens or session; the callback displays a non-authenticated pending-approval page.
-7. A platform administrator may approve the account, after which the user signs in again.
+5. It evaluates a confirmed normalized email against the campus-domain allowlist. Google `hd` is a UX hint only, never an authorization proof.
+6. An identity is `ACTIVE` only when its email is confirmed and either the domain is allowlisted or a `PLATFORM_ADMIN` activates it. An unverified or out-of-domain identity creates `PENDING_APPROVAL` without any app tokens or session; the callback displays a non-authenticated pending-approval page.
+7. A platform administrator may activate a confirmed out-of-domain account, after which the user signs in again.
 
 ### 3.6 Account linking and provisioning
 

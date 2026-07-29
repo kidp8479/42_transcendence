@@ -50,7 +50,9 @@ decisions:
   local_credentials:
     enabled: true
     password_hash: argon2id
+    account_status_until_email_verification: ACTIVE
     email_verification: required-before-automatic-provider-linking
+    future_activation: confirmed-email-and-(allowlisted-domain-or-platform-admin)
   totp:
     initial_milestone: deferred
     design_requirement: reserve-schema-and-assurance-level
