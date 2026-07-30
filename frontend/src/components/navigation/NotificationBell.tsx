@@ -194,7 +194,7 @@ export function NotificationBell() {
         </div>
       </DropdownHeader>
 
-      <div className="max-h-80 max-w-80 overflow-y-auto">
+      <div className="max-h-80 max-w-80 overflow-y-auto bg-surface-overlay">
         {loading ? (
           <p className="px-4 py-4 text-left text-sm leading-5 text-text-secondary">
             Loading notifications...
@@ -209,7 +209,7 @@ export function NotificationBell() {
               key={notification.id}
               className={
                 "flex items-start justify-between gap-2 border-b border-surface-border px-4 py-3 last:border-b-0 " +
-                (notification.isRead ? "" : "bg-surface-overlay")
+                (notification.isRead ? "" : "bg-brand-500/10")
               }
             >
               <button
