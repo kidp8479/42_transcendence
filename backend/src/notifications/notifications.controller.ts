@@ -34,6 +34,14 @@ export class NotificationsController {
     return this.notificationsService.findAllByUser(request.user.id);
   }
 
+  // PATCH (mark every unread notification as read - no request body, no id:
+  // it always applies to the whole authenticated user's set)
+  @ApiSecurity("csrf")
+  @Patch("read-all")
+  markAllAsRead(@Req() request: AuthenticatedRequest) {
+    return this.notificationsService.markAllAsRead(request.user.id);
+  }
+
   // PATCH (mark as read - no request body, the URL says it all)
   @ApiSecurity("csrf")
   @Patch(":id/read")

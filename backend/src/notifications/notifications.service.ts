@@ -58,6 +58,16 @@ export class NotificationsService {
     });
   }
 
+  // marks every unread notification belonging to this user as read in one
+  // query - no per-row ownership check needed like markAsRead/remove, the
+  // where clause itself already scopes everything to userId
+  async markAllAsRead(userId: string) {
+    return this.prisma.notification.updateMany({
+      where: { userId: userId, isRead: false },
+      data: { isRead: true },
+    });
+  }
+
   // same ownership check as markAsRead, then a permanent delete
   async remove(id: string, userId: string) {
     const notification = await this.prisma.notification.findFirst({
