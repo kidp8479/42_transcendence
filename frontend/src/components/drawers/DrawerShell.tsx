@@ -43,6 +43,11 @@ export function DrawerShell({
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // stopPropagation so an open drawer always gets first claim on
+        // Escape - without it, SideBarCmp's own window-level Escape
+        // listener fires independently and closes the sidebar at the same
+        // time, since it has no way to know a drawer is open on top of it.
+        event.stopPropagation();
         onEscape();
       }
     }

@@ -14,7 +14,6 @@ import {
 } from "react-icons/hi2";
 import { DrawerShell } from "@/components/drawers/DrawerShell";
 import { EventForm } from "@/components/project/calendar/EventForm";
-import { useSidebar } from "@/hooks/useSidebar";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import type { CalendarCategory } from "@/lib/calendarCategoriesApi";
 import type {
@@ -49,16 +48,13 @@ export function CalendarEventDrawer({
   // expand/collapse: widens the panel to fill the content area instead of
   // navigating to a separate route
   const [isExpanded, setIsExpanded] = useState(false);
-  const { isCollapsed: isSidebarCollapsed } = useSidebar();
   const titleId = useId();
 
   // staged Escape: collapse the expanded panel first, only close on a
-  // second press - and defer to the sidebar's own Escape listener while
-  // it's open, so one key press doesn't trigger two actions at once
+  // second press. DrawerShell's own Escape listener takes priority over the
+  // sidebar's (stopPropagation), so this doesn't need to account for the
+  // sidebar's state at all.
   function handleEscape() {
-    if (isExpanded && !isSidebarCollapsed) {
-      return;
-    }
     if (isExpanded) {
       setIsExpanded(false);
       return;
