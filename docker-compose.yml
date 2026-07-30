@@ -4,6 +4,24 @@
 # network reach. Segmented networks are deferred to the production Vault
 # design - see .github/copilot-instructions.md "Flat Compose network".
 services:
+  rustfs:
+    image: rustfs/rustfs:1.0.0-beta.12
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_SERVER_DOMAINS: ${RUSTFS_SERVER_DOMAINS}
+      RUSTFS_CONSOLE_ENABLE: ${RUSTFS_CONSOLE_ENABLE}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+    volumes:
+      - rustfs_data:/data
+    depends_on:
+      - frontend
+      - backend
+      - auth
+    restart: unless-stopped
+
   nginx:
     image: nginx:alpine
     ports:
@@ -233,3 +251,4 @@ volumes:
   vault_auth_runtime_secret:
   vault_backend_runtime_secret:
   vault_migration_secret:
+  rustfs_data:

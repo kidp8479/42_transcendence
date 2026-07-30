@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: abelov <abelov@student.42london.com>       +#+  +:+       +#+         #
+#    By: fox <fox@student.42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/06/18 18:04:43 by abelov            #+#    #+#              #
-#    Updated: 2026/06/18 18:04:43 by abelov           ###   ########.fr        #
+#    Updated: 2026/07/30 18:53:08 by fox              ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -138,6 +138,10 @@ logs-auth:
 logs-db:
 	$(COMPOSE) logs -f db
 
+## follow rustfs logs
+logs-rustfs:
+	$(COMPOSE) logs -f rustfs
+
 
 # ---------------------------------------------------------------------------- #
 # shells                                                                       #
@@ -159,6 +163,10 @@ shell-auth:
 shell-db: $(ENV_FILE)
 	@set -a; . ./$(ENV_FILE); set +a; \
 	$(COMPOSE) exec db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+
+## open a shell in the rustfs container
+shell-rustfs:
+	$(COMPOSE) exec rustfs sh
 
 
 # ---------------------------------------------------------------------------- #
