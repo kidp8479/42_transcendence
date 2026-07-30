@@ -3,6 +3,7 @@
 // connection (see realtimeSocket.ts) for anything created afterwards.
 import { Dropdown, DropdownHeader } from "flowbite-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import dayjs from "dayjs";
 import { HiOutlineBell } from "react-icons/hi2";
 import { darkDropdownTheme } from "../../lib/flowbite";
@@ -18,6 +19,7 @@ import {
 import { useToast } from "../../hooks/useToast";
 
 export function NotificationBell() {
+  const router = useRouter();
   const { showToast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +82,17 @@ export function NotificationBell() {
       );
     } catch (error) {
       showToast({ type: "error", message: errorMessage(error) });
+    }
+  }
+
+  // clicking a notification always navigates to its link (if it has one),
+  // read or not - only the mark-as-read call is skipped when it's already read
+  async function handleNotificationClick(notification: Notification) {
+    if (!notification.isRead) {
+      await handleMarkAsRead(notification.id);
+    }
+    if (notification.link) {
+      await router.navigate({ href: notification.link });
     }
   }
 
@@ -201,9 +214,8 @@ export function NotificationBell() {
             >
               <button
                 type="button"
-                disabled={notification.isRead}
-                onClick={() => void handleMarkAsRead(notification.id)}
-                className="flex-1 text-left focus:outline-none disabled:cursor-default"
+                onClick={() => void handleNotificationClick(notification)}
+                className="flex-1 text-left focus:outline-none"
               >
                 <p className="text-sm text-text-primary">
                   {notification.message}
@@ -216,9 +228,9 @@ export function NotificationBell() {
                 type="button"
                 aria-label="Delete notification"
                 onClick={() => void handleDelete(notification.id)}
-                className="text-xs text-text-secondary hover:text-control-error focus:outline-none focus:underline"
+                className="shrink-0 text-text-secondary hover:text-control-error focus:outline-none"
               >
-                Remove
+                &times;
               </button>
             </div>
           ))

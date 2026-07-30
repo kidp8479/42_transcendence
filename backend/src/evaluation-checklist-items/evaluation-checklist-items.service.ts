@@ -88,7 +88,7 @@ export class EvaluationChecklistItemsService {
       await this.notificationsService.create(
         member.userId,
         `${SECTION_LABELS[section]} reached 100% on "${project.name}"`,
-        `/projects/${projectId}/evaluation-checklist`
+        `/${projectId}/evaluation-checklist`
       );
     }
   }
