@@ -1,10 +1,28 @@
 // DangerZoneSection.tsx
-//
+import { Button } from "flowbite-react";
+import { SettingsSection } from "./SettingsSection";
+import { SettingsActionRow } from "./SettingsActionRow";
 // Displays destructive project actions inside the Project Settings page.
-//
+
 // This section is intentionally isolated from the other settings because these
 // actions have irreversible or high-impact consequences.
-//
+
+export function DangerZoneSection() {
+  return (
+    <SettingsSection title="Danger Zone" variant="danger">
+      <div className="divide-y divide-red-500/20">
+        <SettingsActionRow
+          title="Delete project"
+          description="Permanently delete this project and all its data. This cannot be undone."
+        >
+          {/* TODO: Replace default Flowbite button colors with final danger button styling */}
+          <Button>Delete project</Button>
+        </SettingsActionRow>
+      </div>
+    </SettingsSection>
+  );
+}
+
 // Current actions:
 // - Delete project
 //   => permanently removes the project and its related data.

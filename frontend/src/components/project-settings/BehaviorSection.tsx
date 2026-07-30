@@ -1,12 +1,39 @@
 // BehaviourSection.tsx
-//
 // Displays project behaviour-related settings inside the Project Settings page.
-//
-// NOTE:
-// This section is currently a UI scaffold only.
-// The Figma mockup includes behaviour toggles, but there is no backend storage
-// or ProjectSettings model for these values yet.
-//
+
+import { useState } from "react";
+
+import { SettingsSection } from "./SettingsSection";
+import { SettingsToggleRow } from "./SettingsToggleRow";
+
+export function BehaviorSection() {
+  const [autoArchive, setAutoArchive] = useState(true);
+  const [deadlineReminders, setDeadlineReminders] = useState(true);
+
+  return (
+    <SettingsSection
+      title="Behavior"
+      description="Configure how this project behaves."
+    >
+      <div className="divide-y divide-surface-border">
+        <SettingsToggleRow
+          title="Auto-archive tasks when done"
+          description="Tickets moved to 'Completed' are automatically archived after 7 days."
+          checked={autoArchive}
+          onChange={setAutoArchive}
+        />
+
+        <SettingsToggleRow
+          title="Deadline reminders"
+          description="Show a visual indicator on tasks that are due within 48 hours."
+          checked={deadlineReminders}
+          onChange={setDeadlineReminders}
+        />
+      </div>
+    </SettingsSection>
+  );
+}
+
 // Current behaviour options shown in the design:
 // - Auto-archive tasks when done
 //   => tasks moved to Completed would automatically be archived after 7 days.

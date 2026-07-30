@@ -1,5 +1,6 @@
 // MembersSection.tsx
-//
+
+import { SettingsSection } from "./SettingsSection";
 // Displays the users currently belonging to a project.
 //
 // A project membership is represented by the ProjectMember join table:
@@ -11,7 +12,22 @@
 // - allowing ADMIN users to remove members
 //
 // API interactions are handled through projectMembersApi.ts:
-//
+
+export function MembersSection() {
+  return (
+    <SettingsSection
+      title="Members"
+      description="Add or remove people from this project."
+    >
+      <div className="space-y-4">
+        {/* Member rows will go here */}
+
+        {/* Add member form will go here */}
+      </div>
+    </SettingsSection>
+  );
+}
+
 // GET /api/projects/:projectId/members
 //      => retrieves all members of the project
 //      => any project member can view the member list

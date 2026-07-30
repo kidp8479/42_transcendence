@@ -1,10 +1,38 @@
 // ProjectStatusSection.tsx
-//
+import { Button } from "flowbite-react";
+import { SettingsActionRow } from "./SettingsActionRow";
+import { SettingsSection } from "./SettingsSection";
+
 // Displays project lifecycle management actions inside the Project Settings page.
 //
 // This section is responsible for actions that change the current state of a
 // project without deleting it.
-//
+
+export function ProjectStatusSection() {
+  return (
+    <SettingsSection
+      title="Project Status"
+      description="Manage the lifecycle of this project."
+    >
+      <div className="divide-y divide-surface-border">
+        <SettingsActionRow
+          title="Mark project as finished"
+          description="Flags the project as complete on the dashboard and projects page. Removes it from the sidebar."
+        >
+          {/* TODO: Update button colors to match the final design system */}
+          <Button>Mark as finished</Button>
+        </SettingsActionRow>
+
+        <SettingsActionRow
+          title="Archive project"
+          description="Hide from active views without deleting data. Can be restored anytime."
+        >
+          <Button>Archive</Button>
+        </SettingsActionRow>
+      </div>
+    </SettingsSection>
+  );
+}
 // Current actions:
 // - Mark as finished
 //   => updates the project status to COMPLETED.
