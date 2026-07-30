@@ -17,6 +17,9 @@ import { maxProjectsPerUser } from "./projects.constants";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
 import { DEFAULT_CALENDAR_CATEGORIES } from "../calendar-categories/default-calendar-categories";
+import { DEFAULT_TASK_CATEGORIES } from "../task-categories/default-task-categories";
+import { DEFAULT_DISCOVERY_BLOCKS } from "../discovery-blocks/default-discovery-blocks";
+import { computeDiscoveryBlockStatus } from "../discovery-blocks/discovery-block-status.util";
 
 // Mirrors the weighted, gated score computed client-side in
 // evaluation-checklist.tsx (totalProgress.percent / READINESS_THRESHOLD /
@@ -178,6 +181,37 @@ export class ProjectsService {
               projectId: project.id,
               name: category.name,
               color: category.color,
+            },
+          });
+        }
+
+        // every task needs a category, so seed the default set here too
+        for (const category of DEFAULT_TASK_CATEGORIES) {
+          await database.taskCategory.create({
+            data: {
+              projectId: project.id,
+              name: category.name,
+              color: category.color,
+            },
+          });
+        }
+
+        // unlike task/calendar categories, discovery blocks are just a
+        // starting point - the user is free to delete or edit them afterwards
+        for (const block of DEFAULT_DISCOVERY_BLOCKS) {
+          const seedItems = block.items.map((label, index) => {
+            return { label: label, order: index, isChecked: false };
+          });
+          await database.discoveryBlock.create({
+            data: {
+              projectId: project.id,
+              title: block.title,
+              icon: block.icon,
+              color: block.color,
+              status: computeDiscoveryBlockStatus(seedItems),
+              discoveryBlockItems: {
+                create: seedItems,
+              },
             },
           });
         }
