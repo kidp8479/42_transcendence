@@ -170,16 +170,21 @@ services:
     command: npx tsx scripts/check-vault-prisma.ts
     environment:
       - VAULT_ADDR=http://vault:8200
-      - VAULT_ROLE_ID_FILE=/run/secrets/vault/role_id
-      - VAULT_SECRET_ID_FILE=/run/secrets/vault/secret_id
-      - VAULT_DB_ROLE=backend-runtime
+      - AUTH_VAULT_ROLE_ID_FILE=/run/secrets/auth/role_id
+      - AUTH_VAULT_SECRET_ID_FILE=/run/secrets/auth/secret_id
+      - BACKEND_VAULT_ROLE_ID_FILE=/run/secrets/backend/role_id
+      - BACKEND_VAULT_SECRET_ID_FILE=/run/secrets/backend/secret_id
+      - MIGRATION_VAULT_ROLE_ID_FILE=/run/secrets/migration/role_id
+      - MIGRATION_VAULT_SECRET_ID_FILE=/run/secrets/migration/secret_id
       - VAULT_DB_HOST=db
       - VAULT_DB_PORT=5432
       - VAULT_DB_NAME=${POSTGRES_DB}
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
-      - vault_backend_runtime_secret:/run/secrets/vault:ro
+      - vault_auth_runtime_secret:/run/secrets/auth:ro
+      - vault_backend_runtime_secret:/run/secrets/backend:ro
+      - vault_migration_secret:/run/secrets/migration:ro
     depends_on:
       db:
         condition: service_healthy

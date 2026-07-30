@@ -271,7 +271,7 @@ check-shell:
 check-vault-policies: $(ENV_FILE)
 	$(COMPOSE) --profile tests run --rm vault-test
 
-## verify Prisma can rotate between Vault-issued backend database credentials
+## verify Vault-issued Prisma credential rotation, grants, and TR-69 migration safety
 check-vault-prisma: $(ENV_FILE)
 	$(COMPOSE) --profile tests run --rm backend-vault-test
 
@@ -362,4 +362,5 @@ help:
         shell-frontend shell-backend shell-auth shell-db \
         migrate migrate-dev migrate-fix-permissions prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
-        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell
+        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell \
+        check-vault-policies check-vault-prisma
