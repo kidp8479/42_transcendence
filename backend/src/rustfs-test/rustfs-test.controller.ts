@@ -22,7 +22,7 @@ import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "crypto";
 import { StorageService } from "../storage/storage.service";
 
-const MAX_TEST_UPLOAD_BYTES = 5 * 1024 * 1024;
+const MAX_TEST_UPLOAD_BYTES = 1 * 1024 * 1024;
 
 @Controller("rustfs-test")
 export class RustfsTestController {
@@ -38,9 +38,9 @@ export class RustfsTestController {
   )
   async upload(@UploadedFile() file: Express.Multer.File) {
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
-    // No "/" in the key: keeps the download route a plain single :key param
-    // instead of needing wildcard route syntax.
-    const key = `${randomUUID()}-${file.originalname}`;
+    // Keep the key slash-free so download is a plain :key route param.
+    const safeOriginalName = file.originalname.replace(/[\\/]/g, "_");
+    const key = `${randomUUID()}-${safeOriginalName}`;
     await this.storage.uploadObject(bucket, key, file.buffer, file.mimetype);
     return { bucket, key, size: file.size };
   }
