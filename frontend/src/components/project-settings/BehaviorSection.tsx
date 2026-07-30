@@ -5,6 +5,8 @@ import { useState } from "react";
 
 import { SettingsSection } from "./SettingsSection";
 import { SettingsToggleRow } from "./SettingsToggleRow";
+import { IoArchiveSharp } from "react-icons/io5";
+import { HiOutlineBell } from "react-icons/hi2";
 
 export function BehaviorSection() {
   const [autoArchive, setAutoArchive] = useState(true);
@@ -17,6 +19,7 @@ export function BehaviorSection() {
     >
       <div className="divide-y divide-surface-border">
         <SettingsToggleRow
+          icon={<IoArchiveSharp className="h-5 w-5" />}
           title="Auto-archive tasks when done"
           description="Tickets moved to 'Completed' are automatically archived after 7 days."
           checked={autoArchive}
@@ -24,6 +27,7 @@ export function BehaviorSection() {
         />
 
         <SettingsToggleRow
+          icon={<HiOutlineBell className="h-5 w-5" />}
           title="Deadline reminders"
           description="Show a visual indicator on tasks that are due within 48 hours."
           checked={deadlineReminders}

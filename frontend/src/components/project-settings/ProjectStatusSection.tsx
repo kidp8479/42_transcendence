@@ -2,6 +2,7 @@
 import { Button } from "flowbite-react";
 import { SettingsActionRow } from "./SettingsActionRow";
 import { SettingsSection } from "./SettingsSection";
+import { HiOutlineArchive, HiOutlineShieldCheck } from "react-icons/hi";
 
 // Displays project lifecycle management actions inside the Project Settings page.
 //
@@ -18,6 +19,7 @@ export function ProjectStatusSection() {
         <SettingsActionRow
           title="Mark project as finished"
           description="Flags the project as complete on the dashboard and projects page. Removes it from the sidebar."
+          icon={<HiOutlineShieldCheck className="h-5 w-5" />}
         >
           {/* TODO: Update button colors to match the final design system */}
           <Button
@@ -42,6 +44,7 @@ export function ProjectStatusSection() {
         <SettingsActionRow
           title="Archive project"
           description="Hide from active views without deleting data. Can be restored anytime."
+          icon={<HiOutlineArchive className="h-5 w-5" />}
         >
           <Button
             className="
@@ -56,8 +59,12 @@ export function ProjectStatusSection() {
 			  focus-visible:!ring-2
 			  focus-visible:!ring-yellow-500
 			  dark:focus:!ring-yellow-500
+			  inline-flex
+			  items-center
+			  gap-2
 			"
           >
+            <HiOutlineArchive className="h-4 w-4" />
             Archive
           </Button>
         </SettingsActionRow>

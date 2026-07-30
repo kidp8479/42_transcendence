@@ -6,15 +6,24 @@ interface SettingsActionRowProps {
   title: string;
   description: string;
   children: ReactNode;
+  icon?: ReactNode;
+  iconClassName?: string;
 }
 
 export function SettingsActionRow({
   title,
   description,
   children,
+  icon,
+  iconClassName,
 }: SettingsActionRowProps) {
   return (
-    <SettingsRow title={title} description={description}>
+    <SettingsRow
+      title={title}
+      description={description}
+      icon={icon}
+      iconClassName={iconClassName}
+    >
       {children}
     </SettingsRow>
   );

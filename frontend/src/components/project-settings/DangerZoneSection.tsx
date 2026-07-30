@@ -2,6 +2,7 @@
 import { Button } from "flowbite-react";
 import { SettingsSection } from "./SettingsSection";
 import { SettingsActionRow } from "./SettingsActionRow";
+import { LiaTrashAltSolid } from "react-icons/lia";
 // Displays destructive project actions inside the Project Settings page.
 
 // This section is intentionally isolated from the other settings because these
@@ -14,6 +15,12 @@ export function DangerZoneSection() {
         <SettingsActionRow
           title="Delete project"
           description="Permanently delete this project and all its data. This cannot be undone."
+          icon={<LiaTrashAltSolid className="h-5 w-5" />}
+          iconClassName="
+			!border-red-500/30
+			!bg-red-500/10
+			!text-red-400
+		  "
         >
           {/* TODO: Replace default Flowbite button colors with final danger button styling */}
           <Button
@@ -31,8 +38,12 @@ export function DangerZoneSection() {
 				focus-visible:!ring-2
 				focus-visible:!ring-red-500
 				dark:focus:!ring-red-500
-				"
+				inline-flex
+				items-center
+				gap-2
+			"
           >
+            <LiaTrashAltSolid className="h-5 w-5" />
             Delete project
           </Button>
         </SettingsActionRow>
