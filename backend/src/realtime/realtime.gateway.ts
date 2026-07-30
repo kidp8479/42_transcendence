@@ -14,7 +14,10 @@ import { ProjectsService } from "../projects/projects.service";
 // deliberately duplicated instead of shared. Andrei's WebSocket ticket
 // system (auth ticket 7.7) will replace this entirely - delete this
 // check once that lands, don't extract/reuse it in the meantime.
-@WebSocketGateway()
+// nginx.conf only routes "/ws" to the backend (Socket.io's default path is
+// "/socket.io", which nginx never forwards) - without this, no client could
+// ever reach this gateway through nginx.
+@WebSocketGateway({ path: "/ws" })
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
