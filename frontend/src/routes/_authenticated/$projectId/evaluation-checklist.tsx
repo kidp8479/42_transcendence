@@ -29,6 +29,10 @@ import type {
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
 import { ChecklistItemRow } from "@/components/project/evaluation-checklist/ChecklistItemRow";
+import {
+  computeEvaluationChecklistProgress,
+  EVALUATION_CHECKLIST_READINESS_THRESHOLD,
+} from "@/lib/evaluationChecklistProgress";
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
@@ -239,16 +243,6 @@ function errorMessage(arg: string) {
   return "Item could not be " + arg + ". Please retry.";
 }
 
-// Mandatory alone carries the first 100 points (READY). Bonus and Supplemental
-// each unlock CATEGORY_WEIGHT further points once the previous category is
-// fully done, topping the score out at EXTRA_READY.
-const CATEGORY_WEIGHT = 25;
-const READINESS_THRESHOLD = {
-  READY: 100,
-  SUPER_READY: 125,
-  EXTRA_READY: 150,
-} as const;
-
 function EvaluationChecklistPage() {
   const { projectId } = Route.useParams();
   const checklistItems = Route.useLoaderData();
@@ -272,39 +266,12 @@ function EvaluationChecklistPage() {
 
   // accordionItemData is always [Mandatory, Bonus, Supplemental], in that
   // order - see categorizeChecklistItems.
-  const [mandatoryData, bonusData, supplementalData] = accordionItemData;
   const categoryPercents = accordionItemData.map(categoryPercent);
-  const [mandatoryPercent, bonusPercent, supplementalPercent] =
-    categoryPercents;
-  const mandatoryComplete = mandatoryPercent >= READINESS_THRESHOLD.READY;
-  const bonusComplete = bonusPercent >= READINESS_THRESHOLD.READY;
 
-  // Same gating as the percent below: a category's items only join the
-  // overall "X / Y" count once the previous category is fully done.
-  const totalProgress: ItemCount = {
-    currentValue: mandatoryData.count.currentValue,
-    completeAt: mandatoryData.count.completeAt,
-  };
-  if (mandatoryComplete) {
-    totalProgress.currentValue += bonusData.count.currentValue;
-    totalProgress.completeAt += bonusData.count.completeAt;
-    if (bonusComplete) {
-      totalProgress.currentValue += supplementalData.count.currentValue;
-      totalProgress.completeAt += supplementalData.count.completeAt;
-    }
-  }
-
-  // Bonus only starts counting once Mandatory is done, and Supplemental only
-  // once both Mandatory and Bonus are done - see READINESS_THRESHOLD/
-  // CATEGORY_WEIGHT above for what each stage is worth.
-  let overallPercent = mandatoryPercent;
-  if (mandatoryComplete) {
-    overallPercent += (bonusPercent / 100) * CATEGORY_WEIGHT;
-    if (bonusComplete) {
-      overallPercent += (supplementalPercent / 100) * CATEGORY_WEIGHT;
-    }
-  }
-  totalProgress.percent = Math.round(overallPercent);
+  // Gated currentValue/completeAt/percent - see
+  // lib/evaluationChecklistProgress.ts, shared with the Summary tab's
+  // DefenseReadiness widget so both always agree on what "ready" means.
+  const totalProgress = computeEvaluationChecklistProgress(items);
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -404,24 +371,30 @@ function EvaluationChecklistPage() {
   }
 
   // "Ready"/"Super Ready"/"Extra Ready" badge shown at the top of the page,
-  // one tier per READINESS_THRESHOLD crossed.
+  // one tier per EVALUATION_CHECKLIST_READINESS_THRESHOLD crossed.
   const readinessLabel =
-    totalProgress.percent >= READINESS_THRESHOLD.EXTRA_READY
+    totalProgress.percent >=
+    EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY
       ? "Extra Ready"
-      : totalProgress.percent >= READINESS_THRESHOLD.SUPER_READY
+      : totalProgress.percent >=
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY
         ? "Super Ready"
-        : totalProgress.percent >= READINESS_THRESHOLD.READY
+        : totalProgress.percent >=
+            EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY
           ? "Ready"
           : "Not ready yet";
 
   // Each milestone borrows the color of the category that unlocked it.
   const readinessColor =
-    totalProgress.percent >= READINESS_THRESHOLD.EXTRA_READY
+    totalProgress.percent >=
+    EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY
       ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL]
           .iconText
-      : totalProgress.percent >= READINESS_THRESHOLD.SUPER_READY
+      : totalProgress.percent >=
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY
         ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS].iconText
-        : totalProgress.percent >= READINESS_THRESHOLD.READY
+        : totalProgress.percent >=
+            EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY
           ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY]
               .iconText
           : "text-text-secondary";
@@ -431,19 +404,19 @@ function EvaluationChecklistPage() {
   // readinessLabel/readinessColor above, just applied to the fill itself
   // instead of the badge.
   const overallBarBg =
-    totalProgress.percent > READINESS_THRESHOLD.SUPER_READY
+    totalProgress.percent > EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY
       ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL].barBg
-      : totalProgress.percent > READINESS_THRESHOLD.READY
+      : totalProgress.percent > EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY
         ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS].barBg
         : CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY].barBg;
 
   // Same tiers as overallBarBg, applied to the "X / Y — Z%" stat text next to
   // the "Overall progress" heading so it always matches the bar's color.
   const overallTextColor =
-    totalProgress.percent > READINESS_THRESHOLD.SUPER_READY
+    totalProgress.percent > EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY
       ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.SUPPLEMENTAL]
           .iconText
-      : totalProgress.percent > READINESS_THRESHOLD.READY
+      : totalProgress.percent > EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY
         ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS].iconText
         : CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY]
             .iconText;
@@ -492,13 +465,13 @@ function EvaluationChecklistPage() {
           role="progressbar"
           aria-valuenow={totalProgress.percent}
           aria-valuemin={0}
-          aria-valuemax={READINESS_THRESHOLD.EXTRA_READY}
+          aria-valuemax={EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY}
           aria-labelledby="overall-progress-heading"
         >
           <div
             className={`h-2 rounded-full transition-colors ${overallBarBg}`}
             style={{
-              width: `${Math.min((totalProgress.percent / READINESS_THRESHOLD.EXTRA_READY) * 100, 100)}%`,
+              width: `${Math.min((totalProgress.percent / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100, 100)}%`,
             }}
           />
           {/* Tick marks for the 100/125% readiness thresholds only - 150% gets
@@ -507,23 +480,24 @@ function EvaluationChecklistPage() {
           currently active (the fill color already does that). Their labels
           live in the row below instead of right under the tick, so they line
           up with "Defense day". */}
-          {[READINESS_THRESHOLD.READY, READINESS_THRESHOLD.SUPER_READY].map(
-            (threshold) => (
-              <div
-                key={threshold}
-                className="absolute top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-text-muted/60"
-                style={{
-                  left: `${(threshold / READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
-                }}
-              />
-            )
-          )}
+          {[
+            EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY,
+            EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY,
+          ].map((threshold) => (
+            <div
+              key={threshold}
+              className="absolute top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-text-muted/60"
+              style={{
+                left: `${(threshold / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
+              }}
+            />
+          ))}
         </div>
         <div className="relative mt-2 flex items-center justify-between text-xs text-text-muted">
           {[
-            READINESS_THRESHOLD.READY,
-            READINESS_THRESHOLD.SUPER_READY,
-            READINESS_THRESHOLD.EXTRA_READY,
+            EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY,
+            EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY,
+            EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY,
           ].map((threshold) => (
             <span
               key={threshold}
@@ -532,7 +506,7 @@ function EvaluationChecklistPage() {
               // background, needs 4.5:1
               className="absolute -translate-x-1/2 text-text-muted-on-surface"
               style={{
-                left: `${(threshold / READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
+                left: `${(threshold / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
               }}
             >
               {threshold}%

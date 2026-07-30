@@ -8,6 +8,8 @@ import {
 import { DefenseReadiness } from "@/components/summary/DefenseReadiness";
 import { TeamWorkload } from "@/components/summary/TeamWorkload";
 import { listCalendarEvents } from "@/lib/calendarEventsApi";
+import { fetchEvaluationChecklistItems } from "@/lib/evaluationChecklist";
+import { computeEvaluationChecklistProgress } from "@/lib/evaluationChecklistProgress";
 
 // Summary tab shows at most this many upcoming events - the backend has no
 // date-range/limit filter yet (see calendar.tsx's own note on this), so the
@@ -15,7 +17,10 @@ import { listCalendarEvents } from "@/lib/calendarEventsApi";
 const UPCOMING_EVENTS_LIMIT = 6;
 
 async function loadSummaryPageData(projectId: string) {
-  const events = await listCalendarEvents(projectId);
+  const [events, checklistItems] = await Promise.all([
+    listCalendarEvents(projectId),
+    fetchEvaluationChecklistItems(projectId),
+  ]);
 
   const now = Date.now();
   const upcomingEvents: UpcomingEvent[] = events
@@ -34,7 +39,9 @@ async function loadSummaryPageData(projectId: string) {
       color: event.category?.color ?? 0,
     }));
 
-  return { upcomingEvents };
+  const defenseReadiness = computeEvaluationChecklistProgress(checklistItems);
+
+  return { upcomingEvents, defenseReadiness };
 }
 
 export const Route = createFileRoute("/_authenticated/$projectId/summary")({
@@ -43,16 +50,17 @@ export const Route = createFileRoute("/_authenticated/$projectId/summary")({
 });
 
 function SummaryPage() {
-  const { upcomingEvents } = Route.useLoaderData();
+  const { upcomingEvents, defenseReadiness } = Route.useLoaderData();
 
   // --- beginning of mock data - will be replaced by a call to
   // GET /api/projects/:id/summary once the backend for it exists ---
   // Fake data standing in for the real GET /api/projects/:id/summary response.
   // Auth is wired (see ProjectLayout) - what's still missing is the backend
-  // itself: Tasks/EvaluationChecklistItems endpoints plus a team_workload
-  // aggregation, none of which exist yet (tracked for a follow-up PR).
-  // Upcoming events are now real, loaded above. Each field below is passed
-  // down as props to its own section component.
+  // itself: Tasks endpoints plus a team_workload aggregation, neither of
+  // which exist yet (tracked for a follow-up PR, tasks.service.ts is still a
+  // TODO stub). Upcoming events and defense readiness are now real, loaded
+  // above. Each field below is passed down as props to its own section
+  // component.
   const summary_data_json_mock_up = {
     // count of tasks per status, matches the TaskStatus enum in schema.prisma
     tasks_by_status: {
@@ -72,15 +80,6 @@ function SummaryPage() {
       { name: "Parsing", completed: 0, total: 2, color: 6 },
       { name: "Documentation", completed: 1, total: 2, color: 7 },
     ],
-    // percent: how ready the team is for the defense, checkpoints_total: fixed
-    // list of defense prerequisites (defined elsewhere, ex: mandatory part done,
-    // bonus part done, subject compliance...) - checkpoints_done counts how many
-    // of those are currently checked off
-    defense_readiness: {
-      percent: 0,
-      checkpoints_done: 0,
-      checkpoints_total: 8,
-    },
     // open_tasks: tasks assigned to this member that aren't COMPLETED yet.
     // color: index into CATEGORY_COLOR_PALETTE, used for this member's avatar
     // - it's the member's own display color, unrelated to task/calendar
@@ -134,13 +133,9 @@ function SummaryPage() {
         <div className="flex flex-col gap-6">
           <UpcomingEvents events={upcomingEvents} />
           <DefenseReadiness
-            percent={summary_data_json_mock_up.defense_readiness.percent}
-            checkpointsDone={
-              summary_data_json_mock_up.defense_readiness.checkpoints_done
-            }
-            checkpointsTotal={
-              summary_data_json_mock_up.defense_readiness.checkpoints_total
-            }
+            percent={defenseReadiness.percent}
+            checkpointsDone={defenseReadiness.currentValue}
+            checkpointsTotal={defenseReadiness.completeAt}
           />
         </div>
       </div>
