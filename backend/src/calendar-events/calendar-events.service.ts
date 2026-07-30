@@ -48,11 +48,11 @@ export class CalendarEventsService {
 
   async create(projectId: string, dto: CreateCalendarEventDto, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
+    this.assertValidDateRange(dto.startAt, dto.endAt);
     await this.assertCategoryBelongsToProject(projectId, dto.categoryId);
     if (dto.assigneeIds) {
       await this.assertAssigneesAreProjectMembers(projectId, dto.assigneeIds);
     }
-    this.assertValidDateRange(dto.startAt, dto.endAt);
 
     const event = await this.prisma.calendarEvent.create({
       data: {
@@ -107,6 +107,13 @@ export class CalendarEventsService {
     userId: string
   ) {
     const existingEvent = await this.findById(id, projectId, userId); // access guard
+    // a PATCH can send only one of startAt/endAt - validate the pair as it
+    // will actually end up in the database, not just the field(s) sent.
+    // Pure/synchronous, so it runs before the remaining DB round-trips below.
+    this.assertValidDateRange(
+      dto.startAt ?? existingEvent.startAt.toISOString(),
+      dto.endAt ?? existingEvent.endAt.toISOString()
+    );
     if (dto.categoryId) {
       await this.assertCategoryBelongsToProject(projectId, dto.categoryId);
     }
@@ -116,12 +123,6 @@ export class CalendarEventsService {
     if (assigneeIds) {
       await this.assertAssigneesAreProjectMembers(projectId, assigneeIds);
     }
-    // a PATCH can send only one of startAt/endAt - validate the pair as it
-    // will actually end up in the database, not just the field(s) sent
-    this.assertValidDateRange(
-      dto.startAt ?? existingEvent.startAt.toISOString(),
-      dto.endAt ?? existingEvent.endAt.toISOString()
-    );
     const eventFields = {
       title: dto.title,
       categoryId: dto.categoryId,
