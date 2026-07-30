@@ -10,13 +10,31 @@ import { SettingsActionRow } from "./SettingsActionRow";
 export function DangerZoneSection() {
   return (
     <SettingsSection title="Danger Zone" variant="danger">
-      <div className="divide-y divide-red-500/20">
+      <div className="divide-y divide-red-500/30">
         <SettingsActionRow
           title="Delete project"
           description="Permanently delete this project and all its data. This cannot be undone."
         >
           {/* TODO: Replace default Flowbite button colors with final danger button styling */}
-          <Button>Delete project</Button>
+          <Button
+            className="
+				border
+				border-red-500/30
+				bg-red-500/10
+				text-red-400
+				hover:bg-red-500/20
+				dark:border-red-500/30
+				dark:bg-red-500/10
+				dark:text-red-500
+				dark:hover:bg-transparent
+				focus-visible:!outline-none
+				focus-visible:!ring-2
+				focus-visible:!ring-red-500
+				dark:focus:!ring-red-500
+				"
+          >
+            Delete project
+          </Button>
         </SettingsActionRow>
       </div>
     </SettingsSection>

@@ -20,14 +20,46 @@ export function ProjectStatusSection() {
           description="Flags the project as complete on the dashboard and projects page. Removes it from the sidebar."
         >
           {/* TODO: Update button colors to match the final design system */}
-          <Button>Mark as finished</Button>
+          <Button
+            className="
+			  !border
+			  !border-surface-border
+			  !bg-surface-overlay
+			  !text-text-primary
+		      hover:!bg-transparent
+			  hover:!border-brand-500
+			  hover:!text-brand-500
+			  focus-visible:!outline-none
+			  focus-visible:!ring-2
+		      focus-visible:!ring-brand-600
+			  dark:focus:!ring-brand-800
+			"
+          >
+            Mark as finished
+          </Button>
         </SettingsActionRow>
 
         <SettingsActionRow
           title="Archive project"
           description="Hide from active views without deleting data. Can be restored anytime."
         >
-          <Button>Archive</Button>
+          <Button
+            className="
+			  !border
+		      !border-surface-border
+			  !bg-surface-overlay
+			  !text-text-primary
+			  hover:!bg-transparent
+			  hover:!border-yellow-400
+			  hover:!text-yellow-400
+		      focus-visible:!outline-none
+			  focus-visible:!ring-2
+			  focus-visible:!ring-yellow-500
+			  dark:focus:!ring-yellow-500
+			"
+          >
+            Archive
+          </Button>
         </SettingsActionRow>
       </div>
     </SettingsSection>
