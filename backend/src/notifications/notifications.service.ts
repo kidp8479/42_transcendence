@@ -81,4 +81,12 @@ export class NotificationsService {
       where: { id: id },
     });
   }
+
+  // deletes every notification belonging to this user, read or unread -
+  // same deleteMany/no-ownership-check-needed reasoning as markAllAsRead
+  async removeAll(userId: string) {
+    return this.prisma.notification.deleteMany({
+      where: { userId: userId },
+    });
+  }
 }

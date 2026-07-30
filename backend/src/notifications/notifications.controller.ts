@@ -52,7 +52,15 @@ export class NotificationsController {
     return this.notificationsService.markAsRead(id, request.user.id);
   }
 
-  // DELETE
+  // DELETE (every notification belonging to the authenticated user, read
+  // or unread - no id, same "no body, URL says it all" shape as read-all)
+  @ApiSecurity("csrf")
+  @Delete()
+  removeAll(@Req() request: AuthenticatedRequest) {
+    return this.notificationsService.removeAll(request.user.id);
+  }
+
+  // DELETE (one)
   @ApiSecurity("csrf")
   @Delete(":id")
   remove(
