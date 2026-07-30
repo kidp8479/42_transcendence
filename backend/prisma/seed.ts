@@ -16,6 +16,7 @@ import {
   EvaluationChecklistItemSection,
 } from "@prisma/client";
 import { computeDiscoveryBlockStatus } from "../src/discovery-blocks/discovery-block-status.util";
+import { DEFAULT_CALENDAR_CATEGORIES } from "../src/calendar-categories/default-calendar-categories";
 
 const prisma = new PrismaClient();
 
@@ -29,7 +30,7 @@ const SEED_PASSWORD = "SeedPassword123!";
 // seeding more than that in a tight loop trips it, so this pauses just past
 // the window once the limit is reached instead of registering all seed
 // users in one burst
-const REGISTER_REQUESTS_PER_MINUTE = 5;
+const REGISTER_REQUESTS_PER_MINUTE = 20;
 let registrationsInCurrentWindow = 0;
 
 function sleep(ms: number): Promise<void> {
@@ -273,6 +274,22 @@ async function main() {
   for (const project of createdProjects) {
     for (const cat of taskCategories) {
       await prisma.taskCategory.create({
+        data: {
+          projectId: project.id,
+          name: cat.name,
+          color: cat.color,
+        },
+      });
+    }
+  }
+
+  // 4b. Calendar categories ("labels"). These fake projects were created
+  // with a raw prisma.project.create(), which skips ProjectsService.create()
+  // (the code that normally seeds these for real projects) - so add them
+  // here too, importing the same list rather than duplicating it.
+  for (const project of createdProjects) {
+    for (const cat of DEFAULT_CALENDAR_CATEGORIES) {
+      await prisma.calendarCategory.create({
         data: {
           projectId: project.id,
           name: cat.name,
@@ -610,6 +627,17 @@ function getRandomGoal() {
   > = {};
   for (const cat of taskCategories) {
     demoTaskCategories[cat.name] = await prisma.taskCategory.create({
+      data: {
+        projectId: demoProject.id,
+        name: cat.name,
+        color: cat.color,
+      },
+    });
+  }
+
+  // demo project needs the same default labels as every other seeded project
+  for (const cat of DEFAULT_CALENDAR_CATEGORIES) {
+    await prisma.calendarCategory.create({
       data: {
         projectId: demoProject.id,
         name: cat.name,

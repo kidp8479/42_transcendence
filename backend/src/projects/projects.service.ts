@@ -16,6 +16,7 @@ import {
 import { maxProjectsPerUser } from "./projects.constants";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
+import { DEFAULT_CALENDAR_CATEGORIES } from "../calendar-categories/default-calendar-categories";
 
 // Mirrors the weighted, gated score computed client-side in
 // evaluation-checklist.tsx (totalProgress.percent / READINESS_THRESHOLD /
@@ -169,6 +170,18 @@ export class ProjectsService {
             },
           },
         });
+
+        // every event needs a label, so seed the default set here too
+        for (const category of DEFAULT_CALENDAR_CATEGORIES) {
+          await database.calendarCategory.create({
+            data: {
+              projectId: project.id,
+              name: category.name,
+              color: category.color,
+            },
+          });
+        }
+
         return this.findProjectForUser(database, project.id, userId);
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }

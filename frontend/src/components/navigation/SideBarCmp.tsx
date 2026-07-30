@@ -16,6 +16,10 @@ interface NavigationItem {
   icon: IconType;
 }
 
+// md:z-50: now that <main> is a positioned element (see AuthenticatedLayout),
+// it would otherwise paint over the sidebar's collapse toggle button, which
+// pokes out past the sidebar's own edge. Also needs to beat DrawerShell's
+// z-40, since an expanded CalendarEventDrawer starts right under that button.
 const sidebarContainerClasses =
   "fixed inset-y-0 left-0 z-40 w-full transition-transform duration-300";
 const sidebarInnerClasses = "font-mono relative h-full w-full overflow-hidden";
@@ -143,7 +147,7 @@ export function SideBarCmp() {
         className={`
           ${sidebarContainerClasses}
           ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
-          md:sticky md:top-0 md:h-screen md:z-auto md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
+          md:sticky md:top-0 md:h-screen md:z-50 md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
           ${isCollapsed ? "md:w-0" : "md:w-64"}
         `}
       >

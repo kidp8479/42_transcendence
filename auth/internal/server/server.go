@@ -24,7 +24,7 @@ const (
 	maxRequestBody          = 16 * 1024
 	rateLimitWindow         = time.Minute
 	maxRateLimitEntries     = 10_000
-	registerRequestsPerIP   = 5
+	registerRequestsPerIP   = 20
 	loginRequestsPerIP      = 10
 	loginRequestsPerAccount = 5
 	passwordConcurrency     = 2
