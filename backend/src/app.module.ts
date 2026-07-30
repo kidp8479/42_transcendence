@@ -25,6 +25,8 @@ import { TasksModule } from "./tasks/tasks.module";
 import { TaskCategoriesModule } from "./task-categories/task-categories.module";
 import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
 import { CalendarCategoriesModule } from "./calendar-categories/calendar-categories.module";
+import { StorageModule } from "./storage/storage.module";
+import { RustfsTestModule } from "./rustfs-test/rustfs-test.module";
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { CalendarCategoriesModule } from "./calendar-categories/calendar-categor
     TaskCategoriesModule,
     CalendarEventsModule,
     CalendarCategoriesModule,
+    StorageModule,
+    RustfsTestModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [

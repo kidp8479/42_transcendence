@@ -10,16 +10,13 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
+      RUSTFS_VOLUMES: /data
       RUSTFS_SERVER_DOMAINS: ${RUSTFS_SERVER_DOMAINS}
       RUSTFS_CONSOLE_ENABLE: ${RUSTFS_CONSOLE_ENABLE}
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
       RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
     volumes:
       - rustfs_data:/data
-    depends_on:
-      - frontend
-      - backend
-      - auth
     restart: unless-stopped
 
   nginx:
@@ -122,6 +119,11 @@ services:
       - VAULT_DB_HOST=db
       - VAULT_DB_PORT=5432
       - VAULT_DB_NAME=${POSTGRES_DB}
+      - RUSTFS_ENDPOINT=${RUSTFS_ENDPOINT}
+      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY}
+      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY}
+      - RUSTFS_BUCKET=${RUSTFS_BUCKET}
+      - RUSTFS_REGION=${RUSTFS_REGION}
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules

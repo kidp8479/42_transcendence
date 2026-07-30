@@ -16,4 +16,9 @@ export const envValidationSchema = Joi.object({
   VAULT_DB_HOST: Joi.string().hostname().required(),
   VAULT_DB_PORT: Joi.number().port().required(),
   VAULT_DB_NAME: Joi.string().required(),
+  RUSTFS_ENDPOINT: Joi.string().uri().required(),
+  RUSTFS_ACCESS_KEY: Joi.string().required(),
+  RUSTFS_SECRET_KEY: Joi.string().required(),
+  RUSTFS_BUCKET: Joi.string().required(),
+  RUSTFS_REGION: Joi.string().default("us-east-1"),
 });
