@@ -43,6 +43,21 @@ export async function markNotificationAsRead(
   return parsed;
 }
 
+// PATCH - marks every unread notification as read in one request (no id,
+// no request body). The backend uses a Prisma updateMany, which returns a
+// count instead of the updated rows, so this returns that count rather
+// than a Notification like the other wrappers.
+export async function markAllNotificationsAsRead(): Promise<number> {
+  const payload = await apiClient<unknown>("/notifications/read-all", {
+    method: "PATCH",
+  });
+
+  if (!isRecord(payload) || typeof payload.count !== "number") {
+    throw new Error("Mark-all-as-read response was invalid");
+  }
+  return payload.count;
+}
+
 // DELETE - the backend returns the deleted notification's own body (200, not 204)
 export async function deleteNotification(
   notificationId: string
@@ -56,6 +71,19 @@ export async function deleteNotification(
     throw new Error("Notification deletion response was invalid");
   }
   return parsed;
+}
+
+// DELETE - deletes every notification belonging to the authenticated user,
+// read or unread. Same count-not-rows return shape as markAllNotificationsAsRead.
+export async function deleteAllNotifications(): Promise<number> {
+  const payload = await apiClient<unknown>("/notifications", {
+    method: "DELETE",
+  });
+
+  if (!isRecord(payload) || typeof payload.count !== "number") {
+    throw new Error("Delete-all response was invalid");
+  }
+  return payload.count;
 }
 
 function parseNotification(value: unknown): Notification | null {
