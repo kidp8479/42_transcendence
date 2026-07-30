@@ -89,6 +89,19 @@ create databases. The subsequent grants step remains an explicit
 developer/operator action through `make` and the database shell's bootstrap
 user.
 
+Migrations are forward-only. Inspect generated SQL before committing it and
+never modify a migration recorded in `_prisma_migrations`. If deployment fails
+before it is recorded, correct the cause and rerun `make migrate`; if any part
+is recorded, recover through a reviewed corrective migration. TR-69 additionally
+preflights that every project has a member, assigns the oldest `ADMIN` (or
+oldest member) as its deterministic `OWNER`, and rejects a second owner through
+a partial unique index. Its persistence rollout deliberately leaves the legacy
+opaque `AuthSession` path untouched until the later JWT/refresh cutover.
+
+Run `make check-vault-prisma` to verify dynamic credential rotation, runtime
+database-role permissions and denials, and the TR-69 upgrade fixture after
+migrations.
+
 Before the first Vault migration on a development volume created before this
 cutover, the team must run `make wipe-db` and then `make up`: legacy schema
 objects are owned by the former bootstrap role and must not be silently

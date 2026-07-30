@@ -2,7 +2,7 @@
 
 **Status:** Accepted target architecture
 **Scope:** ft_transcendence local credentials, 42 OAuth2, Google OIDC, browser/API authentication, authorization, WebSockets, and secret management.
-**Implementation status:** 7.1 (Vault and runtime secrets) is delivered. 7.2 persistence is partially delivered; TR-80 / 7.2.1 is in progress to enforce `ACTIVE` account status in the current local-login and opaque-session path. It is the first safety slice of target Phase 1 (account and authorization data model). The JWT/refresh cutover begins only after the remaining 7.2 runtime invariants are complete.
+**Implementation status:** 7.1 (Vault and runtime secrets) and the 7.2 persistence migrations are delivered. TR-80 / 7.2.1 is delivered: `ACTIVE` is enforced in the current local-login and opaque-session path. The JWT/refresh cutover begins only after the remaining 7.2 runtime invariants are complete.
 
 > This is the approved target architecture. `docs/architecture/authentication-authorization.yaml` and `docs/contracts/auth-service.openapi.yaml` remain the current opaque-session runtime contracts until the JWT/refresh cutover. Any interim change to the opaque path, including TR-80, must update the relevant legacy contract in its implementation PR rather than replacing it with this target design early.
 
@@ -435,6 +435,36 @@ The current in-process limiter resets on restart and is per replica. Its bounded
 - campus-domain eligibility and pending Google-account state;
 - platform-admin bootstrap and last-admin invariant;
 - centralized NestJS role/membership/resource policy helpers.
+
+#### TR-69 persistence rollout
+
+TR-69's migrations are forward-only. Before applying them, operators must
+verify that every existing project has a member; a project without members
+fails the migration rather than receiving a fabricated owner:
+
+```sql
+SELECT project.id
+FROM "Project" AS project
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM "ProjectMember" AS member
+  WHERE member."projectId" = project.id
+);
+```
+
+For each eligible project, the migration promotes exactly one owner:
+the oldest `ADMIN`, falling back to the oldest member, ordered by
+`createdAt` and then `id`. A partial unique index then prevents a second
+`OWNER`. Apply the migration through `make migrate`, which uses the
+Vault-issued migration role and reapplies runtime grants afterwards.
+
+Do not edit or replay a committed migration to recover from a failed
+deployment. Resolve a failure before it is recorded and rerun `make migrate`;
+after a recorded partial rollout, ship a reviewed corrective forward migration.
+The current `AuthSession` opaque-cookie path remains authoritative throughout
+this persistence rollout. The future refresh-family tables are inert until the
+JWT/refresh cutover, so no browser cookie, session lifetime, or legacy session
+lookup behavior changes merely by applying TR-69.
 
 ### Phase 2: JWT and refresh lifecycle
 
