@@ -1,5 +1,6 @@
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { useSyncExternalStore } from "react";
 import { RootErrorComponent } from "../components/errors/RootErrorComponent";
 import { ModalLayer } from "../components/modals/ModalLayer";
 import { ModalProvider } from "../components/modals/ModalProvider";
@@ -8,7 +9,7 @@ import { HeaderAuthenticated } from "../components/navigation/HeaderAuthenticate
 import { HeaderPublic } from "../components/navigation/HeaderPublic";
 import { SidebarProvider } from "../components/navigation/SidebarProvider";
 import { ToastProvider } from "../components/toast/ToastProvider";
-import type { AppRouterContext } from "../lib/authState";
+import { authSessionResource, type AppRouterContext } from "../lib/authState";
 
 export const Route = createRootRouteWithContext<AppRouterContext>()({
   beforeLoad: async ({ context }) => ({
@@ -22,7 +23,12 @@ export const Route = createRootRouteWithContext<AppRouterContext>()({
 });
 
 function RootLayout() {
-  const { authState } = Route.useRouteContext();
+  const { authState: initialAuthState } = Route.useRouteContext();
+  const authState = useSyncExternalStore(
+    (listener) => authSessionResource.subscribe(listener),
+    () => authSessionResource.getState() ?? initialAuthState,
+    () => initialAuthState
+  );
 
   return (
     <ModalProvider>

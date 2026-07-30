@@ -13,7 +13,7 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineSquares2X2,
 } from "react-icons/hi2";
-import { logout, type AuthSession } from "../../lib/auth";
+import { AuthRequestError, logout, type AuthSession } from "../../lib/auth";
 import { authSessionResource } from "../../lib/authState";
 import { darkDropdownTheme } from "../../lib/flowbite";
 
@@ -35,6 +35,11 @@ export function UserMenu({ session }: UserMenuProps) {
       authSessionResource.setAnonymous();
       await navigate({ to: "/" });
     } catch (error) {
+      if (error instanceof AuthRequestError && error.status === 401) {
+        await authSessionResource.endSession();
+        await navigate({ to: "/" });
+        return;
+      }
       setLogoutError(
         error instanceof Error ? error.message : "Unable to sign out"
       );

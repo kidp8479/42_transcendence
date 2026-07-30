@@ -1,4 +1,5 @@
 import { getSession, type AuthSession } from "./auth";
+import { setApiSession } from "./apiClient";
 
 const sessionCacheTtlMs = 30_000;
 
@@ -12,6 +13,7 @@ export class AuthSessionResource {
   private checkedAt = 0;
   private inFlight: Promise<AuthState> | null = null;
   private revision = 0;
+  private listeners = new Set<() => void>();
 
   async resolve(): Promise<AuthState> {
     if (this.hasFreshState()) {
@@ -37,6 +39,8 @@ export class AuthSessionResource {
         }
         this.state = state;
         this.checkedAt = Date.now();
+        setApiSession(state.status === "authenticated" ? state.session : null);
+        this.notify();
         return state;
       })
       .finally(() => {
@@ -53,12 +57,16 @@ export class AuthSessionResource {
     this.revision += 1;
     this.state = { status: "authenticated", session };
     this.checkedAt = Date.now();
+    setApiSession(session);
+    this.notify();
   }
 
   setAnonymous(): void {
     this.revision += 1;
     this.state = { status: "anonymous" };
     this.checkedAt = Date.now();
+    setApiSession(null);
+    this.notify();
   }
 
   invalidate(): void {
@@ -66,6 +74,22 @@ export class AuthSessionResource {
     this.state = null;
     this.checkedAt = 0;
     this.inFlight = null;
+    setApiSession(null);
+    this.notify();
+  }
+
+  async endSession(): Promise<void> {
+    await getSession();
+    this.setAnonymous();
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  getState(): AuthState | null {
+    return this.state;
   }
 
   private hasFreshState(): boolean {
@@ -77,6 +101,12 @@ export class AuthSessionResource {
     }
 
     return Date.parse(this.state.session.idleExpiresAt) > Date.now();
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) {
+      listener();
+    }
   }
 }
 

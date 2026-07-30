@@ -68,7 +68,10 @@ export async function logout(csrfToken?: string): Promise<void> {
   });
 
   if (response.status !== 204) {
-    throw new Error(await readErrorMessage(response));
+    throw new AuthRequestError(
+      response.status,
+      await readErrorMessage(response)
+    );
   }
 }
 

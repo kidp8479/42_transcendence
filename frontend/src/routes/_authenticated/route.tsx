@@ -18,13 +18,14 @@ export const Route = createFileRoute("/_authenticated")({
   },
   // Load projects once at the authenticated layout boundary so the sidebar can
   // render real data on every private page without duplicating fetch logic.
-  loader: async () => {
+  loader: async ({ context }) => {
     try {
       return await listProjects();
     } catch (error) {
       // If session expires between root auth check and loader execution,
       // recover with a safe redirect instead of rendering a broken sidebar.
       if (error instanceof ApiError && error.status === 401) {
+        await context.auth.endSession();
         throw redirect({ to: "/" });
       }
       throw error;

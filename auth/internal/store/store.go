@@ -22,6 +22,14 @@ var (
 	ErrNotFound = errors.New("auth record not found")
 )
 
+type AccountStatus string
+
+const (
+	AccountStatusActive          AccountStatus = "ACTIVE"
+	AccountStatusPendingApproval AccountStatus = "PENDING_APPROVAL"
+	AccountStatusDisabled        AccountStatus = "DISABLED"
+)
+
 type Store struct {
 	pool atomic.Pointer[pgxpool.Pool]
 }
@@ -33,6 +41,8 @@ type User struct {
 	Username      string  `json:"username"`
 	AvatarURL     *string `json:"avatarUrl"`
 	Campus        *string `json:"campus"`
+	// Status controls authentication eligibility and is not profile response data.
+	Status AccountStatus `json:"-"`
 }
 
 type LocalCredential struct {
@@ -91,6 +101,7 @@ func (s *Store) CreateLocalAccount(
 		ID:       uuid.NewString(),
 		Email:    email,
 		Username: username,
+		Status:   AccountStatusActive,
 	}
 	identityID := uuid.NewString()
 	credentialID := uuid.NewString()
@@ -98,11 +109,12 @@ func (s *Store) CreateLocalAccount(
 	_, err = tx.Exec(
 		ctx,
 		`INSERT INTO "User"
-			("id", "email", "emailVerified", "username", "twoFactorEnabled", "createdAt", "updatedAt")
-		 VALUES ($1, $2, false, $3, false, $4, $4)`,
+			("id", "email", "emailVerified", "username", "twoFactorEnabled", "status", "createdAt", "updatedAt")
+		 VALUES ($1, $2, false, $3, false, CAST($4 AS "AccountStatus"), $5, $5)`,
 		user.ID,
 		user.Email,
 		user.Username,
+		string(user.Status),
 		now,
 	)
 	if err != nil {
@@ -154,6 +166,7 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 			u."username",
 			u."avatarUrl",
 			u."campus",
+			u."status"::text,
 			pc."passwordHash"
 		 FROM "AuthIdentity" ai
 		 JOIN "User" u ON u."id" = ai."userId"
@@ -168,6 +181,7 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 		&credential.Username,
 		&credential.AvatarURL,
 		&credential.Campus,
+		&credential.Status,
 		&credential.PasswordHash,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -260,6 +274,7 @@ func (s *Store) IntrospectSession(
 		   AND s."revokedAt" IS NULL
 		   AND s."idleExpiresAt" > CURRENT_TIMESTAMP
 		   AND s."absoluteExpiresAt" > CURRENT_TIMESTAMP
+		   AND u."status" = CAST('ACTIVE' AS "AccountStatus")
 		 RETURNING
 			s."id",
 			u."id",
