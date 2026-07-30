@@ -201,7 +201,7 @@ export function NotificationBell() {
           </p>
         ) : notifications.length === 0 ? (
           <p className="px-4 py-4 text-left text-sm leading-5 text-text-secondary">
-            No new notifications. Project updates will appear here.
+            No new notifications.
           </p>
         ) : (
           notifications.map((notification) => (
