@@ -3,11 +3,12 @@
 
 import { Module } from "@nestjs/common";
 import { ProjectsModule } from "../projects/projects.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { EvaluationChecklistItemsService } from "./evaluation-checklist-items.service";
 import { EvaluationChecklistItemsController } from "./evaluation-checklist-items.controller";
 
 @Module({
-  imports: [ProjectsModule], // needed to inject ProjectsService (assertMembership) into EvaluationChecklistItemsService
+  imports: [ProjectsModule, NotificationsModule], // ProjectsModule: ProjectsService (assertMembership). NotificationsModule: notify project members when a section reaches 100%
   controllers: [EvaluationChecklistItemsController], // handles HTTP requests
   providers: [EvaluationChecklistItemsService], // handles database operations
   exports: [EvaluationChecklistItemsService], // expose EvaluationChecklistItemsService to other modules that may need it
