@@ -16,6 +16,7 @@ export type ApplicationDatabaseTransaction = Pick<
   | "calendarCategory"
   | "calendarAssignee"
   | "notification"
+  | "taskCategory"
 >;
 
 type TransactionOptions = {
