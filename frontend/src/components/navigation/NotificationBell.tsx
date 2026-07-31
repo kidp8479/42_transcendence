@@ -60,8 +60,10 @@ export function NotificationBell() {
   // job is only to attach/detach the socket listener, not to fetch anything
   useEffect(() => {
     const socket = getRealtimeSocket();
+    console.log("[debug] NotificationBell mounted, socket.id:", socket.id);
 
     function handleNewNotification(notification: Notification) {
+      console.log("[debug] notification:new received:", notification);
       setNotifications((current) => [notification, ...current]);
     }
 

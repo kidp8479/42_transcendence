@@ -19,6 +19,6 @@ export function getRealtimeSocket(): Socket {
 export function resetRealtimeSocket(): void {
   if (socket) {
     socket.disconnect();
-    socket = undefined;
+    socket.connect();
   }
 }
