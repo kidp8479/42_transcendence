@@ -19,6 +19,12 @@ export function setApiSession(session: AuthSession | null) {
   csrfToken = session?.csrfToken;
 }
 
+// Exposed for callers that can't use apiClient() directly (ex: multipart
+// uploads, which can't use its JSON-only body handling).
+export function getCsrfToken(): string | undefined {
+  return csrfToken;
+}
+
 // eslint-disable-next-line no-undef -- RequestInit is a TypeScript DOM ambient type.
 type ApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
@@ -70,7 +76,9 @@ export async function apiClient<T>(
   return response.status === 204 ? (undefined as T) : response.json();
 }
 
-async function readErrorMessage(response: Response): Promise<string> {
+// Exported so callers that can't use apiClient() (ex: multipart uploads)
+// still normalize backend error bodies the same way.
+export async function readErrorMessage(response: Response): Promise<string> {
   const fallback = `API request failed (${response.status})`;
   if (!response.headers.get("content-type")?.includes("application/json")) {
     return fallback;

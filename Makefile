@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: abelov <abelov@student.42london.com>       +#+  +:+       +#+         #
+#    By: fox <fox@student.42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/06/18 18:04:43 by abelov            #+#    #+#              #
-#    Updated: 2026/06/18 18:04:43 by abelov           ###   ########.fr        #
+#    Updated: 2026/07/30 18:53:08 by fox              ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -138,6 +138,10 @@ logs-auth:
 logs-db:
 	$(COMPOSE) logs -f db
 
+## follow rustfs logs
+logs-rustfs:
+	$(COMPOSE) logs -f rustfs
+
 
 # ---------------------------------------------------------------------------- #
 # shells                                                                       #
@@ -159,6 +163,10 @@ shell-auth:
 shell-db: $(ENV_FILE)
 	@set -a; . ./$(ENV_FILE); set +a; \
 	$(COMPOSE) exec db psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+
+## open a shell in the rustfs container
+shell-rustfs:
+	$(COMPOSE) exec rustfs sh
 
 
 # ---------------------------------------------------------------------------- #
@@ -211,6 +219,18 @@ wipe-db: $(ENV_FILE)
 	done
 	docker volume ls -q | grep -E '_db_data$$' | xargs -r docker volume rm -f
 	@echo "Database wiped. Run 'make up' (not just 'make up-db') then 'make migrate' to recreate it."
+
+## stop RustFS and remove its Compose-managed data volume
+# simpler than wipe-db: nothing in docker-compose.yml has depends_on: rustfs,
+# so there's no dependent-container chain to stop/remove first - just rustfs
+# itself. Same portable label-based removal as wipe-db/ffclean (works on both
+# docker compose and podman-compose, unlike `compose rm`).
+wipe-storage: $(ENV_FILE)
+	$(COMPOSE) stop rustfs
+	ids=$$(docker ps -aq --filter label=com.docker.compose.service=rustfs); \
+	if [ -n "$$ids" ]; then echo $$ids | xargs -r docker rm -f; fi
+	docker volume ls -q | grep -E '_rustfs_data$$' | xargs -r docker volume rm -f
+	@echo "RustFS storage wiped. Run 'make up' to recreate it - buckets are re-created lazily on the first upload."
 
 
 # ---------------------------------------------------------------------------- #
@@ -355,7 +375,7 @@ help:
 	@printf "\n"
 
 .PHONY: all up up-build down restart build logs ps clean fclean re rere ffclean rebuild \
-        recreate-env wipe-db \
+        recreate-env wipe-db wipe-storage \
         up-db up-frontend up-backend up-auth vault-status \
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-frontend logs-backend logs-auth logs-db \
