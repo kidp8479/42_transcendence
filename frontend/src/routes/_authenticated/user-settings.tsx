@@ -16,6 +16,8 @@ import { darkSurfaceTextInputTheme } from "@/lib/flowbite";
 import { createFileRoute } from "@tanstack/react-router";
 import { UploadFile } from "@/lib/rustfsApi";
 
+import { updateMe } from "@/lib/userSettingsApi"
+
 export const Route = createFileRoute("/_authenticated/user-settings")({
   component: UserSettingsPage,
 });
@@ -61,7 +63,6 @@ function UserSettingsPage() {
     } finally {
       setLoading(false);
     }
-    
   }
 
   return (
@@ -103,9 +104,11 @@ function UserSettingsPage() {
               id="dropzone-file"
               className="hidden"
               onChange={(e) => {
+                const selectedFile = e.target.files?.[0];
                 setFile(e.target.files?.[0] ?? null);
                 setOpenModal(false);
                 handleUpload(e.target.files?.[0] ?? null);
+                updateMe( { avatarUrl:e.target.files?.[0].name } );
               }}
             />
           </Label>
