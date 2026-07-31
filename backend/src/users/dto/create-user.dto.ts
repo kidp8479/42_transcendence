@@ -8,16 +8,25 @@
 // in which case this DTO (and a create() method) may never be used from this backend.
 // whether/how to wire this up is the auth team's call - kept ready here in case they need it.
 
-import { IsEmail, IsOptional, IsString } from "class-validator";
+import { IsEmail, IsOptional, IsString, MinLength, MaxLength } from "class-validator";
+
+export const MIN_USERNAME_LENGTH = 3;
+export const MAX_USERNAME_LENGTH = 32;
 
 export class CreateUserDto {
   @IsEmail()
   email: string;
 
+  @MinLength(MIN_USERNAME_LENGTH)
+  @MaxLength(MAX_USERNAME_LENGTH)
   @IsString()
   username: string;
 
   @IsOptional()
   @IsString()
   avatarUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  campus?: string;
 }

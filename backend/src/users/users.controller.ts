@@ -6,6 +6,11 @@ import { UsersService } from "./users.service";
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get()
+  findUser(@Req() request: AuthenticatedRequest) {
+    return this.usersService.findById(request.user.id);
+  }
+
   @Get("me")
   findMe(@Req() request: AuthenticatedRequest) {
     return this.usersService.findById(request.user.id);
