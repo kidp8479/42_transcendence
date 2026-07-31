@@ -30,6 +30,11 @@ export class RealtimeGateway
   @WebSocketServer() server: Server;
 
   async handleConnection(client: Socket): Promise<void> {
+    const appOrigin = this.configService.getOrThrow<string>("APP_ORIGIN");
+    if (appOrigin !== client.handshake.headers.origin) {
+      client.disconnect(true);
+      return;
+    }
     const sessionCookieName = this.configService.getOrThrow<string>(
       "AUTH_SESSION_COOKIE"
     );

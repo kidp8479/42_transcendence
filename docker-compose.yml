@@ -110,6 +110,7 @@ services:
       context: ./backend
       target: dev
     environment:
+      - APP_ORIGIN=${APP_ORIGIN}
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
       - AUTH_SESSION_COOKIE=${AUTH_SESSION_COOKIE}
       - VAULT_ADDR=http://vault:8200
