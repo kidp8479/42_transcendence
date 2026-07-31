@@ -9,6 +9,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { DiscoveryBlocksService } from "../discovery-blocks/discovery-blocks.service";
+import { RealtimeService } from "../realtime/realtime.service";
 import { CreateDiscoveryBlockItemDto } from "./dto/create-discovery-block-item.dto";
 import { UpdateDiscoveryBlockItemDto } from "./dto/update-discovery-block-item.dto";
 
@@ -19,12 +20,15 @@ const MAX_ITEMS_PER_DISCOVERY_BLOCK = 30;
 export class DiscoveryBlockItemsService {
   prisma: PrismaService;
   discoveryBlocksService: DiscoveryBlocksService;
+  realtimeService: RealtimeService;
   constructor(
     prisma: PrismaService,
-    discoveryBlocksService: DiscoveryBlocksService
+    discoveryBlocksService: DiscoveryBlocksService,
+    realtimeService: RealtimeService
   ) {
     this.prisma = prisma;
     this.discoveryBlocksService = discoveryBlocksService;
+    this.realtimeService = realtimeService;
   }
 
   // GET (all)
@@ -138,6 +142,11 @@ export class DiscoveryBlockItemsService {
     // than tracking which field changed, and the total item count never
     // changes here so a label/order-only update is a harmless no-op recompute
     await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-item:updated",
+      updatedItem
+    );
     return updatedItem;
   }
 

@@ -2,11 +2,12 @@
 // NestJS will not know they exist until they are declared here
 import { Module } from "@nestjs/common";
 import { DiscoveryBlocksModule } from "../discovery-blocks/discovery-blocks.module";
+import { RealtimeModule } from "../realtime/realtime.module";
 import { DiscoveryBlockItemsService } from "./discovery-block-items.service";
 import { DiscoveryBlockItemsController } from "./discovery-block-items.controller";
 
 @Module({
-  imports: [DiscoveryBlocksModule], // needed to inject DiscoveryBlocksService (findById guard, recalculateStatus) into DiscoveryBlockItemsService
+  imports: [DiscoveryBlocksModule, RealtimeModule], // DiscoveryBlocksModule: findById guard, recalculateStatus. RealtimeModule: broadcast checkbox toggles live
   controllers: [DiscoveryBlockItemsController], // handles HTTP requests
   providers: [DiscoveryBlockItemsService], // handles database operations
   exports: [DiscoveryBlockItemsService], // expose DiscoveryBlockItemsService to other modules that may need it

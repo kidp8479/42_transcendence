@@ -10,6 +10,7 @@ import { Prisma, EvaluationChecklistItemSection } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { RealtimeService } from "../realtime/realtime.service";
 import { CreateEvaluationChecklistItemDto } from "./dto/create-evaluation-checklist-item.dto";
 import { UpdateEvaluationChecklistItemDto } from "./dto/update-evaluation-checklist-item.dto";
 import { EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION } from "./evaluation-checklist-items.constants";
@@ -37,16 +38,19 @@ export class EvaluationChecklistItemsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
-    private readonly notificationsService: NotificationsService
+    private readonly notificationsService: NotificationsService,
+    private readonly realtimeService: RealtimeService
   ) {}
   // strictly equivalent to the lesser expanded (yet more readable) form:
   //  prisma: PrismaService;
   //  projectsService: ProjectsService;
   //  notificationsService: NotificationsService;
-  //  constructor(prisma: PrismaService, projectsService: ProjectsService, notificationsService: NotificationsService) {
+  //  realtimeService: RealtimeService;
+  //  constructor(prisma: PrismaService, projectsService: ProjectsService, notificationsService: NotificationsService, realtimeService: RealtimeService) {
   //    this.prisma = prisma;
   //    this.projectsService = projectsService;
   //    this.notificationsService = notificationsService;
+  //    this.realtimeService = realtimeService;
   //  }
 
   // called after create/update/remove below, with the section's percent
@@ -201,6 +205,11 @@ export class EvaluationChecklistItemsService {
       existingItem.section,
       previousPercent,
       userId
+    );
+    this.realtimeService.emitToProject(
+      projectId,
+      "checklist-item:updated",
+      updatedItem
     );
     return updatedItem;
   }
