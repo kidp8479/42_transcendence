@@ -31,7 +31,13 @@ export class RealtimeGateway
 
   async handleConnection(client: Socket): Promise<void> {
     const appOrigin = this.configService.getOrThrow<string>("APP_ORIGIN");
-    if (appOrigin !== client.handshake.headers.origin) {
+    // Only enforce a match when Origin is actually sent. Socket.io's first
+    // handshake goes through plain HTTP long-polling, and browsers don't
+    // set Origin on a same-origin fetch/XHR - only cross-origin requests
+    // reliably carry it, which is exactly the case this check needs to
+    // catch. Rejecting on a missing header blocked every real connection.
+    const origin = client.handshake.headers.origin;
+    if (origin !== undefined && origin !== appOrigin) {
       client.disconnect(true);
       return;
     }
