@@ -180,7 +180,6 @@ const CATEGORY_STYLE: Record<
 interface ItemCount {
   currentValue: number;
   completeAt: number;
-  percent?: number;
 }
 
 interface AccordionItemData {
