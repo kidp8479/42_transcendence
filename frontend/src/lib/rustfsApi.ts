@@ -1,6 +1,6 @@
 import { ApiError, bearerFetch, readErrorMessage } from "./apiClient";
 
-export interface UploadTestFileResult {
+export interface UploadFileResult {
   bucket: string;
   key: string;
   size: number;
@@ -9,7 +9,7 @@ export interface UploadTestFileResult {
 // Can't go through apiClient() here: it always JSON-encodes the body and
 // force-sets Content-Type, which breaks multipart/form-data uploads (the
 // browser needs to set its own boundary in Content-Type).
-export async function uploadTestFile(
+export async function UploadFile(
   file: File
 ): Promise<UploadTestFileResult> {
   const formData = new FormData();

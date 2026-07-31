@@ -65,8 +65,12 @@ import { RealtimeModule } from "./realtime/realtime.module";
     CalendarEventsModule,
     CalendarCategoriesModule,
     StorageModule,
+<<<<<<< HEAD
     RustfsTestModule,
     RealtimeModule,
+=======
+    RustfsModule,
+>>>>>>> 174045c (feat(TR-56): implemented drop-zone upload)
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [

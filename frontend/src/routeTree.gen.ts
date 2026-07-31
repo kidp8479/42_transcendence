@@ -22,7 +22,6 @@ import { Route as PublicAuthCallbackRouteImport } from './routes/_public/auth-ca
 import { Route as PublicAboutRouteImport } from './routes/_public/about'
 import { Route as AuthenticatedUserSettingsRouteImport } from './routes/_authenticated/user-settings'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
-import { Route as AuthenticatedRustfsTestRouteImport } from './routes/_authenticated/rustfs-test'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedProjectIdRouteRouteImport } from './routes/_authenticated/$projectId/route'
@@ -98,11 +97,6 @@ const AuthenticatedUserSettingsRoute =
 const AuthenticatedSearchRoute = AuthenticatedSearchRouteImport.update({
   id: '/search',
   path: '/search',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedRustfsTestRoute = AuthenticatedRustfsTestRouteImport.update({
-  id: '/rustfs-test',
-  path: '/rustfs-test',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
@@ -182,7 +176,6 @@ export interface FileRoutesByFullPath {
   '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/projects': typeof AuthenticatedProjectsRoute
-  '/rustfs-test': typeof AuthenticatedRustfsTestRoute
   '/search': typeof AuthenticatedSearchRoute
   '/user-settings': typeof AuthenticatedUserSettingsRoute
   '/about': typeof PublicAboutRoute
@@ -208,7 +201,6 @@ export interface FileRoutesByTo {
   '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/projects': typeof AuthenticatedProjectsRoute
-  '/rustfs-test': typeof AuthenticatedRustfsTestRoute
   '/search': typeof AuthenticatedSearchRoute
   '/user-settings': typeof AuthenticatedUserSettingsRoute
   '/about': typeof PublicAboutRoute
@@ -236,7 +228,6 @@ export interface FileRoutesById {
   '/_authenticated/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
-  '/_authenticated/rustfs-test': typeof AuthenticatedRustfsTestRoute
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/_authenticated/user-settings': typeof AuthenticatedUserSettingsRoute
   '/_public/about': typeof PublicAboutRoute
@@ -265,7 +256,6 @@ export interface FileRouteTypes {
     | '/$projectId'
     | '/dashboard'
     | '/projects'
-    | '/rustfs-test'
     | '/search'
     | '/user-settings'
     | '/about'
@@ -291,7 +281,6 @@ export interface FileRouteTypes {
     | '/$projectId'
     | '/dashboard'
     | '/projects'
-    | '/rustfs-test'
     | '/search'
     | '/user-settings'
     | '/about'
@@ -318,7 +307,6 @@ export interface FileRouteTypes {
     | '/_authenticated/$projectId'
     | '/_authenticated/dashboard'
     | '/_authenticated/projects'
-    | '/_authenticated/rustfs-test'
     | '/_authenticated/search'
     | '/_authenticated/user-settings'
     | '/_public/about'
@@ -437,13 +425,6 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof AuthenticatedSearchRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/rustfs-test': {
-      id: '/_authenticated/rustfs-test'
-      path: '/rustfs-test'
-      fullPath: '/rustfs-test'
-      preLoaderRoute: typeof AuthenticatedRustfsTestRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/projects': {
@@ -568,7 +549,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectIdRouteRoute: typeof AuthenticatedProjectIdRouteRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
-  AuthenticatedRustfsTestRoute: typeof AuthenticatedRustfsTestRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
   AuthenticatedUserSettingsRoute: typeof AuthenticatedUserSettingsRoute
   AuthenticatedUsersUsernameRoute: typeof AuthenticatedUsersUsernameRoute
@@ -579,7 +559,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedProjectIdRouteRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
-  AuthenticatedRustfsTestRoute: AuthenticatedRustfsTestRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
   AuthenticatedUserSettingsRoute: AuthenticatedUserSettingsRoute,
   AuthenticatedUsersUsernameRoute: AuthenticatedUsersUsernameRoute,
