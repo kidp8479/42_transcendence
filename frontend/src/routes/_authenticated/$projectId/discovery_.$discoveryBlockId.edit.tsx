@@ -74,10 +74,24 @@ function DiscoveryBlockEditPage() {
   );
 
   // claim the lock as soon as this screen is open - released automatically
-  // on unmount by the hook itself
+  // on unmount by the hook itself. Fields default to read-only
+  // (lockPending) until the server actually confirms the lock is ours -
+  // the same race the checklist item fix covers, just with no separate
+  // edit-mode toggle here since this whole screen is always the "editing"
+  // view, gated on readOnly instead.
+  const [lockPending, setLockPending] = useState(true);
   useEffect(() => {
-    acquireFieldLock();
+    let cancelled = false;
+    void acquireFieldLock().then(() => {
+      if (!cancelled) {
+        setLockPending(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [acquireFieldLock]);
+  const fieldsDisabled = isLockedByOther || lockPending;
 
   // Escape goes back to the Discovery list, same target as the Back link
   useEffect(() => {
@@ -364,7 +378,7 @@ function DiscoveryBlockEditPage() {
         <Button
           className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
           onClick={handleSave}
-          disabled={isLockedByOther}
+          disabled={fieldsDisabled}
         >
           Save Changes
         </Button>
@@ -417,7 +431,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_TITLE_MAX_LENGTH}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              readOnly={isLockedByOther}
+              readOnly={fieldsDisabled}
             />
           </div>
           <div>
@@ -434,7 +448,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_DESCRIPTION_MAX_LENGTH}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              readOnly={isLockedByOther}
+              readOnly={fieldsDisabled}
             />
           </div>
           <div>
@@ -451,7 +465,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_NOTES_MAX_LENGTH}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              readOnly={isLockedByOther}
+              readOnly={fieldsDisabled}
             />
           </div>
         </div>
