@@ -39,7 +39,7 @@ export class RealtimeGateway
   private locks = new Map<string, FieldLock>();
 
   // grabs the lock for key, only if nobody else already has it
-  acquireLock(key: string, lock: FieldLock): boolean {
+  private acquireLock(key: string, lock: FieldLock): boolean {
     if (this.locks.has(key)) {
       return false;
     } else {
@@ -49,7 +49,7 @@ export class RealtimeGateway
   }
 
   // releases key, but only if userId is the one actually holding it
-  releaseLock(key: string, userId: string): void {
+  private releaseLock(key: string, userId: string): void {
     const lock = this.locks.get(key);
     if (lock == undefined) {
       return;
@@ -60,7 +60,7 @@ export class RealtimeGateway
   }
 
   // who's currently editing key, if anyone
-  getLock(key: string): FieldLock | undefined {
+  private getLock(key: string): FieldLock | undefined {
     return this.locks.get(key);
   }
 
@@ -170,14 +170,20 @@ export class RealtimeGateway
     }
   }
 
-  // client wants to start editing key
+  // client wants to start editing key - rejects if client isn't a member
+  // of body.projectId, same rule as every REST controller in the app
   @SubscribeMessage("field:lock")
-  handleFieldLock(
+  async handleFieldLock(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
-  ): { locked: boolean; lock: FieldLock | undefined } {
+  ): Promise<{ locked: boolean; lock: FieldLock | undefined }> {
+    const userId = client.data.userId as string;
+    if (!(await this.isMember(body.projectId, userId))) {
+      return { locked: false, lock: undefined };
+    }
+
     const lock: FieldLock = {
-      userId: client.data.userId as string,
+      userId,
       username: client.data.username as string,
       avatarUrl: client.data.avatarUrl as string | null,
       projectId: body.projectId,
@@ -195,11 +201,15 @@ export class RealtimeGateway
 
   // client is done editing key
   @SubscribeMessage("field:unlock")
-  handleFieldUnlock(
+  async handleFieldUnlock(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
-  ): void {
+  ): Promise<void> {
     const userId = client.data.userId as string;
+    if (!(await this.isMember(body.projectId, userId))) {
+      return;
+    }
+
     const lock = this.getLock(body.key);
     if (lock === undefined || lock.userId !== userId) {
       return;
@@ -213,10 +223,24 @@ export class RealtimeGateway
 
   // for a client opening something that was already locked before it connected
   @SubscribeMessage("field:query")
-  handleFieldQuery(@MessageBody() body: { key: string }): {
-    lock: FieldLock | undefined;
-  } {
+  async handleFieldQuery(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { projectId: string; key: string }
+  ): Promise<{ lock: FieldLock | undefined }> {
+    const userId = client.data.userId as string;
+    if (!(await this.isMember(body.projectId, userId))) {
+      return { lock: undefined };
+    }
     return { lock: this.getLock(body.key) };
+  }
+
+  private async isMember(projectId: string, userId: string): Promise<boolean> {
+    try {
+      await this.projectsService.assertMembership(projectId, userId);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
