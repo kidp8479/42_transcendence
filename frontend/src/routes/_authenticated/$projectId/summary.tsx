@@ -33,9 +33,8 @@ async function loadSummaryPageData(projectId: string) {
       id: event.id,
       title: event.title,
       startAt: event.startAt,
-      // every project's calendar categories are seeded/fixed (never user-
-      // deletable today), so category is expected to always be set - the
-      // fallback only satisfies CalendarEvent's nullable type.
+      // Categories are seeded/fixed, never user-deletable - fallback only
+      // satisfies the nullable type.
       color: event.category?.color ?? 0,
     }));
 
@@ -52,15 +51,9 @@ export const Route = createFileRoute("/_authenticated/$projectId/summary")({
 function SummaryPage() {
   const { upcomingEvents, defenseReadiness } = Route.useLoaderData();
 
-  // --- beginning of mock data - will be replaced by a call to
-  // GET /api/projects/:id/summary once the backend for it exists ---
-  // Fake data standing in for the real GET /api/projects/:id/summary response.
-  // Auth is wired (see ProjectLayout) - what's still missing is the backend
-  // itself: Tasks endpoints plus a team_workload aggregation, neither of
-  // which exist yet (tracked for a follow-up PR, tasks.service.ts is still a
-  // TODO stub). Upcoming events and defense readiness are now real, loaded
-  // above. Each field below is passed down as props to its own section
-  // component.
+  // Still mock: Tasks endpoints and the team_workload aggregation don't
+  // exist yet (tasks.service.ts is a TODO stub, tracked for a follow-up PR).
+  // Upcoming events and defense readiness are real now, loaded above.
   const summary_data_json_mock_up = {
     // count of tasks per status, matches the TaskStatus enum in schema.prisma
     tasks_by_status: {

@@ -1,19 +1,6 @@
-// This file is a good reference for how every component in src/components/summary
-// is built - read it once and the pattern repeats everywhere else.
-//
-// - interface: a named contract describing the shape an object must have.
-//   DefenseReadinessProps below says "whoever renders <DefenseReadiness />
-//   must pass a `percent`, `checkpointsDone` and `checkpointsTotal`, all
-//   numbers, nothing more, nothing less".
-// - Props destructuring: `function DefenseReadiness({ percent, ... }: ...)`
-//   pulls each field straight out of the single props object React passes
-//   in, instead of writing `props.percent` everywhere below. Standard React
-//   style, used in every component here.
-// - Data flow: this component owns no data of its own. Everything it renders
-//   is handed down as props by the parent (routes/.../summary.tsx), which is
-//   the only place holding the real data (mock today, an API response
-//   later). That's why nothing here does any fetching - it just displays
-//   what it's given.
+// Reference for the pattern every component in this folder follows: props
+// interface, destructured in the signature, no fetching - the parent
+// (routes/.../summary.tsx) owns the data and passes it down.
 import {
   EVALUATION_CHECKLIST_READINESS_THRESHOLD,
   getEvaluationChecklistReadinessTier,
@@ -34,10 +21,8 @@ const READINESS_TIER_TEXT_COLOR = {
 } as const;
 
 interface DefenseReadinessProps {
-  // percent is uncapped (can exceed 100, up to
-  // EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY = 150), same as the
-  // checklist page's own "Overall progress" - Bonus/Supplemental push it
-  // past 100 once Mandatory (then Bonus) is fully checked off.
+  // Uncapped, up to EXTRA_READY (150), same as the checklist page's Overall
+  // progress bar. Bonus/Supplemental push it past 100.
   percent: number;
   checkpointsDone: number;
   checkpointsTotal: number;

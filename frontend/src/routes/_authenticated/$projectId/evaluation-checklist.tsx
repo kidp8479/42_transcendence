@@ -267,9 +267,8 @@ function EvaluationChecklistPage() {
   // order - see categorizeChecklistItems.
   const categoryPercents = accordionItemData.map(categoryPercent);
 
-  // Gated currentValue/completeAt/percent - see
-  // lib/evaluationChecklistProgress.ts, shared with the Summary tab's
-  // DefenseReadiness widget so both always agree on what "ready" means.
+  // Gated calc, shared with the Summary tab's DefenseReadiness widget - see
+  // lib/evaluationChecklistProgress.ts.
   const totalProgress = computeEvaluationChecklistProgress(items);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -409,7 +408,7 @@ function EvaluationChecklistPage() {
         ? CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.BONUS].barBg
         : CATEGORY_STYLE[EVALUATION_CHECKLIST_CATEGORY_LABELS.MANDATORY].barBg;
 
-  // Same tiers as overallBarBg, applied to the "X / Y — Z%" stat text next to
+  // Same tiers as overallBarBg, applied to the "X / Y - Z%" stat text next to
   // the "Overall progress" heading so it always matches the bar's color.
   const overallTextColor =
     totalProgress.percent > EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY
@@ -452,7 +451,7 @@ function EvaluationChecklistPage() {
             </span>
             <span className="text-text-secondary">
               {" "}
-              / {totalProgress.completeAt} —{" "}
+              / {totalProgress.completeAt} -{" "}
             </span>
             <span className={`font-bold ${overallTextColor}`}>
               {totalProgress.percent}%

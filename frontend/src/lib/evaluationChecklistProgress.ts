@@ -3,14 +3,13 @@ import type {
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
 
-// Pure calculation, no network/validation here - see evaluationChecklist.ts
-// for the fetch/parse layer this reads its input from. Shared by the
-// evaluation-checklist page and the Summary tab's DefenseReadiness widget so
-// both always agree on what "ready" means.
+// Pure calculation, no fetching - see evaluationChecklist.ts for that layer.
+// Shared by the checklist page and the Summary tab's DefenseReadiness widget
+// so both agree on what "ready" means.
 //
 // Mandatory alone carries the first 100 points (READY). Bonus and
-// Supplemental each unlock CATEGORY_WEIGHT further points once the previous
-// section is fully done, topping the score out at EXTRA_READY.
+// Supplemental each unlock CATEGORY_WEIGHT more once the previous section is
+// fully done, topping out at EXTRA_READY.
 export const EVALUATION_CHECKLIST_CATEGORY_WEIGHT = 25;
 export const EVALUATION_CHECKLIST_READINESS_THRESHOLD = {
   READY: 100,
