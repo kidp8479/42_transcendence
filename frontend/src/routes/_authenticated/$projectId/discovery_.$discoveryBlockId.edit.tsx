@@ -16,7 +16,7 @@ import {
 } from "@/lib/discoveryBlockItems";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { useEffect, useState } from "react";
-import { Label, TextInput, Textarea, Button } from "flowbite-react";
+import { Label, TextInput, Textarea, Button, Avatar } from "flowbite-react";
 import { HiArrowLeft } from "react-icons/hi";
 import {
   darkSurfaceFieldClassName,
@@ -33,6 +33,7 @@ import { DiscoveryBlockAppearancePicker } from "@/components/discovery/Discovery
 import { DiscoveryBlockChecklist } from "@/components/discovery/DiscoveryBlockChecklist";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
+import { useFieldLock } from "@/hooks/useFieldLock";
 
 // trailing "_" opts out of nesting under discovery.tsx (no <Outlet/> there)
 export const Route = createFileRoute(
@@ -57,9 +58,26 @@ function DiscoveryBlockEditPage() {
   // Route.useLoaderData() directly inside useState(...) breaks TS inference
   const loaderData = Route.useLoaderData();
   const params = Route.useParams();
+  const { session } = Route.useRouteContext();
   const navigate = useNavigate();
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
+  const {
+    lock: editingLock,
+    isLockedByOther,
+    acquire: acquireFieldLock,
+    release: releaseFieldLock,
+  } = useFieldLock(
+    params.projectId,
+    `discovery-block:${params.discoveryBlockId}`,
+    session.user.id
+  );
+
+  // claim the lock as soon as this screen is open - released automatically
+  // on unmount by the hook itself
+  useEffect(() => {
+    acquireFieldLock();
+  }, [acquireFieldLock]);
 
   // Escape goes back to the Discovery list, same target as the Back link
   useEffect(() => {
@@ -178,6 +196,7 @@ function DiscoveryBlockEditPage() {
     setTitle(trimmedTitle);
     await safeInvalidateRouter();
     showToast({ type: "success", message: "Changes saved" });
+    releaseFieldLock();
   }
 
   // color/icon autosave on click, same optimistic pattern as the checkbox
@@ -345,10 +364,28 @@ function DiscoveryBlockEditPage() {
         <Button
           className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
           onClick={handleSave}
+          disabled={isLockedByOther}
         >
           Save Changes
         </Button>
       </div>
+
+      {isLockedByOther && editingLock && (
+        <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-4 py-2 text-sm text-text-secondary">
+          <Avatar
+            img={editingLock.avatarUrl ?? undefined}
+            placeholderInitials={editingLock.username.slice(0, 2).toUpperCase()}
+            rounded
+            size="xs"
+          />
+          <span>
+            <span className="font-semibold text-text-primary">
+              {editingLock.username}
+            </span>{" "}
+            is currently editing this category
+          </span>
+        </div>
+      )}
 
       {/* single column below lg, 2 columns above (fields left, checklist right) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -374,6 +411,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_TITLE_MAX_LENGTH}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
+              readOnly={isLockedByOther}
             />
           </div>
           <div>
@@ -390,6 +428,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_DESCRIPTION_MAX_LENGTH}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
+              readOnly={isLockedByOther}
             />
           </div>
           <div>
@@ -406,6 +445,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_NOTES_MAX_LENGTH}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
+              readOnly={isLockedByOther}
             />
           </div>
         </div>
