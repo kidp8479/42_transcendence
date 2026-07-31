@@ -1,6 +1,10 @@
 // MembersSection.tsx
 
 import { SettingsSection } from "./SettingsSection";
+import { MemberListItem } from "./MemberListItem";
+import { useEffect, useState } from "react";
+import { getMembers, type ProjectMember } from "@/lib/projectMembersApi";
+
 // Displays the users currently belonging to a project.
 //
 // A project membership is represented by the ProjectMember join table:
@@ -12,15 +16,41 @@ import { SettingsSection } from "./SettingsSection";
 // - allowing ADMIN users to remove members
 //
 // API interactions are handled through projectMembersApi.ts:
+interface MembersSectionProps {
+  projectId: string;
+}
 
-export function MembersSection() {
+export function MembersSection({ projectId }: MembersSectionProps) {
+  const [members, setMembers] = useState<ProjectMember[]>([]);
+
+  useEffect(() => {
+    async function loadMembers() {
+      try {
+        const data = await getMembers(projectId);
+        setMembers(data);
+      } catch (error) {
+        console.error(error);
+        const raw = await fetch(`/api/projects/${projectId}/members`, {
+          credentials: "include",
+        }).then((r) => r.json());
+        console.log("Raw project members:", raw);
+      }
+    }
+    loadMembers();
+  }, [projectId]);
   return (
     <SettingsSection
       title="Members"
       description="Add or remove people from this project."
     >
       <div className="space-y-4">
-        {/* Member rows will go here */}
+        {members.map((member) => (
+          <MemberListItem
+            key={member.id}
+            username={member.user.username}
+            avatarUrl={member.user.avatarUrl}
+          />
+        ))}
 
         {/* Add member form will go here */}
       </div>

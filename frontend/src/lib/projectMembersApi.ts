@@ -47,6 +47,7 @@ function parseProjectMembers(value: unknown): ProjectMember[] {
 }
 
 function parseProjectMember(value: unknown): ProjectMember {
+  console.log("parseProjectMember received:", value);
   if (
     !isRecord(value) ||
     typeof value.id !== "string" ||

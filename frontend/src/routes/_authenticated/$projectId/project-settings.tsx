@@ -15,23 +15,17 @@ export const Route = createFileRoute(
 });
 
 function ProjectSettingsPage() {
-  // temporary hardcoded for now, later repalce with something like:
-  // const { data: project } = useProject(projectId);
-  const project = {
-    id: "123",
-    status: "ACTIVE",
-    members: [],
-  };
+  const { projectId } = Route.useParams();
 
   return (
     <div className="w-full space-y-6">
-      <MembersSection members={project.members} />
+      <MembersSection projectId={projectId} />
 
-      <BehaviorSection behavior={project.behavior} />
+      <BehaviorSection />
 
-      <ProjectStatusSection status={project.status} />
+      <ProjectStatusSection />
 
-      <DangerZoneSection projectId={project.id} />
+      <DangerZoneSection projectId={projectId} />
     </div>
   );
 }
