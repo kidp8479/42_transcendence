@@ -1,6 +1,9 @@
 import {
+  ConnectedSocket,
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
@@ -8,15 +11,16 @@ import { ConfigService } from "@nestjs/config";
 import { Socket, Server } from "socket.io";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import { ProjectsService } from "../projects/projects.service";
+import { PrismaService } from "../prisma/prisma.service";
 
-// TEMPORARY auth: validates the socket using the same session cookie +
-// introspection endpoint as AuthGuard (backend/src/auth/auth.guard.ts),
-// deliberately duplicated instead of shared. Andrei's WebSocket ticket
-// system (auth ticket 7.7) will replace this entirely - delete this
-// check once that lands, don't extract/reuse it in the meantime.
-// nginx.conf only routes "/ws" to the backend (Socket.io's default path is
-// "/socket.io", which nginx never forwards) - without this, no client could
-// ever reach this gateway through nginx.
+interface FieldLock {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  // so handleDisconnect knows which room to broadcast field:unlocked to
+  projectId: string;
+}
+
 @WebSocketGateway({ path: "/ws" })
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
@@ -24,11 +28,50 @@ export class RealtimeGateway
   constructor(
     private readonly configService: ConfigService,
     private readonly vaultRuntime: VaultRuntimeService,
-    private readonly projectsService: ProjectsService
+    private readonly projectsService: ProjectsService,
+    private readonly prisma: PrismaService
   ) {}
 
   @WebSocketServer() server: Server;
 
+  // those 3 methods are used for websocket, defining "priority" when someone edits the same resource
+  // map to store all the locks, private because mutable
+  private locks = new Map<string, FieldLock>();
+
+  // grabs the lock for key, only if nobody else already has it
+  acquireLock(key: string, lock: FieldLock): boolean {
+    if (this.locks.has(key)) {
+      return false;
+    } else {
+      this.locks.set(key, lock);
+      return true;
+    }
+  }
+
+  // releases key, but only if userId is the one actually holding it
+  releaseLock(key: string, userId: string): void {
+    const lock = this.locks.get(key);
+    if (lock == undefined) {
+      return;
+    }
+    if (lock.userId === userId) {
+      this.locks.delete(key);
+    }
+  }
+
+  // who's currently editing key, if anyone
+  getLock(key: string): FieldLock | undefined {
+    return this.locks.get(key);
+  }
+
+  // TEMPORARY auth: validates the socket using the same session cookie +
+  // introspection endpoint as AuthGuard (backend/src/auth/auth.guard.ts),
+  // deliberately duplicated instead of shared. Andrei's WebSocket ticket
+  // system (auth ticket 7.7) will replace this entirely - delete this
+  // check once that lands, don't extract/reuse it in the meantime.
+  // nginx.conf only routes "/ws" to the backend (Socket.io's default path is
+  // "/socket.io", which nginx never forwards) - without this, no client could
+  // ever reach this gateway through nginx.
   async handleConnection(client: Socket): Promise<void> {
     const appOrigin = this.configService.getOrThrow<string>("APP_ORIGIN");
     // Only enforce a match when Origin is actually sent. Socket.io's first
@@ -91,6 +134,14 @@ export class RealtimeGateway
 
     client.data.userId = result.userId;
 
+    // cached on the socket, avoids a DB query on every field:lock message
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: result.userId },
+      select: { username: true, avatarUrl: true },
+    });
+    client.data.username = user.username;
+    client.data.avatarUrl = user.avatarUrl;
+
     // WS-specific logic starts here: auth above is just "who is this",
     // this part is "what should this connection receive". Joining a room
     // per project means we can later broadcast to everyone on a project
@@ -102,9 +153,70 @@ export class RealtimeGateway
     await client.join(`user:${result.userId}`);
   }
 
-  handleDisconnect(): void {
-    // nothing to do here - Socket.io removes a disconnected socket from
-    // every room it had joined automatically.
+  // locks live in our own Map, not Socket.io's room state - release them
+  // here or a dropped connection leaves them stuck forever
+  handleDisconnect(@ConnectedSocket() client: Socket): void {
+    const userId = client.data.userId as string | undefined;
+    if (userId === undefined) {
+      return;
+    }
+    for (const [key, lock] of this.locks) {
+      if (lock.userId === userId) {
+        this.locks.delete(key);
+        this.server
+          .to(`project:${lock.projectId}`)
+          .emit("field:unlocked", { key });
+      }
+    }
+  }
+
+  // client wants to start editing key
+  @SubscribeMessage("field:lock")
+  handleFieldLock(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { projectId: string; key: string }
+  ): { locked: boolean; lock: FieldLock | undefined } {
+    const lock: FieldLock = {
+      userId: client.data.userId as string,
+      username: client.data.username as string,
+      avatarUrl: client.data.avatarUrl as string | null,
+      projectId: body.projectId,
+    };
+
+    const locked = this.acquireLock(body.key, lock);
+    if (locked) {
+      this.server
+        .to(`project:${body.projectId}`)
+        .emit("field:locked", { key: body.key, lock });
+    }
+
+    return { locked, lock: this.getLock(body.key) };
+  }
+
+  // client is done editing key
+  @SubscribeMessage("field:unlock")
+  handleFieldUnlock(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { projectId: string; key: string }
+  ): void {
+    const userId = client.data.userId as string;
+    const lock = this.getLock(body.key);
+    if (lock === undefined || lock.userId !== userId) {
+      return;
+    }
+
+    this.releaseLock(body.key, userId);
+    this.server
+      .to(`project:${body.projectId}`)
+      .emit("field:unlocked", { key: body.key });
+  }
+
+  // for a client opening something that was already locked before it connected
+  @SubscribeMessage("field:query")
+  handleFieldQuery(@MessageBody() body: { key: string }): {
+    lock: FieldLock | undefined;
+  } {
+    return { lock: this.getLock(body.key) };
   }
 }
 
