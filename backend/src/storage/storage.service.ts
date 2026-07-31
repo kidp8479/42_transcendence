@@ -85,7 +85,13 @@ export class StorageService {
       if (!this.isNotFoundError(error)) {
         throw error;
       }
-      await this.client.send(new CreateBucketCommand({ Bucket: bucket }));
+      try {
+        await this.client.send(new CreateBucketCommand({ Bucket: bucket }));
+      } catch (createError) {
+        if (!this.isAlreadyExistsError(createError)) {
+          throw createError;
+        }
+      }
     }
     this.ensuredBuckets.add(bucket);
   }
@@ -96,5 +102,20 @@ export class StorageService {
       error as { $metadata?: { httpStatusCode?: number } } | undefined
     )?.$metadata?.httpStatusCode;
     return name === "NotFound" || name === "NoSuchKey" || statusCode === 404;
+  }
+
+  // Guards against a race where two concurrent uploads both see a missing
+  // bucket via HeadBucket and both attempt CreateBucket; the loser gets a
+  // 409/BucketAlreadyExists-style error even though the bucket now exists.
+  private isAlreadyExistsError(error: unknown): boolean {
+    const name = (error as { name?: string } | undefined)?.name;
+    const statusCode = (
+      error as { $metadata?: { httpStatusCode?: number } } | undefined
+    )?.$metadata?.httpStatusCode;
+    return (
+      name === "BucketAlreadyExists" ||
+      name === "BucketAlreadyOwnedByYou" ||
+      statusCode === 409
+    );
   }
 }
