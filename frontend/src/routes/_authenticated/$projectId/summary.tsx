@@ -33,8 +33,9 @@ async function loadSummaryPageData(projectId: string) {
       id: event.id,
       title: event.title,
       startAt: event.startAt,
-      // Categories are seeded/fixed, never user-deletable - fallback only
-      // satisfies the nullable type.
+      // category is nullable in the type (delete would SetNull it), though
+      // no UI calls deleteCalendarCategory today. Same fallback-to-0 as
+      // EventPill/CalendarDayCell on the Calendar page either way.
       color: event.category?.color ?? 0,
     }));
 
