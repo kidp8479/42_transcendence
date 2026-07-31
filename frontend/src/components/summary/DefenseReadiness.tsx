@@ -67,7 +67,7 @@ export function DefenseReadiness({
         <span className={`text-sm font-bold ${textColor}`}>{percent}%</span>
       </div>
       <div
-        className="h-2 w-full rounded-full bg-surface-overlay"
+        className="relative h-2 w-full rounded-full bg-surface-overlay"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}
@@ -80,8 +80,40 @@ export function DefenseReadiness({
             width: `${Math.min((percent / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100, 100)}%`,
           }}
         />
+        {/* Same 100/125% tick marks as the checklist page's own "Overall
+        progress" bar, so filling past the visual "end" here reads as the
+        same gated-progress pattern instead of a bug. */}
+        {[
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY,
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY,
+        ].map((threshold) => (
+          <div
+            key={threshold}
+            className="absolute top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-text-muted/60"
+            style={{
+              left: `${(threshold / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
+            }}
+          />
+        ))}
       </div>
-      <p className="mt-2 text-xs text-text-secondary">
+      <div className="relative mt-2 flex items-center justify-between text-xs text-text-muted">
+        {[
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY,
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY,
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY,
+        ].map((threshold) => (
+          <span
+            key={threshold}
+            className="absolute -translate-x-1/2 text-text-muted/70"
+            style={{
+              left: `${(threshold / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
+            }}
+          >
+            {threshold}%
+          </span>
+        ))}
+      </div>
+      <p className="mt-5 text-xs text-text-secondary">
         {checkpointsDone}/{checkpointsTotal} checkpoints
       </p>
     </section>
