@@ -1,5 +1,6 @@
 import { getSession, type AuthSession } from "./auth";
 import { setApiSession } from "./apiClient";
+import { resetRealtimeSocket } from "./realtimeSocket";
 
 const sessionCacheTtlMs = 30_000;
 
@@ -58,6 +59,7 @@ export class AuthSessionResource {
     this.state = { status: "authenticated", session };
     this.checkedAt = Date.now();
     setApiSession(session);
+    resetRealtimeSocket();
     this.notify();
   }
 
@@ -66,6 +68,7 @@ export class AuthSessionResource {
     this.state = { status: "anonymous" };
     this.checkedAt = Date.now();
     setApiSession(null);
+    resetRealtimeSocket();
     this.notify();
   }
 
@@ -75,6 +78,7 @@ export class AuthSessionResource {
     this.checkedAt = 0;
     this.inFlight = null;
     setApiSession(null);
+    resetRealtimeSocket();
     this.notify();
   }
 

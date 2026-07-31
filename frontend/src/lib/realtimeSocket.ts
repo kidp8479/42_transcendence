@@ -15,3 +15,10 @@ export function getRealtimeSocket(): Socket {
   }
   return socket;
 }
+
+export function resetRealtimeSocket(): void {
+  if (socket) {
+    socket.disconnect();
+    socket = undefined;
+  }
+}
