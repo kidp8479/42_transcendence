@@ -371,7 +371,12 @@ function DiscoveryBlockEditPage() {
       </div>
 
       {isLockedByOther && editingLock && (
-        <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-4 py-2 text-sm text-text-secondary">
+        <div
+          className={
+            "flex items-center gap-2 rounded-lg border-2 bg-surface-raised px-4 py-2 text-sm text-text-secondary " +
+            discoveryBlockColor.border
+          }
+        >
           <Avatar
             img={editingLock.avatarUrl ?? undefined}
             placeholderInitials={editingLock.username.slice(0, 2).toUpperCase()}
@@ -382,7 +387,8 @@ function DiscoveryBlockEditPage() {
             <span className="font-semibold text-text-primary">
               {editingLock.username}
             </span>{" "}
-            is currently editing this category
+            is editing this category right now - you'll be able to make changes
+            once they save.
           </span>
         </div>
       )}
