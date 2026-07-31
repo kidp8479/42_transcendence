@@ -20,11 +20,13 @@ import {
   Post,
   Body,
   Delete,
+  Patch,
 } from "@nestjs/common";
 
 import { ProjectMembersService } from "./project-members.service";
 import { AuthenticatedRequest } from "../auth/authenticated-request";
 import { AddMemberDto } from "./dto/add-member.dto";
+import { UpdateMemberRoleDto } from "./dto/update-member-role.dto";
 
 @Controller("projects/:projectId/members")
 export class ProjectMembersController {
@@ -73,6 +75,25 @@ export class ProjectMembersController {
     return this.projectMembersService.removeMember(
       projectId,
       userId,
+      request.user.id
+    );
+  }
+
+  // PATCH	/api/projects/:projectId/members/:userId
+  //    => change a member role
+  //    => only OWNER can promote/demote members
+  //    => OWNER role cannot be assigned through this endpoint
+  @Patch(":userId")
+  updateMemberRole(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() dto: UpdateMemberRoleDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectMembersService.updateMemberRole(
+      projectId,
+      userId,
+      dto.role,
       request.user.id
     );
   }

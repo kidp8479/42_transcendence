@@ -43,7 +43,7 @@ export class ProjectMembersService {
     // verify they're owner or admin
     if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
       throw new ForbiddenException(
-        "Only the project owner or admin can add members"
+        "Only project owner or admins can add members"
       );
     }
 
@@ -161,6 +161,56 @@ export class ProjectMembersService {
         this.realtimeService.emitFieldUnlock(released);
       }
       return removed;
+    });
+  }
+
+  async updateMemberRole(
+    projectId: string,
+    userId: string,
+    newRole: "ADMIN" | "MEMBER",
+    requestingUserId: string
+  ) {
+    // verify requester belongs to project
+    const requester = await this.projectsService.assertMembership(
+      projectId,
+      requestingUserId
+    );
+    // only OWNER can change roles
+    if (requester.role !== "OWNER") {
+      throw new ForbiddenException(
+        "Only the project owner can change member roles"
+      );
+    }
+    // verify target exists in project
+    const memberToUpdate = await this.projectsService.assertMembership(
+      projectId,
+      userId
+    );
+    // cannot change OWNER role
+    if (memberToUpdate.role === "OWNER") {
+      throw new ForbiddenException("Cannot change the project owner's role");
+    }
+    // update role
+    return this.prisma.projectMember.update({
+      where: {
+        userId_projectId: {
+          userId,
+          projectId,
+        },
+      },
+      data: {
+        role: newRole,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+            campus: true,
+          },
+        },
+      },
     });
   }
 }
