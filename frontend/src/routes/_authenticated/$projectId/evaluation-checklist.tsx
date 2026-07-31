@@ -6,7 +6,6 @@ import {
   AccordionTitle,
   TextInput,
   Button,
-  Checkbox,
   createTheme,
   ThemeProvider,
 } from "flowbite-react";
@@ -14,7 +13,6 @@ import { FaRegStar } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
-import { RiDeleteBackFill } from "react-icons/ri";
 import {
   createEvaluationChecklistItem,
   deleteEvaluationChecklistItem,
@@ -31,6 +29,7 @@ import type {
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import { ChecklistItemRow } from "@/components/project/evaluation-checklist/ChecklistItemRow";
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
@@ -252,6 +251,7 @@ const READINESS_THRESHOLD = {
 
 function EvaluationChecklistPage() {
   const { projectId } = Route.useParams();
+  const { session } = Route.useRouteContext();
   const checklistItems = Route.useLoaderData();
   const [items, setItems] = useState<EvaluationChecklistItem[]>(checklistItems);
   const accordionItemData = categorizeChecklistItems(items);
@@ -621,95 +621,34 @@ function EvaluationChecklistPage() {
 
                   <AccordionContent>
                     <ul>
-                      {item.contents.map((c) => {
-                        // Only fires the PATCH if the label actually changed
-                        // and isn't blank - either way, exits edit mode.
-                        function commitLabel(newValue: string) {
-                          if (newValue.trim().length && newValue !== c.label) {
-                            handleUpdate(c.id, { label: newValue });
+                      {item.contents.map((c) => (
+                        <ChecklistItemRow
+                          key={c.id}
+                          item={c}
+                          projectId={projectId}
+                          currentUserId={session.user.id}
+                          checkedColor={style.checkedColor}
+                          isEditing={editingId === c.id}
+                          onStartEdit={() => setEditingId(c.id)}
+                          onStopEdit={() => setEditingId(null)}
+                          onToggle={() =>
+                            handleUpdate(c.id, { isChecked: !c.isChecked })
                           }
-                          setEditingId(null);
-                        }
-
-                        return (
-                          <li
-                            key={c.id}
-                            className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border"
-                          >
-                            {/* checked:bg-current uses this text color as the
-                          checkmark fill. */}
-                            <Checkbox
-                              className={style.checkedColor}
-                              aria-label={c.label}
-                              checked={c.isChecked}
-                              onChange={() =>
-                                handleUpdate(c.id, { isChecked: !c.isChecked })
-                              }
-                            />
-
-                            {/* This edits the text:
-                            - cancel on ESCAPE
-                            - commit new text on ENTER or click out of the box                    */}
-                            {editingId === c.id ? (
-                              <TextInput
-                                maxLength={
-                                  EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-                                }
-                                className="w-full px-2 text-sm"
-                                aria-label={`Edit "${c.label}"`}
-                                defaultValue={c.label}
-                                autoFocus
-                                onBlur={(e) => {
-                                  if (
-                                    e.currentTarget.value.length <=
-                                    EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-                                  )
-                                    commitLabel(e.currentTarget.value);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    if (
-                                      e.currentTarget.value.length <=
-                                      EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-                                    )
-                                      commitLabel(e.currentTarget.value);
-                                  }
-                                  if (e.key === "Escape") {
-                                    setEditingId(null);
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                className="w-full min-w-0 wrap-break-word px-2 text-left text-sm"
-                                aria-label={`Edit "${c.label}"`}
-                                onDoubleClick={() => setEditingId(c.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    setEditingId(c.id);
-                                  }
-                                }}
-                              >
-                                {c.label}
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              className="opacity-0 transition-opacity group-hover:opacity-50 group-focus-within:opacity-50 focus:opacity-100"
-                              aria-label={`Delete "${c.label}"`}
-                              onClick={() => handleDelete(c.id)}
-                            >
-                              <RiDeleteBackFill
-                                aria-hidden="true"
-                                className="h-5 w-5"
-                              />
-                            </button>
-                          </li>
-                        );
-                      })}
+                          onCommitLabel={(newValue) => {
+                            // Only fires the PATCH if the label actually
+                            // changed and isn't blank - either way, exits
+                            // edit mode.
+                            if (
+                              newValue.trim().length &&
+                              newValue !== c.label
+                            ) {
+                              handleUpdate(c.id, { label: newValue });
+                            }
+                            setEditingId(null);
+                          }}
+                          onDelete={() => handleDelete(c.id)}
+                        />
+                      ))}
                     </ul>
                     <div className="mt-5 flex items-center gap-3">
                       <TextInput
