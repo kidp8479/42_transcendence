@@ -2,7 +2,12 @@
 // called by the controller, never called directly by the frontend
 // ProjectMember is a join table: each row = one user belonging to one project (many-to-many relation)
 
-import { Injectable, ForbiddenException } from "@nestjs/common";
+import {
+  Injectable,
+  ForbiddenException,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { AddMemberDto } from "./dto/add-member.dto";
@@ -46,12 +51,32 @@ export class ProjectMembersService {
         "Only project owner or admins can add members"
       );
     }
-
+    // find user by username
+    const user = await this.prisma.user.findUnique({
+      where: {
+        username: dto.username,
+      },
+    });
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+    // prevent adding the same user twice
+    const existingMember = await this.prisma.projectMember.findUnique({
+      where: {
+        userId_projectId: {
+          userId: user.id,
+          projectId,
+        },
+      },
+    });
+    if (existingMember) {
+      throw new BadRequestException("User is already a member of this project");
+    }
     // create a ProjectMember row
     const member = await this.prisma.projectMember.create({
       data: {
         projectId,
-        userId: dto.userId,
+        userId: user.id,
         role: "MEMBER",
       },
       include: {

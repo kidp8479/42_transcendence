@@ -3,7 +3,12 @@
 import { SettingsSection } from "./SettingsSection";
 import { MemberListItem } from "./MemberListItem";
 import { useEffect, useState } from "react";
-import { getMembers, type ProjectMember } from "@/lib/projectMembersApi";
+import {
+  getMembers,
+  addMember,
+  type ProjectMember,
+} from "@/lib/projectMembersApi";
+import { Button, TextInput } from "flowbite-react";
 
 // Displays the users currently belonging to a project.
 //
@@ -22,6 +27,7 @@ interface MembersSectionProps {
 
 export function MembersSection({ projectId }: MembersSectionProps) {
   const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
     async function loadMembers() {
@@ -30,14 +36,28 @@ export function MembersSection({ projectId }: MembersSectionProps) {
         setMembers(data);
       } catch (error) {
         console.error(error);
-        const raw = await fetch(`/api/projects/${projectId}/members`, {
-          credentials: "include",
-        }).then((r) => r.json());
-        console.log("Raw project members:", raw);
       }
     }
     loadMembers();
   }, [projectId]);
+
+  async function handleAddMember() {
+    try {
+      await addMember(projectId, {
+        username,
+      });
+
+      // refresh the member list after adding
+      const data = await getMembers(projectId);
+      setMembers(data);
+
+      // clear input
+      setUsername("");
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   return (
     <SettingsSection
       title="Members"
@@ -51,8 +71,18 @@ export function MembersSection({ projectId }: MembersSectionProps) {
             avatarUrl={member.user.avatarUrl}
           />
         ))}
+        <div className="flex items-center gap-3">
+          <TextInput
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="Enter username"
+            className="flex-1"
+          />
 
-        {/* Add member form will go here */}
+          <Button onClick={handleAddMember} disabled={!username.trim()}>
+            Add
+          </Button>
+        </div>
       </div>
     </SettingsSection>
   );
