@@ -20,7 +20,10 @@ interface FieldUnlockedEvent {
 interface UseFieldLockResult {
   lock: FieldLock | null;
   isLockedByOther: boolean;
-  acquire: () => void;
+  // resolves to whether the lock was actually granted - callers must wait
+  // for this before treating the resource as editable, the request can
+  // still be denied server-side even if the local state looked free
+  acquire: () => Promise<boolean>;
   release: () => void;
 }
 
@@ -69,15 +72,18 @@ export function useFieldLock(
     };
   }, [projectId, key]);
 
-  const acquire = useCallback(() => {
+  const acquire = useCallback((): Promise<boolean> => {
     const socket = getRealtimeSocket();
-    socket.emit(
-      "field:lock",
-      { projectId, key },
-      (response: { locked: boolean; lock: FieldLock | undefined }) => {
-        setLock(response.lock ?? null);
-      }
-    );
+    return new Promise((resolve) => {
+      socket.emit(
+        "field:lock",
+        { projectId, key },
+        (response: { locked: boolean; lock: FieldLock | undefined }) => {
+          setLock(response.lock ?? null);
+          resolve(response.locked);
+        }
+      );
+    });
   }, [projectId, key]);
 
   const release = useCallback(() => {

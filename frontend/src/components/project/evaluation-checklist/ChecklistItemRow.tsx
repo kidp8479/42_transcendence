@@ -42,12 +42,17 @@ export function ChecklistItemRow({
     currentUserId
   );
 
-  function startEdit() {
+  async function startEdit() {
     if (isLockedByOther) {
       return;
     }
-    acquire();
-    onStartEdit();
+    // the server can still refuse (someone else won the race) even though
+    // isLockedByOther looked false locally - only enter edit mode once it
+    // actually confirms the lock is ours
+    const granted = await acquire();
+    if (granted) {
+      onStartEdit();
+    }
   }
 
   function commit(newValue: string) {
