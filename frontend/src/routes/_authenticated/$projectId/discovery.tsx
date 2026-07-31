@@ -10,12 +10,14 @@ import {
 import {
   listDiscoveryBlockItems,
   updateDiscoveryBlockItem,
+  parseDiscoveryBlockItem,
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
 import { DiscoveryBlockCard } from "@/components/discovery/DiscoveryBlockCard";
 import { NewDiscoveryBlockCard } from "@/components/discovery/NewDiscoveryBlockCard";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
 interface DiscoveryBlockWithItems {
   discoveryBlock: DiscoveryBlock;
@@ -62,6 +64,37 @@ function DiscoveryPage() {
   useEffect(() => {
     setDiscoveryBlocksWithItems(loaderData);
   }, [loaderData]);
+
+  // live sync: another member checking/unchecking an item updates this
+  // page without a reload - last-write-wins, no lock needed for a checkbox
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleItemUpdated(payload: unknown) {
+      const updatedItem = parseDiscoveryBlockItem(payload);
+      if (updatedItem === null) {
+        return;
+      }
+      setDiscoveryBlocksWithItems((previous) =>
+        previous.map((entry) => {
+          if (entry.discoveryBlock.id !== updatedItem.discoveryBlockId) {
+            return entry;
+          }
+          return {
+            discoveryBlock: entry.discoveryBlock,
+            items: entry.items.map((currentItem) =>
+              currentItem.id === updatedItem.id ? updatedItem : currentItem
+            ),
+          };
+        })
+      );
+    }
+
+    socket.on("discovery-item:updated", handleItemUpdated);
+    return () => {
+      socket.off("discovery-item:updated", handleItemUpdated);
+    };
+  }, []);
 
   // optimistic toggle: flips isChecked locally first, PATCHes in the
   // background, rolls back on failure

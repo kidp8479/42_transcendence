@@ -11,8 +11,10 @@ import {
   createDiscoveryBlockItem,
   updateDiscoveryBlockItem,
   deleteDiscoveryBlockItem,
+  parseDiscoveryBlockItem,
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { useEffect, useState } from "react";
 import { Label, TextInput, Textarea, Button } from "flowbite-react";
 import { HiArrowLeft } from "react-icons/hi";
@@ -90,6 +92,33 @@ function DiscoveryBlockEditPage() {
   useEffect(() => {
     setItems(loaderData.items);
   }, [loaderData]);
+
+  // live sync: another member checking/unchecking an item on this same
+  // block updates it here without a reload
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleItemUpdated(payload: unknown) {
+      const updatedItem = parseDiscoveryBlockItem(payload);
+      if (
+        updatedItem === null ||
+        updatedItem.discoveryBlockId !== params.discoveryBlockId
+      ) {
+        return;
+      }
+      setItems((previous) =>
+        previous.map((currentItem) =>
+          currentItem.id === updatedItem.id ? updatedItem : currentItem
+        )
+      );
+    }
+
+    socket.on("discovery-item:updated", handleItemUpdated);
+    return () => {
+      socket.off("discovery-item:updated", handleItemUpdated);
+    };
+  }, [params.discoveryBlockId]);
+
   const [selectedColorIndex, setSelectedColorIndex] = useState(
     loaderData.discoveryBlock.color ?? 0
   );

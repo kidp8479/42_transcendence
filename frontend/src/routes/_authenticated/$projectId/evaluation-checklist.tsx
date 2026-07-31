@@ -11,7 +11,7 @@ import {
   ThemeProvider,
 } from "flowbite-react";
 import { FaRegStar } from "react-icons/fa";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
 import { RiDeleteBackFill } from "react-icons/ri";
@@ -20,6 +20,7 @@ import {
   deleteEvaluationChecklistItem,
   fetchEvaluationChecklistItems,
   updateEvaluationChecklistItem,
+  parseEvaluationChecklistItem,
   EVALUATION_CHECKLIST_SECTIONS,
   EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH,
   EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY,
@@ -29,6 +30,7 @@ import type {
   EvaluationChecklistItem,
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
@@ -255,6 +257,29 @@ function EvaluationChecklistPage() {
   const accordionItemData = categorizeChecklistItems(items);
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
+
+  // live sync: another member checking/unchecking an item updates this
+  // page without a reload
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleItemUpdated(payload: unknown) {
+      const updatedItem = parseEvaluationChecklistItem(payload);
+      if (updatedItem === null) {
+        return;
+      }
+      setItems((previous) =>
+        previous.map((currentItem) =>
+          currentItem.id === updatedItem.id ? updatedItem : currentItem
+        )
+      );
+    }
+
+    socket.on("checklist-item:updated", handleItemUpdated);
+    return () => {
+      socket.off("checklist-item:updated", handleItemUpdated);
+    };
+  }, []);
 
   // Plain per-category completion percent (no gating, unlike totalProgress
   // below) - used for each accordion's own progress bar.
