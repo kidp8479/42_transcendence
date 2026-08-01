@@ -11,7 +11,21 @@ let socket: Socket | undefined;
 // gateway currently authenticates connections the same way as apiClient.ts.
 export function getRealtimeSocket(): Socket {
   if (socket === undefined) {
-    socket = io({ path: "/ws", withCredentials: true });
+    // transports: ["websocket"] skips socket.io's default long-polling
+    // bootstrap (connect via polling, then probe/upgrade to a real
+    // WebSocket) and opens a real WebSocket connection immediately. The
+    // polling phase holds an HTTP connection open to localhost:8080 for as
+    // long as the handshake+upgrade takes - on top of everything Vite's dev
+    // server is already fetching (many small unbundled module files), that
+    // can exhaust the browser's ~6-connections-per-origin limit and queue
+    // unrelated fetches (notifications, projects...) behind it for
+    // multiple seconds right after login. A real WebSocket connection
+    // doesn't count against that same pool once it upgrades.
+    socket = io({
+      path: "/ws",
+      withCredentials: true,
+      transports: ["websocket"],
+    });
   }
   return socket;
 }
