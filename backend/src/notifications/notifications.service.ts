@@ -4,6 +4,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RealtimeService } from "../realtime/realtime.service";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 
 @Injectable()
 export class NotificationsService {
@@ -57,10 +58,21 @@ export class NotificationsService {
   async markAsRead(id: string, userId: string) {
     await this.findOwnedOrThrow(id, userId);
 
-    return this.prisma.notification.update({
-      where: { id: id },
-      data: { isRead: true },
-    });
+    try {
+      return await this.prisma.notification.update({
+        where: { id: id },
+        data: { isRead: true },
+      });
+    } catch (error) {
+      // someone else (or another tab) deleted this notification in the race
+      // window between the guard above and this update - a clean 404
+      // instead of Prisma's raw "record to update not found" text leaking
+      // to the client
+      if (isRecordNotFoundError(error)) {
+        throw new NotFoundException("Notification not found");
+      }
+      throw error;
+    }
   }
 
   // marks every unread notification belonging to this user as read in one
@@ -74,11 +86,22 @@ export class NotificationsService {
   }
 
   async remove(id: string, userId: string) {
-    await this.findOwnedOrThrow(id, userId);
+    const existingNotification = await this.findOwnedOrThrow(id, userId);
 
-    return this.prisma.notification.delete({
-      where: { id: id },
-    });
+    // two deletes racing on the same notification (double-click, or a
+    // client-side "mark as read" auto-deleting while the user also hits
+    // delete) both want it gone - the second one isn't really a failure,
+    // same reasoning as the delete-race fix elsewhere in this PR
+    try {
+      return await this.prisma.notification.delete({
+        where: { id: id },
+      });
+    } catch (error) {
+      if (isRecordNotFoundError(error)) {
+        return existingNotification;
+      }
+      throw error;
+    }
   }
 
   // deletes every notification belonging to this user, read or unread -
