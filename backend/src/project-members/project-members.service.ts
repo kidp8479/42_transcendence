@@ -7,6 +7,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { AddMemberDto } from "./dto/add-member.dto";
 import { NotificationsService } from "../notifications/notifications.service";
+import { RealtimeService } from "../realtime/realtime.service";
 
 @Injectable()
 export class ProjectMembersService {
@@ -18,7 +19,8 @@ export class ProjectMembersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
-    private readonly notificationsService: NotificationsService
+    private readonly notificationsService: NotificationsService,
+    private readonly realtimeService: RealtimeService
   ) {}
 
   // NOTE ON ROLES: adding/removing a member changes who's on the team, so unlike most other
@@ -73,6 +75,7 @@ export class ProjectMembersService {
       `You were added to "${project.name}"`,
       `/${projectId}/project-settings`
     );
+    this.realtimeService.joinProjectRoom(dto.userId, projectId);
 
     return member;
   }
@@ -133,7 +136,7 @@ export class ProjectMembersService {
         "Only the project owner can remove an admin"
       );
     }
-    return this.prisma.projectMember.delete({
+    const removed = await this.prisma.projectMember.delete({
       where: {
         userId_projectId: {
           userId,
@@ -141,5 +144,7 @@ export class ProjectMembersService {
         },
       },
     });
+    this.realtimeService.leaveProjectRoom(userId, projectId);
+    return removed;
   }
 }

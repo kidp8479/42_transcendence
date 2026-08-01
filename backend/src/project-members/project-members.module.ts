@@ -7,9 +7,10 @@ import { ProjectsModule } from "../projects/projects.module";
 import { ProjectMembersService } from "./project-members.service";
 import { ProjectMembersController } from "./project-members.controller";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { RealtimeModule } from "../realtime/realtime.module";
 
 @Module({
-  imports: [ProjectsModule, NotificationsModule], // ProjectsModule: ProjectsService (assertMembership). NotificationsModule: notify the newly-added member
+  imports: [ProjectsModule, NotificationsModule, RealtimeModule], // ProjectsModule: ProjectsService (assertMembership). NotificationsModule: notify the newly-added member. RealtimeModule: join/leave the project's socket room
   controllers: [ProjectMembersController], // handles HTTP requests
   providers: [ProjectMembersService], // handles database operations
   exports: [ProjectMembersService], // expose ProjectMembersService to other modules that may need it
