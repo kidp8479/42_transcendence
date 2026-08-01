@@ -20,6 +20,7 @@ import { DEFAULT_CALENDAR_CATEGORIES } from "../calendar-categories/default-cale
 import { DEFAULT_TASK_CATEGORIES } from "../task-categories/default-task-categories";
 import { DEFAULT_DISCOVERY_BLOCKS } from "../discovery-blocks/default-discovery-blocks";
 import { computeDiscoveryBlockStatus } from "../discovery-blocks/discovery-block-status.util";
+import { RealtimeService } from "../realtime/realtime.service";
 
 // Mirrors the weighted, gated score computed client-side in
 // evaluation-checklist.tsx (totalProgress.percent / READINESS_THRESHOLD /
@@ -59,7 +60,10 @@ function computeProjectProgress(
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeService: RealtimeService
+  ) {}
 
   // shared access guard, meant to be called by any module that needs to verify
   // "is userId allowed to access projectId" (discovery-blocks, tasks, calendar-events, etc.)
@@ -147,7 +151,7 @@ export class ProjectsService {
   }
 
   async create(dto: CreateProjectDto, userId: string) {
-    return this.prisma.transaction(
+    const project = await this.prisma.transaction(
       async (database) => {
         const membershipCount = await database.projectMember.count({
           where: { userId },
@@ -220,6 +224,14 @@ export class ProjectsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
+    // outside the transaction on purpose - an in-memory room join isn't
+    // part of the DB's atomicity guarantee, and doesn't need to roll back
+    // with it. Without this, a creator with an already-open socket would
+    // miss every realtime broadcast for their own new project (their
+    // socket only joined rooms for projects that existed at connect time)
+    // until their next reconnect.
+    this.realtimeService.joinProjectRoom(userId, project.id);
+    return project;
   }
 
   // NOTE ON ROLES: deleting the project is a team-affecting, hard-to-undo action -
