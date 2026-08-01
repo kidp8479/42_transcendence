@@ -17,9 +17,8 @@ import { HiOutlineExclamationTriangle } from "react-icons/hi2";
 import { darkSurfaceTextInputTheme } from "@/lib/flowbite";
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { UploadFile, fileDownloadUrl } from "@/lib/rustfsApi";
 
-import { getMe, updateMe, deleteMe } from "@/lib/userSettingsApi";
+import { getMe, updateMe, deleteMe, uploadAvatar } from "@/lib/userSettingsApi";
 import { authSessionResource } from "@/lib/authState";
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
@@ -92,8 +91,7 @@ function UserSettingsPage() {
   async function handleUpload(file: File | null) {
     if (!file) return;
     try {
-      const result = await UploadFile(file);
-      await updateMe({ avatarUrl: fileDownloadUrl(result.key) });
+      await uploadAvatar(file);
       safeInvalidateRouter();
     } catch {
       showToast({ type: "error", message: "Upload failed. Please retry." });

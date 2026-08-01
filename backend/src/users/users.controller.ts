@@ -1,9 +1,29 @@
-import { Body, Controller, Get, Patch, Delete, Req } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Delete,
+  Post,
+  Param,
+  Req,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  StreamableFile,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+// tsconfig restricts automatic @types inclusion to "node" only, so
+// @types/multer's global Express.Multer.File augmentation needs an explicit
+// import to be picked up by the compiler.
+import "multer";
 import { ApiSecurity } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { UsersService } from "./users.service";
 // import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 @Controller("users")
 export class UsersController {
@@ -24,5 +44,32 @@ export class UsersController {
   @Delete("me")
   remove(@Req() request: AuthenticatedRequest) {
     return this.usersService.remove(request.user.id);
+  }
+
+  @ApiSecurity("csrf")
+  @Post("me/avatar")
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fileSize: MAX_AVATAR_BYTES } })
+  )
+  uploadAvatar(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() request: AuthenticatedRequest
+  ) {
+    if (!file) {
+      throw new BadRequestException("A file is required");
+    }
+    if (!file.mimetype.startsWith("image/")) {
+      throw new BadRequestException("Avatar must be an image");
+    }
+    return this.usersService.uploadAvatar(request.user.id, file);
+  }
+
+  // Behind the same global AuthGuard as every other route: any authenticated
+  // user can view any other user's avatar, which matches how avatars are
+  // already surfaced (project members, calendar events, ...).
+  @Get("avatar/:key")
+  async downloadAvatar(@Param("key") key: string): Promise<StreamableFile> {
+    const { body, contentType } = await this.usersService.getAvatar(key);
+    return new StreamableFile(body, { type: contentType });
   }
 }

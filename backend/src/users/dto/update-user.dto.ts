@@ -9,6 +9,9 @@
 import { PartialType, OmitType } from "@nestjs/mapped-types";
 import { CreateUserDto } from "./create-user.dto";
 
+// avatarUrl is excluded: it's only ever set by POST /users/me/avatar, which
+// uploads to storage and derives the URL itself. Allowing it here would let
+// a client point their avatar at an arbitrary URL.
 export class UpdateUserDto extends PartialType(
-  OmitType(CreateUserDto, ["email"] as const)
+  OmitType(CreateUserDto, ["email", "avatarUrl"] as const)
 ) {}

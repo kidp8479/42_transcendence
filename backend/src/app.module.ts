@@ -26,7 +26,6 @@ import { TaskCategoriesModule } from "./task-categories/task-categories.module";
 import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
 import { CalendarCategoriesModule } from "./calendar-categories/calendar-categories.module";
 import { StorageModule } from "./storage/storage.module";
-import { RustfsTestModule } from "./rustfs-test/rustfs-test.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
 @Module({
@@ -64,6 +63,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     TaskCategoriesModule,
     CalendarEventsModule,
     CalendarCategoriesModule,
+<<<<<<< HEAD
     StorageModule,
 <<<<<<< HEAD
     RustfsTestModule,
@@ -71,6 +71,8 @@ import { RealtimeModule } from "./realtime/realtime.module";
 =======
     RustfsModule,
 >>>>>>> 174045c (feat(TR-56): implemented drop-zone upload)
+=======
+>>>>>>> ed22a73 (refactor(TR-56): suppressed remains of rustfs, only 'storage' now)
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [
