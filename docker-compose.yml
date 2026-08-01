@@ -24,7 +24,19 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # mounted as a template, not the final config: /etc/nginx/nginx.conf
+      # itself is generated at startup below (see command:), it can't also
+      # be the read-only mount target.
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
+    # nginx.conf.template has a __DOCKER_RESOLVER__ placeholder instead of a
+    # hardcoded resolver address - this fills it in with whatever nameserver
+    # this container's own /etc/resolv.conf actually has (Docker's embedded
+    # DNS and podman's aardvark-dns each write their own real, reachable
+    # address there under their own network), so nginx never wastes a DNS
+    # timeout querying a second, guessed address that doesn't exist on this
+    # particular network.
+    command: >
+      sh -c "sed \"s/__DOCKER_RESOLVER__/$$(grep '^nameserver' /etc/resolv.conf | head -1 | cut -d' ' -f2)/\" /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && exec nginx -g 'daemon off;'"
     depends_on:
       - frontend
       - backend
