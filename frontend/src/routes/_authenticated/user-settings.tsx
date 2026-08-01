@@ -49,7 +49,6 @@ function UserSettingsPage() {
   const [openModal, setOpenModal] = useState(false);
 
   const [switch2FA, setSwitch2FA] = useState(false);
-  const userName = "Christophe";
 
   const [file, setFile] = useState<File | null>(null);
   const [key, setKey] = useState<string | null>(null);
@@ -152,7 +151,7 @@ function UserSettingsPage() {
                 aria-labelledby="profile-picture-upload-area"
               >
                 <Label className="font-semibold text-text-primary">
-                  {userName}
+                  {user.username}
                 </Label>
                 <Button
                   size="sm"
@@ -174,7 +173,7 @@ function UserSettingsPage() {
               <TextInput
                 className="w-80"
                 theme={darkSurfaceTextInputTheme}
-                defaultValue={userName}
+                defaultValue={user.username}
               />
             </section>
 
