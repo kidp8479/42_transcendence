@@ -24,11 +24,14 @@ import { authSessionResource } from "@/lib/authState";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 
+const DISPLAY_NAME_MIN_LENGTH = 3;
+const DISPLAY_NAME_MAX_LENGTH = 32;
+
 // Second step of the delete-account flow forces the user to type this
 // phrase verbatim - a plain "Confirm" click is too easy to hit by mistake
 // for a destructive, unrecoverable action.
 const DELETE_CONFIRMATION_PHRASE =
-  "I acknowledge that will be lost forever but I want to delete it anyway";
+  "I acknowledge that my account will be lost forever and I want to delete it anyway";
 
 // theme override shared by the delete-account modal - matches the
 // surface/border tokens ModalLayer.tsx uses for the auth modal, instead of
@@ -91,7 +94,17 @@ function UserSettingsPage() {
   async function handleUpload(file: File | null) {
     if (!file) return;
     try {
-      await uploadAvatar(file);
+      const updated = await uploadAvatar(file);
+      // The header reads the avatar from authSessionResource, a separate
+      // cache from this page's route loader - safeInvalidateRouter() alone
+      // only refreshes the `user` used below, not the header.
+      const authState = authSessionResource.getState();
+      if (authState?.status === "authenticated") {
+        authSessionResource.setAuthenticated({
+          ...authState.session,
+          user: { ...authState.session.user, avatarUrl: updated.avatarUrl },
+        });
+      }
       safeInvalidateRouter();
     } catch {
       showToast({ type: "error", message: "Upload failed. Please retry." });
@@ -252,6 +265,7 @@ function UserSettingsPage() {
                   onChange={(e) => {
                     setDeleteConfirmationText(e.currentTarget.value);
                   }}
+                  maxLength={DELETE_CONFIRMATION_PHRASE.length}
                 />
                 <div className="mt-2 flex w-full justify-center gap-3">
                   <Button
@@ -337,8 +351,13 @@ function UserSettingsPage() {
                 theme={darkSurfaceTextInputTheme}
                 defaultValue={user.username}
                 onBlur={(e) => {
-                  setDisplayedName(e.currentTarget.value);
+                  if (e.currentTarget.value.length >= DISPLAY_NAME_MIN_LENGTH) {
+                    setDisplayedName(e.currentTarget.value);
+                  } else {
+                    e.currentTarget.value = displayedName;
+                  }
                 }}
+                maxLength={DISPLAY_NAME_MAX_LENGTH}
               />
             </section>
 
