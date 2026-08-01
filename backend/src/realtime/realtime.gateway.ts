@@ -10,8 +10,16 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { Socket, Server } from "socket.io";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
-import { ProjectsService } from "../projects/projects.service";
 import { PrismaService } from "../prisma/prisma.service";
+
+// Resolves the real projectId a lockable resource belongs to, given the id
+// half of its key (the "checklist-item:" / "discovery-block:" prefix is
+// stripped before calling this). Returns undefined if the resource doesn't
+// exist. Each owning module registers its own via
+// RealtimeService.registerKeyPrefixValidator - this file has no business
+// knowing about EvaluationChecklistItem, DiscoveryBlock, or any future
+// lockable model (Kanban cards, per useFieldLock's own comment).
+type KeyPrefixValidator = (id: string) => Promise<string | undefined>;
 
 interface FieldLock {
   userId: string;
@@ -28,7 +36,6 @@ export class RealtimeGateway
   constructor(
     private readonly configService: ConfigService,
     private readonly vaultRuntime: VaultRuntimeService,
-    private readonly projectsService: ProjectsService,
     private readonly prisma: PrismaService
   ) {}
 
@@ -38,14 +45,28 @@ export class RealtimeGateway
   // map to store all the locks, private because mutable
   private locks = new Map<string, FieldLock>();
 
-  // grabs the lock for key, only if nobody else already has it
+  // registered by each owning module's service (see keyBelongsToProject)
+  private keyPrefixValidators = new Map<string, KeyPrefixValidator>();
+
+  registerKeyPrefixValidator(
+    prefix: string,
+    validator: KeyPrefixValidator
+  ): void {
+    this.keyPrefixValidators.set(prefix, validator);
+  }
+
+  // grabs the lock for key, only if nobody else already has it - the same
+  // user re-acquiring their own lock always succeeds (idempotent), needed
+  // for React StrictMode's dev-only double effect invocation (mount ->
+  // cleanup -> mount), which releases then immediately re-requests the same
+  // lock for the same user
   private acquireLock(key: string, lock: FieldLock): boolean {
-    if (this.locks.has(key)) {
+    const existing = this.locks.get(key);
+    if (existing !== undefined && existing.userId !== lock.userId) {
       return false;
-    } else {
-      this.locks.set(key, lock);
-      return true;
     }
+    this.locks.set(key, lock);
+    return true;
   }
 
   // releases key, but only if userId is the one actually holding it
@@ -62,6 +83,15 @@ export class RealtimeGateway
   // who's currently editing key, if anyone
   private getLock(key: string): FieldLock | undefined {
     return this.locks.get(key);
+  }
+
+  // used by RealtimeService.isLockedByOther, so a REST service (e.g.
+  // EvaluationChecklistItemsService.update) can enforce the same lock a
+  // client's UI already shows as read-only - the field-lock hook is
+  // otherwise only a UI hint, never checked before this on the write path.
+  isLockedByOtherUser(key: string, userId: string): boolean {
+    const lock = this.getLock(key);
+    return lock !== undefined && lock.userId !== userId;
   }
 
   // TEMPORARY auth: validates the socket using the same session cookie +
@@ -146,9 +176,16 @@ export class RealtimeGateway
     // this part is "what should this connection receive". Joining a room
     // per project means we can later broadcast to everyone on a project
     // (client.join is the same Socket.io method any future feature will use).
-    const projects = await this.projectsService.findAll(result.userId);
-    for (const project of projects) {
-      await client.join(`project:${project.id}`);
+    // A plain membership lookup, not ProjectsService.findAll - that one
+    // joins members/evaluationChecklistItems/_count to compute progress for
+    // the projects list page, all of it wasted work here since only the
+    // project ids are needed to join rooms.
+    const memberships = await this.prisma.projectMember.findMany({
+      where: { userId: result.userId },
+      select: { projectId: true },
+    });
+    for (const membership of memberships) {
+      await client.join(`project:${membership.projectId}`);
     }
     await client.join(`user:${result.userId}`);
   }
@@ -178,7 +215,10 @@ export class RealtimeGateway
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<{ locked: boolean; lock: FieldLock | undefined }> {
     const userId = client.data.userId as string;
-    if (!(await this.isMember(body.projectId, userId))) {
+    if (
+      !this.isMember(client, body.projectId) ||
+      !(await this.keyBelongsToProject(body.key, body.projectId))
+    ) {
       return { locked: false, lock: undefined };
     }
 
@@ -206,7 +246,10 @@ export class RealtimeGateway
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<void> {
     const userId = client.data.userId as string;
-    if (!(await this.isMember(body.projectId, userId))) {
+    if (
+      !this.isMember(client, body.projectId) ||
+      !(await this.keyBelongsToProject(body.key, body.projectId))
+    ) {
       return;
     }
 
@@ -227,20 +270,59 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<{ lock: FieldLock | undefined }> {
-    const userId = client.data.userId as string;
-    if (!(await this.isMember(body.projectId, userId))) {
+    if (
+      !this.isMember(client, body.projectId) ||
+      !(await this.keyBelongsToProject(body.key, body.projectId))
+    ) {
       return { lock: undefined };
     }
     return { lock: this.getLock(body.key) };
   }
 
-  private async isMember(projectId: string, userId: string): Promise<boolean> {
-    try {
-      await this.projectsService.assertMembership(projectId, userId);
-      return true;
-    } catch {
+  // handleConnection joins this socket to a room per project the user
+  // belongs to (project:<id>) - checking room membership is an in-memory
+  // Set lookup instead of a DB round-trip per field:lock/unlock/query
+  // message, and is the same authorization boundary: being in the room is
+  // exactly what lets a client receive that project's broadcasts at all.
+  private isMember(client: Socket, projectId: string): boolean {
+    return client.rooms.has(`project:${projectId}`);
+  }
+
+  // isMember only proves the caller belongs to body.projectId - it says
+  // nothing about whether body.key (an opaque client-supplied string) is
+  // actually a resource IN that project. Without this, a member of project
+  // A could pass projectId: A but key: "checklist-item:<id from project B>"
+  // and lock/unlock/query a resource in a project they have no access to.
+  // The prefix -> validator lookup itself comes from
+  // registerKeyPrefixValidator, not a hardcoded per-model branch here.
+  private async keyBelongsToProject(
+    key: string,
+    projectId: string
+  ): Promise<boolean> {
+    const [prefix, id] = key.split(":");
+    if (id === undefined) {
       return false;
     }
+    const validator = this.keyPrefixValidators.get(prefix);
+    if (validator === undefined) {
+      // unknown key shape - reject rather than silently allow a lock on
+      // something no module has registered a validator for
+      return false;
+    }
+    return (await validator(id)) === projectId;
+  }
+
+  // used when a lockable resource itself is deleted (e.g.
+  // EvaluationChecklistItemsService.remove()) - the holder's own socket
+  // never gets a field:unlock for a resource that no longer exists, so
+  // without this the Map entry would sit there until they disconnect.
+  forceReleaseLock(key: string): void {
+    const lock = this.locks.get(key);
+    if (lock === undefined) {
+      return;
+    }
+    this.locks.delete(key);
+    this.server.to(`project:${lock.projectId}`).emit("field:unlocked", { key });
   }
 }
 
