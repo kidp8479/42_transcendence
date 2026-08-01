@@ -31,34 +31,51 @@ export function NotificationBell() {
     (notification) => !notification.isRead
   ).length;
 
-  // initial fetch - runs once on mount, independent of the WebSocket below
+  // Authoritative refetch - runs on mount, and again on every socket
+  // "connect" (including reconnects). Socket.io never replays events missed
+  // while disconnected, so a notification created during an outage (wifi
+  // drop, backend restart) would otherwise never appear until a manual
+  // reload - refetching the full list on reconnect is what actually catches
+  // it up. A plain GET is idempotent, so this is safe to also run on the
+  // very first connect alongside the mount fetch below.
   useEffect(() => {
     let cancelled = false;
 
-    getNotifications()
-      .then((fetched) => {
-        if (!cancelled) {
-          setNotifications(fetched);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          showToast({ type: "error", message: errorMessage(error) });
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+    function refetch() {
+      getNotifications()
+        .then((fetched) => {
+          if (!cancelled) {
+            setNotifications(fetched);
+          }
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            showToast({ type: "error", message: errorMessage(error) });
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        });
+    }
+
+    refetch();
+    const socket = getRealtimeSocket();
+    socket.on("connect", refetch);
 
     return () => {
       cancelled = true;
+      socket.off("connect", refetch);
     };
   }, [showToast]);
 
   // live updates - separate effect from the fetch above, since this one's
-  // job is only to attach/detach the socket listener, not to fetch anything
+  // job is only to attach/detach socket listeners, not to fetch anything.
+  // notification:read/read-all/deleted/deleted-all are broadcast to every
+  // tab this user has open (including the tab that made the request, which
+  // already applied it locally - a harmless idempotent no-op there) so
+  // marking as read or deleting in one tab is reflected in the others.
   useEffect(() => {
     const socket = getRealtimeSocket();
 
@@ -70,10 +87,54 @@ export function NotificationBell() {
       setNotifications((current) => [notification, ...current]);
     }
 
+    function handleRead(payload: unknown) {
+      const updated = parseNotification(payload);
+      if (updated === null) {
+        return;
+      }
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === updated.id ? updated : notification
+        )
+      );
+    }
+
+    function handleReadAll() {
+      setNotifications((current) =>
+        current.map((notification) => ({ ...notification, isRead: true }))
+      );
+    }
+
+    function handleDeleted(payload: unknown) {
+      if (
+        typeof payload !== "object" ||
+        payload === null ||
+        typeof (payload as { id?: unknown }).id !== "string"
+      ) {
+        return;
+      }
+      const deletedId = (payload as { id: string }).id;
+      setNotifications((current) =>
+        current.filter((notification) => notification.id !== deletedId)
+      );
+    }
+
+    function handleDeletedAll() {
+      setNotifications([]);
+    }
+
     socket.on("notification:new", handleNewNotification);
+    socket.on("notification:read", handleRead);
+    socket.on("notification:read-all", handleReadAll);
+    socket.on("notification:deleted", handleDeleted);
+    socket.on("notification:deleted-all", handleDeletedAll);
 
     return () => {
       socket.off("notification:new", handleNewNotification);
+      socket.off("notification:read", handleRead);
+      socket.off("notification:read-all", handleReadAll);
+      socket.off("notification:deleted", handleDeleted);
+      socket.off("notification:deleted-all", handleDeletedAll);
     };
   }, []);
 

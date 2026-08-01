@@ -145,6 +145,10 @@ export class ProjectMembersService {
       },
     });
     this.realtimeService.leaveProjectRoom(userId, projectId);
+    // otherwise a removed member who keeps their tab open goes on holding
+    // whatever field locks they had, indefinitely blocking every remaining
+    // member from editing those fields - see the gateway's own comment
+    this.realtimeService.forceReleaseLocksForUserInProject(userId, projectId);
     return removed;
   }
 }

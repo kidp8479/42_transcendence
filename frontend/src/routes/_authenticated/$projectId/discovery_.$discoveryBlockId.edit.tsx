@@ -61,7 +61,6 @@ function DiscoveryBlockEditPage() {
   // Route.useLoaderData() directly inside useState(...) breaks TS inference
   const loaderData = Route.useLoaderData();
   const params = Route.useParams();
-  const { session } = Route.useRouteContext();
   const navigate = useNavigate();
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
@@ -72,8 +71,7 @@ function DiscoveryBlockEditPage() {
     release: releaseFieldLock,
   } = useFieldLock(
     params.projectId,
-    `discovery-block:${params.discoveryBlockId}`,
-    session.user.id
+    `discovery-block:${params.discoveryBlockId}`
   );
 
   // Lock is claimed on the first real interaction (focusing a text field,
@@ -84,14 +82,15 @@ function DiscoveryBlockEditPage() {
   // user tries to edit anything.
   const [isAcquiringLock, setIsAcquiringLock] = useState(false);
 
-  // Checks "do I currently hold the lock" via editingLock (kept live by
-  // field:locked/unlocked broadcasts) rather than a one-shot "already
-  // tried" flag - a flag would skip re-acquiring after this same user
-  // saves (releasing the lock) and then edits again on the same page load,
-  // or after losing an acquire race once and the other holder later
-  // releases it.
+  // Checks "do I currently hold the lock" via isLockedByOther (kept live by
+  // field:locked/unlocked broadcasts, scoped to this socket - not just this
+  // account, since two tabs signed into the same account are two different
+  // sockets) rather than a one-shot "already tried" flag - a flag would
+  // skip re-acquiring after this same user saves (releasing the lock) and
+  // then edits again on the same page load, or after losing an acquire
+  // race once and the other holder later releases it.
   async function ensureLock(): Promise<boolean> {
-    if (editingLock?.userId === session.user.id) {
+    if (editingLock !== null && !isLockedByOther) {
       return true;
     }
     setIsAcquiringLock(true);
@@ -177,7 +176,7 @@ function DiscoveryBlockEditPage() {
       ) {
         return;
       }
-      const holdsLockMyself = editingLock?.userId === session.user.id;
+      const holdsLockMyself = editingLock !== null && !isLockedByOther;
       if (!holdsLockMyself) {
         setTitle(updatedBlock.title);
         setDescription(updatedBlock.description ?? "");
@@ -191,7 +190,7 @@ function DiscoveryBlockEditPage() {
     return () => {
       socket.off("discovery-block:updated", handleBlockUpdated);
     };
-  }, [params.discoveryBlockId, editingLock, session.user.id]);
+  }, [params.discoveryBlockId, editingLock, isLockedByOther]);
 
   // reads from state, not loaderData - picking a swatch/icon below updates
   // this (and everything derived from it) live, before Save is even clicked

@@ -251,7 +251,6 @@ const READINESS_THRESHOLD = {
 
 function EvaluationChecklistPage() {
   const { projectId } = Route.useParams();
-  const { session } = Route.useRouteContext();
   const checklistItems = Route.useLoaderData();
   const [items, setItems] = useState<EvaluationChecklistItem[]>(checklistItems);
   const accordionItemData = categorizeChecklistItems(items);
@@ -350,13 +349,16 @@ function EvaluationChecklistPage() {
     await safeInvalidateRouter();
   }
 
+  // returns whether the save actually succeeded - ChecklistItemRow's own
+  // commit() needs that to decide whether it's safe to release its field
+  // lock and exit edit mode, or keep both so the user can retry
   async function handleUpdate(
     id: string,
     changes: Partial<EvaluationChecklistItem>
-  ) {
+  ): Promise<boolean> {
     // save previous state in case rollback is needed
     const previousItem = items.find((it) => it.id === id);
-    if (!previousItem) return;
+    if (!previousItem) return false;
 
     // optimistic update
     setItems((prevItems) =>
@@ -368,9 +370,10 @@ function EvaluationChecklistPage() {
     } catch {
       setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
       showToast({ type: "error", message: errorMessage("updated") });
-      return;
+      return false;
     }
     await safeInvalidateRouter();
+    return true;
   }
 
   // Optimistic delete: removed from the list immediately, re-inserted on
@@ -616,7 +619,6 @@ function EvaluationChecklistPage() {
                           key={c.id}
                           item={c}
                           projectId={projectId}
-                          currentUserId={session.user.id}
                           checkedColor={style.checkedColor}
                           isEditing={editingId === c.id}
                           onStartEdit={() => setEditingId(c.id)}
@@ -624,17 +626,22 @@ function EvaluationChecklistPage() {
                           onToggle={() =>
                             handleUpdate(c.id, { isChecked: !c.isChecked })
                           }
-                          onCommitLabel={(newValue) => {
+                          onCommitLabel={async (newValue) => {
                             // Only fires the PATCH if the label actually
-                            // changed and isn't blank - either way, exits
-                            // edit mode.
+                            // changed and isn't blank - a no-op commit has
+                            // nothing to save, so it's always a "success"
+                            // (ChecklistItemRow exits edit mode and
+                            // releases the lock either way). Exiting edit
+                            // mode itself is now ChecklistItemRow's own
+                            // call, made only once the save actually
+                            // settles - not unconditional here.
                             if (
                               newValue.trim().length &&
                               newValue !== c.label
                             ) {
-                              handleUpdate(c.id, { label: newValue });
+                              return handleUpdate(c.id, { label: newValue });
                             }
-                            setEditingId(null);
+                            return true;
                           }}
                           onDelete={() => handleDelete(c.id)}
                         />

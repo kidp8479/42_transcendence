@@ -34,6 +34,12 @@ export class RealtimeService {
     this.gateway.forceReleaseLock(key);
   }
 
+  // call when a member is removed from a project, so any lock they held
+  // there doesn't outlive their membership - see the gateway's own comment
+  forceReleaseLocksForUserInProject(userId: string, projectId: string): void {
+    this.gateway.forceReleaseLocksForUserInProject(userId, projectId);
+  }
+
   // handleConnection only joins project rooms from a snapshot taken at
   // connect time - a user added to a project while already connected (an
   // open tab) never gets joined to that project's room otherwise, and

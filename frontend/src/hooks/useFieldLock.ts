@@ -6,6 +6,10 @@ export interface FieldLock {
   userId: string;
   username: string;
   avatarUrl: string | null;
+  // identifies which socket/tab actually holds the lock, not just which
+  // account - two tabs signed into the same account are two different
+  // sockets, and isLockedByOther below needs to tell them apart
+  socketId: string;
 }
 
 interface FieldLockedEvent {
@@ -32,15 +36,20 @@ interface UseFieldLockResult {
 // Server side is RealtimeGateway's field:lock/field:unlock/field:query.
 export function useFieldLock(
   projectId: string,
-  key: string,
-  currentUserId: string
+  key: string
 ): UseFieldLockResult {
   const [lock, setLock] = useState<FieldLock | null>(null);
+  // this tab's own socket id - re-read on every "connect" (including
+  // reconnects, which socket.io-client assigns a new id to) so
+  // isLockedByOther below always compares against the live connection,
+  // not a stale id from before a reconnect
+  const [mySocketId, setMySocketId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const socket = getRealtimeSocket();
 
     function queryLock() {
+      setMySocketId(socket.id);
       socket.emit(
         "field:query",
         { projectId, key },
@@ -105,7 +114,7 @@ export function useFieldLock(
 
   return {
     lock,
-    isLockedByOther: lock !== null && lock.userId !== currentUserId,
+    isLockedByOther: lock !== null && lock.socketId !== mySocketId,
     acquire,
     release,
   };

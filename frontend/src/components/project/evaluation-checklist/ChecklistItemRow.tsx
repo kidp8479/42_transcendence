@@ -11,13 +11,15 @@ import {
 interface ChecklistItemRowProps {
   item: EvaluationChecklistItem;
   projectId: string;
-  currentUserId: string;
   checkedColor: string;
   isEditing: boolean;
   onStartEdit: () => void;
   onStopEdit: () => void;
   onToggle: () => void;
-  onCommitLabel: (newValue: string) => void;
+  // resolves to whether the save actually succeeded - the caller (this
+  // component) needs that to decide whether it's safe to release the lock
+  // and exit edit mode, or whether to keep both and let the user retry
+  onCommitLabel: (newValue: string) => Promise<boolean>;
   onDelete: () => void;
 }
 
@@ -29,7 +31,6 @@ interface ChecklistItemRowProps {
 export function ChecklistItemRow({
   item,
   projectId,
-  currentUserId,
   checkedColor,
   isEditing,
   onStartEdit,
@@ -40,8 +41,7 @@ export function ChecklistItemRow({
 }: ChecklistItemRowProps) {
   const { lock, isLockedByOther, acquire, release } = useFieldLock(
     projectId,
-    `checklist-item:${item.id}`,
-    currentUserId
+    `checklist-item:${item.id}`
   );
 
   // Enter calls commit() directly, which triggers onCommitLabel -> the
@@ -65,13 +65,24 @@ export function ChecklistItemRow({
     }
   }
 
-  function commit(newValue: string) {
+  // Holds the lock (and stays in edit mode) until the save actually
+  // settles - releasing it beforehand let a second member grab the field
+  // while this request was still in flight, so a slow PATCH could land
+  // after theirs and silently overwrite it. On failure, the lock and the
+  // user's typed value are both kept so they can see the error and retry
+  // without losing their edit or the field.
+  async function commit(newValue: string) {
     if (hasCommittedRef.current) {
       return;
     }
     hasCommittedRef.current = true;
-    release();
-    onCommitLabel(newValue);
+    const success = await onCommitLabel(newValue);
+    if (success) {
+      release();
+      onStopEdit();
+    } else {
+      hasCommittedRef.current = false;
+    }
   }
 
   function cancel() {

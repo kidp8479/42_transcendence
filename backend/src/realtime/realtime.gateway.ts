@@ -60,14 +60,19 @@ export class RealtimeGateway
     this.keyPrefixValidators.set(prefix, validator);
   }
 
-  // grabs the lock for key, only if nobody else already has it - the same
-  // user re-acquiring their own lock always succeeds (idempotent), needed
-  // for React StrictMode's dev-only double effect invocation (mount ->
-  // cleanup -> mount), which releases then immediately re-requests the same
-  // lock for the same user
+  // grabs the lock for key, only if nobody else already has it - scoped by
+  // socketId, not userId: two tabs signed into the same account are two
+  // different sockets, and must not be able to silently steal or overwrite
+  // each other's lock (that was the bug - re-acquiring by userId let a
+  // second tab of the same account grab the lock while the first tab still
+  // believed it held it, both able to save, last write wins). The same
+  // socket re-acquiring its own lock still always succeeds (idempotent),
+  // which is what React StrictMode's dev-only double effect invocation
+  // (mount -> cleanup -> mount) relies on - that replay happens on the same
+  // live connection, so its socketId is unchanged.
   private acquireLock(key: string, lock: FieldLock): boolean {
     const existing = this.locks.get(key);
-    if (existing !== undefined && existing.userId !== lock.userId) {
+    if (existing !== undefined && existing.socketId !== lock.socketId) {
       return false;
     }
     this.locks.set(key, lock);
@@ -332,12 +337,24 @@ export class RealtimeGateway
   // and lock/unlock/query a resource in a project they have no access to.
   // The prefix -> validator lookup itself comes from
   // registerKeyPrefixValidator, not a hardcoded per-model branch here.
+  //
+  // Requires exactly "prefix:id" - key.split(":") on its own only reads the
+  // first two segments and silently ignores anything past the second colon,
+  // so "checklist-item:<realId>:<anything>" used to validate against the
+  // same real resource while being a distinct Map key from the canonical
+  // "checklist-item:<realId>" - every extra suffix created a brand new,
+  // permanent entry in the locks Map for the same underlying field, with no
+  // bound on how many a single connected socket could create.
   private async keyBelongsToProject(
     key: string,
     projectId: string
   ): Promise<boolean> {
-    const [prefix, id] = key.split(":");
-    if (id === undefined) {
+    const segments = key.split(":");
+    if (segments.length !== 2) {
+      return false;
+    }
+    const [prefix, id] = segments;
+    if (prefix === "" || id === "") {
       return false;
     }
     const validator = this.keyPrefixValidators.get(prefix);
@@ -360,6 +377,22 @@ export class RealtimeGateway
     }
     this.locks.delete(key);
     this.server.to(`project:${lock.projectId}`).emit("field:unlocked", { key });
+  }
+
+  // used when a member is removed from a project (ProjectMembersService.
+  // removeMember) - removal only evicts their sockets from the project's
+  // room, it never touched this Map, so without this a removed member who
+  // keeps their tab open would go on holding whatever locks they had,
+  // indefinitely blocking every remaining member from editing those fields
+  // (REST writes still enforce locks by key, independent of room
+  // membership).
+  forceReleaseLocksForUserInProject(userId: string, projectId: string): void {
+    for (const [key, lock] of this.locks) {
+      if (lock.userId === userId && lock.projectId === projectId) {
+        this.locks.delete(key);
+        this.server.to(`project:${projectId}`).emit("field:unlocked", { key });
+      }
+    }
   }
 }
 

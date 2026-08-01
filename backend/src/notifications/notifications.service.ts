@@ -58,8 +58,9 @@ export class NotificationsService {
   async markAsRead(id: string, userId: string) {
     await this.findOwnedOrThrow(id, userId);
 
+    let updated;
     try {
-      return await this.prisma.notification.update({
+      updated = await this.prisma.notification.update({
         where: { id: id },
         data: { isRead: true },
       });
@@ -73,16 +74,24 @@ export class NotificationsService {
       }
       throw error;
     }
+    // so every other tab this user has open (a mark-as-read in tab A should
+    // be reflected in tab B without waiting for a reload) stays in sync -
+    // the acting tab already applied this locally, so receiving its own
+    // echo back is a harmless no-op update by id
+    this.realtimeService.emitToUser(userId, "notification:read", updated);
+    return updated;
   }
 
   // marks every unread notification belonging to this user as read in one
   // query - no per-row ownership check needed like markAsRead/remove, the
   // where clause itself already scopes everything to userId
   async markAllAsRead(userId: string) {
-    return this.prisma.notification.updateMany({
+    const result = await this.prisma.notification.updateMany({
       where: { userId: userId, isRead: false },
       data: { isRead: true },
     });
+    this.realtimeService.emitToUser(userId, "notification:read-all", {});
+    return result;
   }
 
   async remove(id: string, userId: string) {
@@ -92,23 +101,31 @@ export class NotificationsService {
     // client-side "mark as read" auto-deleting while the user also hits
     // delete) both want it gone - the second one isn't really a failure,
     // same reasoning as the delete-race fix elsewhere in this PR
+    let deleted;
     try {
-      return await this.prisma.notification.delete({
+      deleted = await this.prisma.notification.delete({
         where: { id: id },
       });
     } catch (error) {
       if (isRecordNotFoundError(error)) {
-        return existingNotification;
+        deleted = existingNotification;
+      } else {
+        throw error;
       }
-      throw error;
     }
+    this.realtimeService.emitToUser(userId, "notification:deleted", {
+      id: deleted.id,
+    });
+    return deleted;
   }
 
   // deletes every notification belonging to this user, read or unread -
   // same deleteMany/no-ownership-check-needed reasoning as markAllAsRead
   async removeAll(userId: string) {
-    return this.prisma.notification.deleteMany({
+    const result = await this.prisma.notification.deleteMany({
       where: { userId: userId },
     });
+    this.realtimeService.emitToUser(userId, "notification:deleted-all", {});
+    return result;
   }
 }
