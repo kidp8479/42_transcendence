@@ -10,6 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { CalendarAssigneeService } from "./calendar-assignee.service";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 import { CreateCalendarEventDto } from "./dto/create-calendar-event.dto";
 import { UpdateCalendarEventDto } from "./dto/update-calendar-event.dto";
 
@@ -180,10 +181,20 @@ export class CalendarEventsService {
       notes: dto.notes,
     };
 
-    await this.prisma.calendarEvent.update({
-      where: { id: id },
-      data: eventFields,
-    });
+    try {
+      await this.prisma.calendarEvent.update({
+        where: { id: id },
+        data: eventFields,
+      });
+    } catch (error) {
+      // someone else deleted this event in the race window between the
+      // guard above and this update - a clean 404 instead of Prisma's raw
+      // "record to update not found" text leaking to the client
+      if (isRecordNotFoundError(error)) {
+        throw new NotFoundException("Calendar event not found");
+      }
+      throw error;
+    }
 
     if (assigneeIds) {
       // existingEvent was fetched above, before replaceAssignees wipes the
@@ -203,14 +214,24 @@ export class CalendarEventsService {
   }
 
   async remove(id: string, projectId: string, userId: string) {
-    await this.findById(id, projectId, userId); // access guard
-    // same include as every other read path - without it the response is
-    // missing category/assignees and the frontend rejects it as invalid
-    const event = await this.prisma.calendarEvent.delete({
-      where: { id: id },
-      include: calendarEventInclude,
-    });
-    return mapCalendarEvent(event);
+    const existingEvent = await this.findById(id, projectId, userId); // access guard
+
+    // two members deleting the same event within the same race window both
+    // want it gone - same reasoning as the other services in this PR
+    try {
+      // same include as every other read path - without it the response is
+      // missing category/assignees and the frontend rejects it as invalid
+      const event = await this.prisma.calendarEvent.delete({
+        where: { id: id },
+        include: calendarEventInclude,
+      });
+      return mapCalendarEvent(event);
+    } catch (error) {
+      if (isRecordNotFoundError(error)) {
+        return existingEvent;
+      }
+      throw error;
+    }
   }
 
   // the frontend already blocks this in the form, but nothing stops a direct
