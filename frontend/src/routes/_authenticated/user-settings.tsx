@@ -8,21 +8,23 @@ import {
   Label,
   Modal,
   TextInput,
-  ToggleSwitch
- } from "flowbite-react";
-import { useState } from "react"
+  ToggleSwitch,
+} from "flowbite-react";
+import { useState } from "react";
 import { darkSurfaceTextInputTheme } from "@/lib/flowbite";
 
-import { createFileRoute } from "@tanstack/react-router";
-import { UploadFile } from "@/lib/rustfsApi";
+import { createFileRoute, useLoaderData } from "@tanstack/react-router";
+import { UploadFile, fileDownloadUrl } from "@/lib/rustfsApi";
 
-import { updateMe } from "@/lib/userSettingsApi"
+import { getMe, updateMe, User } from "@/lib/userSettingsApi";
 
 export const Route = createFileRoute("/_authenticated/user-settings")({
+  loader: () => getMe(),
   component: UserSettingsPage,
 });
 
-const rowClass = "flex items-center justify-between gap-6 border-b border-surface-border pb-4";
+const rowClass =
+  "flex items-center justify-between gap-6 border-b border-surface-border pb-4";
 const rowUploadButtonClass = `
   bg-surface-overlay
   dark:bg-surface-overlay!
@@ -41,6 +43,9 @@ const rowUploadButtonClass = `
 `;
 
 function UserSettingsPage() {
+
+  const user = Route.useLoaderData();
+
   const [openModal, setOpenModal] = useState(false);
 
   const [switch2FA, setSwitch2FA] = useState(false);
@@ -58,6 +63,7 @@ function UserSettingsPage() {
     try {
       const result = await UploadFile(file);
       setKey(result.key);
+      await updateMe({ avatarUrl: fileDownloadUrl(result.key) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -70,7 +76,7 @@ function UserSettingsPage() {
       <Modal
         show={openModal}
         dismissible
-        size="md" 
+        size="md"
         onClose={() => setOpenModal(false)}
         popup
       >
@@ -96,25 +102,27 @@ function UserSettingsPage() {
                 />
               </svg>
               <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-                <span className="font-semibold">Click to upload</span> or drag and drop
+                <span className="font-semibold">Click to upload</span> or drag
+                and drop
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">SVG, PNG, JPG or GIF (MAX. 800x400px)</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                SVG, PNG, JPG or GIF (MAX. 800x400px)
+              </p>
             </div>
             <FileInput
               id="dropzone-file"
               className="hidden"
               onChange={(e) => {
-                const selectedFile = e.target.files?.[0];
-                setFile(e.target.files?.[0] ?? null);
+                const selectedFile = e.target.files;
+                setFile(selectedFile?.[0] ?? null);
                 setOpenModal(false);
-                handleUpload(e.target.files?.[0] ?? null);
-                updateMe( { avatarUrl:e.target.files?.[0].name } );
+                handleUpload(selectedFile?.[0] ?? null);
               }}
             />
           </Label>
-        </div>    
+        </div>
       </Modal>
-  
+
       <div className="w-full mx-10">
         <h1 className="font-mono text-xl my-10 font-semibold text-text-primary">
           Settings
@@ -134,9 +142,11 @@ function UserSettingsPage() {
             >
               <Avatar
                 size="lg"
-                placeholderInitials={userName}
+                img={user.avatarUrl || undefined}
+                placeholderInitials= {user.username.slice(0, 2).toUpperCase()}
                 rounded
               />
+
               <section
                 className="flex flex-col gap-2"
                 aria-labelledby="profile-picture-upload-area"
@@ -170,9 +180,7 @@ function UserSettingsPage() {
 
             <section className={rowClass} aria-labelledby="account-email-area">
               <div>
-                <Label className="font-semibold text-text-primary">
-                  Email
-                </Label>
+                <Label className="font-semibold text-text-primary">Email</Label>
                 <p className="text-xs text-text-secondary">
                   Used for account recovery
                 </p>

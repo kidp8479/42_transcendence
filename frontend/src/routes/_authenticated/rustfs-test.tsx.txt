@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FileInput, Button, Label } from "flowbite-react";
+<<<<<<< HEAD
 import { downloadTestFile, uploadTestFile } from "../../lib/rustfsTestApi";
+=======
+import { uploadTestFile, fileDownloadUrl } from "../../lib/rustfsTestApi";
+>>>>>>> 97c0447 (feat(TR-56): implemented picture (not working yet) or capitals as an avatar)
 
 // Throwaway page: only exists to manually verify the RustFS pipeline works
 // end-to-end (browser -> backend -> RustFS -> backend -> browser). Not linked
@@ -77,6 +81,7 @@ function RustfsTestPage() {
       {key && (
         <div className="space-y-2">
           <p className="text-sm text-gray-600">Uploaded key: {key}</p>
+<<<<<<< HEAD
           {imageUrl && (
             <img
               src={imageUrl}
@@ -84,6 +89,13 @@ function RustfsTestPage() {
               className="max-w-full rounded border"
             />
           )}
+=======
+          <img
+            src={fileDownloadUrl(key)}
+            alt="uploaded test file"
+            className="max-w-full rounded border"
+          />
+>>>>>>> 97c0447 (feat(TR-56): implemented picture (not working yet) or capitals as an avatar)
         </div>
       )}
     </div>

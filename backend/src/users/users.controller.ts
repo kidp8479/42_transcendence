@@ -27,6 +27,6 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.usersService.findById(request.user.id);
+    return this.usersService.update(request.user.id, dto);
   }  
 }

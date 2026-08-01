@@ -3,8 +3,8 @@ import { apiClient } from "./apiClient";
 export interface User {
   username: string;
   email: string;
-  avatarUrl: string;
-  campus: string;
+  avatarUrl: string | null;
+  campus: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -13,22 +13,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseUser(
   value: unknown
-): User | null {
+): User {
   if (!isRecord(value)) {
-    return null;
+    throw new Error("Users response contains invalid items");
   }
 
   const { username, email, avatarUrl, campus } = value;
   if (
     typeof username !== "string" ||
     typeof email !== "string" ||
-    typeof avatarUrl !== "string" ||
-    typeof campus !== "string"
-  ) { 
-    return null;
+    (avatarUrl !== null && typeof avatarUrl !== "string") ||
+    (campus !== null && typeof campus !== "string")
+  ) {
+    throw new Error("Users response contains invalid items");
   }
 
   return { username, email, avatarUrl, campus };
+}
+
+export async function getMe(
+): Promise<User> {
+  return apiClient<unknown>(
+    `/users/me`, { method: "GET" }
+  ).then(parseUser);
 }
 
 
