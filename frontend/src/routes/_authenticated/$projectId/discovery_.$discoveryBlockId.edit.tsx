@@ -17,7 +17,7 @@ import {
 } from "@/lib/discoveryBlockItems";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { useEffect, useState } from "react";
-import { Label, TextInput, Textarea, Button, Avatar } from "flowbite-react";
+import { Label, TextInput, Textarea, Button } from "flowbite-react";
 import { HiArrowLeft } from "react-icons/hi";
 import {
   darkSurfaceFieldClassName,
@@ -35,6 +35,8 @@ import { DiscoveryBlockChecklist } from "@/components/discovery/DiscoveryBlockCh
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 import { useFieldLock } from "@/hooks/useFieldLock";
+import { useLiveItemSync } from "@/hooks/useLiveItemSync";
+import { LockOwnerAvatar } from "@/components/LockOwnerAvatar";
 
 // trailing "_" opts out of nesting under discovery.tsx (no <Outlet/> there)
 export const Route = createFileRoute(
@@ -137,65 +139,13 @@ function DiscoveryBlockEditPage() {
     setItems(loaderData.items);
   }, [loaderData]);
 
-  // live sync: another member checking/unchecking an item on this same
-  // block updates it here without a reload
-  useEffect(() => {
-    const socket = getRealtimeSocket();
-
-    function handleItemUpdated(payload: unknown) {
-      const updatedItem = parseDiscoveryBlockItem(payload);
-      if (
-        updatedItem === null ||
-        updatedItem.discoveryBlockId !== params.discoveryBlockId
-      ) {
-        return;
-      }
-      setItems((previous) =>
-        previous.map((currentItem) =>
-          currentItem.id === updatedItem.id ? updatedItem : currentItem
-        )
-      );
-    }
-
-    function handleItemCreated(payload: unknown) {
-      const createdItem = parseDiscoveryBlockItem(payload);
-      if (
-        createdItem === null ||
-        createdItem.discoveryBlockId !== params.discoveryBlockId
-      ) {
-        return;
-      }
-      // ignore an echo of our own create - handleAddItem already appended
-      // it locally with the real backend-assigned id
-      setItems((previous) =>
-        previous.some((item) => item.id === createdItem.id)
-          ? previous
-          : [...previous, createdItem]
-      );
-    }
-
-    function handleItemDeleted(payload: unknown) {
-      const deletedItem = parseDiscoveryBlockItem(payload);
-      if (
-        deletedItem === null ||
-        deletedItem.discoveryBlockId !== params.discoveryBlockId
-      ) {
-        return;
-      }
-      setItems((previous) =>
-        previous.filter((item) => item.id !== deletedItem.id)
-      );
-    }
-
-    socket.on("discovery-item:updated", handleItemUpdated);
-    socket.on("discovery-item:created", handleItemCreated);
-    socket.on("discovery-item:deleted", handleItemDeleted);
-    return () => {
-      socket.off("discovery-item:updated", handleItemUpdated);
-      socket.off("discovery-item:created", handleItemCreated);
-      socket.off("discovery-item:deleted", handleItemDeleted);
-    };
-  }, [params.discoveryBlockId]);
+  // live sync: another member checking/unchecking, adding, or removing an
+  // item on this same block updates it here without a reload - scoped to
+  // this block, other Discovery blocks' item events are ignored
+  useLiveItemSync("discovery-item", parseDiscoveryBlockItem, setItems, {
+    value: params.discoveryBlockId,
+    getValue: (item) => item.discoveryBlockId,
+  });
 
   const [selectedColorIndex, setSelectedColorIndex] = useState(
     loaderData.discoveryBlock.color ?? 0
@@ -490,12 +440,7 @@ function DiscoveryBlockEditPage() {
             discoveryBlockColor.border
           }
         >
-          <Avatar
-            img={editingLock.avatarUrl ?? undefined}
-            placeholderInitials={editingLock.username.slice(0, 2).toUpperCase()}
-            rounded
-            size="xs"
-          />
+          <LockOwnerAvatar lock={editingLock} />
           <span>
             <span className="font-semibold text-text-primary">
               {editingLock.username}

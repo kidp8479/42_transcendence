@@ -100,16 +100,21 @@ export class EvaluationChecklistItemsService {
       select: { userId: true },
     });
 
-    for (const member of members) {
-      if (member.userId === actingUserId) {
-        continue;
-      }
-      await this.notificationsService.create(
-        member.userId,
-        `${SECTION_LABELS[section]} reached 100% on "${project.name}"`,
-        `/${projectId}/evaluation-checklist`
-      );
-    }
+    // each member's insert + socket emit is independent - run them
+    // concurrently instead of awaiting one at a time, so this PATCH/DELETE
+    // response isn't delayed by N sequential DB round-trips on a project
+    // with N members
+    await Promise.all(
+      members
+        .filter((member) => member.userId !== actingUserId)
+        .map((member) =>
+          this.notificationsService.create(
+            member.userId,
+            `${SECTION_LABELS[section]} reached 100% on "${project.name}"`,
+            `/${projectId}/evaluation-checklist`
+          )
+        )
+    );
   }
 
   // GET (all)

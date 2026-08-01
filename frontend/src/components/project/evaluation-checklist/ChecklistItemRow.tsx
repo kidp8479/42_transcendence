@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Avatar, Checkbox, TextInput } from "flowbite-react";
+import { Checkbox, TextInput } from "flowbite-react";
 import { RiDeleteBackFill } from "react-icons/ri";
 import { useFieldLock } from "@/hooks/useFieldLock";
+import { LockOwnerAvatar } from "@/components/LockOwnerAvatar";
 import {
   EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH,
   type EvaluationChecklistItem,
@@ -137,12 +138,7 @@ export function ChecklistItemRow({
         />
       ) : isLockedByOther && lock ? (
         <span className="flex w-full min-w-0 items-center gap-2 px-2 text-left text-sm">
-          <Avatar
-            img={lock.avatarUrl ?? undefined}
-            placeholderInitials={lock.username.slice(0, 2).toUpperCase()}
-            rounded
-            size="xs"
-          />
+          <LockOwnerAvatar lock={lock} />
           <span className="min-w-0 wrap-break-word">{item.label}</span>
         </span>
       ) : (

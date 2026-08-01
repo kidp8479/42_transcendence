@@ -103,6 +103,19 @@ export class RealtimeGateway
   // "/socket.io", which nginx never forwards) - without this, no client could
   // ever reach this gateway through nginx.
   async handleConnection(client: Socket): Promise<void> {
+    // handleConnection is async (auth fetch + 2 Prisma calls + room joins
+    // below), but a client can emit field:lock/unlock/query the instant it
+    // connects - before any of that has finished. Handlers await this so
+    // they never run against a socket that hasn't joined its rooms yet
+    // (isMember would wrongly read as "not a member"). Left unresolved
+    // forever on an early-disconnect return path below, which is fine: a
+    // disconnected socket's own handlers never get their response delivered
+    // either way.
+    let resolveReady: () => void;
+    client.data.ready = new Promise<void>((resolve) => {
+      resolveReady = resolve;
+    });
+
     const appOrigin = this.configService.getOrThrow<string>("APP_ORIGIN");
     // Only enforce a match when Origin is actually sent. Socket.io's first
     // handshake goes through plain HTTP long-polling, and browsers don't
@@ -188,6 +201,7 @@ export class RealtimeGateway
       await client.join(`project:${membership.projectId}`);
     }
     await client.join(`user:${result.userId}`);
+    resolveReady!();
   }
 
   // locks live in our own Map, not Socket.io's room state - release them
@@ -214,6 +228,7 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<{ locked: boolean; lock: FieldLock | undefined }> {
+    await this.waitUntilReady(client);
     const userId = client.data.userId as string;
     if (
       !this.isMember(client, body.projectId) ||
@@ -245,6 +260,7 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<void> {
+    await this.waitUntilReady(client);
     const userId = client.data.userId as string;
     if (
       !this.isMember(client, body.projectId) ||
@@ -270,6 +286,7 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<{ lock: FieldLock | undefined }> {
+    await this.waitUntilReady(client);
     if (
       !this.isMember(client, body.projectId) ||
       !(await this.keyBelongsToProject(body.key, body.projectId))
@@ -277,6 +294,14 @@ export class RealtimeGateway
       return { lock: undefined };
     }
     return { lock: this.getLock(body.key) };
+  }
+
+  // handleConnection's own body assigns client.data.ready synchronously as
+  // its very first statement, so this is only ever undefined for a socket
+  // NestJS hasn't called handleConnection on yet - not expected to happen
+  // in practice, but awaiting nothing is a safe no-op if it ever did.
+  private async waitUntilReady(client: Socket): Promise<void> {
+    await (client.data.ready as Promise<void> | undefined);
   }
 
   // handleConnection joins this socket to a room per project the user

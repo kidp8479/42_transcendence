@@ -10,7 +10,7 @@ import {
   ThemeProvider,
 } from "flowbite-react";
 import { FaRegStar } from "react-icons/fa";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
 import {
@@ -28,11 +28,11 @@ import type {
   EvaluationChecklistItem,
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
-import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { ChecklistItemRow } from "@/components/project/evaluation-checklist/ChecklistItemRow";
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
+import { useLiveItemSync } from "@/hooks/useLiveItemSync";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -258,56 +258,10 @@ function EvaluationChecklistPage() {
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
-  // live sync: another member checking/unchecking an item updates this
-  // page without a reload
-  useEffect(() => {
-    const socket = getRealtimeSocket();
-
-    function handleItemUpdated(payload: unknown) {
-      const updatedItem = parseEvaluationChecklistItem(payload);
-      if (updatedItem === null) {
-        return;
-      }
-      setItems((previous) =>
-        previous.map((currentItem) =>
-          currentItem.id === updatedItem.id ? updatedItem : currentItem
-        )
-      );
-    }
-
-    function handleItemCreated(payload: unknown) {
-      const createdItem = parseEvaluationChecklistItem(payload);
-      if (createdItem === null) {
-        return;
-      }
-      // ignore an echo of our own create - handleAddItem already appended
-      // it locally with the real backend-assigned id
-      setItems((previous) =>
-        previous.some((item) => item.id === createdItem.id)
-          ? previous
-          : [...previous, createdItem]
-      );
-    }
-
-    function handleItemDeleted(payload: unknown) {
-      const deletedItem = parseEvaluationChecklistItem(payload);
-      if (deletedItem === null) {
-        return;
-      }
-      setItems((previous) =>
-        previous.filter((item) => item.id !== deletedItem.id)
-      );
-    }
-
-    socket.on("checklist-item:updated", handleItemUpdated);
-    socket.on("checklist-item:created", handleItemCreated);
-    socket.on("checklist-item:deleted", handleItemDeleted);
-    return () => {
-      socket.off("checklist-item:updated", handleItemUpdated);
-      socket.off("checklist-item:created", handleItemCreated);
-      socket.off("checklist-item:deleted", handleItemDeleted);
-    };
-  }, []);
+  // live sync: another member checking/unchecking, adding, or removing an
+  // item updates this page without a reload - no scope filter, the whole
+  // project's checklist lives on this one page
+  useLiveItemSync("checklist-item", parseEvaluationChecklistItem, setItems);
 
   // Plain per-category completion percent (no gating, unlike totalProgress
   // below) - used for each accordion's own progress bar.

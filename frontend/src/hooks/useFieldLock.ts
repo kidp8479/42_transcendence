@@ -40,13 +40,23 @@ export function useFieldLock(
   useEffect(() => {
     const socket = getRealtimeSocket();
 
-    socket.emit(
-      "field:query",
-      { projectId, key },
-      (response: { lock: FieldLock | undefined }) => {
-        setLock(response.lock ?? null);
-      }
-    );
+    function queryLock() {
+      socket.emit(
+        "field:query",
+        { projectId, key },
+        (response: { lock: FieldLock | undefined }) => {
+          setLock(response.lock ?? null);
+        }
+      );
+    }
+
+    queryLock();
+    // the backend's lock Map is in-memory, wiped on every backend restart -
+    // a client whose socket survives that as a reconnect (not a page
+    // reload) would otherwise keep showing a lock that no longer exists
+    // server-side, since nothing else re-triggers a query. "connect" fires
+    // on every reconnect, not just the first one.
+    socket.on("connect", queryLock);
 
     function handleLocked(event: FieldLockedEvent) {
       if (event.key === key) {
@@ -63,6 +73,7 @@ export function useFieldLock(
     socket.on("field:unlocked", handleUnlocked);
 
     return () => {
+      socket.off("connect", queryLock);
       socket.off("field:locked", handleLocked);
       socket.off("field:unlocked", handleUnlocked);
       // a component unmounting (navigating away) doesn't close the socket,

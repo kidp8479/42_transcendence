@@ -40,17 +40,22 @@ export class NotificationsService {
     });
   }
 
-  // ownership check happens here, not just trusted from the controller:
-  // find the notification scoped to this exact userId - if it doesn't come
-  // back, either it doesn't exist or it belongs to someone else, and either
-  // way the right response is the same 404 (never leak which case it was)
-  async markAsRead(id: string, userId: string) {
+  // shared by markAsRead/remove below: find the notification scoped to
+  // this exact userId - if it doesn't come back, either it doesn't exist
+  // or it belongs to someone else, and either way the right response is
+  // the same 404 (never leak which case it was)
+  private async findOwnedOrThrow(id: string, userId: string) {
     const notification = await this.prisma.notification.findFirst({
       where: { id: id, userId: userId },
     });
     if (!notification) {
       throw new NotFoundException("Notification not found");
     }
+    return notification;
+  }
+
+  async markAsRead(id: string, userId: string) {
+    await this.findOwnedOrThrow(id, userId);
 
     return this.prisma.notification.update({
       where: { id: id },
@@ -68,14 +73,8 @@ export class NotificationsService {
     });
   }
 
-  // same ownership check as markAsRead, then a permanent delete
   async remove(id: string, userId: string) {
-    const notification = await this.prisma.notification.findFirst({
-      where: { id: id, userId: userId },
-    });
-    if (!notification) {
-      throw new NotFoundException("Notification not found");
-    }
+    await this.findOwnedOrThrow(id, userId);
 
     return this.prisma.notification.delete({
       where: { id: id },
