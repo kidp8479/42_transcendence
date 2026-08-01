@@ -50,6 +50,10 @@ GRANT UPDATE (
 ) ON TABLE
 	"User"
 TO backend_runtime;
+-- grant self account deletion to user
+GRANT DELETE ON TABLE
+	"User"
+TO backend_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
 	"Notification",
 	"ProjectMember",

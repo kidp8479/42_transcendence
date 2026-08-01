@@ -7,9 +7,7 @@
 // All fields are optional in the update DTO file, the user can update only one field at a time.
 
 import { PartialType, OmitType } from "@nestjs/mapped-types";
-import {
-  CreateUserDto
-} from "./create-user.dto";
+import { CreateUserDto } from "./create-user.dto";
 
 export class UpdateUserDto extends PartialType(
   OmitType(CreateUserDto, ["email"] as const)

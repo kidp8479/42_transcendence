@@ -7,31 +7,50 @@ import {
   FileInput,
   Label,
   Modal,
+  ModalBody,
+  ModalHeader,
   TextInput,
   // ToggleSwitch,
 } from "flowbite-react";
 import { useState } from "react";
+import { HiOutlineExclamationTriangle } from "react-icons/hi2";
 import { darkSurfaceTextInputTheme } from "@/lib/flowbite";
 
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { UploadFile, fileDownloadUrl } from "@/lib/rustfsApi";
 
-import { getMe, updateMe } from "@/lib/userSettingsApi";
+import { getMe, updateMe, deleteMe } from "@/lib/userSettingsApi";
+import { authSessionResource } from "@/lib/authState";
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
+
+// Second step of the delete-account flow forces the user to type this
+// phrase verbatim - a plain "Confirm" click is too easy to hit by mistake
+// for a destructive, unrecoverable action.
+const DELETE_CONFIRMATION_PHRASE =
+  "I acknowledge that will be lost forever but I want to delete it anyway";
+
+// theme override shared by the delete-account modal - matches the
+// surface/border tokens ModalLayer.tsx uses for the auth modal, instead of
+// Flowbite's default light popup card.
+const darkSurfaceModalTheme = {
+  content: {
+    inner:
+      "relative flex max-h-[90dvh] flex-col rounded-2xl border border-surface-border bg-surface-raised shadow-2xl",
+  },
+};
 
 export const Route = createFileRoute("/_authenticated/user-settings")({
   loader: () => getMe(),
   component: UserSettingsPage,
 });
 
-const rowClass =
-  "flex items-center justify-between gap-6 pb-4";
+const rowClass = "flex items-center justify-between gap-6 pb-4";
 
-const rowClassBorder = 
- "flex items-center justify-between gap-6 pb-4 border-b border-surface-border";
-  
+const rowClassBorder =
+  "flex items-center justify-between gap-6 pb-4 border-b border-surface-border";
+
 const rowUploadButtonClass = `
   bg-surface-overlay
   dark:bg-surface-overlay!
@@ -49,16 +68,26 @@ const rowUploadButtonClass = `
   dark:focus:ring-brand-500
 `;
 
-function UserSettingsPage() {
+type DeleteAccountStep = "confirm" | "type-to-confirm";
 
+function UserSettingsPage() {
   const user = Route.useLoaderData();
+  const navigate = useNavigate();
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
-  const [openModal, setOpenModal] = useState(false);
+  const [openModalUploadAvatar, setOpenModalUploadAvatar] = useState(false);
+  const [deleteAccountStep, setDeleteAccountStep] =
+    useState<DeleteAccountStep | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [displayedName, setDisplayedName] = useState(user.username);
   // const [displayedCampus, setDisplayedCampus] = useState(user.campus);
-
   // const [switch2FA, setSwitch2FA] = useState(false);
+
+  function closeDeleteAccountModal() {
+    setDeleteAccountStep(null);
+    setDeleteConfirmationText("");
+  }
 
   async function handleUpload(file: File | null) {
     if (!file) return;
@@ -66,13 +95,27 @@ function UserSettingsPage() {
       const result = await UploadFile(file);
       await updateMe({ avatarUrl: fileDownloadUrl(result.key) });
       safeInvalidateRouter();
-    } catch (err) {
+    } catch {
       showToast({ type: "error", message: "Upload failed. Please retry." });
     }
   }
 
-  async function handleSaveChanges() {
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await deleteMe();
+      authSessionResource.setAnonymous();
+      await navigate({ to: "/" });
+    } catch {
+      showToast({
+        type: "error",
+        message: "Account deletion failed. Please retry.",
+      });
+      setDeleting(false);
+    }
+  }
 
+  async function handleSaveChanges() {
     const changes: Partial<typeof user> = {};
 
     if (displayedName !== user.username) {
@@ -80,14 +123,14 @@ function UserSettingsPage() {
     }
     // if (displayedCampus !== user.campus) {
     //   changes.campus = displayedCampus;
-    // }        
+    // }
 
     try {
       await updateMe({
         username: changes.username,
         email: changes.email,
         campus: changes.campus,
-      })
+      });
       safeInvalidateRouter();
     } catch {
       showToast({ type: "error", message: "Saving failed. Please retry." });
@@ -97,10 +140,10 @@ function UserSettingsPage() {
   return (
     <>
       <Modal
-        show={openModal}
+        show={openModalUploadAvatar}
         dismissible
         size="md"
-        onClose={() => setOpenModal(false)}
+        onClose={() => setOpenModalUploadAvatar(false)}
         popup
       >
         <div className="flex w-full items-center justify-center">
@@ -138,12 +181,109 @@ function UserSettingsPage() {
               onChange={(e) => {
                 const selectedFile = e.target.files;
                 // setFile(selectedFile?.[0] ?? null);
-                setOpenModal(false);
+                setOpenModalUploadAvatar(false);
                 handleUpload(selectedFile?.[0] ?? null);
               }}
             />
           </Label>
         </div>
+      </Modal>
+
+      <Modal
+        show={deleteAccountStep !== null}
+        dismissible
+        size="md"
+        theme={darkSurfaceModalTheme}
+        onClose={closeDeleteAccountModal}
+        popup
+      >
+        <ModalHeader />
+        <ModalBody>
+          <div className="flex flex-col items-center gap-4 pb-2 text-center">
+            <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
+
+            {deleteAccountStep === "confirm" && (
+              <>
+                <h3 className="text-lg font-semibold text-text-primary">
+                  Deleting an account is permanent, do you wish to continue?
+                </h3>
+                <p className="text-sm text-text-secondary">
+                  This will permanently remove your account and all associated
+                  data. This action cannot be undone.
+                </p>
+                <div className="mt-2 flex w-full justify-center gap-3">
+                  <Button
+                    className={rowUploadButtonClass}
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      closeDeleteAccountModal();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    color="red"
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      setDeleteAccountStep("type-to-confirm");
+                    }}
+                  >
+                    Continue
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {deleteAccountStep === "type-to-confirm" && (
+              <>
+                <h3 className="text-lg font-semibold text-text-primary">
+                  Last chance
+                </h3>
+                <p className="text-sm text-text-secondary">
+                  Type{" "}
+                  <span className="font-semibold text-text-primary">
+                    &quot;{DELETE_CONFIRMATION_PHRASE}&quot;
+                  </span>{" "}
+                  below to confirm.
+                </p>
+                <TextInput
+                  className="w-full"
+                  theme={darkSurfaceTextInputTheme}
+                  value={deleteConfirmationText}
+                  disabled={deleting}
+                  onChange={(e) => {
+                    setDeleteConfirmationText(e.currentTarget.value);
+                  }}
+                />
+                <div className="mt-2 flex w-full justify-center gap-3">
+                  <Button
+                    className={rowUploadButtonClass}
+                    disabled={deleting}
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      closeDeleteAccountModal();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    color="red"
+                    disabled={
+                      deleting ||
+                      deleteConfirmationText !== DELETE_CONFIRMATION_PHRASE
+                    }
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      handleDelete();
+                    }}
+                  >
+                    {deleting ? "Deleting..." : "Delete account"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </ModalBody>
       </Modal>
 
       <div className="w-full mx-10">
@@ -166,7 +306,7 @@ function UserSettingsPage() {
               <Avatar
                 size="lg"
                 img={user.avatarUrl || undefined}
-                placeholderInitials= {user.username.slice(0, 2).toUpperCase()}
+                placeholderInitials={user.username.slice(0, 2).toUpperCase()}
                 rounded
               />
 
@@ -182,7 +322,7 @@ function UserSettingsPage() {
                   className={rowUploadButtonClass}
                   onClick={(e) => {
                     e.currentTarget.blur();
-                    setOpenModal(true);
+                    setOpenModalUploadAvatar(true);
                   }}
                 >
                   Upload photo
@@ -198,7 +338,7 @@ function UserSettingsPage() {
                 className="w-80"
                 theme={darkSurfaceTextInputTheme}
                 defaultValue={user.username}
-                onBlur={ (e) => {
+                onBlur={(e) => {
                   setDisplayedName(e.currentTarget.value);
                 }}
               />
@@ -215,26 +355,31 @@ function UserSettingsPage() {
                 className="w-80"
                 theme={darkSurfaceTextInputTheme}
                 type="email"
-                value={ user.email }
+                value={user.email}
                 disabled
               />
             </section>
 
-            <section className={rowClassBorder} aria-labelledby="account-campus-area">
+            <section
+              className={rowClassBorder}
+              aria-labelledby="account-campus-area"
+            >
               <div>
-                <Label className="font-semibold text-text-primary">Campus</Label>
+                <Label className="font-semibold text-text-primary">
+                  Campus
+                </Label>
               </div>
               <TextInput
                 className="w-80"
                 theme={darkSurfaceTextInputTheme}
                 type="campus"
-                value={ user.campus ?? "" }
+                value={user.campus ?? ""}
                 disabled
                 // onBlur={ (e) => {
                 //   setDisplayedCampus(e.currentTarget.value);
                 // }}
               />
-            </section>            
+            </section>
 
             <div>
               <Button
@@ -253,7 +398,11 @@ function UserSettingsPage() {
             className="flex flex-col gap-4 mt-6"
             aria-labelledby="security-heading"
           >
-            <h2 className="font-mono uppercase text-xs font-semibold text-text-muted">
+
+            {/* 
+              PASSWORD CHANGE UI
+            */}
+            {/* <h2 className="font-mono uppercase text-xs font-semibold text-text-muted">
               Security
             </h2>
 
@@ -275,8 +424,12 @@ function UserSettingsPage() {
               >
                 Change
               </Button>
-            </section>
+            </section> */}
 
+
+            {/*
+              2-FA UI
+            */}
             {/* <section className={rowClass} aria-labelledby="two-factor-area">
               <div>
                 <Label className="font-semibold text-text-primary">
@@ -314,6 +467,7 @@ function UserSettingsPage() {
                 outline
                 onClick={(e) => {
                   e.currentTarget.blur();
+                  setDeleteAccountStep("confirm");
                 }}
               >
                 Delete

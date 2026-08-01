@@ -11,9 +11,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function parseUser(
-  value: unknown
-): User {
+function parseUser(value: unknown): User {
   if (!isRecord(value)) {
     throw new Error("Users response contains invalid items");
   }
@@ -31,26 +29,32 @@ function parseUser(
   return { username, email, avatarUrl, campus };
 }
 
-export async function getMe(
-): Promise<User> {
-  return apiClient<unknown>(
-    `/users/me`, { method: "GET" }
-  ).then(parseUser);
+export async function getMe(): Promise<User> {
+  return apiClient<unknown>(`/users/me`, { method: "GET" }).then(parseUser);
 }
 
-
 // PATCH /users/me
-export async function updateMe(
-  dto: Partial<User>
-): Promise<User> {
-
-  return apiClient<unknown>(
-    `/users/me`, { method: "PATCH", body: dto }
-  ).then((payload) => {
-    const parsed = parseUser(payload);
-    if (parsed === null) {
-      throw new Error("Item response is invalid");
+export async function updateMe(dto: Partial<User>): Promise<User> {
+  return apiClient<unknown>(`/users/me`, { method: "PATCH", body: dto }).then(
+    (payload) => {
+      const parsed = parseUser(payload);
+      if (parsed === null) {
+        throw new Error("User response is invalid");
+      }
+      return parsed;
     }
-    return parsed;
-  })
+  );
+}
+
+// DELETE /users/me
+export async function deleteMe(): Promise<User> {
+  return apiClient<unknown>(`/users/me`, { method: "DELETE" }).then(
+    (payload) => {
+      const parsed = parseUser(payload);
+      if (parsed === null) {
+        throw new Error("User response is invalid");
+      }
+      return parsed;
+    }
+  );
 }

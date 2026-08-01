@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Req } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Delete, Req } from "@nestjs/common";
 import { ApiSecurity } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { UsersService } from "./users.service";
@@ -23,10 +16,13 @@ export class UsersController {
 
   @ApiSecurity("csrf")
   @Patch("me")
-  update(
-    @Body() dto: UpdateUserDto,
-    @Req() request: AuthenticatedRequest
-  ) {
+  update(@Body() dto: UpdateUserDto, @Req() request: AuthenticatedRequest) {
     return this.usersService.update(request.user.id, dto);
+  }
+
+  @ApiSecurity("csrf")
+  @Delete("me")
+  remove(@Req() request: AuthenticatedRequest) {
+    return this.usersService.remove(request.user.id);
   }
 }

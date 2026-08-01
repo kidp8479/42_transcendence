@@ -36,9 +36,7 @@ export class RustfsController {
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: MAX_TEST_UPLOAD_BYTES } })
   )
-  async upload(
-    @UploadedFile() file: Express.Multer.File
-  ) {
+  async upload(@UploadedFile() file: Express.Multer.File) {
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
     // Keep the key slash-free so download is a plain :key route param.
     const safeOriginalName = file.originalname.replace(/[\\/]/g, "_");
@@ -49,9 +47,7 @@ export class RustfsController {
 
   // GET (one)
   @Get(":key")
-  async download(
-    @Param("key") key: string
-  ): Promise<StreamableFile> {
+  async download(@Param("key") key: string): Promise<StreamableFile> {
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
     const { body, contentType } = await this.storage.getObject(bucket, key);
     return new StreamableFile(body, { type: contentType });
