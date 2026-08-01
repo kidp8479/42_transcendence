@@ -76,13 +76,20 @@ export class CalendarEventsService {
     });
     const message = messageFor(project.name);
 
-    for (const userId of addedUserIds) {
-      await this.notificationsService.create(
-        userId,
-        message,
-        `/${projectId}/calendar`
-      );
-    }
+    // each assignee's insert + socket emit is independent - run them
+    // concurrently instead of awaiting one at a time, so this request
+    // isn't delayed by N sequential DB round-trips on an event with N
+    // new assignees, same reasoning as
+    // EvaluationChecklistItemsService.notifySectionIfJustCompleted
+    await Promise.all(
+      addedUserIds.map((userId) =>
+        this.notificationsService.create(
+          userId,
+          message,
+          `/${projectId}/calendar`
+        )
+      )
+    );
   }
 
   async create(projectId: string, dto: CreateCalendarEventDto, userId: string) {
