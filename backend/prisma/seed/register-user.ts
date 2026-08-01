@@ -40,7 +40,7 @@ export async function registerSeedUser(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Origin: "http://localhost:8080",
+      Origin: process.env.APP_ORIGIN ?? "http://localhost:8080",
     },
     body: JSON.stringify({ email, username, password: SEED_PASSWORD }),
   });
