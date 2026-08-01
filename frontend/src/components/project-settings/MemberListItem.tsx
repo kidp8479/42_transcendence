@@ -58,17 +58,18 @@ export function MemberListItem({
             <RiMoreLine className="h-4 w-4 text-text-secondary hover:text-text-primary" />
           }
         >
-          {currentUserRole === "OWNER" && role === "MEMBER" && (
-            <DropdownItem
-              className="!text-xs hover:!bg-transparent focus:!bg-transparent"
-              onClick={() => onRoleChange(userId, "ADMIN")}
-            >
-              <div className="flex items-center gap-2">
-                <LuShieldPlus className="h-4 w-4" />
-                <span className="text-xs">Promote to Admin</span>
-              </div>
-            </DropdownItem>
-          )}
+          {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") &&
+            role === "MEMBER" && (
+              <DropdownItem
+                className="!text-xs hover:!bg-transparent focus:!bg-transparent"
+                onClick={() => onRoleChange(userId, "ADMIN")}
+              >
+                <div className="flex items-center gap-2">
+                  <LuShieldPlus className="h-4 w-4" />
+                  <span className="text-xs">Promote to Admin</span>
+                </div>
+              </DropdownItem>
+            )}
           {currentUserRole === "OWNER" && role === "ADMIN" && (
             <DropdownItem
               className="hover:!bg-transparent focus:!bg-transparent"

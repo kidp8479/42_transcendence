@@ -200,10 +200,10 @@ export class ProjectMembersService {
       projectId,
       requestingUserId
     );
-    // only OWNER can change roles
-    if (requester.role !== "OWNER") {
+    // only OWNER and ADMIN can change roles
+    if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
       throw new ForbiddenException(
-        "Only the project owner can change member roles"
+        "Only the project owner and admin can change member roles"
       );
     }
     // verify target exists in project
@@ -215,6 +215,16 @@ export class ProjectMembersService {
     if (memberToUpdate.role === "OWNER") {
       throw new ForbiddenException("Cannot change the project owner's role");
     }
+
+    // only OWNER can demote an ADMIN
+    if (
+      memberToUpdate.role === "ADMIN" &&
+      newRole === "MEMBER" &&
+      requester.role !== "OWNER"
+    ) {
+      throw new ForbiddenException("Only the project owner can demote admins");
+    }
+
     if (memberToUpdate.role === newRole) {
       throw new BadRequestException("Member already has this role");
     }
