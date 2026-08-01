@@ -74,13 +74,16 @@ export class RealtimeGateway
     return true;
   }
 
-  // releases key, but only if userId is the one actually holding it
-  private releaseLock(key: string, userId: string): void {
+  // releases key, but only if this exact socket is the one holding it -
+  // userId alone isn't enough: useFieldLock emits field:unlock on unmount,
+  // so a second tab's unmount (route change, tab close) could otherwise
+  // unlock a field the first tab is still actively editing
+  private releaseLock(key: string, socketId: string): void {
     const lock = this.locks.get(key);
     if (lock == undefined) {
       return;
     }
-    if (lock.userId === userId) {
+    if (lock.socketId === socketId) {
       this.locks.delete(key);
     }
   }
@@ -271,7 +274,6 @@ export class RealtimeGateway
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<void> {
     await this.waitUntilReady(client);
-    const userId = client.data.userId as string;
     if (
       !this.isMember(client, body.projectId) ||
       !(await this.keyBelongsToProject(body.key, body.projectId))
@@ -280,11 +282,11 @@ export class RealtimeGateway
     }
 
     const lock = this.getLock(body.key);
-    if (lock === undefined || lock.userId !== userId) {
+    if (lock === undefined || lock.socketId !== client.id) {
       return;
     }
 
-    this.releaseLock(body.key, userId);
+    this.releaseLock(body.key, client.id);
     this.server
       .to(`project:${body.projectId}`)
       .emit("field:unlocked", { key: body.key });
