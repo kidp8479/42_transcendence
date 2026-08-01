@@ -95,6 +95,11 @@ export class DiscoveryBlockItemsService {
     // recalculateStatus still protects its own read-then-write internally
     // (see its own comment), just as a separate transaction.
     await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-item:created",
+      blockItem
+    );
     return blockItem;
   }
 
@@ -165,6 +170,11 @@ export class DiscoveryBlockItemsService {
     // recalculated after the delete, so the removed item is already excluded
     // from the count/ratio
     await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-item:deleted",
+      deletedItem
+    );
     return deletedItem;
   }
 }
