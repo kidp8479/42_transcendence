@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Avatar, Checkbox, TextInput } from "flowbite-react";
 import { RiDeleteBackFill } from "react-icons/ri";
 import { useFieldLock } from "@/hooks/useFieldLock";
@@ -42,6 +43,13 @@ export function ChecklistItemRow({
     currentUserId
   );
 
+  // Enter calls commit() directly, which triggers onCommitLabel -> the
+  // parent sets isEditing=false -> this TextInput unmounts -> the browser
+  // fires a native blur on it, re-running onBlur's own commit() with the
+  // same value. Guards against sending the same commit twice; reset
+  // whenever a fresh edit session actually starts.
+  const hasCommittedRef = useRef(false);
+
   async function startEdit() {
     if (isLockedByOther) {
       return;
@@ -51,19 +59,40 @@ export function ChecklistItemRow({
     // actually confirms the lock is ours
     const granted = await acquire();
     if (granted) {
+      hasCommittedRef.current = false;
       onStartEdit();
     }
   }
 
   function commit(newValue: string) {
+    if (hasCommittedRef.current) {
+      return;
+    }
+    hasCommittedRef.current = true;
     release();
     onCommitLabel(newValue);
   }
 
   function cancel() {
+    // same reasoning as commit()'s guard - Escape unmounts the TextInput
+    // too, and the resulting blur would otherwise still call commit()
+    // and save the value the user just chose to discard
+    hasCommittedRef.current = true;
     release();
     onStopEdit();
   }
+
+  // Defense in depth against this row's own lock silently changing hands
+  // while isEditing is already true locally (e.g. this socket reconnects -
+  // a backend restart, a dropped connection - and someone else grabs the
+  // lock in the gap): the isEditing branch below renders a plain TextInput
+  // with no lock check at all, so without this the user could keep typing
+  // into a field someone else now legitimately holds.
+  useEffect(() => {
+    if (isEditing && isLockedByOther) {
+      onStopEdit();
+    }
+  }, [isEditing, isLockedByOther, onStopEdit]);
 
   return (
     <li className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border">
@@ -85,6 +114,7 @@ export function ChecklistItemRow({
           aria-label={`Edit "${item.label}"`}
           defaultValue={item.label}
           autoFocus
+          readOnly={isLockedByOther}
           onBlur={(event) => {
             if (
               event.currentTarget.value.length <=

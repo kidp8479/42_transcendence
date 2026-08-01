@@ -3,6 +3,7 @@
 
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -40,7 +41,21 @@ export class EvaluationChecklistItemsService {
     private readonly projectsService: ProjectsService,
     private readonly notificationsService: NotificationsService,
     private readonly realtimeService: RealtimeService
-  ) {}
+  ) {
+    // teaches the gateway how to resolve a "checklist-item:<id>" key's real
+    // projectId, so it can validate a field:lock/unlock/query without this
+    // service's model leaking into realtime.gateway.ts
+    this.realtimeService.registerKeyPrefixValidator(
+      "checklist-item",
+      async (id) => {
+        const item = await this.prisma.evaluationChecklistItem.findUnique({
+          where: { id },
+          select: { projectId: true },
+        });
+        return item?.projectId;
+      }
+    );
+  }
   // strictly equivalent to the lesser expanded (yet more readable) form:
   //  prisma: PrismaService;
   //  projectsService: ProjectsService;
@@ -144,7 +159,7 @@ export class EvaluationChecklistItemsService {
     // a Serializable transaction so Postgres itself rejects the second
     // transaction if it would have read stale data. Same pattern as
     // ProjectsService.create() and DiscoveryBlocksService.create().
-    return await this.prisma.transaction(
+    const createdItem = await this.prisma.transaction(
       async (transactionPrisma) => {
         const existingItemCount =
           await transactionPrisma.evaluationChecklistItem.count({
@@ -167,6 +182,12 @@ export class EvaluationChecklistItemsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
+    this.realtimeService.emitToProject(
+      projectId,
+      "checklist-item:created",
+      createdItem
+    );
+    return createdItem;
   }
 
   // PATCH (partial update)
@@ -184,6 +205,18 @@ export class EvaluationChecklistItemsService {
     // its return value is also reused below - it already carries this
     // item's section, no need for a second query.
     const existingItem = await this.findById(projectId, id, userId);
+    // only the label is lock-gated - isChecked/order are "last one wins" by
+    // design (see the frontend's own comment on this), so a checkbox toggle
+    // must go through even while someone else holds the label's edit lock.
+    // Without this check, a second member could still PATCH the label
+    // straight past a lock their own UI shows as read-only (replay, race,
+    // or a client bug) - the field-lock hook is otherwise a UI hint only.
+    if (
+      dto.label !== undefined &&
+      this.realtimeService.isLockedByOther(`checklist-item:${id}`, userId)
+    ) {
+      throw new ForbiddenException("This item is being edited by someone else");
+    }
     const previousPercent = computeSectionPercent(
       await this.prisma.evaluationChecklistItem.findMany({
         where: { projectId: projectId, section: existingItem.section },
@@ -230,6 +263,10 @@ export class EvaluationChecklistItemsService {
     const deletedItem = await this.prisma.evaluationChecklistItem.delete({
       where: { id: id },
     });
+    // the deleted item's own label lock (if any) will never be released by
+    // its holder now - findById would 404 for anyone who tried, so nothing
+    // would ever clear it otherwise until they disconnect
+    this.realtimeService.forceReleaseLock(`checklist-item:${id}`);
     // deleting the last unchecked item in a section can itself push it to
     // 100%, same as checking it would
     await this.notifySectionIfJustCompleted(
@@ -237,6 +274,11 @@ export class EvaluationChecklistItemsService {
       existingItem.section,
       previousPercent,
       userId
+    );
+    this.realtimeService.emitToProject(
+      projectId,
+      "checklist-item:deleted",
+      deletedItem
     );
     return deletedItem;
   }
