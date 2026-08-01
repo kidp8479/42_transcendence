@@ -19,6 +19,7 @@ import { NewDiscoveryBlockCard } from "@/components/discovery/NewDiscoveryBlockC
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import { ApiError } from "@/lib/apiClient";
 
 interface DiscoveryBlockWithItems {
   discoveryBlock: DiscoveryBlock;
@@ -210,18 +211,26 @@ function DiscoveryPage() {
   async function handleDeleteBlock(discoveryBlockId: string): Promise<boolean> {
     try {
       await deleteDiscoveryBlock(params.projectId, discoveryBlockId);
-      setDiscoveryBlocksWithItems((previous) =>
-        previous.filter((entry) => entry.discoveryBlock.id !== discoveryBlockId)
-      );
     } catch (error) {
-      console.error("Failed to delete discovery block", error);
-      showToast({
-        type: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to delete category",
-      });
-      return false;
+      // a 404 here means someone else already deleted this block (race
+      // between two members both clicking delete) - the tile disappearing
+      // is exactly what this user wanted too, so treat it as success
+      // instead of showing an error for an outcome they actually asked for
+      if (!(error instanceof ApiError && error.status === 404)) {
+        console.error("Failed to delete discovery block", error);
+        showToast({
+          type: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to delete category",
+        });
+        return false;
+      }
     }
+    setDiscoveryBlocksWithItems((previous) =>
+      previous.filter((entry) => entry.discoveryBlock.id !== discoveryBlockId)
+    );
     await safeInvalidateRouter();
     showToast({ type: "success", message: "Category deleted" });
     return true;

@@ -16,6 +16,7 @@ import {
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import { ApiError } from "@/lib/apiClient";
 import { useEffect, useState } from "react";
 import { Label, TextInput, Textarea, Button } from "flowbite-react";
 import { HiArrowLeft } from "react-icons/hi";
@@ -339,18 +340,22 @@ function DiscoveryBlockEditPage() {
         params.discoveryBlockId,
         id
       );
-      setItems((previousItems) =>
-        previousItems.filter((item) => item.id !== id)
-      );
     } catch (error) {
-      console.error("Failed to delete discovery block item", error);
-      showToast({
-        type: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to delete item",
-      });
-      return;
+      // a 404 here means someone else already deleted this item (race
+      // between two members both clicking delete) - the row disappearing
+      // is exactly what this user wanted too, so treat it as success
+      // instead of showing an error for an outcome they actually asked for
+      if (!(error instanceof ApiError && error.status === 404)) {
+        console.error("Failed to delete discovery block item", error);
+        showToast({
+          type: "error",
+          message:
+            error instanceof Error ? error.message : "Failed to delete item",
+        });
+        return;
+      }
     }
+    setItems((previousItems) => previousItems.filter((item) => item.id !== id));
     await safeInvalidateRouter();
   }
 
