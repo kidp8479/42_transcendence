@@ -354,7 +354,8 @@ function EvaluationChecklistPage() {
   // lock and exit edit mode, or keep both so the user can retry
   async function handleUpdate(
     id: string,
-    changes: Partial<EvaluationChecklistItem>
+    changes: Partial<EvaluationChecklistItem>,
+    fieldLockToken?: string
   ): Promise<boolean> {
     // save previous state in case rollback is needed
     const previousItem = items.find((it) => it.id === id);
@@ -366,7 +367,12 @@ function EvaluationChecklistPage() {
     );
 
     try {
-      await updateEvaluationChecklistItem(projectId, id, changes);
+      await updateEvaluationChecklistItem(
+        projectId,
+        id,
+        changes,
+        fieldLockToken
+      );
     } catch {
       setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
       showToast({ type: "error", message: errorMessage("updated") });
@@ -381,14 +387,14 @@ function EvaluationChecklistPage() {
   // re-appending it doesn't guarantee its original spot in the list - fine
   // here since a failed delete is rare and the list gets re-sorted by
   // `order` on the next render anyway.
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, fieldLockToken?: string) {
     const previousItem = items.find((it) => it.id === id);
     if (!previousItem) return;
 
     setItems((prevItems) => prevItems.filter((it) => it.id !== id));
 
     try {
-      await deleteEvaluationChecklistItem(projectId, id);
+      await deleteEvaluationChecklistItem(projectId, id, fieldLockToken);
     } catch {
       setItems((prevItems) => [...prevItems, previousItem]);
       showToast({ type: "error", message: errorMessage("deleted") });
@@ -626,7 +632,7 @@ function EvaluationChecklistPage() {
                           onToggle={() =>
                             handleUpdate(c.id, { isChecked: !c.isChecked })
                           }
-                          onCommitLabel={async (newValue) => {
+                          onCommitLabel={async (newValue, fieldLockToken) => {
                             // Only fires the PATCH if the label actually
                             // changed and isn't blank - a no-op commit has
                             // nothing to save, so it's always a "success"
@@ -639,11 +645,17 @@ function EvaluationChecklistPage() {
                               newValue.trim().length &&
                               newValue !== c.label
                             ) {
-                              return handleUpdate(c.id, { label: newValue });
+                              return handleUpdate(
+                                c.id,
+                                { label: newValue },
+                                fieldLockToken
+                              );
                             }
                             return true;
                           }}
-                          onDelete={() => handleDelete(c.id)}
+                          onDelete={(fieldLockToken) =>
+                            handleDelete(c.id, fieldLockToken)
+                          }
                         />
                       ))}
                     </ul>

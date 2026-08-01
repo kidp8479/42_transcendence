@@ -16,6 +16,7 @@ import {
   Delete,
   Req,
   Body,
+  Headers,
   Param,
   ParseUUIDPipe,
 } from "@nestjs/common";
@@ -77,13 +78,15 @@ export class EvaluationChecklistItemsController {
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateEvaluationChecklistItemDto,
+    @Headers("x-field-lock-token") fieldLockToken: string | undefined,
     @Req() request: AuthenticatedRequest
   ) {
     return this.evaluationChecklistItem.update(
       projectId,
       id,
       dto,
-      request.user.id
+      request.user.id,
+      fieldLockToken
     );
   }
 
@@ -93,8 +96,14 @@ export class EvaluationChecklistItemsController {
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("id", ParseUUIDPipe) id: string,
+    @Headers("x-field-lock-token") fieldLockToken: string | undefined,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.evaluationChecklistItem.remove(projectId, id, request.user.id);
+    return this.evaluationChecklistItem.remove(
+      projectId,
+      id,
+      request.user.id,
+      fieldLockToken
+    );
   }
 }

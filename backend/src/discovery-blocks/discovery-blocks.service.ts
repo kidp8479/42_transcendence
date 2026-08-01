@@ -11,6 +11,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { RealtimeService } from "../realtime/realtime.service";
+import { FieldLockLeaseError } from "../realtime/field-lock-manager";
 import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
 import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
@@ -176,30 +177,31 @@ export class DiscoveryBlocksService {
     projectId: string,
     id: string,
     dto: UpdateDiscoveryBlockDto,
-    userId: string
+    userId: string,
+    fieldLockToken: string | undefined
   ) {
-    await this.findById(projectId, id, userId); // access guard, see findById's own comment
-    // one lock covers the whole form here (unlike checklist items, which
-    // only gate the label field) - Title/Description/Notes/color/icon are
-    // all part of the same "Edit Category" screen, so any field of this
-    // PATCH is blocked while someone else holds it. Otherwise this is a
-    // UI-only hint: a member could PATCH straight past the disabled
-    // controls their own screen shows.
-    if (this.realtimeService.isLockedByOther(`discovery-block:${id}`, userId)) {
-      throw new ForbiddenException(
-        "This category is being edited by someone else"
-      );
-    }
-
-    // { ...dto } (spread notation in js) only contains the fields actually sent by the client (PATCH is partial):
-    // Prisma's update() only touches the keys present in `data`, leaving the rest of the row untouched
     let updatedBlock;
     try {
-      updatedBlock = await this.prisma.discoveryBlock.update({
-        where: { id: id },
-        data: { ...dto },
-      });
+      updatedBlock = await this.realtimeService.withValidatedFieldLock(
+        projectId,
+        `discovery-block:${id}`,
+        userId,
+        fieldLockToken,
+        async () => {
+          await this.findById(projectId, id, userId);
+        },
+        async () =>
+          this.prisma.discoveryBlock.update({
+            where: { id: id },
+            data: { ...dto },
+          })
+      );
     } catch (error) {
+      if (error instanceof FieldLockLeaseError) {
+        throw new ForbiddenException(
+          "A current editing lease is required to update this category"
+        );
+      }
       // someone else deleted this block in the race window between the
       // guard above and this update - a clean 404 instead of Prisma's raw
       // "record to update not found" text leaking to the client
@@ -219,30 +221,58 @@ export class DiscoveryBlocksService {
   // DELETE
   // discoveryBlockItems cascade-delete automatically at the DB level
   // (onDelete: Cascade on DiscoveryBlockItem.discoveryBlock in schema.prisma) - no need to delete them here
-  async remove(projectId: string, id: string, userId: string) {
-    const existingBlock = await this.findById(projectId, id, userId); // access guard, see findById's own comment
-
-    // two members deleting the same block within the same race window both
-    // want it gone - same reasoning as DiscoveryBlockItemsService.remove()
-    let deletedBlock = existingBlock;
+  async remove(
+    projectId: string,
+    id: string,
+    userId: string,
+    fieldLockToken: string | undefined
+  ) {
+    let result;
     try {
-      deletedBlock = await this.prisma.discoveryBlock.delete({
-        where: { id: id },
-      });
+      result = await this.realtimeService.withProjectFieldLock(
+        projectId,
+        `discovery-block:${id}`,
+        async () => {
+          this.realtimeService.assertFieldLockOwnerIfLocked(
+            `discovery-block:${id}`,
+            userId,
+            fieldLockToken
+          );
+          const existingBlock = await this.findById(projectId, id, userId);
+          let deletedBlock = existingBlock;
+          try {
+            deletedBlock = await this.prisma.discoveryBlock.delete({
+              where: { id: id },
+            });
+          } catch (error) {
+            if (!isRecordNotFoundError(error)) {
+              throw error;
+            }
+          }
+          return {
+            deletedBlock,
+            released: this.realtimeService.releaseFieldLockForResource(
+              `discovery-block:${id}`
+            ),
+          };
+        }
+      );
     } catch (error) {
-      if (!isRecordNotFoundError(error)) {
-        throw error;
+      if (error instanceof FieldLockLeaseError) {
+        throw new ForbiddenException(
+          "This category is currently being edited by another tab"
+        );
       }
+      throw error;
     }
-    // same reasoning as EvaluationChecklistItemsService.remove(): nothing
-    // would ever release this lock otherwise, the block it referred to no
-    // longer exists for anyone to release it against
-    this.realtimeService.forceReleaseLock(`discovery-block:${id}`);
+    if (result.released !== undefined) {
+      this.realtimeService.emitFieldUnlock(result.released);
+    }
     this.realtimeService.emitToProject(
       projectId,
       "discovery-block:deleted",
-      deletedBlock
+      result.deletedBlock
     );
-    return deletedBlock;
+    return result.deletedBlock;
   }
 }

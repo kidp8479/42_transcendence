@@ -12,6 +12,7 @@ import {
   Delete,
   Req,
   Body,
+  Headers,
   Param,
   ParseUUIDPipe,
 } from "@nestjs/common";
@@ -65,13 +66,15 @@ export class DiscoveryBlocksController {
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateDiscoveryBlockDto,
+    @Headers("x-field-lock-token") fieldLockToken: string | undefined,
     @Req() request: AuthenticatedRequest
   ) {
     return this.discoveryBlocksService.update(
       projectId,
       id,
       dto,
-      request.user.id
+      request.user.id,
+      fieldLockToken
     );
   }
 
@@ -81,8 +84,14 @@ export class DiscoveryBlocksController {
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("id", ParseUUIDPipe) id: string,
+    @Headers("x-field-lock-token") fieldLockToken: string | undefined,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.discoveryBlocksService.remove(projectId, id, request.user.id);
+    return this.discoveryBlocksService.remove(
+      projectId,
+      id,
+      request.user.id,
+      fieldLockToken
+    );
   }
 }

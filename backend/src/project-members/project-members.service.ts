@@ -108,47 +108,51 @@ export class ProjectMembersService {
     userId: string,
     requestingUserId: string
   ) {
-    // verify requester belongs to project
-    const requester = await this.projectsService.assertMembership(
-      projectId,
-      requestingUserId
-    );
-    // only OWNER or ADMIN can remove members
-    if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
-      throw new ForbiddenException(
-        "Only the project owner or admin can remove members"
+    return this.realtimeService.withProjectLock(projectId, async () => {
+      // verify requester belongs to project
+      const requester = await this.projectsService.assertMembership(
+        projectId,
+        requestingUserId
       );
-    }
-    // verify target exists in project
-    const memberToRemove = await this.projectsService.assertMembership(
-      projectId,
-      userId
-    );
-    // prevent removing the OWNER - every project has exactly one, enforced in DB (TR-69)
-    if (memberToRemove.role === "OWNER") {
-      throw new ForbiddenException("Cannot remove the project owner");
-    }
-    // an ADMIN can remove a MEMBER, but not a fellow ADMIN - only the OWNER
-    // can remove an ADMIN (flagged in TR-80's cross-branch review: without
-    // this, any two admins could remove each other)
-    if (memberToRemove.role === "ADMIN" && requester.role !== "OWNER") {
-      throw new ForbiddenException(
-        "Only the project owner can remove an admin"
+      // only OWNER or ADMIN can remove members
+      if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
+        throw new ForbiddenException(
+          "Only the project owner or admin can remove members"
+        );
+      }
+      // verify target exists in project
+      const memberToRemove = await this.projectsService.assertMembership(
+        projectId,
+        userId
       );
-    }
-    const removed = await this.prisma.projectMember.delete({
-      where: {
-        userId_projectId: {
-          userId,
-          projectId,
+      // prevent removing the OWNER - every project has exactly one, enforced in DB (TR-69)
+      if (memberToRemove.role === "OWNER") {
+        throw new ForbiddenException("Cannot remove the project owner");
+      }
+      // an ADMIN can remove a MEMBER, but not a fellow ADMIN - only the OWNER
+      // can remove an ADMIN (flagged in TR-80's cross-branch review: without
+      // this, any two admins could remove each other)
+      if (memberToRemove.role === "ADMIN" && requester.role !== "OWNER") {
+        throw new ForbiddenException(
+          "Only the project owner can remove an admin"
+        );
+      }
+      const removed = await this.prisma.projectMember.delete({
+        where: {
+          userId_projectId: {
+            userId,
+            projectId,
+          },
         },
-      },
+      });
+      this.realtimeService.leaveProjectRoom(userId, projectId);
+      for (const released of this.realtimeService.releaseFieldLocksForUserInProject(
+        userId,
+        projectId
+      )) {
+        this.realtimeService.emitFieldUnlock(released);
+      }
+      return removed;
     });
-    this.realtimeService.leaveProjectRoom(userId, projectId);
-    // otherwise a removed member who keeps their tab open goes on holding
-    // whatever field locks they had, indefinitely blocking every remaining
-    // member from editing those fields - see the gateway's own comment
-    this.realtimeService.forceReleaseLocksForUserInProject(userId, projectId);
-    return removed;
   }
 }

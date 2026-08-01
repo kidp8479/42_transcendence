@@ -11,6 +11,11 @@ import { ConfigService } from "@nestjs/config";
 import { Socket, Server } from "socket.io";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import { PrismaService } from "../prisma/prisma.service";
+import {
+  AcquireFieldLockResult,
+  FieldLockManager,
+  ReleasedFieldLock,
+} from "./field-lock-manager";
 
 // Resolves the real projectId a lockable resource belongs to, given the id
 // half of its key (the "checklist-item:" / "discovery-block:" prefix is
@@ -32,6 +37,7 @@ interface FieldLock {
   // network blip, not the tab that's editing) would release this lock too,
   // since it only checked userId
   socketId: string;
+  expiresAt: number;
 }
 
 @WebSocketGateway({ path: "/ws" })
@@ -41,14 +47,15 @@ export class RealtimeGateway
   constructor(
     private readonly configService: ConfigService,
     private readonly vaultRuntime: VaultRuntimeService,
-    private readonly prisma: PrismaService
-  ) {}
+    private readonly prisma: PrismaService,
+    private readonly fieldLockManager: FieldLockManager
+  ) {
+    this.fieldLockManager.setExpirationHandler((released) => {
+      this.emitFieldUnlock(released);
+    });
+  }
 
   @WebSocketServer() server: Server;
-
-  // those 3 methods are used for websocket, defining "priority" when someone edits the same resource
-  // map to store all the locks, private because mutable
-  private locks = new Map<string, FieldLock>();
 
   // registered by each owning module's service (see keyBelongsToProject)
   private keyPrefixValidators = new Map<string, KeyPrefixValidator>();
@@ -70,32 +77,27 @@ export class RealtimeGateway
   // which is what React StrictMode's dev-only double effect invocation
   // (mount -> cleanup -> mount) relies on - that replay happens on the same
   // live connection, so its socketId is unchanged.
-  private acquireLock(key: string, lock: FieldLock): boolean {
-    const existing = this.locks.get(key);
-    if (existing !== undefined && existing.socketId !== lock.socketId) {
-      return false;
-    }
-    this.locks.set(key, lock);
-    return true;
+  private acquireLock(
+    key: string,
+    lock: Omit<FieldLock, "expiresAt">
+  ): AcquireFieldLockResult {
+    return this.fieldLockManager.acquire({ key, ...lock });
   }
 
   // releases key, but only if this exact socket is the one holding it -
   // userId alone isn't enough: useFieldLock emits field:unlock on unmount,
   // so a second tab's unmount (route change, tab close) could otherwise
   // unlock a field the first tab is still actively editing
-  private releaseLock(key: string, socketId: string): void {
-    const lock = this.locks.get(key);
-    if (lock == undefined) {
-      return;
-    }
-    if (lock.socketId === socketId) {
-      this.locks.delete(key);
-    }
+  private releaseLock(
+    key: string,
+    socketId: string
+  ): ReleasedFieldLock | undefined {
+    return this.fieldLockManager.release(key, socketId);
   }
 
   // who's currently editing key, if anyone
   private getLock(key: string): FieldLock | undefined {
-    return this.locks.get(key);
+    return this.fieldLockManager.get(key);
   }
 
   // used by RealtimeService.isLockedByOther, so a REST service (e.g.
@@ -124,8 +126,8 @@ export class RealtimeGateway
     // forever on an early-disconnect return path below, which is fine: a
     // disconnected socket's own handlers never get their response delivered
     // either way.
-    let resolveReady: () => void;
-    client.data.ready = new Promise<void>((resolve) => {
+    let resolveReady: (ready: boolean) => void;
+    client.data.ready = new Promise<boolean>((resolve) => {
       resolveReady = resolve;
     });
 
@@ -137,6 +139,7 @@ export class RealtimeGateway
     // catch. Rejecting on a missing header blocked every real connection.
     const origin = client.handshake.headers.origin;
     if (origin !== undefined && origin !== appOrigin) {
+      resolveReady!(false);
       client.disconnect(true);
       return;
     }
@@ -148,6 +151,7 @@ export class RealtimeGateway
       sessionCookieName
     );
     if (!sessionToken) {
+      resolveReady!(false);
       client.disconnect(true);
       return;
     }
@@ -170,11 +174,13 @@ export class RealtimeGateway
         signal: AbortSignal.timeout(2000),
       });
     } catch {
+      resolveReady!(false);
       client.disconnect(true);
       return;
     }
 
     if (!response.ok) {
+      resolveReady!(false);
       client.disconnect(true);
       return;
     }
@@ -184,6 +190,7 @@ export class RealtimeGateway
       userId?: string;
     };
     if (result.active !== true || typeof result.userId !== "string") {
+      resolveReady!(false);
       client.disconnect(true);
       return;
     }
@@ -195,6 +202,10 @@ export class RealtimeGateway
       where: { id: result.userId },
       select: { username: true, avatarUrl: true },
     });
+    if (!client.connected) {
+      resolveReady!(false);
+      return;
+    }
     client.data.username = user.username;
     client.data.avatarUrl = user.avatarUrl;
 
@@ -211,10 +222,18 @@ export class RealtimeGateway
       select: { projectId: true },
     });
     for (const membership of memberships) {
+      if (!client.connected) {
+        resolveReady!(false);
+        return;
+      }
       await client.join(`project:${membership.projectId}`);
     }
+    if (!client.connected) {
+      resolveReady!(false);
+      return;
+    }
     await client.join(`user:${result.userId}`);
-    resolveReady!();
+    resolveReady!(true);
   }
 
   // locks live in our own Map, not Socket.io's room state - release them
@@ -223,18 +242,10 @@ export class RealtimeGateway
   // the same user can have two tabs open, one actively editing (holding a
   // lock) while the other's connection drops and reconnects; only the
   // disconnecting socket's own locks should be released.
-  handleDisconnect(@ConnectedSocket() client: Socket): void {
-    const userId = client.data.userId as string | undefined;
-    if (userId === undefined) {
-      return;
-    }
-    for (const [key, lock] of this.locks) {
-      if (lock.socketId === client.id) {
-        this.locks.delete(key);
-        this.server
-          .to(`project:${lock.projectId}`)
-          .emit("field:unlocked", { key });
-      }
+  async handleDisconnect(@ConnectedSocket() client: Socket): Promise<void> {
+    const released = await this.fieldLockManager.releaseSocket(client.id);
+    for (const lock of released) {
+      this.emitFieldUnlock(lock);
     }
   }
 
@@ -244,32 +255,53 @@ export class RealtimeGateway
   async handleFieldLock(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
-  ): Promise<{ locked: boolean; lock: FieldLock | undefined }> {
-    await this.waitUntilReady(client);
-    const userId = client.data.userId as string;
-    if (
-      !this.isMember(client, body.projectId) ||
-      !(await this.keyBelongsToProject(body.key, body.projectId))
-    ) {
-      return { locked: false, lock: undefined };
+  ): Promise<{
+    locked: boolean;
+    lock: FieldLock | undefined;
+    leaseToken: string | undefined;
+  }> {
+    if (!(await this.waitUntilReady(client))) {
+      return { locked: false, lock: undefined, leaseToken: undefined };
     }
+    const userId = client.data.userId as string;
+    const result = await this.fieldLockManager.withProjectResource(
+      body.projectId,
+      body.key,
+      async () => {
+        if (
+          !client.connected ||
+          !this.isMember(client, body.projectId) ||
+          !(await this.isCurrentProjectMember(userId, body.projectId)) ||
+          !(await this.keyBelongsToProject(body.key, body.projectId))
+        ) {
+          return {
+            acquired: false,
+            lock: undefined,
+            token: undefined,
+          };
+        }
 
-    const lock: FieldLock = {
-      userId,
-      username: client.data.username as string,
-      avatarUrl: client.data.avatarUrl as string | null,
-      projectId: body.projectId,
-      socketId: client.id,
-    };
+        return this.acquireLock(body.key, {
+          userId,
+          username: client.data.username as string,
+          avatarUrl: client.data.avatarUrl as string | null,
+          projectId: body.projectId,
+          socketId: client.id,
+        });
+      }
+    );
 
-    const locked = this.acquireLock(body.key, lock);
-    if (locked) {
+    if (result.acquired && result.lock !== undefined) {
       this.server
         .to(`project:${body.projectId}`)
-        .emit("field:locked", { key: body.key, lock });
+        .emit("field:locked", { key: body.key, lock: result.lock });
     }
 
-    return { locked, lock: this.getLock(body.key) };
+    return {
+      locked: result.acquired,
+      lock: result.lock,
+      leaseToken: result.token,
+    };
   }
 
   // client is done editing key
@@ -278,23 +310,60 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<void> {
-    await this.waitUntilReady(client);
-    if (
-      !this.isMember(client, body.projectId) ||
-      !(await this.keyBelongsToProject(body.key, body.projectId))
-    ) {
+    if (!(await this.waitUntilReady(client))) {
       return;
     }
 
-    const lock = this.getLock(body.key);
-    if (lock === undefined || lock.socketId !== client.id) {
-      return;
+    const released = await this.fieldLockManager.withProjectResource(
+      body.projectId,
+      body.key,
+      async () => {
+        const userId = client.data.userId as string;
+        if (
+          !client.connected ||
+          !this.isMember(client, body.projectId) ||
+          !(await this.isCurrentProjectMember(userId, body.projectId)) ||
+          !(await this.keyBelongsToProject(body.key, body.projectId))
+        ) {
+          return undefined;
+        }
+        return this.releaseLock(body.key, client.id);
+      }
+    );
+    if (released !== undefined) {
+      this.emitFieldUnlock(released);
+    }
+  }
+
+  @SubscribeMessage("field:renew")
+  async handleFieldRenew(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { projectId: string; key: string; leaseToken: string }
+  ): Promise<{ renewed: boolean }> {
+    if (!(await this.waitUntilReady(client))) {
+      return { renewed: false };
     }
 
-    this.releaseLock(body.key, client.id);
-    this.server
-      .to(`project:${body.projectId}`)
-      .emit("field:unlocked", { key: body.key });
+    const renewed = await this.fieldLockManager.withProjectResource(
+      body.projectId,
+      body.key,
+      async () => {
+        const userId = client.data.userId as string;
+        if (
+          !client.connected ||
+          !this.isMember(client, body.projectId) ||
+          !(await this.isCurrentProjectMember(userId, body.projectId)) ||
+          !(await this.keyBelongsToProject(body.key, body.projectId))
+        ) {
+          return false;
+        }
+        return (
+          this.fieldLockManager.renew(body.key, client.id, body.leaseToken) !==
+          undefined
+        );
+      }
+    );
+    return { renewed };
   }
 
   // for a client opening something that was already locked before it connected
@@ -303,22 +372,34 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { projectId: string; key: string }
   ): Promise<{ lock: FieldLock | undefined }> {
-    await this.waitUntilReady(client);
-    if (
-      !this.isMember(client, body.projectId) ||
-      !(await this.keyBelongsToProject(body.key, body.projectId))
-    ) {
+    if (!(await this.waitUntilReady(client))) {
       return { lock: undefined };
     }
-    return { lock: this.getLock(body.key) };
+    return this.fieldLockManager.withProjectResource(
+      body.projectId,
+      body.key,
+      async () => {
+        const userId = client.data.userId as string;
+        if (
+          !client.connected ||
+          !this.isMember(client, body.projectId) ||
+          !(await this.isCurrentProjectMember(userId, body.projectId)) ||
+          !(await this.keyBelongsToProject(body.key, body.projectId))
+        ) {
+          return { lock: undefined };
+        }
+        return { lock: this.getLock(body.key) };
+      }
+    );
   }
 
   // handleConnection's own body assigns client.data.ready synchronously as
   // its very first statement, so this is only ever undefined for a socket
   // NestJS hasn't called handleConnection on yet - not expected to happen
   // in practice, but awaiting nothing is a safe no-op if it ever did.
-  private async waitUntilReady(client: Socket): Promise<void> {
-    await (client.data.ready as Promise<void> | undefined);
+  private async waitUntilReady(client: Socket): Promise<boolean> {
+    const ready = await (client.data.ready as Promise<boolean> | undefined);
+    return ready === true && client.connected;
   }
 
   // handleConnection joins this socket to a room per project the user
@@ -328,6 +409,17 @@ export class RealtimeGateway
   // exactly what lets a client receive that project's broadcasts at all.
   private isMember(client: Socket, projectId: string): boolean {
     return client.rooms.has(`project:${projectId}`);
+  }
+
+  private async isCurrentProjectMember(
+    userId: string,
+    projectId: string
+  ): Promise<boolean> {
+    return (
+      (await this.prisma.projectMember.count({
+        where: { userId, projectId },
+      })) === 1
+    );
   }
 
   // isMember only proves the caller belongs to body.projectId - it says
@@ -371,12 +463,10 @@ export class RealtimeGateway
   // never gets a field:unlock for a resource that no longer exists, so
   // without this the Map entry would sit there until they disconnect.
   forceReleaseLock(key: string): void {
-    const lock = this.locks.get(key);
-    if (lock === undefined) {
-      return;
+    const released = this.fieldLockManager.releaseResource(key);
+    if (released !== undefined) {
+      this.emitFieldUnlock(released);
     }
-    this.locks.delete(key);
-    this.server.to(`project:${lock.projectId}`).emit("field:unlocked", { key });
   }
 
   // used when a member is removed from a project (ProjectMembersService.
@@ -387,12 +477,18 @@ export class RealtimeGateway
   // (REST writes still enforce locks by key, independent of room
   // membership).
   forceReleaseLocksForUserInProject(userId: string, projectId: string): void {
-    for (const [key, lock] of this.locks) {
-      if (lock.userId === userId && lock.projectId === projectId) {
-        this.locks.delete(key);
-        this.server.to(`project:${projectId}`).emit("field:unlocked", { key });
-      }
+    for (const released of this.fieldLockManager.releaseUserInProject(
+      userId,
+      projectId
+    )) {
+      this.emitFieldUnlock(released);
     }
+  }
+
+  emitFieldUnlock(released: ReleasedFieldLock): void {
+    this.server
+      .to(`project:${released.lock.projectId}`)
+      .emit("field:unlocked", { key: released.key });
   }
 }
 

@@ -12,6 +12,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { RealtimeService } from "../realtime/realtime.service";
+import { FieldLockLeaseError } from "../realtime/field-lock-manager";
 import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 import { CreateEvaluationChecklistItemDto } from "./dto/create-evaluation-checklist-item.dto";
 import { UpdateEvaluationChecklistItemDto } from "./dto/update-evaluation-checklist-item.dto";
@@ -203,7 +204,8 @@ export class EvaluationChecklistItemsService {
     projectId: string,
     id: string,
     dto: UpdateEvaluationChecklistItemDto,
-    userId: string
+    userId: string,
+    fieldLockToken: string | undefined
   ) {
     // ownership check via findById, will throw if failed: confirms both that
     // userId is a member of projectId AND that id actually belongs to
@@ -212,42 +214,56 @@ export class EvaluationChecklistItemsService {
     // (to pass the membership half) with a foreign item id (IDOR).
     // its return value is also reused below - it already carries this
     // item's section, no need for a second query.
-    const existingItem = await this.findById(projectId, id, userId);
-    // only the label is lock-gated - isChecked/order are "last one wins" by
-    // design (see the frontend's own comment on this), so a checkbox toggle
-    // must go through even while someone else holds the label's edit lock.
-    // Without this check, a second member could still PATCH the label
-    // straight past a lock their own UI shows as read-only (replay, race,
-    // or a client bug) - the field-lock hook is otherwise a UI hint only.
-    if (
-      dto.label !== undefined &&
-      this.realtimeService.isLockedByOther(`checklist-item:${id}`, userId)
-    ) {
-      throw new ForbiddenException("This item is being edited by someone else");
-    }
-    const sectionItems = await this.prisma.evaluationChecklistItem.findMany({
-      where: { projectId: projectId, section: existingItem.section },
-      select: { id: true, isChecked: true },
-    });
-    const previousPercent = computeSectionPercent(sectionItems);
-
-    // safe to update by id alone now - findById already proved it belongs
-    // to projectId.
-    let updatedItem;
-    try {
-      updatedItem = await this.prisma.evaluationChecklistItem.update({
-        where: { id: id },
-        data: { ...dto },
+    const updateItem = async (
+      existingItem: Awaited<ReturnType<typeof this.findById>>
+    ) => {
+      const sectionItems = await this.prisma.evaluationChecklistItem.findMany({
+        where: { projectId: projectId, section: existingItem.section },
+        select: { id: true, isChecked: true },
       });
-    } catch (error) {
-      // someone else deleted this item in the race window between findById
-      // above and this update - a clean 404 instead of Prisma's raw
-      // "record to update not found" text leaking to the client
-      if (isRecordNotFoundError(error)) {
-        throw new NotFoundException("Checklist item not found");
+      const previousPercent = computeSectionPercent(sectionItems);
+
+      let updatedItem;
+      try {
+        updatedItem = await this.prisma.evaluationChecklistItem.update({
+          where: { id: id },
+          data: { ...dto },
+        });
+      } catch (error) {
+        if (isRecordNotFoundError(error)) {
+          throw new NotFoundException("Checklist item not found");
+        }
+        throw error;
       }
-      throw error;
+      return { existingItem, sectionItems, previousPercent, updatedItem };
+    };
+
+    let result;
+    if (dto.label !== undefined) {
+      let existingItem: Awaited<ReturnType<typeof this.findById>>;
+      try {
+        result = await this.realtimeService.withValidatedFieldLock(
+          projectId,
+          `checklist-item:${id}`,
+          userId,
+          fieldLockToken,
+          async () => {
+            existingItem = await this.findById(projectId, id, userId);
+          },
+          async () => updateItem(existingItem)
+        );
+      } catch (error) {
+        if (error instanceof FieldLockLeaseError) {
+          throw new ForbiddenException(
+            "A current editing lease is required to update this item"
+          );
+        }
+        throw error;
+      }
+    } else {
+      result = await updateItem(await this.findById(projectId, id, userId));
     }
+
     // only isChecked toggling (not label/order) can ever move a section's
     // percent, but recomputing unconditionally is simpler than tracking
     // which field changed, same reasoning as DiscoveryBlocksService.
@@ -255,64 +271,94 @@ export class EvaluationChecklistItemsService {
     // instead of a second findMany - it's the same list, just one row changed.
     await this.notifySectionIfJustCompleted(
       projectId,
-      existingItem.section,
-      previousPercent,
-      sectionItems.map((item) =>
-        item.id === id ? { isChecked: updatedItem.isChecked } : item
+      result.existingItem.section,
+      result.previousPercent,
+      result.sectionItems.map((item) =>
+        item.id === id ? { isChecked: result.updatedItem.isChecked } : item
       ),
       userId
     );
     this.realtimeService.emitToProject(
       projectId,
       "checklist-item:updated",
-      updatedItem
+      result.updatedItem
     );
-    return updatedItem;
+    return result.updatedItem;
   }
 
   // DELETE
-  async remove(projectId: string, id: string, userId: string) {
-    // membership check via findById, will throw if failed - its return
-    // value is reused below (section, for the same reason as update()).
-    const existingItem = await this.findById(projectId, id, userId);
-    const sectionItems = await this.prisma.evaluationChecklistItem.findMany({
-      where: { projectId: projectId, section: existingItem.section },
-      select: { id: true, isChecked: true },
-    });
-    const previousPercent = computeSectionPercent(sectionItems);
-
-    // two members deleting the same item within the same race window both
-    // want it gone - the second delete isn't really a failure, so treat it
-    // as one instead of surfacing Prisma's raw "record not found" text
-    let deletedItem = existingItem;
+  async remove(
+    projectId: string,
+    id: string,
+    userId: string,
+    fieldLockToken: string | undefined
+  ) {
+    let result;
     try {
-      deletedItem = await this.prisma.evaluationChecklistItem.delete({
-        where: { id: id },
-      });
+      result = await this.realtimeService.withProjectFieldLock(
+        projectId,
+        `checklist-item:${id}`,
+        async () => {
+          this.realtimeService.assertFieldLockOwnerIfLocked(
+            `checklist-item:${id}`,
+            userId,
+            fieldLockToken
+          );
+          const existingItem = await this.findById(projectId, id, userId);
+          const sectionItems =
+            await this.prisma.evaluationChecklistItem.findMany({
+              where: { projectId: projectId, section: existingItem.section },
+              select: { id: true, isChecked: true },
+            });
+          const previousPercent = computeSectionPercent(sectionItems);
+
+          let deletedItem = existingItem;
+          try {
+            deletedItem = await this.prisma.evaluationChecklistItem.delete({
+              where: { id: id },
+            });
+          } catch (error) {
+            if (!isRecordNotFoundError(error)) {
+              throw error;
+            }
+          }
+          return {
+            existingItem,
+            sectionItems,
+            previousPercent,
+            deletedItem,
+            released: this.realtimeService.releaseFieldLockForResource(
+              `checklist-item:${id}`
+            ),
+          };
+        }
+      );
     } catch (error) {
-      if (!isRecordNotFoundError(error)) {
-        throw error;
+      if (error instanceof FieldLockLeaseError) {
+        throw new ForbiddenException(
+          "This item is currently being edited by another tab"
+        );
       }
+      throw error;
     }
-    // the deleted item's own label lock (if any) will never be released by
-    // its holder now - findById would 404 for anyone who tried, so nothing
-    // would ever clear it otherwise until they disconnect
-    this.realtimeService.forceReleaseLock(`checklist-item:${id}`);
+    if (result.released !== undefined) {
+      this.realtimeService.emitFieldUnlock(result.released);
+    }
     // deleting the last unchecked item in a section can itself push it to
     // 100%, same as checking it would. sectionItems filtered in-memory
     // instead of a second findMany - it's the same list minus this row.
     await this.notifySectionIfJustCompleted(
       projectId,
-      existingItem.section,
-      previousPercent,
-      sectionItems.filter((item) => item.id !== id),
+      result.existingItem.section,
+      result.previousPercent,
+      result.sectionItems.filter((item) => item.id !== id),
       userId
     );
     this.realtimeService.emitToProject(
       projectId,
       "checklist-item:deleted",
-      deletedItem
+      result.deletedItem
     );
-    return deletedItem;
+    return result.deletedItem;
   }
 }
