@@ -146,19 +146,28 @@ export class DiscoveryBlocksService {
   // toggle's final state. Same Serializable-transaction fix, so Postgres
   // rejects whichever transaction read stale data instead of letting it commit.
   async recalculateStatus(discoveryBlockId: string): Promise<void> {
-    await this.prisma.transaction(
+    const updatedBlock = await this.prisma.transaction(
       async (transactionPrisma) => {
         const items = await transactionPrisma.discoveryBlockItem.findMany({
           where: { discoveryBlockId: discoveryBlockId },
           select: { isChecked: true },
         });
 
-        await transactionPrisma.discoveryBlock.update({
+        return transactionPrisma.discoveryBlock.update({
           where: { id: discoveryBlockId },
           data: { status: computeDiscoveryBlockStatus(items) },
         });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+    // without this, checking a block's last item silently updates its
+    // status in the DB with no live signal - the Discovery overview page
+    // only listens for discovery-block:updated to know when to move a
+    // block between its NOT_STARTED/IN_PROGRESS/COMPLETED sections
+    this.realtimeService.emitToProject(
+      updatedBlock.projectId,
+      "discovery-block:updated",
+      updatedBlock
     );
   }
 
