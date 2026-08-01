@@ -27,6 +27,11 @@ interface FieldLock {
   avatarUrl: string | null;
   // so handleDisconnect knows which room to broadcast field:unlocked to
   projectId: string;
+  // scopes handleDisconnect's cleanup to the socket that actually held the
+  // lock - without this, the same user's other open tab disconnecting (a
+  // network blip, not the tab that's editing) would release this lock too,
+  // since it only checked userId
+  socketId: string;
 }
 
 @WebSocketGateway({ path: "/ws" })
@@ -205,14 +210,18 @@ export class RealtimeGateway
   }
 
   // locks live in our own Map, not Socket.io's room state - release them
-  // here or a dropped connection leaves them stuck forever
+  // here or a dropped connection leaves them stuck forever.
+  // Scoped to this socket's own locks (not every lock this userId holds) -
+  // the same user can have two tabs open, one actively editing (holding a
+  // lock) while the other's connection drops and reconnects; only the
+  // disconnecting socket's own locks should be released.
   handleDisconnect(@ConnectedSocket() client: Socket): void {
     const userId = client.data.userId as string | undefined;
     if (userId === undefined) {
       return;
     }
     for (const [key, lock] of this.locks) {
-      if (lock.userId === userId) {
+      if (lock.socketId === client.id) {
         this.locks.delete(key);
         this.server
           .to(`project:${lock.projectId}`)
@@ -242,6 +251,7 @@ export class RealtimeGateway
       username: client.data.username as string,
       avatarUrl: client.data.avatarUrl as string | null,
       projectId: body.projectId,
+      socketId: client.id,
     };
 
     const locked = this.acquireLock(body.key, lock);
