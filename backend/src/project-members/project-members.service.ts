@@ -215,6 +215,9 @@ export class ProjectMembersService {
     if (memberToUpdate.role === "OWNER") {
       throw new ForbiddenException("Cannot change the project owner's role");
     }
+    if (memberToUpdate.role === newRole) {
+      throw new BadRequestException("Member already has this role");
+    }
     // update role
     return this.prisma.projectMember.update({
       where: {

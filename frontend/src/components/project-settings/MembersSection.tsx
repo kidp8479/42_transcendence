@@ -2,13 +2,18 @@
 
 import { SettingsSection } from "./SettingsSection";
 import { MemberListItem } from "./MemberListItem";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   getMembers,
   addMember,
+  removeMember,
+  updateMemberRole,
   type ProjectMember,
 } from "@/lib/projectMembersApi";
-import { Button, TextInput } from "flowbite-react";
+import { Button } from "flowbite-react";
+import { FaUserPlus } from "react-icons/fa";
+import { useToast } from "@/hooks/useToast";
+import { getSession } from "@/lib/auth";
 
 // Displays the users currently belonging to a project.
 //
@@ -28,33 +33,88 @@ interface MembersSectionProps {
 export function MembersSection({ projectId }: MembersSectionProps) {
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [username, setUsername] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { showToast } = useToast();
 
-  useEffect(() => {
-    async function loadMembers() {
-      try {
-        const data = await getMembers(projectId);
-        setMembers(data);
-      } catch (error) {
-        console.error(error);
-      }
+  const loadMembers = useCallback(async () => {
+    try {
+      const session = await getSession();
+      setCurrentUserId(session?.user.id ?? null);
+
+      const data = await getMembers(projectId);
+      setMembers(data);
+    } catch (error) {
+      console.error(error);
     }
-    loadMembers();
   }, [projectId]);
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
 
-  async function handleAddMember() {
+  const currentUserRole = members.find(
+    (member) => member.userId === currentUserId
+  )?.role;
+
+  const canAddMembers =
+    currentUserRole === "OWNER" || currentUserRole === "ADMIN";
+
+  const handleRoleChange = async (userId: string, role: "ADMIN" | "MEMBER") => {
+    try {
+      await updateMemberRole(projectId, userId, role);
+      await loadMembers();
+
+      showToast({
+        message: "Member role updated",
+        type: "success",
+      });
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        message: "Failed to update member role",
+        type: "error",
+      });
+    }
+  };
+
+  const handleRemove = async (userId: string) => {
+    try {
+      await removeMember(projectId, userId);
+      await loadMembers();
+      showToast({
+        message: "Member removed",
+        type: "success",
+      });
+    } catch (error) {
+      console.error(error);
+
+      showToast({
+        message: "Failed to remove member",
+        type: "error",
+      });
+    }
+  };
+
+  async function handleAddMember(event: FormEvent) {
+    event.preventDefault();
     try {
       await addMember(projectId, {
         username,
       });
+      showToast({
+        message: "User added",
+        type: "success",
+      });
 
-      // refresh the member list after adding
-      const data = await getMembers(projectId);
-      setMembers(data);
-
-      // clear input
+      await loadMembers();
       setUsername("");
     } catch (error) {
       console.error(error);
+
+      showToast({
+        message: error instanceof Error ? error.message : "Failed to add user",
+        type: "error",
+      });
     }
   }
 
@@ -63,26 +123,42 @@ export function MembersSection({ projectId }: MembersSectionProps) {
       title="Members"
       description="Add or remove people from this project."
     >
-      <div className="space-y-4">
+      <div className="space-y-1.5">
         {members.map((member) => (
           <MemberListItem
             key={member.id}
+            userId={member.userId}
             username={member.user.username}
+            role={member.role}
+            currentUserRole={currentUserRole}
+            onRoleChange={handleRoleChange}
             avatarUrl={member.user.avatarUrl}
+            onRemove={handleRemove}
           />
         ))}
-        <div className="flex items-center gap-3">
-          <TextInput
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="Enter username"
-            className="flex-1"
-          />
+        {canAddMembers && (
+          <form onSubmit={handleAddMember}>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Add member by username"
+                className="h-9 flex-1 rounded-md bg-surface-overlay px-3 text-sm text-text-primary placeholder:text-text-secondary"
+              />
 
-          <Button onClick={handleAddMember} disabled={!username.trim()}>
-            Add
-          </Button>
-        </div>
+              <Button
+                type="submit"
+                color="none"
+                className="!h-9 !rounded-lg !bg-brand-500 !text-black hover:!bg-brand-600 inline-flex items-center gap-2"
+                disabled={!username.trim()}
+              >
+                <FaUserPlus className="h-4 w-4" />
+                Add
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
     </SettingsSection>
   );

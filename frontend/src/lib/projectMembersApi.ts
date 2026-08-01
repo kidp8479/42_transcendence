@@ -107,6 +107,17 @@ export function removeMember(projectId: string, userId: string) {
   });
 }
 
+export function updateMemberRole(
+  projectId: string,
+  userId: string,
+  role: "ADMIN" | "MEMBER"
+) {
+  return apiClient<ProjectMember>(`/projects/${projectId}/members/${userId}`, {
+    method: "PATCH",
+    body: { role },
+  }).then(parseProjectMember);
+}
+
 // IMPORTANT:
 // The frontend hides member-management controls for non-ADMIN users,
 // but authorization is always enforced by the backend.
