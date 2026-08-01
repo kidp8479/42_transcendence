@@ -14,6 +14,7 @@ import {
   getNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  parseNotification,
   type Notification,
 } from "../../lib/notificationsApi";
 import { useToast } from "../../hooks/useToast";
@@ -61,7 +62,11 @@ export function NotificationBell() {
   useEffect(() => {
     const socket = getRealtimeSocket();
 
-    function handleNewNotification(notification: Notification) {
+    function handleNewNotification(payload: unknown) {
+      const notification = parseNotification(payload);
+      if (notification === null) {
+        return;
+      }
       setNotifications((current) => [notification, ...current]);
     }
 

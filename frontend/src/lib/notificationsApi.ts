@@ -86,7 +86,7 @@ export async function deleteAllNotifications(): Promise<number> {
   return payload.count;
 }
 
-function parseNotification(value: unknown): Notification | null {
+export function parseNotification(value: unknown): Notification | null {
   if (!isRecord(value)) {
     return null;
   }
