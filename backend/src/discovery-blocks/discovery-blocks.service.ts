@@ -11,6 +11,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { RealtimeService } from "../realtime/realtime.service";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
 import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
 import { computeDiscoveryBlockStatus } from "./discovery-block-status.util";
@@ -178,10 +179,21 @@ export class DiscoveryBlocksService {
 
     // { ...dto } (spread notation in js) only contains the fields actually sent by the client (PATCH is partial):
     // Prisma's update() only touches the keys present in `data`, leaving the rest of the row untouched
-    const updatedBlock = await this.prisma.discoveryBlock.update({
-      where: { id: id },
-      data: { ...dto },
-    });
+    let updatedBlock;
+    try {
+      updatedBlock = await this.prisma.discoveryBlock.update({
+        where: { id: id },
+        data: { ...dto },
+      });
+    } catch (error) {
+      // someone else deleted this block in the race window between the
+      // guard above and this update - a clean 404 instead of Prisma's raw
+      // "record to update not found" text leaking to the client
+      if (isRecordNotFoundError(error)) {
+        throw new NotFoundException("Discovery block not found");
+      }
+      throw error;
+    }
     this.realtimeService.emitToProject(
       projectId,
       "discovery-block:updated",
@@ -194,10 +206,20 @@ export class DiscoveryBlocksService {
   // discoveryBlockItems cascade-delete automatically at the DB level
   // (onDelete: Cascade on DiscoveryBlockItem.discoveryBlock in schema.prisma) - no need to delete them here
   async remove(projectId: string, id: string, userId: string) {
-    await this.findById(projectId, id, userId); // access guard, see findById's own comment
-    const deletedBlock = await this.prisma.discoveryBlock.delete({
-      where: { id: id },
-    });
+    const existingBlock = await this.findById(projectId, id, userId); // access guard, see findById's own comment
+
+    // two members deleting the same block within the same race window both
+    // want it gone - same reasoning as DiscoveryBlockItemsService.remove()
+    let deletedBlock = existingBlock;
+    try {
+      deletedBlock = await this.prisma.discoveryBlock.delete({
+        where: { id: id },
+      });
+    } catch (error) {
+      if (!isRecordNotFoundError(error)) {
+        throw error;
+      }
+    }
     // same reasoning as EvaluationChecklistItemsService.remove(): nothing
     // would ever release this lock otherwise, the block it referred to no
     // longer exists for anyone to release it against

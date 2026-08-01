@@ -12,6 +12,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { RealtimeService } from "../realtime/realtime.service";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 import { CreateEvaluationChecklistItemDto } from "./dto/create-evaluation-checklist-item.dto";
 import { UpdateEvaluationChecklistItemDto } from "./dto/update-evaluation-checklist-item.dto";
 import { EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION } from "./evaluation-checklist-items.constants";
@@ -231,10 +232,21 @@ export class EvaluationChecklistItemsService {
 
     // safe to update by id alone now - findById already proved it belongs
     // to projectId.
-    const updatedItem = await this.prisma.evaluationChecklistItem.update({
-      where: { id: id },
-      data: { ...dto },
-    });
+    let updatedItem;
+    try {
+      updatedItem = await this.prisma.evaluationChecklistItem.update({
+        where: { id: id },
+        data: { ...dto },
+      });
+    } catch (error) {
+      // someone else deleted this item in the race window between findById
+      // above and this update - a clean 404 instead of Prisma's raw
+      // "record to update not found" text leaking to the client
+      if (isRecordNotFoundError(error)) {
+        throw new NotFoundException("Checklist item not found");
+      }
+      throw error;
+    }
     // only isChecked toggling (not label/order) can ever move a section's
     // percent, but recomputing unconditionally is simpler than tracking
     // which field changed, same reasoning as DiscoveryBlocksService
@@ -264,10 +276,19 @@ export class EvaluationChecklistItemsService {
       })
     );
 
-    // database query
-    const deletedItem = await this.prisma.evaluationChecklistItem.delete({
-      where: { id: id },
-    });
+    // two members deleting the same item within the same race window both
+    // want it gone - the second delete isn't really a failure, so treat it
+    // as one instead of surfacing Prisma's raw "record not found" text
+    let deletedItem = existingItem;
+    try {
+      deletedItem = await this.prisma.evaluationChecklistItem.delete({
+        where: { id: id },
+      });
+    } catch (error) {
+      if (!isRecordNotFoundError(error)) {
+        throw error;
+      }
+    }
     // the deleted item's own label lock (if any) will never be released by
     // its holder now - findById would 404 for anyone who tried, so nothing
     // would ever clear it otherwise until they disconnect
