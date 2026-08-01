@@ -22,3 +22,11 @@ export function resetRealtimeSocket(): void {
     socket.connect();
   }
 }
+
+// Logout has no session left to reconnect with - reconnecting anyway just
+// has socket.io-client's default reconnection:true retry the handshake
+// forever against a gateway that will keep rejecting it (no session
+// cookie), hammering /auth/internal/introspect on every attempt.
+export function disconnectRealtimeSocket(): void {
+  socket?.disconnect();
+}

@@ -1,6 +1,9 @@
 import { getSession, type AuthSession } from "./auth";
 import { setApiSession } from "./apiClient";
-import { resetRealtimeSocket } from "./realtimeSocket";
+import {
+  resetRealtimeSocket,
+  disconnectRealtimeSocket,
+} from "./realtimeSocket";
 
 const sessionCacheTtlMs = 30_000;
 
@@ -68,7 +71,8 @@ export class AuthSessionResource {
     this.state = { status: "anonymous" };
     this.checkedAt = Date.now();
     setApiSession(null);
-    resetRealtimeSocket();
+    // no session left to reconnect with - see disconnectRealtimeSocket's own comment
+    disconnectRealtimeSocket();
     this.notify();
   }
 
