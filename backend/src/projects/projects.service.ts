@@ -18,9 +18,12 @@ import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
 import { DEFAULT_CALENDAR_CATEGORIES } from "../calendar-categories/default-calendar-categories";
 import { DEFAULT_TASK_CATEGORIES } from "../task-categories/default-task-categories";
+<<<<<<< HEAD
 import { DEFAULT_DISCOVERY_BLOCKS } from "../discovery-blocks/default-discovery-blocks";
 import { computeDiscoveryBlockStatus } from "../discovery-blocks/discovery-block-status.util";
 import { RealtimeService } from "../realtime/realtime.service";
+=======
+>>>>>>> 1e14176 (feat(TR-49): add backend of kanban and fix bugs in the frontend)
 
 // Mirrors the weighted, gated score computed client-side in
 // evaluation-checklist.tsx (totalProgress.percent / READINESS_THRESHOLD /
@@ -189,7 +192,12 @@ export class ProjectsService {
           });
         }
 
+<<<<<<< HEAD
         // every task needs a category, so seed the default set here too
+=======
+        // same for tasks: CreateTaskDto requires a categoryId, so without this
+        // a brand-new project could not have a single task created in it.
+>>>>>>> 1e14176 (feat(TR-49): add backend of kanban and fix bugs in the frontend)
         for (const category of DEFAULT_TASK_CATEGORIES) {
           await database.taskCategory.create({
             data: {
@@ -200,6 +208,7 @@ export class ProjectsService {
           });
         }
 
+<<<<<<< HEAD
         // unlike task/calendar categories, discovery blocks are just a
         // starting point - the user is free to delete or edit them afterwards
         for (const block of DEFAULT_DISCOVERY_BLOCKS) {
@@ -220,6 +229,8 @@ export class ProjectsService {
           });
         }
 
+=======
+>>>>>>> 1e14176 (feat(TR-49): add backend of kanban and fix bugs in the frontend)
         return this.findProjectForUser(database, project.id, userId);
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }

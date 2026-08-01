@@ -3,57 +3,7 @@
 // rank is here: updated when the user drags and drops a task to reorder it.
 // assigneeIds are handled internally by TaskAssigneeService when provided.
 
-import { TaskStatus } from "@prisma/client";
-import { TaskPriority } from "@prisma/client";
+import { PartialType } from "@nestjs/mapped-types";
+import { CreateTaskDto } from "./create-task.dto";
 
-import {
-  IsBoolean,
-  IsDateString,
-  IsInt,
-  IsOptional,
-  IsString,
-  IsEnum,
-  IsUUID,
-} from "class-validator";
-
-export class UpdateTaskDto {
-  @IsOptional()
-  @IsString()
-  title?: string;
-
-  @IsOptional()
-  @IsUUID("4")
-  categoryId?: string;
-
-  @IsOptional()
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
-
-  @IsOptional()
-  @IsEnum(TaskPriority)
-  priority?: TaskPriority;
-
-  @IsOptional()
-  @IsDateString()
-  startAt?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endAt?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsInt()
-  rank?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  onCalendar?: boolean;
-}
+export class UpdateTaskDto extends PartialType(CreateTaskDto) {}

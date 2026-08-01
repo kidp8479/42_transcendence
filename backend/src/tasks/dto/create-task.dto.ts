@@ -6,6 +6,11 @@
 
 import { TaskStatus } from "@prisma/client";
 import { TaskPriority } from "@prisma/client";
+import {
+  maxTaskTitleLength,
+  maxTaskDescriptionLength,
+  maxTaskNotesLength,
+} from "../tasks.constants";
 
 import {
   ArrayUnique,
@@ -17,10 +22,18 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Length,
+  Min,
 } from "class-validator";
+// Package root, not a deep path into class-transformer/types/*: that directory
+// ships only .d.ts files, so a deep import typechecks and then throws
+// MODULE_NOT_FOUND at boot.
+import { Transform } from "class-transformer";
 
 export class CreateTaskDto {
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
+  @Length(1, maxTaskTitleLength)
   title: string;
 
   @IsUUID("4")
@@ -32,10 +45,12 @@ export class CreateTaskDto {
   @IsEnum(TaskPriority)
   priority: TaskPriority;
 
-  // position of the task in its category column (0-based)
-  // frontend sends the initial rank on creation, same pattern as order in
-  // CreateDiscoveryBlockItemDto and CreateEvaluationChecklistItemDto
+  // 0-based position of the task inside its STATUS column - the Kanban board
+  // groups by status, not by category. The frontend sends the wanted position
+  // on creation; the service shifts the siblings to make room and keeps every
+  // column dense (0..n-1).
   @IsInt()
+  @Min(0)
   rank: number;
 
   @IsOptional()
@@ -48,10 +63,12 @@ export class CreateTaskDto {
 
   @IsOptional()
   @IsString()
+  @Length(0, maxTaskDescriptionLength)
   description?: string;
 
   @IsOptional()
   @IsString()
+  @Length(0, maxTaskNotesLength)
   notes?: string;
 
   @IsBoolean()

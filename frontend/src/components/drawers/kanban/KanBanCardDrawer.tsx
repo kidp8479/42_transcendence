@@ -1,16 +1,28 @@
 // Detail drawer for a kanban card.
 // Opens when the user clicks a card on the Kanban board (edit mode) or one of
 // the board's "+" buttons (create mode, preset to that column's status).
-// Renders its content inside DrawerShell (which owns the click-catcher,
-// Escape, slide-in and resizing) and owns the fullscreen toggle state the
-// shell needs. Both the drawer and its fullscreen mode are confined to the
-// Kanban work area - see DrawerShell's own header.
+// Renders its content inside DrawerShell, which owns the backdrop, the
+// click-outside, Escape and the slide animation. Like CalendarEventDrawer, the
+// fullscreen state lives here and reaches the shell as a width class - the
+// shell has no fullscreen concept of its own.
+//
+// The drawer is confined to the authenticated content area (DrawerShell is
+// absolute, its containing block is AuthenticatedLayout's <main>), so it covers
+// the project title and tabs but never the header or the sidebar.
+//
+// Split in two on purpose, the same way CalendarEventDrawer splits from
+// EventForm: the shell wrapper mounts once and lives forever - remounting it on
+// open would drop the slide-in, since a freshly mounted panel renders already in
+// place - while KanBanCardForm below is re-keyed on `session` so every open
+// starts from a clean draft. The form is deliberately NOT gated on isOpen: it
+// has to keep rendering while the panel slides out, or the panel empties
+// mid-flight.
 //
 // Displays and edits the task fields the board shows: title, status,
-// category, priority, members, notes. The component is a controlled form over
-// a TaskDraft; submitting hands the draft up - the route decides whether that
-// means create or update. The parent remounts this component per task (key
-// prop), which is what initializes the form, so no state-syncing effects.
+// category, priority, members, notes. The form is controlled over a TaskDraft;
+// submitting hands the draft up - the route decides whether that means create
+// or update. The `key` remount is what initializes it, so no state-syncing
+// effects.
 //
 // Fields intentionally NOT here yet (absent from the design mockup):
 // startAt/endAt, description, onCalendar - the route fills create defaults
@@ -45,6 +57,12 @@ export interface TaskDraft {
 }
 
 interface KanBanCardDrawerProps {
+  // The shell stays mounted so its slide-out can play, so this drives the
+  // animation rather than the route mounting/unmounting the drawer.
+  isOpen: boolean;
+  // Changes on every open; keys the form so it resets even when the same card
+  // is reopened. See the header comment.
+  session: number;
   mode: "create" | "edit";
   // the task being edited; null in create mode
   task: Task | null;
@@ -54,11 +72,6 @@ interface KanBanCardDrawerProps {
   members: ProjectMemberUser[];
   onClose: () => void;
   onSubmit: (draft: TaskDraft) => void;
-  // panel width, owned by the route so it survives this component's remounts
-  width: number;
-  minWidth: number;
-  maxWidth: number;
-  onWidthChange: (width: number) => void;
 }
 
 const DRAWER_HEADING_ID = "kanban-card-drawer-heading";
@@ -72,6 +85,8 @@ const ICON_BUTTON_CLASS =
   "rounded-md p-1.5 text-text-secondary hover:bg-surface-overlay hover:text-text-primary focus:ring-2 focus:ring-brand-500/40 focus:outline-none";
 
 export function KanBanCardDrawer({
+  isOpen,
+  session,
   mode,
   task,
   initialStatus,
@@ -79,12 +94,81 @@ export function KanBanCardDrawer({
   members,
   onClose,
   onSubmit,
-  width,
-  minWidth,
-  maxWidth,
-  onWidthChange,
 }: KanBanCardDrawerProps) {
+  // Kept out of the form so it survives the form's re-keying, which is also why
+  // fullscreen carries over from one card to the next - same as the calendar
+  // drawer's expanded state.
   const [is_fullscreen, setIsFullscreen] = useState(false);
+
+  // Staged Escape: leave fullscreen on the first press, close on the second.
+  // DrawerShell's Escape listener already takes priority over the sidebar's, so
+  // this doesn't have to know the sidebar exists.
+  function handleEscape() {
+    if (is_fullscreen) {
+      setIsFullscreen(false);
+      return;
+    }
+    onClose();
+  }
+
+  return (
+    <DrawerShell
+      isOpen={isOpen}
+      onClose={onClose}
+      onEscape={handleEscape}
+      // Fullscreen is just the panel widened to the whole content area - the
+      // same mechanism as CalendarEventDrawer's expand.
+      widthClassName={is_fullscreen ? "w-full" : "max-w-md"}
+      titleId={DRAWER_HEADING_ID}
+    >
+      {/* Outside the form so the dialog keeps its accessible name while the
+          form remounts. */}
+      <h2 id={DRAWER_HEADING_ID} className="sr-only">
+        {mode === "create" ? "Create task" : `Edit task ${task?.title ?? ""}`}
+      </h2>
+
+      <KanBanCardForm
+        key={session}
+        mode={mode}
+        task={task}
+        initialStatus={initialStatus}
+        categories={categories}
+        members={members}
+        onClose={onClose}
+        onSubmit={onSubmit}
+        isFullscreen={is_fullscreen}
+        onToggleFullscreen={() => setIsFullscreen((previous) => !previous)}
+      />
+    </DrawerShell>
+  );
+}
+
+// Everything that reads the draft, so that re-keying it on open resets the form
+// without touching the shell. Renders a fragment, not a wrapper div: these stay
+// direct flex children of DrawerShell's panel.
+interface KanBanCardFormProps {
+  mode: "create" | "edit";
+  task: Task | null;
+  initialStatus: TaskStatus;
+  categories: TaskCategory[];
+  members: ProjectMemberUser[];
+  onClose: () => void;
+  onSubmit: (draft: TaskDraft) => void;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
+}
+
+function KanBanCardForm({
+  mode,
+  task,
+  initialStatus,
+  categories,
+  members,
+  onClose,
+  onSubmit,
+  isFullscreen,
+  onToggleFullscreen,
+}: KanBanCardFormProps) {
   // Validation messages only appear after a failed submit attempt, not while
   // the user is still filling the form in.
   const [show_errors, setShowErrors] = useState(false);
@@ -142,19 +226,7 @@ export function KanBanCardDrawer({
   }
 
   return (
-    <DrawerShell
-      onClose={onClose}
-      isFullscreen={is_fullscreen}
-      labelledBy={DRAWER_HEADING_ID}
-      width={width}
-      minWidth={minWidth}
-      maxWidth={maxWidth}
-      onWidthChange={onWidthChange}
-    >
-      <h2 id={DRAWER_HEADING_ID} className="sr-only">
-        {mode === "create" ? "Create task" : `Edit task ${task?.title ?? ""}`}
-      </h2>
-
+    <>
       {/* Accent bar - the selected category's color, live. */}
       <div
         aria-hidden="true"
@@ -175,12 +247,12 @@ export function KanBanCardDrawer({
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setIsFullscreen((previous) => !previous)}
-            aria-pressed={is_fullscreen}
+            onClick={onToggleFullscreen}
+            aria-pressed={isFullscreen}
             aria-label={
-              is_fullscreen ? "Exit fullscreen" : "Expand to fullscreen"
+              isFullscreen ? "Exit fullscreen" : "Expand to fullscreen"
             }
-            title={is_fullscreen ? "Exit fullscreen" : "Expand to fullscreen"}
+            title={isFullscreen ? "Exit fullscreen" : "Expand to fullscreen"}
             className={ICON_BUTTON_CLASS}
           >
             <HiOutlineArrowsExpand aria-hidden="true" />
@@ -397,6 +469,6 @@ export function KanBanCardDrawer({
           {mode === "create" ? "Create" : "Save"}
         </Button>
       </div>
-    </DrawerShell>
+    </>
   );
 }

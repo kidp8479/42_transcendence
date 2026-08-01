@@ -15,8 +15,14 @@ export type ApplicationDatabaseTransaction = Pick<
   | "calendarEvent"
   | "calendarCategory"
   | "calendarAssignee"
+<<<<<<< HEAD
   | "notification"
   | "taskCategory"
+=======
+  | "task"
+  | "taskCategory"
+  | "taskAssignee"
+>>>>>>> 1e14176 (feat(TR-49): add backend of kanban and fix bugs in the frontend)
 >;
 
 type TransactionOptions = {
@@ -69,8 +75,21 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.currentClient().calendarAssignee;
   }
 
+<<<<<<< HEAD
   get notification(): PrismaClient["notification"] {
     return this.currentClient().notification;
+=======
+  get task(): PrismaClient["task"] {
+    return this.currentClient().task;
+  }
+
+  get taskCategory(): PrismaClient["taskCategory"] {
+    return this.currentClient().taskCategory;
+  }
+
+  get taskAssignee(): PrismaClient["taskAssignee"] {
+    return this.currentClient().taskAssignee;
+>>>>>>> 1e14176 (feat(TR-49): add backend of kanban and fix bugs in the frontend)
   }
 
   async transaction<T>(
