@@ -118,24 +118,6 @@ input[data-auth-field]:-webkit-autofill:focus {
 }
 
 /*
- * Slide-in for right-anchored drawers (DrawerShell). Raw CSS because Tailwind
- * has no built-in slide keyframes and arbitrary values are banned. Entry only:
- * the drawer unmounts on close (so its form state resets) - an exit animation
- * would need the panel to outlive its state, not worth it for now.
- */
-@keyframes drawer-slide-in {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-.drawer-slide-in {
-  animation: drawer-slide-in 300ms ease-out;
-}
-
-/*
  * flowbite-react's ScrollContainer (used internally by Carousel) hardcodes
  * hideScrollbars: true, which applies a "!overflow-x-hidden" class to hide
  * the native scrollbar. This exact class (important-prefix + bracket syntax)

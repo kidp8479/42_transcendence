@@ -29,21 +29,26 @@ export const Route = createFileRoute("/_authenticated/$projectId/kanban")({
   component: KanbanPage,
 });
 
-// Which drawer is open, if any. Edit stores the task ID (not the task): the
+// What the drawer is pointed at. Edit stores the task ID (not the task): the
 // rendered drawer resolves the live task from state, so it stays fresh if a
 // future WebSocket update touches the task mid-edit.
-type DrawerState =
-  | { mode: "closed" }
+type DrawerTarget =
   | { mode: "create"; status: TaskStatus }
   | { mode: "edit"; taskId: string };
 
-// Drawer width bounds, in px. The default matches the max-w-md the drawer had
-// before it became resizable, and the max is Tailwind's 3xl (48rem) rather
-// than an invented number. Plain constants: the panel is also capped by
-// max-w-full in CSS, so it can never exceed the board whatever these say.
-const MIN_DRAWER_WIDTH = 360;
-const DEFAULT_DRAWER_WIDTH = 448;
-const MAX_DRAWER_WIDTH = 768;
+// "closed" is a flag here, not a variant of the target: DrawerShell keeps the
+// panel mounted so it can animate out, and a panel sliding out still has to
+// render the task it was showing. Clearing the target on close would blank it
+// mid-animation.
+interface DrawerState {
+  target: DrawerTarget;
+  isOpen: boolean;
+  // Bumped on every open. The drawer's form initializes when it mounts (see its
+  // `key`), so reopening the same card - or the same column's "+" twice in a
+  // row - has to remount it, which a key derived from the target alone wouldn't
+  // do.
+  session: number;
+}
 
 // --- beginning of mock data - will be replaced by calls to
 // GET /api/projects/:projectId/tasks,
@@ -273,13 +278,31 @@ function KanbanPage() {
   // future WebSocket handler will dispatch these same actions, so board
   // interactions and remote events stay one code path.
   const [tasks, dispatch] = useReducer(tasksReducer, mock_data.tasks);
-  const [drawer_state, setDrawerState] = useState<DrawerState>({
-    mode: "closed",
+  const [drawer, setDrawer] = useState<DrawerState>({
+    // Arbitrary starting target: the drawer is mounted from the very first
+    // render (its slide-in only animates if the panel was already there,
+    // translated off-screen), but stays closed and inert until something opens
+    // it.
+    target: { mode: "create", status: "TODO" },
+    isOpen: false,
+    session: 0,
   });
 
-  // Drawer width lives here, not in the drawer: the drawer is remounted per
-  // task (its `key`), so a width held there would reset on every card.
-  const [drawer_width, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
+  // Pulled out of the state object: TypeScript won't narrow a property path
+  // like drawer.target.mode inside a callback, only a plain const.
+  const drawer_target = drawer.target;
+
+  function openDrawer(target: DrawerTarget) {
+    setDrawer((current) => ({
+      target,
+      isOpen: true,
+      session: current.session + 1,
+    }));
+  }
+
+  function closeDrawer() {
+    setDrawer((current) => ({ ...current, isOpen: false }));
+  }
 
   function handleMoveTask(
     taskId: string,
@@ -303,6 +326,11 @@ function KanbanPage() {
     // try/catch here; on failure console.error + error toast + return false
     // (the card keeps its confirmation open).
     dispatch({ type: "task_deleted", taskId });
+    // The drawer no longer unmounts when it closes, so it can't be left
+    // pointing at a task that just disappeared - it would render an empty form.
+    if (drawer_target.mode === "edit" && drawer_target.taskId === taskId) {
+      closeDrawer();
+    }
     // TODO: await safeInvalidateRouter() here - after the try/catch, never
     // inside it (see the comment in hooks/useSafeRouterInvalidate.ts).
     showToast({ type: "success", message: "Task deleted" });
@@ -318,7 +346,7 @@ function KanbanPage() {
       draft.assigneeIds.includes(member.id)
     );
 
-    if (drawer_state.mode === "create") {
+    if (drawer_target.mode === "create") {
       dispatch({
         type: "task_created",
         task: {
@@ -343,9 +371,9 @@ function KanbanPage() {
       // lib/tasks.ts in a try/catch; on failure console.error + error toast
       // and leave the drawer open.
       showToast({ type: "success", message: "Task created" });
-    } else if (drawer_state.mode === "edit") {
+    } else {
       const submitted_task = tasks.find(
-        (current) => current.id === drawer_state.taskId
+        (current) => current.id === drawer_target.taskId
       );
       if (submitted_task !== undefined) {
         dispatch({
@@ -372,21 +400,21 @@ function KanbanPage() {
       // member changes need that backend fix to persist.
       showToast({ type: "success", message: "Changes saved" });
     }
-    setDrawerState({ mode: "closed" });
+    closeDrawer();
   }
 
-  // Resolved outside the JSX so a stale edit drawer (task deleted while its
-  // id is still in drawer_state) simply renders nothing.
+  // Resolved outside the JSX so a stale edit target (task deleted while its id
+  // is still the drawer's target) just yields null instead of throwing.
   const editing_task =
-    drawer_state.mode === "edit"
-      ? (tasks.find((current) => current.id === drawer_state.taskId) ?? null)
+    drawer_target.mode === "edit"
+      ? (tasks.find((current) => current.id === drawer_target.taskId) ?? null)
       : null;
 
   return (
-    // h-full of the tab's scroll area: the board fills it and the COLUMNS
-    // scroll, not the page. Deliberately NOT `relative` - the drawer has to
-    // reach the tab bar's rule and the footer, so its containing block is
-    // ProjectLayout's anchor one level up, not this padded box.
+    // h-full of the tab's content box: the board fills it and the COLUMNS
+    // scroll, not the page. Deliberately NOT `relative` - DrawerShell is
+    // absolute and has to span the whole content area, so its containing block
+    // must stay AuthenticatedLayout's <main>, the nearest positioned ancestor.
     <div className="flex h-full flex-col">
       <p className="mb-4 shrink-0 text-sm text-text-secondary">
         Drag tasks between columns to track progress.
@@ -396,31 +424,28 @@ function KanbanPage() {
         tasks={tasks}
         categories={mock_data.categories}
         onMoveTask={handleMoveTask}
-        onAddTask={(status) => setDrawerState({ mode: "create", status })}
-        onOpenTask={(taskId) => setDrawerState({ mode: "edit", taskId })}
+        onAddTask={(status) => openDrawer({ mode: "create", status })}
+        onOpenTask={(taskId) => openDrawer({ mode: "edit", taskId })}
         onDeleteTask={handleDeleteTask}
       />
 
-      {(drawer_state.mode === "create" || editing_task !== null) && (
-        <KanBanCardDrawer
-          // Remounts the drawer per task (and per create session), which is
-          // what initializes its form state - no state-syncing effects inside.
-          key={drawer_state.mode === "edit" ? drawer_state.taskId : "create"}
-          mode={drawer_state.mode === "create" ? "create" : "edit"}
-          task={editing_task}
-          initialStatus={
-            drawer_state.mode === "create" ? drawer_state.status : "TODO"
-          }
-          categories={mock_data.categories}
-          members={mock_data.members}
-          onClose={() => setDrawerState({ mode: "closed" })}
-          onSubmit={handleSubmitDrawer}
-          width={drawer_width}
-          minWidth={MIN_DRAWER_WIDTH}
-          maxWidth={MAX_DRAWER_WIDTH}
-          onWidthChange={setDrawerWidth}
-        />
-      )}
+      {/* Rendered unconditionally, and never re-keyed: DrawerShell animates on
+          isOpen and needs the panel to already be in the DOM, so remounting it
+          on open would kill both the slide-in and the slide-out. `session` is
+          what resets the form - the drawer keys it internally. */}
+      <KanBanCardDrawer
+        isOpen={drawer.isOpen}
+        session={drawer.session}
+        mode={drawer_target.mode}
+        task={editing_task}
+        initialStatus={
+          drawer_target.mode === "create" ? drawer_target.status : "TODO"
+        }
+        categories={mock_data.categories}
+        members={mock_data.members}
+        onClose={closeDrawer}
+        onSubmit={handleSubmitDrawer}
+      />
     </div>
   );
 }
