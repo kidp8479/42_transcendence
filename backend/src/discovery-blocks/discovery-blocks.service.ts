@@ -260,7 +260,7 @@ export class DiscoveryBlocksService {
     } catch (error) {
       if (error instanceof FieldLockLeaseError) {
         throw new ForbiddenException(
-          "This category is currently being edited by another tab"
+          "This category is currently being edited by someone else"
         );
       }
       throw error;

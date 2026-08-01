@@ -49,6 +49,7 @@ export function ChecklistItemRow({
   // whenever a fresh edit session actually starts.
   const hasCommittedRef = useRef(false);
   const preserveDraftRef = useRef(false);
+  const suppressBlurSaveRef = useRef(false);
   const [draft, setDraft] = useState(item.label);
 
   async function startEdit() {
@@ -121,6 +122,36 @@ export function ChecklistItemRow({
     }
   }, [isEditing, item.label]);
 
+  useEffect(() => {
+    function suppressBlurSave() {
+      suppressBlurSaveRef.current = true;
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        suppressBlurSave();
+      }
+    }
+
+    window.addEventListener("blur", suppressBlurSave);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", suppressBlurSave);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  function saveAfterSameTabBlur(value: string) {
+    window.setTimeout(() => {
+      if (suppressBlurSaveRef.current) {
+        return;
+      }
+      if (value.length <= EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH) {
+        void commit(value);
+      }
+    }, 50);
+  }
+
   return (
     <li className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border">
       {/* checked:bg-current uses this text color as the checkmark fill. */}
@@ -142,13 +173,10 @@ export function ChecklistItemRow({
           value={draft}
           autoFocus
           readOnly={isLockedByOther}
-          onBlur={(event) => {
-            if (
-              event.currentTarget.value.length <=
-              EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-            )
-              commit(event.currentTarget.value);
+          onFocus={() => {
+            suppressBlurSaveRef.current = false;
           }}
+          onBlur={(event) => saveAfterSameTabBlur(event.currentTarget.value)}
           onChange={(event) => setDraft(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {

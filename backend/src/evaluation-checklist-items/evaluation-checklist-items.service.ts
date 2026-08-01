@@ -336,7 +336,7 @@ export class EvaluationChecklistItemsService {
     } catch (error) {
       if (error instanceof FieldLockLeaseError) {
         throw new ForbiddenException(
-          "This item is currently being edited by another tab"
+          "This item is currently being edited by someone else"
         );
       }
       throw error;

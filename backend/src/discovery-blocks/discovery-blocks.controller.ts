@@ -17,6 +17,7 @@ import {
   ParseUUIDPipe,
 } from "@nestjs/common";
 import { ApiSecurity } from "@nestjs/swagger";
+import { firstHeaderValue } from "../common/first-header-value";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { DiscoveryBlocksService } from "./discovery-blocks.service";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
@@ -66,7 +67,8 @@ export class DiscoveryBlocksController {
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateDiscoveryBlockDto,
-    @Headers("x-field-lock-token") fieldLockToken: string | undefined,
+    @Headers("x-field-lock-token")
+    fieldLockToken: string | string[] | undefined,
     @Req() request: AuthenticatedRequest
   ) {
     return this.discoveryBlocksService.update(
@@ -74,7 +76,7 @@ export class DiscoveryBlocksController {
       id,
       dto,
       request.user.id,
-      fieldLockToken
+      firstHeaderValue(fieldLockToken)
     );
   }
 
@@ -84,14 +86,15 @@ export class DiscoveryBlocksController {
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("id", ParseUUIDPipe) id: string,
-    @Headers("x-field-lock-token") fieldLockToken: string | undefined,
+    @Headers("x-field-lock-token")
+    fieldLockToken: string | string[] | undefined,
     @Req() request: AuthenticatedRequest
   ) {
     return this.discoveryBlocksService.remove(
       projectId,
       id,
       request.user.id,
-      fieldLockToken
+      firstHeaderValue(fieldLockToken)
     );
   }
 }
