@@ -150,11 +150,27 @@ export const darkDatepickerThemeAlignRight = {
 
 export const darkDropdownTheme = {
   floating: {
-    base: "z-10 w-fit rounded-lg border !border-surface-border !bg-surface-raised !text-text-primary shadow-xl focus:outline-none dark:!border-surface-border dark:!bg-surface-raised dark:!text-text-primary",
+    // overflow-hidden matters here: without it, a full-width child with its
+    // own background (ex: NotificationBell's unread-row highlight) paints
+    // square corners over this panel's own rounded-lg instead of being
+    // clipped to match it.
+    // z-50: HeaderShell.tsx's sticky header is z-40 with backdrop-blur - at
+    // only z-10 this panel's top edge rendered underneath it, blurred away
+    // right where the panel meets the header.
+    // A visible border/ring around this panel turned out impossible: the
+    // "minimal" Flowbite theme (index.css) zeroes every --shadow-* variable
+    // app-wide (a deliberate flat-design choice), which also silently kills
+    // `ring` (box-shadow-based) - and Flowbite-react's own built-in
+    // dark:border-none default won over a plain `border` utility even with
+    // !important. Detaching this panel from the header behind it (same
+    // surface-raised shade as this panel) is done with bg-surface-overlay
+    // on the header row below instead - a background-contrast step, same
+    // language the rest of this flat-design app already uses for depth.
+    base: "z-50 w-fit overflow-hidden rounded-lg !bg-surface-raised !text-text-primary shadow-xl focus:outline-none dark:!bg-surface-raised dark:!text-text-primary",
     content: "py-1 text-sm text-text-primary",
     divider: "my-1 h-px !bg-surface-border dark:!bg-surface-border",
     header:
-      "block border-b !border-surface-border px-4 py-2 text-sm !text-text-primary dark:!border-surface-border dark:!text-text-primary",
+      "block !bg-surface-overlay border-b !border-surface-border px-4 py-2 text-sm !text-text-primary dark:!bg-surface-overlay dark:!border-surface-border dark:!text-text-primary",
     item: {
       container: "",
       base: "flex w-full cursor-pointer items-center justify-start px-4 py-2 text-sm !text-text-primary hover:!bg-surface-overlay focus:!bg-surface-overlay focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:!text-text-primary dark:hover:!bg-surface-overlay dark:focus:!bg-surface-overlay",

@@ -4,18 +4,22 @@ import {
   createDiscoveryBlock,
   deleteDiscoveryBlock,
   listDiscoveryBlocks,
+  parseDiscoveryBlock,
   DISCOVERY_BLOCK_STATUS_PILL_STYLE,
   type DiscoveryBlock,
 } from "@/lib/discoveryBlocks";
 import {
   listDiscoveryBlockItems,
   updateDiscoveryBlockItem,
+  parseDiscoveryBlockItem,
   type DiscoveryBlockItem,
 } from "@/lib/discoveryBlockItems";
 import { DiscoveryBlockCard } from "@/components/discovery/DiscoveryBlockCard";
 import { NewDiscoveryBlockCard } from "@/components/discovery/NewDiscoveryBlockCard";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import { ApiError } from "@/lib/apiClient";
 
 interface DiscoveryBlockWithItems {
   discoveryBlock: DiscoveryBlock;
@@ -62,6 +66,65 @@ function DiscoveryPage() {
   useEffect(() => {
     setDiscoveryBlocksWithItems(loaderData);
   }, [loaderData]);
+
+  // live sync: another member checking/unchecking an item updates this
+  // page without a reload - last-write-wins, no lock needed for a checkbox
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleItemUpdated(payload: unknown) {
+      const updatedItem = parseDiscoveryBlockItem(payload);
+      if (updatedItem === null) {
+        return;
+      }
+      setDiscoveryBlocksWithItems((previous) =>
+        previous.map((entry) => {
+          if (entry.discoveryBlock.id !== updatedItem.discoveryBlockId) {
+            return entry;
+          }
+          return {
+            discoveryBlock: entry.discoveryBlock,
+            items: entry.items.map((currentItem) =>
+              currentItem.id === updatedItem.id ? updatedItem : currentItem
+            ),
+          };
+        })
+      );
+    }
+
+    socket.on("discovery-item:updated", handleItemUpdated);
+    return () => {
+      socket.off("discovery-item:updated", handleItemUpdated);
+    };
+  }, []);
+
+  // live sync: checking a block's last item recomputes its status
+  // server-side (see DiscoveryBlocksService.recalculateStatus) - without
+  // this, the block stays under its old NOT_STARTED/IN_PROGRESS/COMPLETED
+  // section on this page until a reload, even though its own item just
+  // updated live above
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleBlockUpdated(payload: unknown) {
+      const updatedBlock = parseDiscoveryBlock(payload);
+      if (updatedBlock === null) {
+        return;
+      }
+      setDiscoveryBlocksWithItems((previous) =>
+        previous.map((entry) =>
+          entry.discoveryBlock.id === updatedBlock.id
+            ? { discoveryBlock: updatedBlock, items: entry.items }
+            : entry
+        )
+      );
+    }
+
+    socket.on("discovery-block:updated", handleBlockUpdated);
+    return () => {
+      socket.off("discovery-block:updated", handleBlockUpdated);
+    };
+  }, []);
 
   // optimistic toggle: flips isChecked locally first, PATCHes in the
   // background, rolls back on failure
@@ -148,18 +211,26 @@ function DiscoveryPage() {
   async function handleDeleteBlock(discoveryBlockId: string): Promise<boolean> {
     try {
       await deleteDiscoveryBlock(params.projectId, discoveryBlockId);
-      setDiscoveryBlocksWithItems((previous) =>
-        previous.filter((entry) => entry.discoveryBlock.id !== discoveryBlockId)
-      );
     } catch (error) {
-      console.error("Failed to delete discovery block", error);
-      showToast({
-        type: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to delete category",
-      });
-      return false;
+      // a 404 here means someone else already deleted this block (race
+      // between two members both clicking delete) - the tile disappearing
+      // is exactly what this user wanted too, so treat it as success
+      // instead of showing an error for an outcome they actually asked for
+      if (!(error instanceof ApiError && error.status === 404)) {
+        console.error("Failed to delete discovery block", error);
+        showToast({
+          type: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to delete category",
+        });
+        return false;
+      }
     }
+    setDiscoveryBlocksWithItems((previous) =>
+      previous.filter((entry) => entry.discoveryBlock.id !== discoveryBlockId)
+    );
     await safeInvalidateRouter();
     showToast({ type: "success", message: "Category deleted" });
     return true;

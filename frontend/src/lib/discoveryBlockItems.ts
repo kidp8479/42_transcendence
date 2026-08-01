@@ -126,7 +126,9 @@ export async function deleteDiscoveryBlockItem(
   return parsed;
 }
 
-function parseDiscoveryBlockItem(value: unknown): DiscoveryBlockItem | null {
+export function parseDiscoveryBlockItem(
+  value: unknown
+): DiscoveryBlockItem | null {
   if (!isRecord(value)) {
     return null;
   }

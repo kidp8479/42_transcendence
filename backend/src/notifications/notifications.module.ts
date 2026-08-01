@@ -3,8 +3,10 @@
 import { Module } from "@nestjs/common";
 import { NotificationsService } from "./notifications.service";
 import { NotificationsController } from "./notifications.controller";
+import { RealtimeModule } from "../realtime/realtime.module";
 
 @Module({
+  imports: [RealtimeModule], // gives NotificationsService access to RealtimeService (emitToUser)
   controllers: [NotificationsController], // handles HTTP requests
   providers: [NotificationsService], // handles database operations
   exports: [NotificationsService], // expose NotificationsService to other modules that may need it

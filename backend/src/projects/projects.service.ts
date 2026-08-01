@@ -17,6 +17,10 @@ import { maxProjectsPerUser } from "./projects.constants";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
 import { DEFAULT_CALENDAR_CATEGORIES } from "../calendar-categories/default-calendar-categories";
+import { DEFAULT_TASK_CATEGORIES } from "../task-categories/default-task-categories";
+import { DEFAULT_DISCOVERY_BLOCKS } from "../discovery-blocks/default-discovery-blocks";
+import { computeDiscoveryBlockStatus } from "../discovery-blocks/discovery-block-status.util";
+import { RealtimeService } from "../realtime/realtime.service";
 
 // Mirrors the weighted, gated score computed client-side in
 // evaluation-checklist.tsx (totalProgress.percent / READINESS_THRESHOLD /
@@ -56,7 +60,10 @@ function computeProjectProgress(
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeService: RealtimeService
+  ) {}
 
   // shared access guard, meant to be called by any module that needs to verify
   // "is userId allowed to access projectId" (discovery-blocks, tasks, calendar-events, etc.)
@@ -144,7 +151,7 @@ export class ProjectsService {
   }
 
   async create(dto: CreateProjectDto, userId: string) {
-    return this.prisma.transaction(
+    const project = await this.prisma.transaction(
       async (database) => {
         const membershipCount = await database.projectMember.count({
           where: { userId },
@@ -182,10 +189,49 @@ export class ProjectsService {
           });
         }
 
+        // every task needs a category, so seed the default set here too
+        for (const category of DEFAULT_TASK_CATEGORIES) {
+          await database.taskCategory.create({
+            data: {
+              projectId: project.id,
+              name: category.name,
+              color: category.color,
+            },
+          });
+        }
+
+        // unlike task/calendar categories, discovery blocks are just a
+        // starting point - the user is free to delete or edit them afterwards
+        for (const block of DEFAULT_DISCOVERY_BLOCKS) {
+          const seedItems = block.items.map((label, index) => {
+            return { label: label, order: index, isChecked: false };
+          });
+          await database.discoveryBlock.create({
+            data: {
+              projectId: project.id,
+              title: block.title,
+              icon: block.icon,
+              color: block.color,
+              status: computeDiscoveryBlockStatus(seedItems),
+              discoveryBlockItems: {
+                create: seedItems,
+              },
+            },
+          });
+        }
+
         return this.findProjectForUser(database, project.id, userId);
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
+    // outside the transaction on purpose - an in-memory room join isn't
+    // part of the DB's atomicity guarantee, and doesn't need to roll back
+    // with it. Without this, a creator with an already-open socket would
+    // miss every realtime broadcast for their own new project (their
+    // socket only joined rooms for projects that existed at connect time)
+    // until their next reconnect.
+    this.realtimeService.joinProjectRoom(userId, project.id);
+    return project;
   }
 
   // NOTE ON ROLES: deleting the project is a team-affecting, hard-to-undo action -

@@ -6,7 +6,6 @@ import {
   AccordionTitle,
   TextInput,
   Button,
-  Checkbox,
   createTheme,
   ThemeProvider,
 } from "flowbite-react";
@@ -14,12 +13,12 @@ import { FaRegStar } from "react-icons/fa";
 import { useState } from "react";
 import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
-import { RiDeleteBackFill } from "react-icons/ri";
 import {
   createEvaluationChecklistItem,
   deleteEvaluationChecklistItem,
   fetchEvaluationChecklistItems,
   updateEvaluationChecklistItem,
+  parseEvaluationChecklistItem,
   EVALUATION_CHECKLIST_SECTIONS,
   EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH,
   EVALUATION_CHECKLIST_MAX_ITEMS_PER_CATEGORY,
@@ -29,9 +28,11 @@ import type {
   EvaluationChecklistItem,
   EvaluationChecklistSection,
 } from "@/lib/evaluationChecklist";
+import { ChecklistItemRow } from "@/components/project/evaluation-checklist/ChecklistItemRow";
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
+import { useLiveItemSync } from "@/hooks/useLiveItemSync";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/evaluation-checklist"
@@ -256,6 +257,11 @@ function EvaluationChecklistPage() {
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
+  // live sync: another member checking/unchecking, adding, or removing an
+  // item updates this page without a reload - no scope filter, the whole
+  // project's checklist lives on this one page
+  useLiveItemSync("checklist-item", parseEvaluationChecklistItem, setItems);
+
   // Plain per-category completion percent (no gating, unlike totalProgress
   // below) - used for each accordion's own progress bar.
   function categoryPercent(data: AccordionItemData): number {
@@ -326,7 +332,15 @@ function EvaluationChecklistPage() {
   }) {
     try {
       const created = await createEvaluationChecklistItem(projectId, dto);
-      setItems((prevItems) => [...prevItems, created]);
+      // the checklist-item:created broadcast (see handleItemCreated above)
+      // can land on this same client before this request's own response
+      // does - same dedup check on both sides so whichever arrives first
+      // wins, the second is a no-op instead of a duplicate row
+      setItems((prevItems) =>
+        prevItems.some((item) => item.id === created.id)
+          ? prevItems
+          : [...prevItems, created]
+      );
     } catch {
       showToast({ type: "error", message: errorMessage("created") });
       // invalidate is skipped on failure - see handleUpdate/handleDelete below.
@@ -335,13 +349,16 @@ function EvaluationChecklistPage() {
     await safeInvalidateRouter();
   }
 
+  // returns whether the save actually succeeded - ChecklistItemRow's own
+  // commit() needs that to decide whether it's safe to release its field
+  // lock and exit edit mode, or keep both so the user can retry
   async function handleUpdate(
     id: string,
     changes: Partial<EvaluationChecklistItem>
-  ) {
+  ): Promise<boolean> {
     // save previous state in case rollback is needed
     const previousItem = items.find((it) => it.id === id);
-    if (!previousItem) return;
+    if (!previousItem) return false;
 
     // optimistic update
     setItems((prevItems) =>
@@ -353,9 +370,10 @@ function EvaluationChecklistPage() {
     } catch {
       setItems((prev) => prev.map((it) => (it.id === id ? previousItem : it)));
       showToast({ type: "error", message: errorMessage("updated") });
-      return;
+      return false;
     }
     await safeInvalidateRouter();
+    return true;
   }
 
   // Optimistic delete: removed from the list immediately, re-inserted on
@@ -596,95 +614,38 @@ function EvaluationChecklistPage() {
 
                   <AccordionContent>
                     <ul>
-                      {item.contents.map((c) => {
-                        // Only fires the PATCH if the label actually changed
-                        // and isn't blank - either way, exits edit mode.
-                        function commitLabel(newValue: string) {
-                          if (newValue.trim().length && newValue !== c.label) {
-                            handleUpdate(c.id, { label: newValue });
+                      {item.contents.map((c) => (
+                        <ChecklistItemRow
+                          key={c.id}
+                          item={c}
+                          projectId={projectId}
+                          checkedColor={style.checkedColor}
+                          isEditing={editingId === c.id}
+                          onStartEdit={() => setEditingId(c.id)}
+                          onStopEdit={() => setEditingId(null)}
+                          onToggle={() =>
+                            handleUpdate(c.id, { isChecked: !c.isChecked })
                           }
-                          setEditingId(null);
-                        }
-
-                        return (
-                          <li
-                            key={c.id}
-                            className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border"
-                          >
-                            {/* checked:bg-current uses this text color as the
-                          checkmark fill. */}
-                            <Checkbox
-                              className={style.checkedColor}
-                              aria-label={c.label}
-                              checked={c.isChecked}
-                              onChange={() =>
-                                handleUpdate(c.id, { isChecked: !c.isChecked })
-                              }
-                            />
-
-                            {/* This edits the text:
-                            - cancel on ESCAPE
-                            - commit new text on ENTER or click out of the box                    */}
-                            {editingId === c.id ? (
-                              <TextInput
-                                maxLength={
-                                  EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-                                }
-                                className="w-full px-2 text-sm"
-                                aria-label={`Edit "${c.label}"`}
-                                defaultValue={c.label}
-                                autoFocus
-                                onBlur={(e) => {
-                                  if (
-                                    e.currentTarget.value.length <=
-                                    EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-                                  )
-                                    commitLabel(e.currentTarget.value);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    if (
-                                      e.currentTarget.value.length <=
-                                      EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-                                    )
-                                      commitLabel(e.currentTarget.value);
-                                  }
-                                  if (e.key === "Escape") {
-                                    setEditingId(null);
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                className="w-full min-w-0 wrap-break-word px-2 text-left text-sm"
-                                aria-label={`Edit "${c.label}"`}
-                                onDoubleClick={() => setEditingId(c.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    setEditingId(c.id);
-                                  }
-                                }}
-                              >
-                                {c.label}
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              className="opacity-0 transition-opacity group-hover:opacity-50 group-focus-within:opacity-50 focus:opacity-100"
-                              aria-label={`Delete "${c.label}"`}
-                              onClick={() => handleDelete(c.id)}
-                            >
-                              <RiDeleteBackFill
-                                aria-hidden="true"
-                                className="h-5 w-5"
-                              />
-                            </button>
-                          </li>
-                        );
-                      })}
+                          onCommitLabel={async (newValue) => {
+                            // Only fires the PATCH if the label actually
+                            // changed and isn't blank - a no-op commit has
+                            // nothing to save, so it's always a "success"
+                            // (ChecklistItemRow exits edit mode and
+                            // releases the lock either way). Exiting edit
+                            // mode itself is now ChecklistItemRow's own
+                            // call, made only once the save actually
+                            // settles - not unconditional here.
+                            if (
+                              newValue.trim().length &&
+                              newValue !== c.label
+                            ) {
+                              return handleUpdate(c.id, { label: newValue });
+                            }
+                            return true;
+                          }}
+                          onDelete={() => handleDelete(c.id)}
+                        />
+                      ))}
                     </ul>
                     <div className="mt-5 flex items-center gap-3">
                       <TextInput

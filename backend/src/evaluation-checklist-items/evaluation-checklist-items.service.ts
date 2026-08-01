@@ -3,29 +3,122 @@
 
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Prisma, EvaluationChecklistItemSection } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { RealtimeService } from "../realtime/realtime.service";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 import { CreateEvaluationChecklistItemDto } from "./dto/create-evaluation-checklist-item.dto";
 import { UpdateEvaluationChecklistItemDto } from "./dto/update-evaluation-checklist-item.dto";
 import { EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION } from "./evaluation-checklist-items.constants";
+
+// Same rounding rule as computeProjectProgress's own per-section helper in
+// projects.service.ts, kept separate on purpose - that one feeds the capped
+// overall project percent, this one only cares about a single section
+// crossing 100% for notification purposes.
+function computeSectionPercent(items: { isChecked: boolean }[]): number {
+  if (items.length === 0) {
+    return 0;
+  }
+  const checked = items.filter((item) => item.isChecked).length;
+  return Math.round((checked / items.length) * 100);
+}
+
+const SECTION_LABELS: Record<EvaluationChecklistItemSection, string> = {
+  MANDATORY: "Mandatory Part",
+  BONUS: "Bonus Part",
+  SUPPLEMENTAL: "Supplemental Goal",
+};
 
 @Injectable()
 export class EvaluationChecklistItemsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly projectsService: ProjectsService
-  ) {}
+    private readonly projectsService: ProjectsService,
+    private readonly notificationsService: NotificationsService,
+    private readonly realtimeService: RealtimeService
+  ) {
+    // teaches the gateway how to resolve a "checklist-item:<id>" key's real
+    // projectId, so it can validate a field:lock/unlock/query without this
+    // service's model leaking into realtime.gateway.ts
+    this.realtimeService.registerKeyPrefixValidator(
+      "checklist-item",
+      async (id) => {
+        const item = await this.prisma.evaluationChecklistItem.findUnique({
+          where: { id },
+          select: { projectId: true },
+        });
+        return item?.projectId;
+      }
+    );
+  }
   // strictly equivalent to the lesser expanded (yet more readable) form:
   //  prisma: PrismaService;
   //  projectsService: ProjectsService;
-  //  constructor(prisma: PrismaService, projectsService: ProjectsService) {
+  //  notificationsService: NotificationsService;
+  //  realtimeService: RealtimeService;
+  //  constructor(prisma: PrismaService, projectsService: ProjectsService, notificationsService: NotificationsService, realtimeService: RealtimeService) {
   //    this.prisma = prisma;
   //    this.projectsService = projectsService;
+  //    this.notificationsService = notificationsService;
+  //    this.realtimeService = realtimeService;
   //  }
+
+  // called after update/remove below, with the section's percent computed
+  // just before that mutation - notifies every other project member (not
+  // the acting user, who already knows what they just did) only on a real
+  // <100 => 100 crossing, never on a mutation that leaves an already-100%
+  // section untouched.
+  //
+  // currentItems is the same section list the caller already fetched for
+  // previousPercent, transformed in-memory to reflect the mutation that
+  // just happened (item's isChecked flipped, or the deleted item filtered
+  // out) - avoids a second full-section findMany right after the first.
+  private async notifySectionIfJustCompleted(
+    projectId: string,
+    section: EvaluationChecklistItemSection,
+    previousPercent: number,
+    currentItems: { isChecked: boolean }[],
+    actingUserId: string
+  ): Promise<void> {
+    if (previousPercent >= 100) {
+      return;
+    }
+
+    if (computeSectionPercent(currentItems) < 100) {
+      return;
+    }
+
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { name: true },
+    });
+    const members = await this.prisma.projectMember.findMany({
+      where: { projectId: projectId },
+      select: { userId: true },
+    });
+
+    // each member's insert + socket emit is independent - run them
+    // concurrently instead of awaiting one at a time, so this PATCH/DELETE
+    // response isn't delayed by N sequential DB round-trips on a project
+    // with N members
+    await Promise.all(
+      members
+        .filter((member) => member.userId !== actingUserId)
+        .map((member) =>
+          this.notificationsService.create(
+            member.userId,
+            `${SECTION_LABELS[section]} reached 100% on "${project.name}"`,
+            `/${projectId}/evaluation-checklist`
+          )
+        )
+    );
+  }
 
   // GET (all)
   async findAll(projectId: string, userId: string) {
@@ -74,7 +167,7 @@ export class EvaluationChecklistItemsService {
     // a Serializable transaction so Postgres itself rejects the second
     // transaction if it would have read stale data. Same pattern as
     // ProjectsService.create() and DiscoveryBlocksService.create().
-    return await this.prisma.transaction(
+    const createdItem = await this.prisma.transaction(
       async (transactionPrisma) => {
         const existingItemCount =
           await transactionPrisma.evaluationChecklistItem.count({
@@ -97,6 +190,12 @@ export class EvaluationChecklistItemsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
+    this.realtimeService.emitToProject(
+      projectId,
+      "checklist-item:created",
+      createdItem
+    );
+    return createdItem;
   }
 
   // PATCH (partial update)
@@ -111,24 +210,109 @@ export class EvaluationChecklistItemsService {
     // projectId - without the second check, a member of any project could
     // PATCH any other project's item just by pairing their own projectId
     // (to pass the membership half) with a foreign item id (IDOR).
-    await this.findById(projectId, id, userId);
+    // its return value is also reused below - it already carries this
+    // item's section, no need for a second query.
+    const existingItem = await this.findById(projectId, id, userId);
+    // only the label is lock-gated - isChecked/order are "last one wins" by
+    // design (see the frontend's own comment on this), so a checkbox toggle
+    // must go through even while someone else holds the label's edit lock.
+    // Without this check, a second member could still PATCH the label
+    // straight past a lock their own UI shows as read-only (replay, race,
+    // or a client bug) - the field-lock hook is otherwise a UI hint only.
+    if (
+      dto.label !== undefined &&
+      this.realtimeService.isLockedByOther(`checklist-item:${id}`, userId)
+    ) {
+      throw new ForbiddenException("This item is being edited by someone else");
+    }
+    const sectionItems = await this.prisma.evaluationChecklistItem.findMany({
+      where: { projectId: projectId, section: existingItem.section },
+      select: { id: true, isChecked: true },
+    });
+    const previousPercent = computeSectionPercent(sectionItems);
 
     // safe to update by id alone now - findById already proved it belongs
     // to projectId.
-    return await this.prisma.evaluationChecklistItem.update({
-      where: { id: id },
-      data: { ...dto },
-    });
+    let updatedItem;
+    try {
+      updatedItem = await this.prisma.evaluationChecklistItem.update({
+        where: { id: id },
+        data: { ...dto },
+      });
+    } catch (error) {
+      // someone else deleted this item in the race window between findById
+      // above and this update - a clean 404 instead of Prisma's raw
+      // "record to update not found" text leaking to the client
+      if (isRecordNotFoundError(error)) {
+        throw new NotFoundException("Checklist item not found");
+      }
+      throw error;
+    }
+    // only isChecked toggling (not label/order) can ever move a section's
+    // percent, but recomputing unconditionally is simpler than tracking
+    // which field changed, same reasoning as DiscoveryBlocksService.
+    // sectionItems patched in-memory with this update's new isChecked
+    // instead of a second findMany - it's the same list, just one row changed.
+    await this.notifySectionIfJustCompleted(
+      projectId,
+      existingItem.section,
+      previousPercent,
+      sectionItems.map((item) =>
+        item.id === id ? { isChecked: updatedItem.isChecked } : item
+      ),
+      userId
+    );
+    this.realtimeService.emitToProject(
+      projectId,
+      "checklist-item:updated",
+      updatedItem
+    );
+    return updatedItem;
   }
 
   // DELETE
   async remove(projectId: string, id: string, userId: string) {
-    // membership check via findById, will throw if failed. Result is discarded.
-    await this.findById(projectId, id, userId);
-
-    // database query
-    return await this.prisma.evaluationChecklistItem.delete({
-      where: { id: id },
+    // membership check via findById, will throw if failed - its return
+    // value is reused below (section, for the same reason as update()).
+    const existingItem = await this.findById(projectId, id, userId);
+    const sectionItems = await this.prisma.evaluationChecklistItem.findMany({
+      where: { projectId: projectId, section: existingItem.section },
+      select: { id: true, isChecked: true },
     });
+    const previousPercent = computeSectionPercent(sectionItems);
+
+    // two members deleting the same item within the same race window both
+    // want it gone - the second delete isn't really a failure, so treat it
+    // as one instead of surfacing Prisma's raw "record not found" text
+    let deletedItem = existingItem;
+    try {
+      deletedItem = await this.prisma.evaluationChecklistItem.delete({
+        where: { id: id },
+      });
+    } catch (error) {
+      if (!isRecordNotFoundError(error)) {
+        throw error;
+      }
+    }
+    // the deleted item's own label lock (if any) will never be released by
+    // its holder now - findById would 404 for anyone who tried, so nothing
+    // would ever clear it otherwise until they disconnect
+    this.realtimeService.forceReleaseLock(`checklist-item:${id}`);
+    // deleting the last unchecked item in a section can itself push it to
+    // 100%, same as checking it would. sectionItems filtered in-memory
+    // instead of a second findMany - it's the same list minus this row.
+    await this.notifySectionIfJustCompleted(
+      projectId,
+      existingItem.section,
+      previousPercent,
+      sectionItems.filter((item) => item.id !== id),
+      userId
+    );
+    this.realtimeService.emitToProject(
+      projectId,
+      "checklist-item:deleted",
+      deletedItem
+    );
+    return deletedItem;
   }
 }

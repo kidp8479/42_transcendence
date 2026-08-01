@@ -15,6 +15,9 @@ interface DiscoveryBlockAppearancePickerProps {
   discoveryBlockColor: CategoryColor;
   onColorChange: (colorIndex: number) => void;
   onIconChange: (iconName: string) => void;
+  // same gating as Title/Description/Notes on the edit screen - a locked
+  // block's color/icon shouldn't be changeable by anyone but the lock holder
+  disabled: boolean;
 }
 
 // color swatches + icon buttons on the edit screen - both autosave on click
@@ -27,6 +30,7 @@ export function DiscoveryBlockAppearancePicker({
   discoveryBlockColor,
   onColorChange,
   onIconChange,
+  disabled,
 }: DiscoveryBlockAppearancePickerProps) {
   return (
     <>
@@ -43,9 +47,10 @@ export function DiscoveryBlockAppearancePicker({
                 aria-label={"Color " + (colorIndex + 1)}
                 aria-pressed={colorIndex === selectedColorIndex}
                 onClick={() => onColorChange(colorIndex)}
+                disabled={disabled}
                 className={
                   color.bg +
-                  " flex h-8 w-8 items-center justify-center rounded-full text-white" +
+                  " flex h-8 w-8 items-center justify-center rounded-full text-white disabled:opacity-50" +
                   (colorIndex === selectedColorIndex
                     ? " ring-2 ring-offset-2 ring-offset-surface-base " +
                       color.ring
@@ -73,13 +78,15 @@ export function DiscoveryBlockAppearancePicker({
                 aria-label={iconName + " icon"}
                 aria-pressed={isSelected}
                 onClick={() => onIconChange(iconName)}
+                disabled={disabled}
                 className={
-                  "flex h-8 w-8 items-center justify-center rounded-full border " +
+                  "flex h-8 w-8 items-center justify-center rounded-full border disabled:opacity-50" +
                   (isSelected
-                    ? discoveryBlockColor.bg +
+                    ? " " +
+                      discoveryBlockColor.bg +
                       " text-white " +
                       discoveryBlockColor.border
-                    : "border-surface-border bg-surface-overlay text-text-secondary dark:border-surface-border dark:bg-surface-overlay")
+                    : " border-surface-border bg-surface-overlay text-text-secondary dark:border-surface-border dark:bg-surface-overlay")
                 }
               >
                 <IconOption />

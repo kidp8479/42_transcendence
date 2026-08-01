@@ -3,12 +3,15 @@
 
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
+import { RealtimeService } from "../realtime/realtime.service";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 import { CreateDiscoveryBlockDto } from "./dto/create-discovery-block.dto";
 import { UpdateDiscoveryBlockDto } from "./dto/update-discovery-block.dto";
 import { computeDiscoveryBlockStatus } from "./discovery-block-status.util";
@@ -23,9 +26,28 @@ export class DiscoveryBlocksService {
   // (that shorthand is the standard form to use elsewhere in the codebase)
   prisma: PrismaService;
   projectsService: ProjectsService;
-  constructor(prisma: PrismaService, projectsService: ProjectsService) {
+  realtimeService: RealtimeService;
+  constructor(
+    prisma: PrismaService,
+    projectsService: ProjectsService,
+    realtimeService: RealtimeService
+  ) {
     this.prisma = prisma;
     this.projectsService = projectsService;
+    this.realtimeService = realtimeService;
+    // teaches the gateway how to resolve a "discovery-block:<id>" key's
+    // real projectId, so it can validate a field:lock/unlock/query without
+    // this service's model leaking into realtime.gateway.ts
+    this.realtimeService.registerKeyPrefixValidator(
+      "discovery-block",
+      async (id) => {
+        const block = await this.prisma.discoveryBlock.findUnique({
+          where: { id },
+          select: { projectId: true },
+        });
+        return block?.projectId;
+      }
+    );
   }
 
   // GET (all)
@@ -88,6 +110,11 @@ export class DiscoveryBlocksService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-block:created",
+      block
+    );
     return block;
   }
 
@@ -119,19 +146,28 @@ export class DiscoveryBlocksService {
   // toggle's final state. Same Serializable-transaction fix, so Postgres
   // rejects whichever transaction read stale data instead of letting it commit.
   async recalculateStatus(discoveryBlockId: string): Promise<void> {
-    await this.prisma.transaction(
+    const updatedBlock = await this.prisma.transaction(
       async (transactionPrisma) => {
         const items = await transactionPrisma.discoveryBlockItem.findMany({
           where: { discoveryBlockId: discoveryBlockId },
           select: { isChecked: true },
         });
 
-        await transactionPrisma.discoveryBlock.update({
+        return transactionPrisma.discoveryBlock.update({
           where: { id: discoveryBlockId },
           data: { status: computeDiscoveryBlockStatus(items) },
         });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+    // without this, checking a block's last item silently updates its
+    // status in the DB with no live signal - the Discovery overview page
+    // only listens for discovery-block:updated to know when to move a
+    // block between its NOT_STARTED/IN_PROGRESS/COMPLETED sections
+    this.realtimeService.emitToProject(
+      updatedBlock.projectId,
+      "discovery-block:updated",
+      updatedBlock
     );
   }
 
@@ -143,13 +179,40 @@ export class DiscoveryBlocksService {
     userId: string
   ) {
     await this.findById(projectId, id, userId); // access guard, see findById's own comment
+    // one lock covers the whole form here (unlike checklist items, which
+    // only gate the label field) - Title/Description/Notes/color/icon are
+    // all part of the same "Edit Category" screen, so any field of this
+    // PATCH is blocked while someone else holds it. Otherwise this is a
+    // UI-only hint: a member could PATCH straight past the disabled
+    // controls their own screen shows.
+    if (this.realtimeService.isLockedByOther(`discovery-block:${id}`, userId)) {
+      throw new ForbiddenException(
+        "This category is being edited by someone else"
+      );
+    }
 
     // { ...dto } (spread notation in js) only contains the fields actually sent by the client (PATCH is partial):
     // Prisma's update() only touches the keys present in `data`, leaving the rest of the row untouched
-    const updatedBlock = await this.prisma.discoveryBlock.update({
-      where: { id: id },
-      data: { ...dto },
-    });
+    let updatedBlock;
+    try {
+      updatedBlock = await this.prisma.discoveryBlock.update({
+        where: { id: id },
+        data: { ...dto },
+      });
+    } catch (error) {
+      // someone else deleted this block in the race window between the
+      // guard above and this update - a clean 404 instead of Prisma's raw
+      // "record to update not found" text leaking to the client
+      if (isRecordNotFoundError(error)) {
+        throw new NotFoundException("Discovery block not found");
+      }
+      throw error;
+    }
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-block:updated",
+      updatedBlock
+    );
     return updatedBlock;
   }
 
@@ -157,10 +220,29 @@ export class DiscoveryBlocksService {
   // discoveryBlockItems cascade-delete automatically at the DB level
   // (onDelete: Cascade on DiscoveryBlockItem.discoveryBlock in schema.prisma) - no need to delete them here
   async remove(projectId: string, id: string, userId: string) {
-    await this.findById(projectId, id, userId); // access guard, see findById's own comment
-    const deletedBlock = await this.prisma.discoveryBlock.delete({
-      where: { id: id },
-    });
+    const existingBlock = await this.findById(projectId, id, userId); // access guard, see findById's own comment
+
+    // two members deleting the same block within the same race window both
+    // want it gone - same reasoning as DiscoveryBlockItemsService.remove()
+    let deletedBlock = existingBlock;
+    try {
+      deletedBlock = await this.prisma.discoveryBlock.delete({
+        where: { id: id },
+      });
+    } catch (error) {
+      if (!isRecordNotFoundError(error)) {
+        throw error;
+      }
+    }
+    // same reasoning as EvaluationChecklistItemsService.remove(): nothing
+    // would ever release this lock otherwise, the block it referred to no
+    // longer exists for anyone to release it against
+    this.realtimeService.forceReleaseLock(`discovery-block:${id}`);
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-block:deleted",
+      deletedBlock
+    );
     return deletedBlock;
   }
 }

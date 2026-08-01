@@ -6,6 +6,8 @@ import { Injectable, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { AddMemberDto } from "./dto/add-member.dto";
+import { NotificationsService } from "../notifications/notifications.service";
+import { RealtimeService } from "../realtime/realtime.service";
 
 @Injectable()
 export class ProjectMembersService {
@@ -16,7 +18,9 @@ export class ProjectMembersService {
   // the constructor is called automatically by NestJS at startup - never called manually
   constructor(
     private readonly prisma: PrismaService,
-    private readonly projectsService: ProjectsService
+    private readonly projectsService: ProjectsService,
+    private readonly notificationsService: NotificationsService,
+    private readonly realtimeService: RealtimeService
   ) {}
 
   // NOTE ON ROLES: adding/removing a member changes who's on the team, so unlike most other
@@ -42,8 +46,9 @@ export class ProjectMembersService {
         "Only the project owner or admin can add members"
       );
     }
+
     // create a ProjectMember row
-    return this.prisma.projectMember.create({
+    const member = await this.prisma.projectMember.create({
       data: {
         projectId,
         userId: dto.userId,
@@ -60,6 +65,19 @@ export class ProjectMembersService {
         },
       },
     });
+
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { name: true },
+    });
+    await this.notificationsService.create(
+      dto.userId,
+      `You were added to "${project.name}"`,
+      `/${projectId}/project-settings`
+    );
+    this.realtimeService.joinProjectRoom(dto.userId, projectId);
+
+    return member;
   }
 
   // no role check, any member can see the member list
@@ -118,7 +136,7 @@ export class ProjectMembersService {
         "Only the project owner can remove an admin"
       );
     }
-    return this.prisma.projectMember.delete({
+    const removed = await this.prisma.projectMember.delete({
       where: {
         userId_projectId: {
           userId,
@@ -126,5 +144,11 @@ export class ProjectMembersService {
         },
       },
     });
+    this.realtimeService.leaveProjectRoom(userId, projectId);
+    // otherwise a removed member who keeps their tab open goes on holding
+    // whatever field locks they had, indefinitely blocking every remaining
+    // member from editing those fields - see the gateway's own comment
+    this.realtimeService.forceReleaseLocksForUserInProject(userId, projectId);
+    return removed;
   }
 }

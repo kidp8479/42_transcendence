@@ -9,6 +9,8 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { DiscoveryBlocksService } from "../discovery-blocks/discovery-blocks.service";
+import { RealtimeService } from "../realtime/realtime.service";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 import { CreateDiscoveryBlockItemDto } from "./dto/create-discovery-block-item.dto";
 import { UpdateDiscoveryBlockItemDto } from "./dto/update-discovery-block-item.dto";
 
@@ -19,12 +21,15 @@ const MAX_ITEMS_PER_DISCOVERY_BLOCK = 30;
 export class DiscoveryBlockItemsService {
   prisma: PrismaService;
   discoveryBlocksService: DiscoveryBlocksService;
+  realtimeService: RealtimeService;
   constructor(
     prisma: PrismaService,
-    discoveryBlocksService: DiscoveryBlocksService
+    discoveryBlocksService: DiscoveryBlocksService,
+    realtimeService: RealtimeService
   ) {
     this.prisma = prisma;
     this.discoveryBlocksService = discoveryBlocksService;
+    this.realtimeService = realtimeService;
   }
 
   // GET (all)
@@ -91,6 +96,11 @@ export class DiscoveryBlockItemsService {
     // recalculateStatus still protects its own read-then-write internally
     // (see its own comment), just as a separate transaction.
     await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-item:created",
+      blockItem
+    );
     return blockItem;
   }
 
@@ -130,14 +140,30 @@ export class DiscoveryBlockItemsService {
   ) {
     await this.findById(projectId, discoveryBlockId, id, userId); // access guard, see findById's own comment
 
-    const updatedItem = await this.prisma.discoveryBlockItem.update({
-      where: { id: id },
-      data: { ...dto },
-    });
+    let updatedItem;
+    try {
+      updatedItem = await this.prisma.discoveryBlockItem.update({
+        where: { id: id },
+        data: { ...dto },
+      });
+    } catch (error) {
+      // someone else deleted this item in the race window between the
+      // guard above and this update - a clean 404 instead of Prisma's raw
+      // "record to update not found" text leaking to the client
+      if (isRecordNotFoundError(error)) {
+        throw new NotFoundException("Discovery block item not found");
+      }
+      throw error;
+    }
     // recomputed on every update, not just when isChecked is sent - simpler
     // than tracking which field changed, and the total item count never
     // changes here so a label/order-only update is a harmless no-op recompute
     await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-item:updated",
+      updatedItem
+    );
     return updatedItem;
   }
 
@@ -148,14 +174,38 @@ export class DiscoveryBlockItemsService {
     id: string,
     userId: string
   ) {
-    await this.findById(projectId, discoveryBlockId, id, userId); // access guard, see findById's own comment
+    // access guard, see findById's own comment - its return value also
+    // doubles as the fallback below if someone else deletes this row in
+    // the race window between this guard and the delete call
+    const existingItem = await this.findById(
+      projectId,
+      discoveryBlockId,
+      id,
+      userId
+    );
 
-    const deletedItem = await this.prisma.discoveryBlockItem.delete({
-      where: { id: id },
-    });
+    let deletedItem = existingItem;
+    try {
+      deletedItem = await this.prisma.discoveryBlockItem.delete({
+        where: { id: id },
+      });
+    } catch (error) {
+      // two members clicking delete on the same item within the same race
+      // window both want the same end state (item gone) - the second
+      // delete isn't really a failure, so treat it as one instead of
+      // surfacing Prisma's raw "record to delete not found" text
+      if (!isRecordNotFoundError(error)) {
+        throw error;
+      }
+    }
     // recalculated after the delete, so the removed item is already excluded
     // from the count/ratio
     await this.discoveryBlocksService.recalculateStatus(discoveryBlockId);
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-item:deleted",
+      deletedItem
+    );
     return deletedItem;
   }
 }

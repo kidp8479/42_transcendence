@@ -54,7 +54,7 @@ function isEvaluationChecklistSection(
 // EvaluationChecklistItem, or null if any field is missing/mistyped -
 // callers turn a null into a thrown Error since the app can't render a
 // checklist item it can't trust the shape of.
-function parseEvaluationChecklistItem(
+export function parseEvaluationChecklistItem(
   value: unknown
 ): EvaluationChecklistItem | null {
   if (!isRecord(value)) {

@@ -175,7 +175,7 @@ export async function updateDiscoveryBlock(
 // doesn't match the shape we expect. Never trust a `fetch` response body's
 // type just because a TS type annotation says so - the backend, network, or
 // a future API change could all send something unexpected at runtime.
-function parseDiscoveryBlock(value: unknown): DiscoveryBlock | null {
+export function parseDiscoveryBlock(value: unknown): DiscoveryBlock | null {
   if (!isRecord(value)) {
     return null;
   }
