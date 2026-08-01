@@ -21,12 +21,12 @@ export class UsersController {
     return this.usersService.findById(request.user.id);
   }
 
-  @ApiSecurity("csrf") 
+  @ApiSecurity("csrf")
   @Patch("me")
   update(
     @Body() dto: UpdateUserDto,
     @Req() request: AuthenticatedRequest
   ) {
     return this.usersService.update(request.user.id, dto);
-  }  
+  }
 }

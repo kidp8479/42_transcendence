@@ -32,9 +32,22 @@ GRANT SELECT, INSERT, DELETE ON TABLE
 	"AuthEvent"
 TO auth_runtime;
 
--- NestJS: application/project/resource tables plus read-only canonical user
--- data. Never PasswordCredential or the other auth-domain tables.
+-- NestJS: application/project/resource tables plus canonical user data.
+-- Read access to the full row, but write access only to the self-service
+-- profile columns (PATCH /users/me) - identity fields (email, emailVerified)
+-- stay exclusively writable by auth_runtime. Never PasswordCredential or the
+-- other auth-domain tables.
 GRANT SELECT ON TABLE
+	"User"
+TO backend_runtime;
+-- includes updatedAt: Prisma's @updatedAt sets it on every generated UPDATE,
+-- so it must be grantable even though callers never set it explicitly.
+GRANT UPDATE (
+	"username",
+	"avatarUrl",
+	"campus",
+	"updatedAt"
+) ON TABLE
 	"User"
 TO backend_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE

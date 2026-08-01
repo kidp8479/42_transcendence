@@ -29,16 +29,12 @@ export class UsersService {
   }
 
   async update(userId: string, dto: UpdateUserDto) {
-    
     // will throw if user doesn't exist
     await this.findById(userId);
-
-    console.log("image: ");
-    console.log(dto.avatarUrl);
 
     return await this.prisma.user.update({
       where: { id: userId },
       data: { ...dto },
-    })
+    });
   }
 }

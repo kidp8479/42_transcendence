@@ -8,15 +8,18 @@ import {
   Label,
   Modal,
   TextInput,
-  ToggleSwitch,
+  // ToggleSwitch,
 } from "flowbite-react";
 import { useState } from "react";
 import { darkSurfaceTextInputTheme } from "@/lib/flowbite";
 
-import { createFileRoute, useLoaderData } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { UploadFile, fileDownloadUrl } from "@/lib/rustfsApi";
 
-import { getMe, updateMe, User } from "@/lib/userSettingsApi";
+import { getMe, updateMe } from "@/lib/userSettingsApi";
+
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
+import { useToast } from "@/hooks/useToast";
 
 export const Route = createFileRoute("/_authenticated/user-settings")({
   loader: () => getMe(),
@@ -24,7 +27,11 @@ export const Route = createFileRoute("/_authenticated/user-settings")({
 });
 
 const rowClass =
-  "flex items-center justify-between gap-6 border-b border-surface-border pb-4";
+  "flex items-center justify-between gap-6 pb-4";
+
+const rowClassBorder = 
+ "flex items-center justify-between gap-6 pb-4 border-b border-surface-border";
+  
 const rowUploadButtonClass = `
   bg-surface-overlay
   dark:bg-surface-overlay!
@@ -45,28 +52,45 @@ const rowUploadButtonClass = `
 function UserSettingsPage() {
 
   const user = Route.useLoaderData();
-
+  const safeInvalidateRouter = useSafeRouterInvalidate();
+  const { showToast } = useToast();
   const [openModal, setOpenModal] = useState(false);
+  const [displayedName, setDisplayedName] = useState(user.username);
+  // const [displayedCampus, setDisplayedCampus] = useState(user.campus);
 
-  const [switch2FA, setSwitch2FA] = useState(false);
-
-  const [file, setFile] = useState<File | null>(null);
-  const [key, setKey] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // const [switch2FA, setSwitch2FA] = useState(false);
 
   async function handleUpload(file: File | null) {
     if (!file) return;
-    setLoading(true);
-    setError(null);
     try {
       const result = await UploadFile(file);
-      setKey(result.key);
       await updateMe({ avatarUrl: fileDownloadUrl(result.key) });
+      safeInvalidateRouter();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setLoading(false);
+      showToast({ type: "error", message: "Upload failed. Please retry." });
+    }
+  }
+
+  async function handleSaveChanges() {
+
+    const changes: Partial<typeof user> = {};
+
+    if (displayedName !== user.username) {
+      changes.username = displayedName;
+    }
+    // if (displayedCampus !== user.campus) {
+    //   changes.campus = displayedCampus;
+    // }        
+
+    try {
+      await updateMe({
+        username: changes.username,
+        email: changes.email,
+        campus: changes.campus,
+      })
+      safeInvalidateRouter();
+    } catch {
+      showToast({ type: "error", message: "Saving failed. Please retry." });
     }
   }
 
@@ -113,7 +137,7 @@ function UserSettingsPage() {
               className="hidden"
               onChange={(e) => {
                 const selectedFile = e.target.files;
-                setFile(selectedFile?.[0] ?? null);
+                // setFile(selectedFile?.[0] ?? null);
                 setOpenModal(false);
                 handleUpload(selectedFile?.[0] ?? null);
               }}
@@ -174,6 +198,9 @@ function UserSettingsPage() {
                 className="w-80"
                 theme={darkSurfaceTextInputTheme}
                 defaultValue={user.username}
+                onBlur={ (e) => {
+                  setDisplayedName(e.currentTarget.value);
+                }}
               />
             </section>
 
@@ -188,14 +215,33 @@ function UserSettingsPage() {
                 className="w-80"
                 theme={darkSurfaceTextInputTheme}
                 type="email"
+                value={ user.email }
+                disabled
               />
             </section>
+
+            <section className={rowClassBorder} aria-labelledby="account-campus-area">
+              <div>
+                <Label className="font-semibold text-text-primary">Campus</Label>
+              </div>
+              <TextInput
+                className="w-80"
+                theme={darkSurfaceTextInputTheme}
+                type="campus"
+                value={ user.campus ?? "" }
+                disabled
+                // onBlur={ (e) => {
+                //   setDisplayedCampus(e.currentTarget.value);
+                // }}
+              />
+            </section>            
 
             <div>
               <Button
                 className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-1 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
                 onClick={(e) => {
                   e.currentTarget.blur();
+                  handleSaveChanges();
                 }}
               >
                 Save changes
@@ -211,7 +257,7 @@ function UserSettingsPage() {
               Security
             </h2>
 
-            <section className={rowClass} aria-labelledby="password-area">
+            <section className={rowClassBorder} aria-labelledby="password-area">
               <div>
                 <Label className="font-semibold text-text-primary">
                   Password
