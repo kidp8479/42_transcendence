@@ -275,9 +275,37 @@ function EvaluationChecklistPage() {
       );
     }
 
+    function handleItemCreated(payload: unknown) {
+      const createdItem = parseEvaluationChecklistItem(payload);
+      if (createdItem === null) {
+        return;
+      }
+      // ignore an echo of our own create - handleAddItem already appended
+      // it locally with the real backend-assigned id
+      setItems((previous) =>
+        previous.some((item) => item.id === createdItem.id)
+          ? previous
+          : [...previous, createdItem]
+      );
+    }
+
+    function handleItemDeleted(payload: unknown) {
+      const deletedItem = parseEvaluationChecklistItem(payload);
+      if (deletedItem === null) {
+        return;
+      }
+      setItems((previous) =>
+        previous.filter((item) => item.id !== deletedItem.id)
+      );
+    }
+
     socket.on("checklist-item:updated", handleItemUpdated);
+    socket.on("checklist-item:created", handleItemCreated);
+    socket.on("checklist-item:deleted", handleItemDeleted);
     return () => {
       socket.off("checklist-item:updated", handleItemUpdated);
+      socket.off("checklist-item:created", handleItemCreated);
+      socket.off("checklist-item:deleted", handleItemDeleted);
     };
   }, []);
 
@@ -351,7 +379,15 @@ function EvaluationChecklistPage() {
   }) {
     try {
       const created = await createEvaluationChecklistItem(projectId, dto);
-      setItems((prevItems) => [...prevItems, created]);
+      // the checklist-item:created broadcast (see handleItemCreated above)
+      // can land on this same client before this request's own response
+      // does - same dedup check on both sides so whichever arrives first
+      // wins, the second is a no-op instead of a duplicate row
+      setItems((prevItems) =>
+        prevItems.some((item) => item.id === created.id)
+          ? prevItems
+          : [...prevItems, created]
+      );
     } catch {
       showToast({ type: "error", message: errorMessage("created") });
       // invalidate is skipped on failure - see handleUpdate/handleDelete below.
