@@ -4,6 +4,7 @@ import {
   createDiscoveryBlock,
   deleteDiscoveryBlock,
   listDiscoveryBlocks,
+  parseDiscoveryBlock,
   DISCOVERY_BLOCK_STATUS_PILL_STYLE,
   type DiscoveryBlock,
 } from "@/lib/discoveryBlocks";
@@ -93,6 +94,34 @@ function DiscoveryPage() {
     socket.on("discovery-item:updated", handleItemUpdated);
     return () => {
       socket.off("discovery-item:updated", handleItemUpdated);
+    };
+  }, []);
+
+  // live sync: checking a block's last item recomputes its status
+  // server-side (see DiscoveryBlocksService.recalculateStatus) - without
+  // this, the block stays under its old NOT_STARTED/IN_PROGRESS/COMPLETED
+  // section on this page until a reload, even though its own item just
+  // updated live above
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleBlockUpdated(payload: unknown) {
+      const updatedBlock = parseDiscoveryBlock(payload);
+      if (updatedBlock === null) {
+        return;
+      }
+      setDiscoveryBlocksWithItems((previous) =>
+        previous.map((entry) =>
+          entry.discoveryBlock.id === updatedBlock.id
+            ? { discoveryBlock: updatedBlock, items: entry.items }
+            : entry
+        )
+      );
+    }
+
+    socket.on("discovery-block:updated", handleBlockUpdated);
+    return () => {
+      socket.off("discovery-block:updated", handleBlockUpdated);
     };
   }, []);
 

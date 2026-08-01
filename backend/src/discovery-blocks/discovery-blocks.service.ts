@@ -110,6 +110,11 @@ export class DiscoveryBlocksService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-block:created",
+      block
+    );
     return block;
   }
 
@@ -224,6 +229,11 @@ export class DiscoveryBlocksService {
     // would ever release this lock otherwise, the block it referred to no
     // longer exists for anyone to release it against
     this.realtimeService.forceReleaseLock(`discovery-block:${id}`);
+    this.realtimeService.emitToProject(
+      projectId,
+      "discovery-block:deleted",
+      deletedBlock
+    );
     return deletedBlock;
   }
 }
