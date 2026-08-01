@@ -95,9 +95,11 @@ function UserSettingsPage() {
     if (!file) return;
     try {
       const updated = await uploadAvatar(file);
-      // The header reads the avatar from authSessionResource, a separate
-      // cache from this page's route loader - safeInvalidateRouter() alone
-      // only refreshes the `user` used below, not the header.
+
+      // safeInvalidateRouter() below only refreshes this page's own `user`
+      // (from the route loader). The header reads the avatar from
+      // authSessionResource instead, a separate store, so it needs to be
+      // patched here directly or it stays stale until the session refetches.
       const authState = authSessionResource.getState();
       if (authState?.status === "authenticated") {
         authSessionResource.setAuthenticated({

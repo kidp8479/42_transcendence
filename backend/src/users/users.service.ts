@@ -53,17 +53,19 @@ export class UsersService {
     });
   }
 
+  // Every upload gets a fresh key (userId + uuid) rather than overwriting a
+  // fixed slot per user - simpler, but it means the previous avatar object
+  // is left behind in storage instead of being deleted.
   async uploadAvatar(userId: string, file: Express.Multer.File) {
     await this.findById(userId);
 
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
-    // Slash-free so download stays a plain :key route param, and prefixed
-    // with the user id so an object leak can't be replayed against another
-    // account's avatar slot.
     const safeOriginalName = file.originalname.replace(/[\\/]/g, "_");
     const key = `avatar-${userId}-${randomUUID()}-${safeOriginalName}`;
     await this.storage.uploadObject(bucket, key, file.buffer, file.mimetype);
 
+    // avatarUrl is what the frontend actually reads/renders - stored as the
+    // route it can hit directly, not the raw storage key.
     return await this.prisma.user.update({
       where: { id: userId },
       data: { avatarUrl: `/api/users/avatar/${key}` },

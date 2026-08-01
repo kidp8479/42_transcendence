@@ -52,10 +52,11 @@ export async function updateMe(dto: Partial<User>): Promise<User> {
   );
 }
 
-// POST /users/me/avatar
-// Can't go through apiClient() here: it always JSON-encodes the body and
-// force-sets Content-Type, which breaks multipart/form-data uploads (the
-// browser needs to set its own boundary in Content-Type).
+// --- Avatar ---
+// POST /users/me/avatar, bypassing apiClient(): it always JSON-encodes the
+// body and force-sets Content-Type, which breaks multipart/form-data (the
+// browser needs to set its own boundary in Content-Type). CSRF/error
+// handling below mirrors what apiClient() does for its own requests.
 export async function uploadAvatar(file: File): Promise<User> {
   const token = getCsrfToken() ?? (await getSession())?.csrfToken;
   if (!token) {

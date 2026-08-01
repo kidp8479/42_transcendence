@@ -23,7 +23,7 @@ import { UsersService } from "./users.service";
 // import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const MAX_AVATAR_BYTES = 1 * 1024 * 1024;
 
 @Controller("users")
 export class UsersController {
@@ -46,6 +46,11 @@ export class UsersController {
     return this.usersService.remove(request.user.id);
   }
 
+  // --- Avatar ---
+  // Multipart upload, so it can't go through UpdateUserDto/class-validator
+  // like the rest of the profile - the file is checked by hand below, and
+  // the resulting object key/URL is computed in the service.
+
   @ApiSecurity("csrf")
   @Post("me/avatar")
   @UseInterceptors(
@@ -64,9 +69,9 @@ export class UsersController {
     return this.usersService.uploadAvatar(request.user.id, file);
   }
 
-  // Behind the same global AuthGuard as every other route: any authenticated
-  // user can view any other user's avatar, which matches how avatars are
-  // already surfaced (project members, calendar events, ...).
+  // Public to any logged-in user, not just the owner: avatars are displayed
+  // all over the app (project members, calendar events...), so this has to
+  // be readable for whoever the avatar belongs to.
   @Get("avatar/:key")
   async downloadAvatar(@Param("key") key: string): Promise<StreamableFile> {
     const { body, contentType } = await this.usersService.getAvatar(key);
