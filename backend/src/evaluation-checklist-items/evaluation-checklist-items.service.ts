@@ -69,26 +69,28 @@ export class EvaluationChecklistItemsService {
   //    this.realtimeService = realtimeService;
   //  }
 
-  // called after create/update/remove below, with the section's percent
-  // computed just before that mutation - notifies every other project
-  // member (not the acting user, who already knows what they just did)
-  // only on a real <100 => 100 crossing, never on a mutation that leaves
-  // an already-100% section untouched.
+  // called after update/remove below, with the section's percent computed
+  // just before that mutation - notifies every other project member (not
+  // the acting user, who already knows what they just did) only on a real
+  // <100 => 100 crossing, never on a mutation that leaves an already-100%
+  // section untouched.
+  //
+  // currentItems is the same section list the caller already fetched for
+  // previousPercent, transformed in-memory to reflect the mutation that
+  // just happened (item's isChecked flipped, or the deleted item filtered
+  // out) - avoids a second full-section findMany right after the first.
   private async notifySectionIfJustCompleted(
     projectId: string,
     section: EvaluationChecklistItemSection,
     previousPercent: number,
+    currentItems: { isChecked: boolean }[],
     actingUserId: string
   ): Promise<void> {
     if (previousPercent >= 100) {
       return;
     }
 
-    const items = await this.prisma.evaluationChecklistItem.findMany({
-      where: { projectId: projectId, section: section },
-      select: { isChecked: true },
-    });
-    if (computeSectionPercent(items) < 100) {
+    if (computeSectionPercent(currentItems) < 100) {
       return;
     }
 
@@ -223,12 +225,11 @@ export class EvaluationChecklistItemsService {
     ) {
       throw new ForbiddenException("This item is being edited by someone else");
     }
-    const previousPercent = computeSectionPercent(
-      await this.prisma.evaluationChecklistItem.findMany({
-        where: { projectId: projectId, section: existingItem.section },
-        select: { isChecked: true },
-      })
-    );
+    const sectionItems = await this.prisma.evaluationChecklistItem.findMany({
+      where: { projectId: projectId, section: existingItem.section },
+      select: { id: true, isChecked: true },
+    });
+    const previousPercent = computeSectionPercent(sectionItems);
 
     // safe to update by id alone now - findById already proved it belongs
     // to projectId.
@@ -249,11 +250,16 @@ export class EvaluationChecklistItemsService {
     }
     // only isChecked toggling (not label/order) can ever move a section's
     // percent, but recomputing unconditionally is simpler than tracking
-    // which field changed, same reasoning as DiscoveryBlocksService
+    // which field changed, same reasoning as DiscoveryBlocksService.
+    // sectionItems patched in-memory with this update's new isChecked
+    // instead of a second findMany - it's the same list, just one row changed.
     await this.notifySectionIfJustCompleted(
       projectId,
       existingItem.section,
       previousPercent,
+      sectionItems.map((item) =>
+        item.id === id ? { isChecked: updatedItem.isChecked } : item
+      ),
       userId
     );
     this.realtimeService.emitToProject(
@@ -269,12 +275,11 @@ export class EvaluationChecklistItemsService {
     // membership check via findById, will throw if failed - its return
     // value is reused below (section, for the same reason as update()).
     const existingItem = await this.findById(projectId, id, userId);
-    const previousPercent = computeSectionPercent(
-      await this.prisma.evaluationChecklistItem.findMany({
-        where: { projectId: projectId, section: existingItem.section },
-        select: { isChecked: true },
-      })
-    );
+    const sectionItems = await this.prisma.evaluationChecklistItem.findMany({
+      where: { projectId: projectId, section: existingItem.section },
+      select: { id: true, isChecked: true },
+    });
+    const previousPercent = computeSectionPercent(sectionItems);
 
     // two members deleting the same item within the same race window both
     // want it gone - the second delete isn't really a failure, so treat it
@@ -294,11 +299,13 @@ export class EvaluationChecklistItemsService {
     // would ever clear it otherwise until they disconnect
     this.realtimeService.forceReleaseLock(`checklist-item:${id}`);
     // deleting the last unchecked item in a section can itself push it to
-    // 100%, same as checking it would
+    // 100%, same as checking it would. sectionItems filtered in-memory
+    // instead of a second findMany - it's the same list minus this row.
     await this.notifySectionIfJustCompleted(
       projectId,
       existingItem.section,
       previousPercent,
+      sectionItems.filter((item) => item.id !== id),
       userId
     );
     this.realtimeService.emitToProject(
