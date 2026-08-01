@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   getDiscoveryBlock,
   updateDiscoveryBlock,
+  parseDiscoveryBlock,
   DISCOVERY_BLOCK_TITLE_MAX_LENGTH,
   DISCOVERY_BLOCK_DESCRIPTION_MAX_LENGTH,
   DISCOVERY_BLOCK_NOTES_MAX_LENGTH,
@@ -73,25 +74,36 @@ function DiscoveryBlockEditPage() {
     session.user.id
   );
 
-  // claim the lock as soon as this screen is open - released automatically
-  // on unmount by the hook itself. Fields default to read-only
-  // (lockPending) until the server actually confirms the lock is ours -
-  // the same race the checklist item fix covers, just with no separate
-  // edit-mode toggle here since this whole screen is always the "editing"
-  // view, gated on readOnly instead.
-  const [lockPending, setLockPending] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    void acquireFieldLock().then(() => {
-      if (!cancelled) {
-        setLockPending(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [acquireFieldLock]);
-  const fieldsDisabled = isLockedByOther || lockPending;
+  // Lock is claimed on the first real interaction (focusing a text field,
+  // clicking a color/icon swatch), not just from opening the screen -
+  // merely viewing a block shouldn't block everyone else out of it.
+  // useFieldLock's own effect still does a passive field:query on mount, so
+  // isLockedByOther/editingLock are accurate immediately even before this
+  // user tries to edit anything.
+  const [isAcquiringLock, setIsAcquiringLock] = useState(false);
+
+  // Checks "do I currently hold the lock" via editingLock (kept live by
+  // field:locked/unlocked broadcasts) rather than a one-shot "already
+  // tried" flag - a flag would skip re-acquiring after this same user
+  // saves (releasing the lock) and then edits again on the same page load,
+  // or after losing an acquire race once and the other holder later
+  // releases it.
+  async function ensureLock(): Promise<boolean> {
+    if (editingLock?.userId === session.user.id) {
+      return true;
+    }
+    setIsAcquiringLock(true);
+    const granted = await acquireFieldLock();
+    setIsAcquiringLock(false);
+    return granted;
+  }
+
+  // Fields stay read-only while someone else holds the lock, or during the
+  // brief round trip after this user's first interaction while the server
+  // confirms the lock is actually theirs (same race the checklist item fix
+  // covers - the server can still refuse even if isLockedByOther looked
+  // false locally).
+  const fieldsDisabled = isLockedByOther || isAcquiringLock;
 
   // Escape goes back to the Discovery list, same target as the Back link
   useEffect(() => {
@@ -145,9 +157,43 @@ function DiscoveryBlockEditPage() {
       );
     }
 
+    function handleItemCreated(payload: unknown) {
+      const createdItem = parseDiscoveryBlockItem(payload);
+      if (
+        createdItem === null ||
+        createdItem.discoveryBlockId !== params.discoveryBlockId
+      ) {
+        return;
+      }
+      // ignore an echo of our own create - handleAddItem already appended
+      // it locally with the real backend-assigned id
+      setItems((previous) =>
+        previous.some((item) => item.id === createdItem.id)
+          ? previous
+          : [...previous, createdItem]
+      );
+    }
+
+    function handleItemDeleted(payload: unknown) {
+      const deletedItem = parseDiscoveryBlockItem(payload);
+      if (
+        deletedItem === null ||
+        deletedItem.discoveryBlockId !== params.discoveryBlockId
+      ) {
+        return;
+      }
+      setItems((previous) =>
+        previous.filter((item) => item.id !== deletedItem.id)
+      );
+    }
+
     socket.on("discovery-item:updated", handleItemUpdated);
+    socket.on("discovery-item:created", handleItemCreated);
+    socket.on("discovery-item:deleted", handleItemDeleted);
     return () => {
       socket.off("discovery-item:updated", handleItemUpdated);
+      socket.off("discovery-item:created", handleItemCreated);
+      socket.off("discovery-item:deleted", handleItemDeleted);
     };
   }, [params.discoveryBlockId]);
 
@@ -157,6 +203,45 @@ function DiscoveryBlockEditPage() {
   const [selectedIcon, setSelectedIcon] = useState(
     loaderData.discoveryBlock.icon ?? DISCOVERY_BLOCK_ICON_NAMES[0]
   );
+
+  // live sync: another member saving Title/Description/Notes, or changing
+  // the color/icon, updates this screen without a reload.
+  //
+  // Title/Description/Notes are only applied when this user does NOT hold
+  // the lock. Holding the lock is what makes handleColorChange/
+  // handleIconChange PATCH color or icon alone (not the whole form) - the
+  // backend still returns and broadcasts the full row, including whatever
+  // title/description/notes are currently persisted (not this user's own
+  // unsaved typing). Applying those fields to the lock holder's own screen
+  // would silently revert their in-progress edit on every color/icon click.
+  // Color/icon are always safe to apply: they're single-click autosaves,
+  // never a multi-keystroke edit that could be "unsaved" underneath us.
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleBlockUpdated(payload: unknown) {
+      const updatedBlock = parseDiscoveryBlock(payload);
+      if (
+        updatedBlock === null ||
+        updatedBlock.id !== params.discoveryBlockId
+      ) {
+        return;
+      }
+      const holdsLockMyself = editingLock?.userId === session.user.id;
+      if (!holdsLockMyself) {
+        setTitle(updatedBlock.title);
+        setDescription(updatedBlock.description ?? "");
+        setNotes(updatedBlock.notes ?? "");
+      }
+      setSelectedColorIndex(updatedBlock.color ?? 0);
+      setSelectedIcon(updatedBlock.icon ?? DISCOVERY_BLOCK_ICON_NAMES[0]);
+    }
+
+    socket.on("discovery-block:updated", handleBlockUpdated);
+    return () => {
+      socket.off("discovery-block:updated", handleBlockUpdated);
+    };
+  }, [params.discoveryBlockId, editingLock, session.user.id]);
 
   // reads from state, not loaderData - picking a swatch/icon below updates
   // this (and everything derived from it) live, before Save is even clicked
@@ -217,6 +302,9 @@ function DiscoveryBlockEditPage() {
   // toggle below - a discrete click, unlike Title/Description/Notes which
   // need a real "saving..." indicator before autosave-while-typing is safe
   async function handleColorChange(newColorIndex: number): Promise<void> {
+    if (!(await ensureLock())) {
+      return;
+    }
     const previousColorIndex = selectedColorIndex;
     setSelectedColorIndex(newColorIndex);
     try {
@@ -237,6 +325,9 @@ function DiscoveryBlockEditPage() {
   }
 
   async function handleIconChange(newIcon: string): Promise<void> {
+    if (!(await ensureLock())) {
+      return;
+    }
     const previousIcon = selectedIcon;
     setSelectedIcon(newIcon);
     try {
@@ -271,7 +362,15 @@ function DiscoveryBlockEditPage() {
         label,
         items.length
       );
-      setItems((previousItems) => [...previousItems, createdItem]);
+      // the discovery-item:created broadcast (see handleItemCreated above)
+      // can land on this same client before this request's own response
+      // does - same dedup check on both sides so whichever arrives first
+      // wins, the second is a no-op instead of a duplicate row
+      setItems((previousItems) =>
+        previousItems.some((item) => item.id === createdItem.id)
+          ? previousItems
+          : [...previousItems, createdItem]
+      );
       setNewItemLabel("");
     } catch (error) {
       console.error("Failed to create discovery block item", error);
@@ -416,6 +515,7 @@ function DiscoveryBlockEditPage() {
             discoveryBlockColor={discoveryBlockColor}
             onColorChange={(colorIndex) => void handleColorChange(colorIndex)}
             onIconChange={(iconName) => void handleIconChange(iconName)}
+            disabled={fieldsDisabled}
           />
           <div>
             <Label
@@ -431,6 +531,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_TITLE_MAX_LENGTH}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
+              onFocus={() => void ensureLock()}
               readOnly={fieldsDisabled}
             />
           </div>
@@ -448,6 +549,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_DESCRIPTION_MAX_LENGTH}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
+              onFocus={() => void ensureLock()}
               readOnly={fieldsDisabled}
             />
           </div>
@@ -465,6 +567,7 @@ function DiscoveryBlockEditPage() {
               maxLength={DISCOVERY_BLOCK_NOTES_MAX_LENGTH}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
+              onFocus={() => void ensureLock()}
               readOnly={fieldsDisabled}
             />
           </div>
