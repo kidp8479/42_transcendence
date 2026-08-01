@@ -398,7 +398,6 @@ function UserSettingsPage() {
             className="flex flex-col gap-4 mt-6"
             aria-labelledby="security-heading"
           >
-
             {/* 
               PASSWORD CHANGE UI
             */}
@@ -425,7 +424,6 @@ function UserSettingsPage() {
                 Change
               </Button>
             </section> */}
-
 
             {/*
               2-FA UI
