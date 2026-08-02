@@ -42,6 +42,10 @@ export function TaskAssignees({
 
   const visible_assignees = assignees.slice(0, maxVisible);
   const hidden_count = assignees.length - visible_assignees.length;
+  const hidden_names = assignees
+    .slice(maxVisible)
+    .map((assignee) => assignee.username)
+    .join(", ");
 
   return (
     <div className="flex -space-x-1.5">
@@ -60,20 +64,28 @@ export function TaskAssignees({
             title={assignee.username}
             className={`${AVATAR_CLASS} ${CATEGORY_COLOR_PALETTE[assigneeColorIndex(assignee.username)].bg}`}
           >
-            {assignee.username.slice(0, 2).toUpperCase()}
+            {/* initials are decoration for the name below them - left visible
+                they were announced first, giving "AN Anna" */}
+            <span aria-hidden="true">
+              {assignee.username.slice(0, 2).toUpperCase()}
+            </span>
             <span className="sr-only">{assignee.username}</span>
           </span>
         )
       )}
       {hidden_count > 0 && (
+        // "+2" read aloud on its own means nothing, so it is hidden from
+        // assistive tech and replaced by the names it stands for. title only
+        // covers pointer users - it is not reliably announced on a plain span.
         <span
           className={`${AVATAR_CLASS} bg-surface-overlay text-text-secondary`}
-          title={assignees
-            .slice(maxVisible)
-            .map((assignee) => assignee.username)
-            .join(", ")}
+          title={hidden_names}
         >
-          +{hidden_count}
+          <span aria-hidden="true">+{hidden_count}</span>
+          <span className="sr-only">
+            {hidden_count} more {hidden_count === 1 ? "assignee" : "assignees"}:{" "}
+            {hidden_names}
+          </span>
         </span>
       )}
     </div>

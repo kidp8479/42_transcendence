@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
-import { KanBanCardDrawer } from "@/components/drawers/kanban/KanBanCardDrawer";
-import type { TaskDraft } from "@/components/drawers/kanban/KanBanCardDrawer";
+import { KanbanCardDrawer } from "@/components/drawers/kanban/KanbanCardDrawer";
+import type { TaskDraft } from "@/components/drawers/kanban/KanbanCardDrawer";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 import { selectColumnTasks, tasksReducer } from "@/lib/tasksReducer";
@@ -290,7 +290,7 @@ function KanbanPage() {
           isOpen and needs the panel to already be in the DOM, so remounting it
           on open would kill both the slide-in and the slide-out. `session` is
           what resets the form - the drawer keys it internally. */}
-      <KanBanCardDrawer
+      <KanbanCardDrawer
         isOpen={drawer.isOpen}
         session={drawer.session}
         mode={drawer_target.mode}

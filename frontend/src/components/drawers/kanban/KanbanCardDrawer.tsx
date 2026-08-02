@@ -11,7 +11,7 @@
 //
 // Split in two on purpose: the shell wrapper mounts once and lives forever -
 // remounting it on open would drop the slide-in, a freshly mounted panel
-// renders already in place - while KanBanCardForm is re-keyed on `session`, so
+// renders already in place - while KanbanCardForm is re-keyed on `session`, so
 // every open starts from a clean draft with no state-syncing effect. The form
 // is deliberately NOT gated on isOpen, or the panel would empty mid slide-out.
 //
@@ -50,7 +50,7 @@ export interface TaskDraft {
   notes: string;
 }
 
-interface KanBanCardDrawerProps {
+interface KanbanCardDrawerProps {
   // The shell stays mounted so its slide-out can play, so this drives the
   // animation rather than the route mounting/unmounting the drawer.
   isOpen: boolean;
@@ -78,7 +78,7 @@ const FIELD_LABEL_CLASS =
 const ICON_BUTTON_CLASS =
   "rounded-md p-1.5 text-text-secondary hover:bg-surface-overlay hover:text-text-primary focus:ring-2 focus:ring-brand-500/40 focus:outline-none";
 
-export function KanBanCardDrawer({
+export function KanbanCardDrawer({
   isOpen,
   session,
   mode,
@@ -88,7 +88,7 @@ export function KanBanCardDrawer({
   members,
   onClose,
   onSubmit,
-}: KanBanCardDrawerProps) {
+}: KanbanCardDrawerProps) {
   // Kept out of the form so it survives the form's re-keying, which is also why
   // fullscreen carries over from one card to the next - same as the calendar
   // drawer's expanded state.
@@ -121,7 +121,7 @@ export function KanBanCardDrawer({
         {mode === "create" ? "Create task" : `Edit task ${task?.title ?? ""}`}
       </h2>
 
-      <KanBanCardForm
+      <KanbanCardForm
         key={session}
         mode={mode}
         task={task}
@@ -140,7 +140,7 @@ export function KanBanCardDrawer({
 // Everything that reads the draft, so that re-keying it on open resets the form
 // without touching the shell. Renders a fragment, not a wrapper div: these stay
 // direct flex children of DrawerShell's panel.
-interface KanBanCardFormProps {
+interface KanbanCardFormProps {
   mode: "create" | "edit";
   task: Task | null;
   initialStatus: TaskStatus;
@@ -152,7 +152,7 @@ interface KanBanCardFormProps {
   onToggleFullscreen: () => void;
 }
 
-function KanBanCardForm({
+function KanbanCardForm({
   mode,
   task,
   initialStatus,
@@ -162,7 +162,7 @@ function KanBanCardForm({
   onSubmit,
   isFullscreen,
   onToggleFullscreen,
-}: KanBanCardFormProps) {
+}: KanbanCardFormProps) {
   // Validation messages only appear after a failed submit attempt, not while
   // the user is still filling the form in.
   const [show_errors, setShowErrors] = useState(false);
