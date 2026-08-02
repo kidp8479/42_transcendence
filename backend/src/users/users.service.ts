@@ -104,6 +104,7 @@ export class UsersService {
     return await this.prisma.user.update({
       where: { id: userId },
       data: { avatarUrl: `/api/users/avatar/${key}` },
+      select: SAFE_USER_SELECT,
     });
   }
 
