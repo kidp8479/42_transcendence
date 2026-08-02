@@ -21,7 +21,6 @@ export function ProjectStatusSection() {
           description="Flags the project as complete on the dashboard and projects page. Removes it from the sidebar."
           icon={<HiOutlineShieldCheck className="h-5 w-5" />}
         >
-          {/* TODO: Update button colors to match the final design system */}
           <Button
             className="
 			  !border
@@ -33,7 +32,7 @@ export function ProjectStatusSection() {
 			  hover:!text-brand-500
 			  focus-visible:!outline-none
 			  focus-visible:!ring-2
-		      focus-visible:!ring-brand-600
+		      focus-visible:!ring-brand-500/20
 			  dark:focus:!ring-brand-800
 			"
           >
@@ -57,8 +56,8 @@ export function ProjectStatusSection() {
 			  hover:!text-yellow-400
 		      focus-visible:!outline-none
 			  focus-visible:!ring-2
-			  focus-visible:!ring-yellow-500
-			  dark:focus:!ring-yellow-500
+			  focus-visible:!ring-yellow-500/20
+			  dark:focus:!ring-yellow-500/20
 			  inline-flex
 			  items-center
 			  gap-2

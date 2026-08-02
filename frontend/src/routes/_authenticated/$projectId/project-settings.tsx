@@ -7,6 +7,9 @@ import { ProjectStatusSection } from "@/components/project-settings/ProjectStatu
 import { MembersSection } from "@/components/project-settings/MembersSection";
 import { BehaviorSection } from "@/components/project-settings/BehaviorSection";
 import { DangerZoneSection } from "@/components/project-settings/DangerZoneSection";
+import { getProject, type Project } from "@/lib/projectsApi";
+import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
   "/_authenticated/$projectId/project-settings"
@@ -16,7 +19,16 @@ export const Route = createFileRoute(
 
 function ProjectSettingsPage() {
   const { projectId } = Route.useParams();
+  const [project, setProject] = useState<Project | null>(null);
+  const navigate = useNavigate();
 
+  useEffect(() => {
+    getProject(projectId).then(setProject).catch(console.error);
+  }, [projectId]);
+
+  if (!project) {
+    return null;
+  }
   return (
     <div className="w-full space-y-6">
       <MembersSection projectId={projectId} />
@@ -24,8 +36,13 @@ function ProjectSettingsPage() {
       <BehaviorSection />
 
       <ProjectStatusSection />
-
-      <DangerZoneSection projectId={projectId} />
+      {project.role === "OWNER" && (
+        <DangerZoneSection
+          projectId={projectId}
+          projectName={project.name}
+          onDeleteProjectSuccess={() => navigate({ to: "/projects" })}
+        />
+      )}
     </div>
   );
 }

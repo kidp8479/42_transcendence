@@ -1,14 +1,57 @@
 // DangerZoneSection.tsx
-import { Button } from "flowbite-react";
+import { useState } from "react";
+import { Button, Modal, TextInput } from "flowbite-react";
 import { SettingsSection } from "./SettingsSection";
 import { SettingsActionRow } from "./SettingsActionRow";
 import { LiaTrashAltSolid } from "react-icons/lia";
-// Displays destructive project actions inside the Project Settings page.
+import { deleteProject } from "@/lib/projectsApi";
 
+// Displays destructive project actions inside the Project Settings page.
 // This section is intentionally isolated from the other settings because these
 // actions have irreversible or high-impact consequences.
 
-export function DangerZoneSection() {
+interface DangerZoneSectionProps {
+  projectId: string;
+  projectName: string;
+  onDeleteProjectSuccess: () => void;
+}
+
+export function DangerZoneSection({
+  projectId,
+  projectName,
+  onDeleteProjectSuccess,
+}: DangerZoneSectionProps) {
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+
+  const canConfirmDelete = confirmText.trim() === projectName;
+
+  function handleOpenDeleteModal() {
+    setConfirmText("");
+    setShowDeleteModal(true);
+  }
+
+  function handleCloseDeleteModal() {
+    setShowDeleteModal(false);
+    setConfirmText("");
+  }
+
+  async function handleDeleteProject() {
+    if (!canConfirmDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteProject(projectId);
+      handleCloseDeleteModal();
+      onDeleteProjectSuccess();
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <SettingsSection title="Danger Zone" variant="danger">
       <div className="divide-y divide-red-500/30">
@@ -22,8 +65,9 @@ export function DangerZoneSection() {
 			!text-red-400
 		  "
         >
-          {/* TODO: Replace default Flowbite button colors with final danger button styling */}
           <Button
+            type="button"
+            onClick={handleOpenDeleteModal}
             className="
 				border
 				border-red-500/30
@@ -35,9 +79,9 @@ export function DangerZoneSection() {
 				dark:text-red-500
 				dark:hover:bg-transparent
 				focus-visible:!outline-none
-				focus-visible:!ring-2
-				focus-visible:!ring-red-500
-				dark:focus:!ring-red-500
+				focus-visible:!ring-0
+				focus-visible:!ring-red-500/20
+				dark:focus:!ring-red-500/20
 				inline-flex
 				items-center
 				gap-2
@@ -47,6 +91,112 @@ export function DangerZoneSection() {
             Delete project
           </Button>
         </SettingsActionRow>
+        <Modal
+          show={showDeleteModal}
+          size="md"
+          popup
+          onClose={handleCloseDeleteModal}
+          className="[&>div>div]:!bg-surface-raised"
+        >
+          <div
+            className="
+			    space-y-4
+				rounded-lg
+				border
+				border-control-border
+				p-4
+			  "
+          >
+            <h3 className="text-sm font-semibold text-text-primary">
+              Delete project?
+            </h3>
+
+            <p className="text-xs text-text-secondary">
+              Type{" "}
+              <span className="font-semibold text-text-primary">
+                {projectName}
+              </span>{" "}
+              to confirm deletion. This action cannot be undone.
+            </p>
+            <TextInput
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={projectName}
+              color="none"
+              theme={{
+                field: {
+                  input: {
+                    base: `
+						    !border-control-border
+						    !bg-surface-overlay
+							!text-text-primary
+							placeholder:!text-text-secondary
+							focus:!border-brand-500
+							focus-visible:!ring-0
+							focus-visible:!outline-none
+						  `,
+                  },
+                },
+              }}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleCloseDeleteModal}
+                className="
+				  !h-8
+				  !px-3
+				  !py-1
+				  !text-xs
+				  !rounded-md
+				  !border
+				  !border-control-border
+				  !bg-surface-overlay
+				  !text-text-secondary
+				  hover:!bg-surface-raised
+				  hover:!border-brand-700
+				  hover:!text-brand-700
+				  focus:!ring-0
+				  transition-colors
+                "
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="button"
+                disabled={!canConfirmDelete || isDeleting}
+                onClick={handleDeleteProject}
+                className="
+				  !h-8
+				  !px-3
+				  !py-1
+				  !text-xs
+				  !rounded-md
+				  border
+				  border-red-500/30
+				  bg-red-500/10
+				  text-red-400
+				  hover:bg-red-500/20
+				  dark:border-red-500/30
+				  dark:bg-red-500/10
+				  dark:text-red-500
+				  dark:hover:bg-red-500/20
+				  focus-visible:!outline-none
+				  focus-visible:!ring-2
+				  focus-visible:!ring-red-500
+				  dark:focus:!ring-red-500
+				  inline-flex
+				  items-center
+				  gap-2
+				"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </SettingsSection>
   );
