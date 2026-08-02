@@ -21,7 +21,7 @@ interface NavigationItem {
 // pokes out past the sidebar's own edge. Also needs to beat DrawerShell's
 // z-40, since an expanded CalendarEventDrawer starts right under that button.
 const sidebarContainerClasses =
-  "fixed inset-y-0 left-0 z-40 w-full transition-transform duration-300";
+  "fixed inset-y-0 left-0 z-50 w-full transition-transform duration-300";
 const sidebarInnerClasses = "font-mono relative h-full w-full overflow-hidden";
 // Fixed: dark: variant must come right before the utility, `!` goes after the variant.
 const sidebarSurfaceClasses =
