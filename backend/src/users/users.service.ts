@@ -127,7 +127,7 @@ export class UsersService {
 
   async removeAvatar(key: string): Promise<boolean> {
     throwIfBadRequest(key);
-    const bucket = this.config.getOrThrow<string>("RUSHFS_BUCKET");
+    const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
     this.storage.deleteObject(bucket, key);
     return true;
   }
