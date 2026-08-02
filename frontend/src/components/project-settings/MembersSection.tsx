@@ -14,6 +14,7 @@ import { Button } from "flowbite-react";
 import { FaUserPlus } from "react-icons/fa";
 import { useToast } from "@/hooks/useToast";
 import { getSession } from "@/lib/auth";
+import { RemoveMemberModal } from "./RemoveMemberModal";
 
 // Displays the users currently belonging to a project.
 //
@@ -34,6 +35,9 @@ export function MembersSection({ projectId }: MembersSectionProps) {
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [username, setUsername] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<ProjectMember | null>(
+    null
+  );
   const { showToast } = useToast();
 
   const loadMembers = useCallback(async () => {
@@ -77,14 +81,19 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     }
   };
 
-  const handleRemove = async (userId: string) => {
+  const handleConfirmRemove = async () => {
+    if (!memberToRemove) {
+      return;
+    }
+
     try {
-      await removeMember(projectId, userId);
+      await removeMember(projectId, memberToRemove.userId);
       await loadMembers();
       showToast({
         message: "Member removed",
         type: "success",
       });
+      setMemberToRemove(null);
     } catch (error) {
       console.error(error);
 
@@ -102,7 +111,7 @@ export function MembersSection({ projectId }: MembersSectionProps) {
         username,
       });
       showToast({
-        message: "User added",
+        message: "Member added",
         type: "success",
       });
 
@@ -112,55 +121,71 @@ export function MembersSection({ projectId }: MembersSectionProps) {
       console.error(error);
 
       showToast({
-        message: error instanceof Error ? error.message : "Failed to add user",
+        message:
+          error instanceof Error ? error.message : "Failed to add member",
         type: "error",
       });
     }
   }
 
-  return (
-    <SettingsSection
-      title="Members"
-      description="Add or remove people from this project."
-    >
-      <div className="space-y-1.5">
-        {members.map((member) => (
-          <MemberListItem
-            key={member.id}
-            userId={member.userId}
-            username={member.user.username}
-            role={member.role}
-            currentUserRole={currentUserRole}
-            onRoleChange={handleRoleChange}
-            avatarUrl={member.user.avatarUrl}
-            onRemove={handleRemove}
-          />
-        ))}
-        {canAddMembers && (
-          <form onSubmit={handleAddMember}>
-            <div className="flex items-center gap-3">
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Add member by username"
-                className="h-9 flex-1 rounded-md bg-surface-overlay px-3 text-sm text-text-primary placeholder:text-text-secondary"
-              />
+  function handleRemoveClick(member: ProjectMember) {
+    setMemberToRemove(member);
+  }
 
-              <Button
-                type="submit"
-                color="none"
-                className="!h-9 !rounded-lg !bg-brand-500 !text-black hover:!bg-brand-600 inline-flex items-center gap-2"
-                disabled={!username.trim()}
-              >
-                <FaUserPlus className="h-4 w-4" />
-                Add
-              </Button>
-            </div>
-          </form>
-        )}
-      </div>
-    </SettingsSection>
+  function handleCloseRemoveModal() {
+    setMemberToRemove(null);
+  }
+
+  return (
+    <>
+      <SettingsSection
+        title="Members"
+        description="Add or remove people from this project."
+      >
+        <div className="space-y-1.5">
+          {members.map((member) => (
+            <MemberListItem
+              key={member.id}
+              userId={member.userId}
+              username={member.user.username}
+              role={member.role}
+              currentUserRole={currentUserRole}
+              onRoleChange={handleRoleChange}
+              avatarUrl={member.user.avatarUrl}
+              onRemove={() => handleRemoveClick(member)}
+            />
+          ))}
+          {canAddMembers && (
+            <form onSubmit={handleAddMember}>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Add member by username"
+                  className="h-9 flex-1 rounded-md bg-surface-overlay px-3 text-sm text-text-primary placeholder:text-text-secondary"
+                />
+
+                <Button
+                  type="submit"
+                  color="none"
+                  className="!h-9 !rounded-lg !bg-brand-500 !text-black hover:!bg-brand-600 inline-flex items-center gap-2"
+                  disabled={!username.trim()}
+                >
+                  <FaUserPlus className="h-4 w-4" />
+                  Add
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </SettingsSection>
+      <RemoveMemberModal
+        member={memberToRemove}
+        onClose={handleCloseRemoveModal}
+        onConfirm={handleConfirmRemove}
+      />
+    </>
   );
 }
 
