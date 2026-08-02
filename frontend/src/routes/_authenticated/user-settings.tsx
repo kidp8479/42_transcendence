@@ -457,7 +457,7 @@ function UserSettingsPage() {
               <TextInput
                 className="w-80"
                 theme={darkSurfaceTextInputTheme}
-                type="campus"
+                type="text"
                 value={user.campus ?? ""}
                 disabled
                 // onBlur={ (e) => {
