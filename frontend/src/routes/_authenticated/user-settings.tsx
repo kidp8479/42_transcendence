@@ -551,7 +551,7 @@ function UserSettingsPage() {
                 </p>
               </div>
               <Button
-                className="focus:ring-1 darkfocus:ring-1"
+                className="focus:ring-1 dark:focus:ring-1"
                 size="sm"
                 color="red"
                 outline
