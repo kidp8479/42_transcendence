@@ -299,12 +299,13 @@ export class EvaluationChecklistItemsService {
         projectId,
         `checklist-item:${id}`,
         async () => {
+          const existingItem = await this.findById(projectId, id, userId);
           this.realtimeService.assertFieldLockOwnerIfLocked(
+            projectId,
             `checklist-item:${id}`,
             userId,
             fieldLockToken
           );
-          const existingItem = await this.findById(projectId, id, userId);
           const sectionItems =
             await this.prisma.evaluationChecklistItem.findMany({
               where: { projectId: projectId, section: existingItem.section },

@@ -50,6 +50,7 @@ export function ChecklistItemRow({
   const hasCommittedRef = useRef(false);
   const preserveDraftRef = useRef(false);
   const suppressBlurSaveRef = useRef(false);
+  const pendingBlurSaveRef = useRef<number | undefined>(undefined);
   const [draft, setDraft] = useState(item.label);
 
   async function startEdit() {
@@ -141,8 +142,21 @@ export function ChecklistItemRow({
     };
   }, []);
 
+  useEffect(
+    () => () => {
+      if (pendingBlurSaveRef.current !== undefined) {
+        window.clearTimeout(pendingBlurSaveRef.current);
+      }
+    },
+    []
+  );
+
   function saveAfterSameTabBlur(value: string) {
-    window.setTimeout(() => {
+    if (pendingBlurSaveRef.current !== undefined) {
+      window.clearTimeout(pendingBlurSaveRef.current);
+    }
+    pendingBlurSaveRef.current = window.setTimeout(() => {
+      pendingBlurSaveRef.current = undefined;
       if (suppressBlurSaveRef.current) {
         return;
       }
@@ -175,6 +189,10 @@ export function ChecklistItemRow({
           readOnly={isLockedByOther}
           onFocus={() => {
             suppressBlurSaveRef.current = false;
+            if (pendingBlurSaveRef.current !== undefined) {
+              window.clearTimeout(pendingBlurSaveRef.current);
+              pendingBlurSaveRef.current = undefined;
+            }
           }}
           onBlur={(event) => saveAfterSameTabBlur(event.currentTarget.value)}
           onChange={(event) => setDraft(event.currentTarget.value)}

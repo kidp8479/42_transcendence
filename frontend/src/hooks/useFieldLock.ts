@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
 // Mirrors the backend's FieldLock shape (RealtimeGateway).
@@ -44,11 +44,16 @@ export function useFieldLock(
   const [lock, setLock] = useState<FieldLock | null>(null);
   const [leaseToken, setLeaseToken] = useState<string | null>(null);
   const [leaseLost, setLeaseLost] = useState(false);
+  const leaseTokenRef = useRef<string | null>(null);
   // this tab's own socket id - re-read on every "connect" (including
   // reconnects, which socket.io-client assigns a new id to) so
   // isLockedByOther below always compares against the live connection,
   // not a stale id from before a reconnect
   const [mySocketId, setMySocketId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    leaseTokenRef.current = leaseToken;
+  }, [leaseToken]);
 
   useEffect(() => {
     const socket = getRealtimeSocket();
@@ -89,9 +94,10 @@ export function useFieldLock(
     }
 
     function handleDisconnect() {
+      const heldLease = leaseTokenRef.current !== null;
       setLock(null);
       setLeaseToken(null);
-      setLeaseLost(true);
+      setLeaseLost(heldLease);
       setMySocketId(undefined);
     }
 
@@ -165,6 +171,7 @@ export function useFieldLock(
     socket.emit("field:unlock", { projectId, key });
     setLock(null);
     setLeaseToken(null);
+    setLeaseLost(false);
   }, [projectId, key]);
 
   return {
