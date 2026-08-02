@@ -53,7 +53,11 @@ export function KanbanColumn({
   return (
     <section
       aria-labelledby={heading_id}
-      className="flex min-h-0 min-w-72 flex-1 flex-col gap-3 rounded-lg border border-surface-border p-3"
+      // min-h-96 below md: on a phone the bounded shell leaves the board barely
+      // 300px, which showed a single card. The floor makes the column usable and
+      // the tab scrolls to reveal it. md:min-h-0 restores the desktop rule,
+      // where the column must be free to shrink so its card list scrolls.
+      className="flex min-h-96 min-w-72 flex-1 flex-col gap-3 rounded-lg border border-surface-border p-3 md:min-h-0"
     >
       {/* Every edge on the board is this same neutral grey. The status shows on
           the icon and the count instead; the title stays neutral so the header
