@@ -11,9 +11,9 @@ import { StorageService, StoredObject } from "../storage/storage.service";
 import { UpdateUserDto } from "./dto/update-user.dto";
 
 // Matches the exact shape uploadAvatar generates below
-// (avatar-{userId}-{uuid}-{safeOriginalName}, safeOriginalName having only
-// "\" and "/" stripped). getAvatar's :key param is otherwise handed straight
-// to S3's GetObjectCommand - Express only percent-decodes it after route
+// (avatar-{userId}-{uuid}-{safeOriginalName}, where safeOriginalName is
+// reduced to [A-Za-z0-9._-] by replacing other characters with "_").
+// getAvatar's :key param is otherwise handed straight
 // matching, so an unvalidated key could smuggle "%2F" (-> "/") or ".."
 // through to the storage layer. StorageService is a generic bucket wrapper,
 // not avatar-specific, so this is the only thing keeping this endpoint
