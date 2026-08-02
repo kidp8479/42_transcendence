@@ -20,12 +20,18 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { getMe, updateMe, deleteMe, uploadAvatar } from "@/lib/userSettingsApi";
 import { authSessionResource } from "@/lib/authState";
+import { ApiError } from "@/lib/apiClient";
 
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 
 const DISPLAY_NAME_MIN_LENGTH = 3;
 const DISPLAY_NAME_MAX_LENGTH = 32;
+
+// mirrors backend/src/users/users.controller.ts's MAX_AVATAR_BYTES - checked
+// client-side too so an oversized file is rejected instantly instead of
+// after a full upload round trip
+const MAX_AVATAR_BYTES = 1 * 1024 * 1024;
 
 // Second step of the delete-account flow forces the user to type this
 // phrase verbatim - a plain "Confirm" click is too easy to hit by mistake
@@ -78,10 +84,12 @@ function UserSettingsPage() {
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
   const [openModalUploadAvatar, setOpenModalUploadAvatar] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [deleteAccountStep, setDeleteAccountStep] =
     useState<DeleteAccountStep | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [savingChanges, setSavingChanges] = useState(false);
   const [displayedName, setDisplayedName] = useState(user.username);
   // const [displayedCampus, setDisplayedCampus] = useState(user.campus);
   // const [switch2FA, setSwitch2FA] = useState(false);
@@ -92,7 +100,31 @@ function UserSettingsPage() {
   }
 
   async function handleUpload(file: File | null) {
-    if (!file) return;
+    // guards against a second upload firing while one is already in flight -
+    // without this, two uploads can resolve out of order and the one that
+    // resolves last (not necessarily the most recent) wins the header/avatar
+    if (!file || uploadingAvatar) return;
+
+    // reject obviously-bad files up front - matches what the backend
+    // enforces (MAX_AVATAR_BYTES, image/* mimetype), so the user gets an
+    // answer immediately instead of after a full upload round trip that was
+    // always going to fail
+    if (!file.type.startsWith("image/")) {
+      showToast({
+        type: "error",
+        message: "Only image files can be used as an avatar.",
+      });
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      showToast({
+        type: "error",
+        message: "Image is too large. Max size is 1 MB.",
+      });
+      return;
+    }
+
+    setUploadingAvatar(true);
     try {
       const updated = await uploadAvatar(file);
 
@@ -108,8 +140,35 @@ function UserSettingsPage() {
         });
       }
       safeInvalidateRouter();
-    } catch {
-      showToast({ type: "error", message: "Upload failed. Please retry." });
+    } catch (error) {
+      // a 401 means the session is already dead server-side - same handling
+      // as UserMenu.handleLogout: drop the local session and send the user
+      // back through re-auth instead of leaving them on a page that still
+      // thinks they're signed in
+      if (error instanceof ApiError && error.status === 401) {
+        await authSessionResource.endSession();
+        await navigate({ to: "/" });
+        return;
+      }
+      // the client-side checks above cover the common size/type cases, but
+      // the backend is the source of truth - a 413/400 here means those
+      // checks disagreed with it (or were bypassed), so retrying the same
+      // file would just fail again the same way, unlike a network blip
+      if (error instanceof ApiError && error.status === 413) {
+        showToast({
+          type: "error",
+          message: "Image is too large. Max size is 1 MB.",
+        });
+      } else if (error instanceof ApiError && error.status === 400) {
+        showToast({
+          type: "error",
+          message: "This file can't be used as an avatar.",
+        });
+      } else {
+        showToast({ type: "error", message: "Upload failed. Please retry." });
+      }
+    } finally {
+      setUploadingAvatar(false);
     }
   }
 
@@ -119,7 +178,13 @@ function UserSettingsPage() {
       await deleteMe();
       authSessionResource.setAnonymous();
       await navigate({ to: "/" });
-    } catch {
+    } catch (error) {
+      // same reasoning as handleUpload's 401 branch above
+      if (error instanceof ApiError && error.status === 401) {
+        await authSessionResource.endSession();
+        await navigate({ to: "/" });
+        return;
+      }
       showToast({
         type: "error",
         message: "Account deletion failed. Please retry.",
@@ -129,6 +194,7 @@ function UserSettingsPage() {
   }
 
   async function handleSaveChanges() {
+    if (savingChanges) return;
     const changes: Partial<typeof user> = {};
 
     if (displayedName !== user.username) {
@@ -138,6 +204,7 @@ function UserSettingsPage() {
     //   changes.campus = displayedCampus;
     // }
 
+    setSavingChanges(true);
     try {
       await updateMe({
         username: changes.username,
@@ -147,6 +214,8 @@ function UserSettingsPage() {
       safeInvalidateRouter();
     } catch {
       showToast({ type: "error", message: "Saving failed. Please retry." });
+    } finally {
+      setSavingChanges(false);
     }
   }
 
@@ -185,7 +254,7 @@ function UserSettingsPage() {
                 and drop
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                SVG, PNG, JPG or GIF (MAX. 800x400px)
+                SVG, PNG, JPG or GIF
               </p>
             </div>
             <FileInput
@@ -197,6 +266,7 @@ function UserSettingsPage() {
                 setOpenModalUploadAvatar(false);
                 handleUpload(selectedFile?.[0] ?? null);
               }}
+              accept="image/*"
             />
           </Label>
         </div>
@@ -332,14 +402,16 @@ function UserSettingsPage() {
                   {user.username}
                 </Label>
                 <Button
+                  aria-label="upload-avatar-button"
                   size="sm"
                   className={rowUploadButtonClass}
+                  disabled={uploadingAvatar}
                   onClick={(e) => {
                     e.currentTarget.blur();
                     setOpenModalUploadAvatar(true);
                   }}
                 >
-                  Upload photo
+                  {uploadingAvatar ? "Uploading..." : "Upload photo"}
                 </Button>
               </section>
             </section>
@@ -403,12 +475,13 @@ function UserSettingsPage() {
             <div>
               <Button
                 className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-1 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
+                disabled={savingChanges}
                 onClick={(e) => {
                   e.currentTarget.blur();
                   handleSaveChanges();
                 }}
               >
-                Save changes
+                {savingChanges ? "Saving..." : "Save changes"}
               </Button>
             </div>
           </section>
