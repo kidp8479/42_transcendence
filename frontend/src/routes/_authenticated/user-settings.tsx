@@ -204,6 +204,8 @@ function UserSettingsPage() {
     //   changes.campus = displayedCampus;
     // }
 
+    if (Object.keys(changes).length === 0) return;
+
     setSavingChanges(true);
     try {
       await updateMe({
