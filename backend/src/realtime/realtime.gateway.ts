@@ -187,6 +187,15 @@ export class RealtimeGateway
     client.data.username = user.username;
     client.data.avatarUrl = user.avatarUrl;
 
+    // Join the user room before reading memberships. Member removal selects
+    // sockets through this room, so it can evict a connection that is still
+    // being admitted to project rooms.
+    await client.join(`user:${result.userId}`);
+    if (!client.connected) {
+      resolveReady!(false);
+      return;
+    }
+
     // WS-specific logic starts here: auth above is just "who is this",
     // this part is "what should this connection receive". Joining a room
     // per project means we can later broadcast to everyone on a project
@@ -204,14 +213,26 @@ export class RealtimeGateway
         resolveReady!(false);
         return;
       }
-      await client.join(`project:${membership.projectId}`);
+      await this.fieldLockManager.withProject(
+        membership.projectId,
+        async () => {
+          if (
+            !client.connected ||
+            !(await this.isCurrentProjectMember(
+              result.userId,
+              membership.projectId
+            ))
+          ) {
+            return;
+          }
+          if (!client.connected) {
+            return;
+          }
+          await client.join(`project:${membership.projectId}`);
+        }
+      );
     }
-    if (!client.connected) {
-      resolveReady!(false);
-      return;
-    }
-    await client.join(`user:${result.userId}`);
-    resolveReady!(true);
+    resolveReady!(client.connected);
   }
 
   // locks live in our own Map, not Socket.io's room state - release them
@@ -246,12 +267,23 @@ export class RealtimeGateway
       body.projectId,
       body.key,
       async () => {
-        if (
-          !client.connected ||
-          !this.isMember(client, body.projectId) ||
-          !(await this.isCurrentProjectMember(userId, body.projectId)) ||
-          !(await this.keyBelongsToProject(body.key, body.projectId))
-        ) {
+        if (!client.connected || !this.isMember(client, body.projectId)) {
+          return {
+            acquired: false,
+            lock: undefined,
+            token: undefined,
+          };
+        }
+
+        const isCurrentMember = await this.isCurrentProjectMember(
+          userId,
+          body.projectId
+        );
+        const keyBelongsToProject = await this.keyBelongsToProject(
+          body.key,
+          body.projectId
+        );
+        if (!client.connected || !isCurrentMember || !keyBelongsToProject) {
           return {
             acquired: false,
             lock: undefined,

@@ -4,6 +4,7 @@ import {
   FieldLockLeaseError,
   FieldLockManager,
 } from "../src/realtime/field-lock-manager";
+import { RealtimeGateway } from "../src/realtime/realtime.gateway";
 
 function acquireLock(manager: FieldLockManager, socketId = "socket-a") {
   return manager.acquire({
@@ -207,5 +208,58 @@ test("gives project-wide cleanup priority over later resource operations", async
   await Promise.all([first, cleanup, second]);
 
   assert.deepEqual(order, ["first", "cleanup", "second"]);
+  manager.onModuleDestroy();
+});
+
+test("does not acquire a lease after the socket disconnects during validation", async () => {
+  const manager = new FieldLockManager();
+  let resolveMembership: (count: number) => void;
+  const membership = new Promise<number>((resolve) => {
+    resolveMembership = resolve;
+  });
+  let signalMembershipLookup: () => void;
+  const membershipLookupStarted = new Promise<void>((resolve) => {
+    signalMembershipLookup = resolve;
+  });
+  const gateway = new RealtimeGateway(
+    {} as never,
+    {} as never,
+    {
+      projectMember: {
+        count: () => {
+          signalMembershipLookup!();
+          return membership;
+        },
+      },
+    } as never,
+    manager
+  );
+  gateway.registerKeyPrefixValidator("checklist-item", async () => "project-a");
+  const client = {
+    id: "socket-a",
+    connected: true,
+    rooms: new Set(["project:project-a"]),
+    data: {
+      ready: Promise.resolve(true),
+      userId: "user-a",
+      username: "Ada",
+      avatarUrl: null,
+    },
+  };
+
+  const response = gateway.handleFieldLock(client as never, {
+    projectId: "project-a",
+    key: "checklist-item:item-a",
+  });
+  await membershipLookupStarted;
+  client.connected = false;
+  resolveMembership!(1);
+
+  assert.deepEqual(await response, {
+    locked: false,
+    lock: undefined,
+    leaseToken: undefined,
+  });
+  assert.equal(manager.get("checklist-item:item-a"), undefined);
   manager.onModuleDestroy();
 });
