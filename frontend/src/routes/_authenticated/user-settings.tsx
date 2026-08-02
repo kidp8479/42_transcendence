@@ -380,13 +380,13 @@ function UserSettingsPage() {
             className="flex flex-col gap-4"
             aria-labelledby="profile-picture-and-name-heading"
           >
-            <h2 className="font-mono uppercase text-xs font-semibold text-text-muted">
+            <h2
+              id="profile-picture-and-name-heading"
+              className="font-mono uppercase text-xs font-semibold text-text-muted"
+            >
               Profile
             </h2>
-            <section
-              className="flex items-center gap-4 pb-4 border-b border-surface-border"
-              aria-labelledby="profile-picture-area"
-            >
+            <section className="flex items-center gap-4 pb-4 border-b border-surface-border">
               <Avatar
                 size="lg"
                 img={user.avatarUrl || undefined}
@@ -394,10 +394,7 @@ function UserSettingsPage() {
                 rounded
               />
 
-              <section
-                className="flex flex-col gap-2"
-                aria-labelledby="profile-picture-upload-area"
-              >
+              <section className="flex flex-col gap-2">
                 <Label className="font-semibold text-text-primary">
                   {user.username}
                 </Label>
@@ -416,7 +413,7 @@ function UserSettingsPage() {
               </section>
             </section>
 
-            <section className={rowClass} aria-labelledby="displayed-name-area">
+            <section className={rowClass}>
               <Label className="font-semibold text-text-primary shrink-0">
                 Display name
               </Label>
@@ -435,7 +432,7 @@ function UserSettingsPage() {
               />
             </section>
 
-            <section className={rowClass} aria-labelledby="account-email-area">
+            <section className={rowClass}>
               <div>
                 <Label className="font-semibold text-text-primary">Email</Label>
                 <p className="text-xs text-text-secondary">
@@ -451,10 +448,7 @@ function UserSettingsPage() {
               />
             </section>
 
-            <section
-              className={rowClassBorder}
-              aria-labelledby="account-campus-area"
-            >
+            <section className={rowClassBorder}>
               <div>
                 <Label className="font-semibold text-text-primary">
                   Campus
@@ -486,18 +480,15 @@ function UserSettingsPage() {
             </div>
           </section>
 
-          <section
-            className="flex flex-col gap-4 mt-6"
-            aria-labelledby="security-heading"
-          >
-            {/* 
+          <section className="flex flex-col gap-4 mt-6" aria-label="Security">
+            {/*
               PASSWORD CHANGE UI
             */}
             {/* <h2 className="font-mono uppercase text-xs font-semibold text-text-muted">
               Security
             </h2>
 
-            <section className={rowClassBorder} aria-labelledby="password-area">
+            <section className={rowClassBorder}>
               <div>
                 <Label className="font-semibold text-text-primary">
                   Password
@@ -520,7 +511,7 @@ function UserSettingsPage() {
             {/*
               2-FA UI
             */}
-            {/* <section className={rowClass} aria-labelledby="two-factor-area">
+            {/* <section className={rowClass}>
               <div>
                 <Label className="font-semibold text-text-primary">
                   Two-factor authentication
@@ -537,11 +528,14 @@ function UserSettingsPage() {
             className="flex flex-col gap-4 mt-6"
             aria-labelledby="danger-zone-heading"
           >
-            <h2 className="font-mono uppercase text-xs font-semibold text-text-muted">
+            <h2
+              id="danger-zone-heading"
+              className="font-mono uppercase text-xs font-semibold text-text-muted"
+            >
               Danger zone
             </h2>
 
-            <section className={rowClass} aria-labelledby="delete-account-area">
+            <section className={rowClass}>
               <div>
                 <Label className="font-semibold text-control-error">
                   Delete account
