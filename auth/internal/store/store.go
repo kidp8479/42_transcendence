@@ -26,7 +26,11 @@ var (
 	ErrReplay   = errors.New("refresh token replay detected")
 )
 
-const refreshTokenGrace = 5 * time.Second
+const (
+	refreshTokenGrace       = 5 * time.Second
+	WebSocketTicketAudience = "transcendence-ws"
+	WebSocketTicketTTL      = 60 * time.Second
+)
 
 type AccountStatus string
 
@@ -78,6 +82,13 @@ type CreatedRefreshSession struct {
 type AccessState struct {
 	RefreshFamily
 	GlobalRole string
+}
+
+type WebSocketAdmission struct {
+	UserID          string
+	RefreshFamilyID string
+	Username        string
+	AvatarURL       *string
 }
 
 type refreshUse int
@@ -632,6 +643,114 @@ func (s *Store) IntrospectAccess(ctx context.Context, userID, familyID string) (
 	}
 	state.User.GlobalRole = state.GlobalRole
 	return state, nil
+}
+
+func (s *Store) IssueWebSocketTicket(
+	ctx context.Context,
+	userID string,
+	familyID string,
+) (string, error) {
+	ticket, err := randomToken(32)
+	if err != nil {
+		return "", err
+	}
+	now := time.Now().UTC()
+	command, err := s.currentPool().Exec(
+		ctx,
+		`INSERT INTO "WebSocketTicket"
+			("id", "ticketHash", "userId", "refreshFamilyId", "audience", "issuedAt", "expiresAt")
+		 SELECT $1, $2, f."userId", f."id", $3, $4, $5
+		 FROM "RefreshTokenFamily" f
+		 JOIN "User" u ON u."id" = f."userId"
+		 WHERE f."id" = $6
+		   AND f."userId" = $7
+		   AND f."revokedAt" IS NULL
+		   AND f."idleExpiresAt" > $4
+		   AND f."absoluteExpiresAt" > $4
+		   AND u."status" = CAST('ACTIVE' AS "AccountStatus")`,
+		uuid.NewString(),
+		hashToken(ticket),
+		WebSocketTicketAudience,
+		now,
+		now.Add(WebSocketTicketTTL),
+		familyID,
+		userID,
+	)
+	if err != nil {
+		return "", fmt.Errorf("issue websocket ticket: %w", err)
+	}
+	if command.RowsAffected() != 1 {
+		return "", ErrNotFound
+	}
+	return ticket, nil
+}
+
+func (s *Store) ConsumeWebSocketTicket(
+	ctx context.Context,
+	ticket string,
+) (WebSocketAdmission, error) {
+	var admission WebSocketAdmission
+	err := s.currentPool().QueryRow(
+		ctx,
+		`UPDATE "WebSocketTicket" t
+		 SET "consumedAt" = CURRENT_TIMESTAMP
+		 FROM "RefreshTokenFamily" f
+		 JOIN "User" u ON u."id" = f."userId"
+		 WHERE t."ticketHash" = $1
+		   AND t."audience" = $2
+		   AND t."consumedAt" IS NULL
+		   AND t."expiresAt" > CURRENT_TIMESTAMP
+		   AND f."id" = t."refreshFamilyId"
+		   AND f."userId" = t."userId"
+		   AND f."revokedAt" IS NULL
+		   AND f."idleExpiresAt" > CURRENT_TIMESTAMP
+		   AND f."absoluteExpiresAt" > CURRENT_TIMESTAMP
+		   AND u."status" = CAST('ACTIVE' AS "AccountStatus")
+		 RETURNING t."userId", t."refreshFamilyId", u."username", u."avatarUrl"`,
+		hashToken(ticket),
+		WebSocketTicketAudience,
+	).Scan(
+		&admission.UserID,
+		&admission.RefreshFamilyID,
+		&admission.Username,
+		&admission.AvatarURL,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return WebSocketAdmission{}, ErrNotFound
+	}
+	if err != nil {
+		return WebSocketAdmission{}, fmt.Errorf("consume websocket ticket: %w", err)
+	}
+	return admission, nil
+}
+
+func (s *Store) ValidateWebSocketSession(
+	ctx context.Context,
+	userID string,
+	familyID string,
+) error {
+	var active bool
+	err := s.currentPool().QueryRow(
+		ctx,
+		`SELECT true
+		 FROM "RefreshTokenFamily" f
+		 JOIN "User" u ON u."id" = f."userId"
+		 WHERE f."id" = $1
+		   AND f."userId" = $2
+		   AND f."revokedAt" IS NULL
+		   AND f."idleExpiresAt" > CURRENT_TIMESTAMP
+		   AND f."absoluteExpiresAt" > CURRENT_TIMESTAMP
+		   AND u."status" = CAST('ACTIVE' AS "AccountStatus")`,
+		familyID,
+		userID,
+	).Scan(&active)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("validate websocket session: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) RecordEvent(

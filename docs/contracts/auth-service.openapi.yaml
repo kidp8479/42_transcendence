@@ -92,6 +92,27 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /ws-ticket:
+    post:
+      operationId: issueWebSocketTicket
+      description: >
+        Exchanges an active access JWT for a hash-only, one-use ticket with the
+        fixed transcendence-ws audience and a 60-second lifetime.
+      security:
+        - accessBearer: []
+      responses:
+        "201":
+          description: One-time WebSocket admission ticket.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebSocketTicketResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /oauth/42/start:
     get:
       x-implementation-status: planned
@@ -252,8 +273,6 @@ paths:
         Internal endpoint. nginx must not expose this path publicly. Invalid,
         expired JWTs and inactive refresh families return typed 401 responses.
         Vault, database, or other dependency failures return typed 503 responses.
-        WebSocket admission and all realtime delivery are disabled until TR-74
-        tickets are implemented; HTTP API access remains available.
       security:
         - internalBearer: []
       requestBody:
@@ -269,6 +288,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IntrospectionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /internal/ws-ticket/consume:
+    post:
+      operationId: consumeWebSocketTicket
+      description: >
+        Internal endpoint. Atomically consumes exactly one unexpired ticket and
+        returns its active user and refresh-family identity.
+      security:
+        - internalBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebSocketTicketRequest"
+      responses:
+        "200":
+          description: Ticket consumed and connection identity established.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebSocketAdmissionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /internal/ws-session/revalidate:
+    post:
+      operationId: revalidateWebSocketSession
+      description: Internal endpoint used to disconnect sockets after family or user revocation.
+      security:
+        - internalBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebSocketSessionRequest"
+      responses:
+        "200":
+          description: Refresh family and user remain active.
         "401":
           $ref: "#/components/responses/Unauthorized"
         "503":
@@ -374,6 +437,54 @@ components:
       properties:
         accessToken:
           type: string
+    WebSocketTicketResponse:
+      type: object
+      additionalProperties: false
+      required: [ticket, expiresIn]
+      properties:
+        ticket:
+          type: string
+          minLength: 43
+          maxLength: 43
+        expiresIn:
+          const: 60
+    WebSocketTicketRequest:
+      type: object
+      additionalProperties: false
+      required: [ticket]
+      properties:
+        ticket:
+          type: string
+          minLength: 43
+          maxLength: 43
+    WebSocketSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [sub, sid]
+      properties:
+        sub:
+          type: string
+          format: uuid
+        sid:
+          type: string
+          format: uuid
+    WebSocketAdmissionResponse:
+      type: object
+      additionalProperties: false
+      required: [active, sub, sid, username, avatarUrl]
+      properties:
+        active:
+          const: true
+        sub:
+          type: string
+          format: uuid
+        sid:
+          type: string
+          format: uuid
+        username:
+          type: string
+        avatarUrl:
+          type: [string, "null"]
     IntrospectionResponse:
       type: object
       required:
@@ -444,6 +555,10 @@ components:
             - TOKEN_INVALID
             - TOKEN_INACTIVE
             - INTROSPECTION_UNAVAILABLE
+            - TICKET_INVALID
+            - TICKET_ISSUE_UNAVAILABLE
+            - TICKET_CONSUME_UNAVAILABLE
+            - SESSION_REVALIDATION_UNAVAILABLE
           description: Present when callers must distinguish an internal introspection failure.
     OneTimeTokenRequest:
       type: object

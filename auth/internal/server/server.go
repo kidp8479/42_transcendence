@@ -32,7 +32,10 @@ const (
 	passwordConcurrency     = 2
 )
 
-var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{3,32}$`)
+var (
+	usernamePattern        = regexp.MustCompile(`^[A-Za-z0-9_-]{3,32}$`)
+	webSocketTicketPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+)
 
 var (
 	errAccessInvalid  = errors.New("access token is invalid")
@@ -43,6 +46,7 @@ type Server struct {
 	cfg                 config.Config
 	internalToken       string
 	store               authStore
+	webSockets          webSocketStore
 	tokens              tokenService
 	passwords           *password.Hasher
 	registerIPLimiter   *middleware.FixedWindowLimiter
@@ -63,6 +67,12 @@ type authStore interface {
 	RecordEvent(context.Context, *string, string, *string, *string, *string) error
 }
 
+type webSocketStore interface {
+	IssueWebSocketTicket(context.Context, string, string) (string, error)
+	ConsumeWebSocketTicket(context.Context, string) (store.WebSocketAdmission, error)
+	ValidateWebSocketSession(context.Context, string, string) error
+}
+
 type tokenService interface {
 	Mint(context.Context, token.MintRequest) (string, error)
 	Validate(context.Context, string) (token.Claims, error)
@@ -81,6 +91,15 @@ type loginRequest struct {
 
 type introspectionRequest struct {
 	AccessToken string `json:"accessToken"`
+}
+
+type webSocketTicketRequest struct {
+	Ticket string `json:"ticket"`
+}
+
+type webSocketSessionRequest struct {
+	Subject   string `json:"sub"`
+	SessionID string `json:"sid"`
 }
 
 type tokenResponse struct {
@@ -106,6 +125,19 @@ type introspectionResponse struct {
 	AuthenticatedAt      time.Time `json:"authenticatedAt"`
 	IdleExpiresAt        time.Time `json:"idleExpiresAt"`
 	AbsoluteExpiresAt    time.Time `json:"absoluteExpiresAt"`
+}
+
+type webSocketTicketResponse struct {
+	Ticket    string `json:"ticket"`
+	ExpiresIn int64  `json:"expiresIn"`
+}
+
+type webSocketAdmissionResponse struct {
+	Active    bool    `json:"active"`
+	Subject   string  `json:"sub"`
+	SessionID string  `json:"sid"`
+	Username  string  `json:"username"`
+	AvatarURL *string `json:"avatarUrl"`
 }
 
 type errorResponse struct {
@@ -151,6 +183,7 @@ func NewWithReadiness(
 		cfg:                 cfg,
 		internalToken:       internalToken,
 		store:               authStore,
+		webSockets:          authStore,
 		tokens:              tokens,
 		passwords:           passwords,
 		registerIPLimiter:   middleware.NewFixedWindowLimiter(registerRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
@@ -167,7 +200,10 @@ func NewWithReadiness(
 	mux.HandleFunc("POST /auth/login", server.handleLogin)
 	mux.HandleFunc("POST /auth/refresh", server.handleRefresh)
 	mux.HandleFunc("POST /auth/logout", server.handleLogout)
+	mux.HandleFunc("POST /auth/ws-ticket", server.handleIssueWebSocketTicket)
 	mux.HandleFunc("POST /auth/internal/introspect", server.handleIntrospect)
+	mux.HandleFunc("POST /auth/internal/ws-ticket/consume", server.handleConsumeWebSocketTicket)
+	mux.HandleFunc("POST /auth/internal/ws-session/revalidate", server.handleRevalidateWebSocketSession)
 
 	return server.recoverPanic(server.securityHeaders(server.requireReady(mux))), nil
 }
@@ -399,6 +435,120 @@ func (s *Server) handleIntrospect(w http.ResponseWriter, r *http.Request) {
 		IdleExpiresAt:        state.IdleExpiresAt,
 		AbsoluteExpiresAt:    state.AbsoluteExpiresAt,
 	})
+}
+
+func (s *Server) handleIssueWebSocketTicket(w http.ResponseWriter, r *http.Request) {
+	if !s.validOrigin(r.Header.Get("Origin")) {
+		writeError(w, http.StatusForbidden, "Forbidden", "request origin is not allowed")
+		return
+	}
+	accessToken, ok := bearerToken(r.Header.Get("Authorization"))
+	if !ok {
+		writeErrorCode(w, http.StatusUnauthorized, "Unauthorized", "access token is required", "TOKEN_INVALID")
+		return
+	}
+	claims, _, err := s.validateAccess(r.Context(), accessToken)
+	if errors.Is(err, errAccessInvalid) {
+		writeErrorCode(w, http.StatusUnauthorized, "Unauthorized", "access token is invalid", "TOKEN_INVALID")
+		return
+	}
+	if errors.Is(err, errAccessInactive) {
+		writeErrorCode(w, http.StatusUnauthorized, "Unauthorized", "access token is inactive", "TOKEN_INACTIVE")
+		return
+	}
+	if err != nil {
+		log.Printf("validate websocket ticket request: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"websocket ticket could not be issued", "TICKET_ISSUE_UNAVAILABLE",
+		)
+		return
+	}
+	ticket, err := s.webSockets.IssueWebSocketTicket(
+		r.Context(),
+		claims.Subject,
+		claims.SessionID,
+	)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErrorCode(w, http.StatusUnauthorized, "Unauthorized", "access token is inactive", "TOKEN_INACTIVE")
+		return
+	}
+	if err != nil {
+		log.Printf("issue websocket ticket: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"websocket ticket could not be issued", "TICKET_ISSUE_UNAVAILABLE",
+		)
+		return
+	}
+	writeJSON(w, http.StatusCreated, webSocketTicketResponse{
+		Ticket:    ticket,
+		ExpiresIn: int64(store.WebSocketTicketTTL / time.Second),
+	})
+}
+
+func (s *Server) handleConsumeWebSocketTicket(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInternal(w, r) {
+		return
+	}
+	var request webSocketTicketRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
+		return
+	}
+	if !webSocketTicketPattern.MatchString(request.Ticket) {
+		writeError(w, http.StatusBadRequest, "Bad Request", "ticket is invalid")
+		return
+	}
+	admission, err := s.webSockets.ConsumeWebSocketTicket(r.Context(), request.Ticket)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErrorCode(w, http.StatusUnauthorized, "Unauthorized", "websocket ticket is invalid", "TICKET_INVALID")
+		return
+	}
+	if err != nil {
+		log.Printf("consume websocket ticket: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"websocket ticket could not be consumed", "TICKET_CONSUME_UNAVAILABLE",
+		)
+		return
+	}
+	writeJSON(w, http.StatusOK, webSocketAdmissionResponse{
+		Active:    true,
+		Subject:   admission.UserID,
+		SessionID: admission.RefreshFamilyID,
+		Username:  admission.Username,
+		AvatarURL: admission.AvatarURL,
+	})
+}
+
+func (s *Server) handleRevalidateWebSocketSession(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInternal(w, r) {
+		return
+	}
+	var request webSocketSessionRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
+		return
+	}
+	if request.Subject == "" || request.SessionID == "" {
+		writeError(w, http.StatusBadRequest, "Bad Request", "sub and sid are required")
+		return
+	}
+	err := s.webSockets.ValidateWebSocketSession(r.Context(), request.Subject, request.SessionID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErrorCode(w, http.StatusUnauthorized, "Unauthorized", "websocket session is inactive", "SESSION_INACTIVE")
+		return
+	}
+	if err != nil {
+		log.Printf("revalidate websocket session: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"websocket session could not be revalidated", "SESSION_REVALIDATION_UNAVAILABLE",
+		)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"active": true})
 }
 
 func (s *Server) createLogin(r *http.Request, user store.User, method string) (store.CreatedRefreshSession, string, error) {
