@@ -1,5 +1,6 @@
 import { io, type Socket } from "socket.io-client";
 import { bearerFetch, readErrorMessage } from "./apiClient";
+import { realtimeServerOrigin } from "./realtimeSocketUrl";
 
 const ticketPattern = /^[A-Za-z0-9_-]{43}$/;
 const connectionAttemptTimeoutMs = 10_000;
@@ -44,12 +45,15 @@ export function disconnectRealtimeSocket(): void {
 }
 
 function createSocket(): Socket {
-  const realtime = io(import.meta.env.VITE_WS_URL || undefined, {
-    path: "/ws",
-    autoConnect: false,
-    reconnection: false,
-    transports: ["websocket"],
-  });
+  const realtime = io(
+    realtimeServerOrigin(import.meta.env.VITE_WS_URL, window.location.href),
+    {
+      path: "/ws",
+      autoConnect: false,
+      reconnection: false,
+      transports: ["websocket"],
+    }
+  );
 
   realtime.on("connect", () => {
     reconnectAttempts = 0;

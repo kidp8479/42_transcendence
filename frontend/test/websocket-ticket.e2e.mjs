@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { io } from "socket.io-client";
+import { realtimeServerOrigin } from "../src/lib/realtimeSocketUrl.ts";
 
 const run = process.env.RUN_WEBSOCKET_E2E === "1";
 const baseUrl = process.env.WEBSOCKET_E2E_URL ?? "http://nginx:8080";
+const configuredSocketUrl =
+  process.env.WEBSOCKET_E2E_SOCKET_URL ?? `${baseUrl}/ws`;
 const appOrigin = process.env.WEBSOCKET_E2E_ORIGIN ?? "http://localhost:8080";
+
+test("keeps the configured /ws path out of the Socket.IO namespace", () => {
+  assert.equal(
+    realtimeServerOrigin("ws://localhost:8080/ws", appOrigin),
+    "ws://localhost:8080"
+  );
+});
 
 test(
   "enforces ticket-only websocket admission and sid revocation",
@@ -33,6 +43,23 @@ test(
     const ticket = await issueTicket(session.accessToken);
     const primary = await connect({ ticket, origin: appOrigin });
     await expectRejected({ ticket, origin: appOrigin });
+
+    const resource = await firstChecklistItem(session.accessToken);
+    const acquired = await primary.timeout(5_000).emitWithAck("field:lock", {
+      projectId: resource.projectId,
+      key: `checklist-item:${resource.itemId}`,
+    });
+    assert.equal(acquired.locked, true);
+    assert.equal(typeof acquired.leaseToken, "string");
+    const queried = await primary.timeout(5_000).emitWithAck("field:query", {
+      projectId: resource.projectId,
+      key: `checklist-item:${resource.itemId}`,
+    });
+    assert.equal(queried.lock?.socketId, primary.id);
+    primary.emit("field:unlock", {
+      projectId: resource.projectId,
+      key: `checklist-item:${resource.itemId}`,
+    });
 
     const originTicket = await issueTicket(session.accessToken);
     await expectRejected({
@@ -90,9 +117,34 @@ async function issueTicket(accessToken) {
   return payload.ticket;
 }
 
+async function firstChecklistItem(accessToken) {
+  const projectsResponse = await fetch(`${baseUrl}/api/projects`, {
+    headers: { Authorization: "Bearer " + accessToken },
+  });
+  await assertStatus(projectsResponse, 200);
+  const projects = await projectsResponse.json();
+  assert.ok(Array.isArray(projects));
+
+  for (const project of projects) {
+    if (!project || typeof project.id !== "string") {
+      continue;
+    }
+    const itemsResponse = await fetch(
+      `${baseUrl}/api/projects/${project.id}/evaluation-checklist-items`,
+      { headers: { Authorization: "Bearer " + accessToken } }
+    );
+    await assertStatus(itemsResponse, 200);
+    const items = await itemsResponse.json();
+    if (Array.isArray(items) && items[0] && typeof items[0].id === "string") {
+      return { projectId: project.id, itemId: items[0].id };
+    }
+  }
+  assert.fail("expected a seeded checklist item");
+}
+
 function connect({ ticket, query, origin, cookie }) {
   return new Promise((resolve, reject) => {
-    const socket = io(baseUrl, {
+    const socket = io(realtimeServerOrigin(configuredSocketUrl, baseUrl), {
       path: "/ws",
       transports: ["websocket"],
       reconnection: false,
