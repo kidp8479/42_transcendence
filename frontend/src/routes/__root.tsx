@@ -34,14 +34,7 @@ function RootLayout() {
     <ModalProvider>
       <ToastProvider>
         <SidebarProvider>
-          {/* h-dvh, not min-h-screen: a min-height only sets a floor, so no
-              descendant ever gets a definite height and every `flex-1 min-h-0`
-              below stays inert. A real height is what lets each area scroll
-              inside itself with the header and footer always visible, and what
-              bounds the Kanban board so its columns scroll instead of the page.
-              dvh over vh: on mobile 100vh exceeds the visible viewport and
-              would push the footer off screen. */}
-          <div className="flex h-dvh flex-col bg-surface-base text-text-primary">
+          <div className="flex min-h-screen flex-col bg-surface-base text-text-primary">
             {authState.status === "authenticated" ? (
               <HeaderAuthenticated session={authState.session} />
             ) : (
@@ -49,7 +42,7 @@ function RootLayout() {
                 authUnavailable={authState.status === "unavailable"}
               />
             )}
-            <div className="flex flex-col flex-1 min-h-0">
+            <div className="flex flex-1 flex-col">
               <Outlet />
             </div>
             <Footer />

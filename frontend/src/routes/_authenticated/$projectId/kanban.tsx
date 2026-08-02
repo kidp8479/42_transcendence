@@ -272,11 +272,15 @@ function KanbanPage() {
       : null;
 
   return (
-    // h-full of ProjectLayout's scroller: the board exactly fills it, so that
+    // md:h-full of ProjectLayout's scroller: the board exactly fills it, so that
     // scroller never overflows and the COLUMNS scroll instead of the page.
+    // Below md it is left to size itself, so the columns' min height (see
+    // KanbanColumn) can push past the viewport and the TAB scrolls - bounding it
+    // there would make the columns row scroll on its own axis instead, stacking
+    // two vertical scrollbars.
     // Deliberately NOT `relative` - DrawerShell is absolute and has to span the
     // whole tab area, so its containing block must stay ProjectLayout's anchor.
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col md:h-full">
       <p className="mb-4 shrink-0 text-sm text-text-secondary">
         Drag tasks between columns to track progress.
       </p>
