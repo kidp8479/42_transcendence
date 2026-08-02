@@ -296,7 +296,7 @@ function UserSettingsPage() {
                   This will permanently remove your account and all associated
                   data. This action cannot be undone.
                 </p>
-                <div className="mt-2 flex w-full justify-center gap-3">
+                <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
                   <Button
                     className={rowUploadButtonClass}
                     onClick={(e) => {
@@ -349,7 +349,7 @@ function UserSettingsPage() {
                   }}
                   maxLength={DELETE_CONFIRMATION_PHRASE.length}
                 />
-                <div className="mt-2 flex w-full justify-center gap-3">
+                <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
                   <Button
                     className={rowUploadButtonClass}
                     disabled={deleting}
@@ -380,8 +380,8 @@ function UserSettingsPage() {
         </ModalBody>
       </Modal>
 
-      <div className="w-full mx-10">
-        <h1 className="font-mono text-xl my-10 font-semibold text-text-primary">
+      <div className="w-full px-4 sm:px-10">
+        <h1 className="font-mono text-xl my-6 sm:my-10 font-semibold text-text-primary">
           Settings
         </h1>
 
@@ -404,8 +404,8 @@ function UserSettingsPage() {
                 rounded
               />
 
-              <div className="flex flex-col gap-2">
-                <Label className="font-semibold text-text-primary">
+              <div className="flex min-w-0 flex-col gap-2">
+                <Label className="font-semibold text-text-primary break-words">
                   {user.username}
                 </Label>
                 <Button
