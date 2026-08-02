@@ -4,19 +4,18 @@
 // components/summary/TaskStatusOverview.tsx so status reads the same across
 // tabs.
 //
-// The board colors statuses in two layers, from the outside in:
-// 1. each column is outlined + tinted with its status color (columnContainer),
-// 2. each card carries a further diluted tint of the same color (card) that
-//    stacks over the column tint - deliberate "same hue, fading inward" look.
-// There used to be a third, outermost layer (a neutral raised container around
-// all four columns, rendered by KanbanBoard). Dropped: against the page
-// background it read as a box inside a box.
+// Every EDGE on the board is neutral (border-surface-border, written as a
+// literal in the components): column outline, card border, rule under the
+// header. The status colour lives on the glyphs instead - the header icon and
+// the count pill - plus the "Add task" button, which wears it outright. The
+// column title stays neutral on purpose, so the header does not turn into a
+// single block of colour.
 //
-// Every class below is written out in full, character for character, even the
-// "/5" and "/40" opacity variants. Tailwind only generates CSS for a class it
-// can see written whole in the source - a class rebuilt at runtime by joining
-// strings (ex: someClass + "/15") never appears in full in the source, so
-// Tailwind silently skips it and the class ends up doing nothing.
+// Cards are the exception that owes nothing to this file: on hover a card takes
+// its CATEGORY's colour, not its status - see CATEGORY_COLOR_PALETTE.
+//
+// Every class is written out in full, opacity variants included - Tailwind only
+// compiles classes it can see whole in the source (see categoryColorPalette.ts).
 import type { IconType } from "react-icons";
 import {
   HiOutlineCheckCircle,
@@ -37,68 +36,57 @@ export const STATUS_ORDER: TaskStatus[] = [
 interface TaskStatusStyle {
   label: string;
   icon: IconType;
-  // icon + column title color
-  headerText: string;
-  // tinted column shell (border + faint bg)
-  columnContainer: string;
-  // count pill next to the column title
-  countBadge: string;
-  // card border + diluted bg tint
-  card: string;
-  cardHover: string;
-  // hover state for the column's two "add" affordances (the header "+" and the
-  // bottom "Add task" button): both rest neutral and pick up the status color
-  // on hover. One key covers both - the border-* part is simply inert on the
-  // header "+", which has no border.
-  addTaskHover: string;
+  // colour of the column header's icon
+  headerIcon: string;
+  // Hover colour of the header's "+" button. Its own key rather than a `hover:`
+  // built from headerIcon: Tailwind only compiles classes written out in full.
+  headerAddHover: string;
+  // Tinted pill, two consumers: the column header's task count and the drawer's
+  // Status select.
+  statusPill: string;
+  // The "Add task" button's whole look - outline, fill and text - which it
+  // wears at rest, not just on hover, plus the deeper fill it takes on hover.
+  addTask: string;
 }
 
 export const STATUS_STYLES: Record<TaskStatus, TaskStatusStyle> = {
   TODO: {
     label: "To Do",
     icon: HiOutlineDotsCircleHorizontal,
-    headerText: "text-status-todo",
-    columnContainer: "border-status-todo/40 bg-status-todo/5",
-    countBadge: "border-status-todo/30 bg-status-todo/15 text-status-todo",
-    card: "border-status-todo/25 bg-status-todo/10",
-    cardHover: "hover:border-status-todo/50",
-    addTaskHover:
-      "hover:border-status-todo/50 hover:bg-status-todo/15 hover:text-status-todo",
+    headerIcon: "text-status-todo",
+    headerAddHover: "hover:text-status-todo",
+    statusPill: "border-status-todo/30 bg-status-todo/15 text-status-todo",
+    addTask:
+      "border-status-todo/50 bg-status-todo/15 text-status-todo hover:bg-status-todo/25",
   },
   IN_PROGRESS: {
     label: "In Progress",
     icon: HiOutlineRefresh,
-    headerText: "text-status-in-progress",
-    columnContainer: "border-status-in-progress/40 bg-status-in-progress/5",
-    countBadge:
+    headerIcon: "text-status-in-progress",
+    headerAddHover: "hover:text-status-in-progress",
+    statusPill:
       "border-status-in-progress/30 bg-status-in-progress/15 text-status-in-progress",
-    card: "border-status-in-progress/25 bg-status-in-progress/10",
-    cardHover: "hover:border-status-in-progress/50",
-    addTaskHover:
-      "hover:border-status-in-progress/50 hover:bg-status-in-progress/15 hover:text-status-in-progress",
+    addTask:
+      "border-status-in-progress/50 bg-status-in-progress/15 text-status-in-progress hover:bg-status-in-progress/25",
   },
   REVIEW: {
     label: "Review",
     icon: HiOutlineEye,
-    headerText: "text-status-review",
-    columnContainer: "border-status-review/40 bg-status-review/5",
-    countBadge:
+    headerIcon: "text-status-review",
+    headerAddHover: "hover:text-status-review",
+    statusPill:
       "border-status-review/30 bg-status-review/15 text-status-review",
-    card: "border-status-review/25 bg-status-review/10",
-    cardHover: "hover:border-status-review/50",
-    addTaskHover:
-      "hover:border-status-review/50 hover:bg-status-review/15 hover:text-status-review",
+    addTask:
+      "border-status-review/50 bg-status-review/15 text-status-review hover:bg-status-review/25",
   },
   COMPLETED: {
     label: "Completed",
     icon: HiOutlineCheckCircle,
-    headerText: "text-status-completed",
-    columnContainer: "border-status-completed/40 bg-status-completed/5",
-    countBadge:
+    headerIcon: "text-status-completed",
+    headerAddHover: "hover:text-status-completed",
+    statusPill:
       "border-status-completed/30 bg-status-completed/15 text-status-completed",
-    card: "border-status-completed/25 bg-status-completed/10",
-    cardHover: "hover:border-status-completed/50",
-    addTaskHover:
-      "hover:border-status-completed/50 hover:bg-status-completed/15 hover:text-status-completed",
+    addTask:
+      "border-status-completed/50 bg-status-completed/15 text-status-completed hover:bg-status-completed/25",
   },
 };

@@ -37,9 +37,8 @@ function RootLayout() {
           {/* h-dvh, not min-h-screen: a min-height only sets a floor, so no
               descendant ever gets a definite height and every `flex-1 min-h-0`
               below stays inert. A real height is what lets each area scroll
-              inside itself with the header and footer always visible - and
-              what lets the Kanban drawer span exactly from the project tabs
-              down to the footer without measuring anything.
+              inside itself with the header and footer always visible, and what
+              bounds the Kanban board so its columns scroll instead of the page.
               dvh over vh: on mobile 100vh exceeds the visible viewport and
               would push the footer off screen. */}
           <div className="flex h-dvh flex-col bg-surface-base text-text-primary">

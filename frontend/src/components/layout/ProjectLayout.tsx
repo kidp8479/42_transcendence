@@ -29,8 +29,22 @@ export function ProjectLayout() {
       <div className="shrink-0">
         <ProjectTabs />
       </div>
-      <div className="flex-1 p-6">
-        <Outlet />
+      {/* Split in two on purpose.
+          The ANCHOR is bounded and carries no padding: min-h-0 is what stops a
+          flex item from growing to its content's height (its default min-height
+          is auto), which is what used to push a tall tab past the viewport and
+          make the whole page scroll - title and tabs included. `relative` makes
+          it the containing block for the drawers (DrawerShell is absolute), so
+          they span exactly from the tab bar's rule down to the footer without
+          measuring anything, and no longer scroll away with the content.
+          The SCROLLER fills it and owns the overflow, so a long tab (Discovery,
+          Evaluation Checklist) scrolls inside the tab area. A tab that wants to
+          fill the space instead renders h-full and never overflows this, which
+          is how the Kanban columns end up scrolling on their own. */}
+      <div className="relative isolate min-h-0 flex-1">
+        <div className="scrollbar-thin-surface h-full overflow-y-auto p-6">
+          <Outlet />
+        </div>
       </div>
     </div>
   );

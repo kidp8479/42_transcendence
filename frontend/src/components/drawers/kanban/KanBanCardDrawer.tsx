@@ -1,32 +1,22 @@
-// Detail drawer for a kanban card.
-// Opens when the user clicks a card on the Kanban board (edit mode) or one of
-// the board's "+" buttons (create mode, preset to that column's status).
-// Renders its content inside DrawerShell, which owns the backdrop, the
-// click-outside, Escape and the slide animation. Like CalendarEventDrawer, the
-// fullscreen state lives here and reaches the shell as a width class - the
-// shell has no fullscreen concept of its own.
+// Detail drawer for a kanban card: edits title, status, category, priority,
+// members and notes over a TaskDraft, then hands the draft up - the route
+// decides whether that means create or update. DrawerShell owns the backdrop,
+// click-outside, Escape and the slide animation; fullscreen lives here and
+// reaches the shell as a width class.
 //
-// The drawer is confined to the authenticated content area (DrawerShell is
-// absolute, its containing block is AuthenticatedLayout's <main>), so it covers
-// the project title and tabs but never the header or the sidebar.
+// Confined to the tab's content area: DrawerShell is absolute and its
+// containing block is ProjectLayout's anchor, so the panel runs from the tab
+// bar's rule down to the footer, leaving the project title and tabs reachable
+// (same as CalendarEventDrawer).
 //
-// Split in two on purpose, the same way CalendarEventDrawer splits from
-// EventForm: the shell wrapper mounts once and lives forever - remounting it on
-// open would drop the slide-in, since a freshly mounted panel renders already in
-// place - while KanBanCardForm below is re-keyed on `session` so every open
-// starts from a clean draft. The form is deliberately NOT gated on isOpen: it
-// has to keep rendering while the panel slides out, or the panel empties
-// mid-flight.
+// Split in two on purpose: the shell wrapper mounts once and lives forever -
+// remounting it on open would drop the slide-in, a freshly mounted panel
+// renders already in place - while KanBanCardForm is re-keyed on `session`, so
+// every open starts from a clean draft with no state-syncing effect. The form
+// is deliberately NOT gated on isOpen, or the panel would empty mid slide-out.
 //
-// Displays and edits the task fields the board shows: title, status,
-// category, priority, members, notes. The form is controlled over a TaskDraft;
-// submitting hands the draft up - the route decides whether that means create
-// or update. The `key` remount is what initializes it, so no state-syncing
-// effects.
-//
-// Fields intentionally NOT here yet (absent from the design mockup):
-// startAt/endAt, description, onCalendar - the route fills create defaults
-// and preserves those fields on edit. Revisit with the Calendar tab.
+// Fields intentionally absent (not in the design mockup): startAt/endAt,
+// description, onCalendar. A PATCH is partial, so editing here preserves them.
 import { useState } from "react";
 import { Button, Label, Textarea } from "flowbite-react";
 import { HiOutlineArrowsExpand, HiOutlineX } from "react-icons/hi";
@@ -38,9 +28,13 @@ import {
   PRIORITY_STYLES,
 } from "@/lib/taskPriorityStyles";
 import { STATUS_ORDER, STATUS_STYLES } from "@/lib/taskStatusStyles";
-import type { Task, TaskPriority, TaskStatus } from "@/lib/tasks";
+import type {
+  Task,
+  TaskAssigneeUser,
+  TaskPriority,
+  TaskStatus,
+} from "@/lib/tasks";
 import type { TaskCategory } from "@/lib/taskCategories";
-import type { ProjectMemberUser } from "@/lib/projectMembers";
 import { DrawerShell } from "@/components/drawers/DrawerShell";
 import { TaskCategoryBadge } from "@/components/kanban/TaskCategoryBadge";
 import { TaskPriorityDot } from "@/components/kanban/TaskPriorityDot";
@@ -69,7 +63,7 @@ interface KanBanCardDrawerProps {
   // status column whose "+" was clicked (create mode's preset)
   initialStatus: TaskStatus;
   categories: TaskCategory[];
-  members: ProjectMemberUser[];
+  members: TaskAssigneeUser[];
   onClose: () => void;
   onSubmit: (draft: TaskDraft) => void;
 }
@@ -151,7 +145,7 @@ interface KanBanCardFormProps {
   task: Task | null;
   initialStatus: TaskStatus;
   categories: TaskCategory[];
-  members: ProjectMemberUser[];
+  members: TaskAssigneeUser[];
   onClose: () => void;
   onSubmit: (draft: TaskDraft) => void;
   isFullscreen: boolean;
@@ -237,8 +231,8 @@ function KanBanCardForm({
         <TaskCategoryBadge category={selected_category} />
         <TaskPriorityDot priority={form_draft.priority} />
         {/* Cosmetic reference only: tasks have no human-readable number, so
-            edit mode shows the start of the id (first uuid segment once real
-            ids exist). A real task number needs backend support. */}
+            edit mode shows the first uuid segment. A real task number would
+            need backend support. */}
         <span className="font-mono text-xs text-text-muted">
           {mode === "edit" && task !== null
             ? `#${task.id.slice(0, 8)}`
@@ -292,7 +286,9 @@ function KanBanCardForm({
           </Label>
           {/* Native selects here on purpose: their whole point is carrying the
               live status/category tint, which a Flowbite Select theme would
-              fight. Tinted with the same literals as the column count pills. */}
+              fight. The board itself is neutral inside its columns, so these two
+              selects are the only tinted controls left - here the colour states
+              the value the user picked, it doesn't just label a fixed column. */}
           <select
             id="kanban-drawer-status"
             value={form_draft.status}
@@ -302,7 +298,7 @@ function KanBanCardForm({
                 status: event.target.value as TaskStatus,
               }))
             }
-            className={`rounded-lg border px-3 py-1.5 text-sm ${STATUS_STYLES[form_draft.status].countBadge}`}
+            className={`rounded-lg border px-3 py-1.5 text-sm ${STATUS_STYLES[form_draft.status].statusPill}`}
           >
             {STATUS_ORDER.map((status) => (
               <option

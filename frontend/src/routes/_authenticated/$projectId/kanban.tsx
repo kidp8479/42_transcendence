@@ -1,31 +1,42 @@
-import { useMemo, useReducer, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { KanBanCardDrawer } from "@/components/drawers/kanban/KanBanCardDrawer";
 import type { TaskDraft } from "@/components/drawers/kanban/KanBanCardDrawer";
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
-import { nextRankForStatus, tasksReducer } from "@/lib/tasksReducer";
-import type { Task, TaskStatus } from "@/lib/tasks";
-import type { TaskCategory } from "@/lib/taskCategories";
-import type { ProjectMemberUser } from "@/lib/projectMembers";
+import { selectColumnTasks, tasksReducer } from "@/lib/tasksReducer";
+import {
+  createTask,
+  deleteTask,
+  listTasks,
+  updateTask,
+  type TaskAssigneeUser,
+  type TaskStatus,
+} from "@/lib/tasks";
+import { listTaskCategories } from "@/lib/taskCategories";
+import { getMembers } from "@/lib/projectMembersApi";
+import { ApiError } from "@/lib/apiClient";
 
-// TODO: when the Tasks/TaskCategories/ProjectMembers backends land, delete
-// buildKanbanMockData below and give this route a loader instead:
-//   loader: async (routeContext) => {
-//     const projectId = routeContext.params.projectId;
-//     const [tasks, categories, members] = await Promise.all([
-//       listTasks(projectId),
-//       listTaskCategories(projectId),
-//       listProjectMembers(projectId),
-//     ]);
-//     return { tasks, categories, members };
-//   },
-// then mirror it into the reducer with
-//   useEffect(() => dispatch({ type: "tasks_loaded", tasks: loaderData.tasks }), [loaderData])
-// (same pattern as discovery.tsx's own loaderData sync). No loader today: one
-// returning constants would make router.invalidate() a no-op and the mirror
-// would wipe local edits on any unrelated invalidate.
+async function loadKanbanPageData(projectId: string) {
+  const [tasks, categories, members] = await Promise.all([
+    listTasks(projectId),
+    listTaskCategories(projectId),
+    getMembers(projectId),
+  ]);
+  return {
+    tasks: tasks,
+    categories: categories,
+    // Flattened to the user: ProjectMember.id is the membership row's id, and
+    // assigneeIds must carry USER ids. Passing the member through would look
+    // fine on screen and only fail at the API with "assigneeIds must all be
+    // members of this project".
+    members: members.map((member): TaskAssigneeUser => member.user),
+  };
+}
+
 export const Route = createFileRoute("/_authenticated/$projectId/kanban")({
+  loader: (routeContext) => loadKanbanPageData(routeContext.params.projectId),
   component: KanbanPage,
 });
 
@@ -50,234 +61,28 @@ interface DrawerState {
   session: number;
 }
 
-// --- beginning of mock data - will be replaced by calls to
-// GET /api/projects/:projectId/tasks,
-// GET /api/projects/:projectId/task-categories and
-// GET /api/projects/:projectId/members once the backend for them exists
-// (typed functions already waiting in lib/tasks.ts, lib/taskCategories.ts and
-// lib/projectMembers.ts - they're just not wired up yet, the services are
-// still empty classes). Everything below is one function so that removing it
-// is a single deletion; the handlers further down already have the shape they
-// need once the calls are real (each carries its own TODO). ---
-function buildKanbanMockData(projectId: string): {
-  tasks: Task[];
-  categories: TaskCategory[];
-  members: ProjectMemberUser[];
-} {
-  // The 8 default categories every project is seeded with (prisma/seed.ts),
-  // color = index into CATEGORY_COLOR_PALETTE.
-  const categories: TaskCategory[] = [
-    { id: "cat-0", name: "Planning", color: 0 },
-    { id: "cat-1", name: "Development", color: 1 },
-    { id: "cat-2", name: "Testing", color: 2 },
-    { id: "cat-3", name: "Backend", color: 3 },
-    { id: "cat-4", name: "Frontend", color: 4 },
-    { id: "cat-5", name: "DevOps", color: 5 },
-    { id: "cat-6", name: "Parsing", color: 6 },
-    { id: "cat-7", name: "Documentation", color: 7 },
-  ];
-
-  // Same fake team as the Summary tab's mock.
-  const members: ProjectMemberUser[] = [
-    { id: "member-1", username: "sboxd", avatarUrl: null },
-    { id: "member-2", username: "mlebrun", avatarUrl: null },
-    { id: "member-3", username: "jdupont", avatarUrl: null },
-    { id: "member-4", username: "klaris", avatarUrl: null },
-  ];
-
-  const sboxd = members[0];
-  const mlebrun = members[1];
-  const jdupont = members[2];
-  const klaris = members[3];
-
-  // Typed as Task[] (the lib/tasks.ts contract) so the mock can't drift from
-  // what GET /tasks will return. rank is the 0-based position inside the
-  // task's STATUS column - dense 0..n-1 per column, kept that way by
-  // tasksReducer. Review is left nearly empty on purpose (drag its task away
-  // to see the empty-column state).
-  const tasks: Task[] = [
-    {
-      id: "task-1",
-      projectId,
-      title: "Implement user authentication",
-      status: "TODO",
-      categoryId: "cat-3",
-      rank: 0,
-      priority: "HIGH",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [sboxd, mlebrun],
-    },
-    {
-      id: "task-2",
-      projectId,
-      title: "Set up WebSocket connection",
-      status: "TODO",
-      categoryId: "cat-3",
-      rank: 1,
-      priority: "MEDIUM",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [mlebrun],
-    },
-    {
-      id: "task-3",
-      projectId,
-      title: "Design matchmaking system",
-      status: "TODO",
-      categoryId: "cat-1",
-      rank: 2,
-      priority: "MEDIUM",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [sboxd, jdupont],
-    },
-    {
-      id: "task-4",
-      projectId,
-      title: "Write unit tests for game engine",
-      status: "TODO",
-      categoryId: "cat-2",
-      rank: 3,
-      priority: "LOW",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [jdupont, sboxd],
-    },
-    {
-      id: "task-5",
-      projectId,
-      title: "Create game engine module",
-      status: "IN_PROGRESS",
-      categoryId: "cat-1",
-      rank: 0,
-      priority: "HIGH",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [jdupont],
-    },
-    {
-      id: "task-6",
-      projectId,
-      title: "Build paddle and ball system",
-      status: "IN_PROGRESS",
-      categoryId: "cat-1",
-      rank: 1,
-      priority: "HIGH",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [jdupont, mlebrun],
-    },
-    {
-      id: "task-7",
-      projectId,
-      title: "Implement real-time game loop",
-      status: "IN_PROGRESS",
-      categoryId: "cat-3",
-      rank: 2,
-      priority: "HIGH",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [mlebrun],
-    },
-    {
-      id: "task-8",
-      projectId,
-      title: "Leaderboard UI",
-      status: "REVIEW",
-      categoryId: "cat-4",
-      rank: 0,
-      priority: "HIGH",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [klaris, sboxd],
-    },
-    {
-      id: "task-9",
-      projectId,
-      title: "Project setup (Docker + Gitflow)",
-      status: "COMPLETED",
-      categoryId: "cat-5",
-      rank: 0,
-      priority: "HIGH",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes:
-        "## Notes\n\n- Compose file covers frontend/backend/auth/nginx\n- Gitflow: feature branches + PR reviews",
-      onCalendar: false,
-      assignees: [sboxd, mlebrun, jdupont, klaris],
-    },
-    {
-      id: "task-10",
-      projectId,
-      title: "Read and understand subject PDF",
-      status: "COMPLETED",
-      categoryId: "cat-0",
-      rank: 1,
-      priority: "MEDIUM",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [sboxd],
-    },
-    {
-      id: "task-11",
-      projectId,
-      title: "Basic frontend layout",
-      status: "COMPLETED",
-      categoryId: "cat-4",
-      rank: 2,
-      priority: "MEDIUM",
-      startAt: null,
-      endAt: null,
-      description: null,
-      notes: null,
-      onCalendar: false,
-      assignees: [klaris],
-    },
-  ];
-
-  return { tasks, categories, members };
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
-// --- end of mock data ---
 
 function KanbanPage() {
   const { projectId } = Route.useParams();
+  const loaderData = Route.useLoaderData();
+  const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
-
-  const mock_data = useMemo(() => buildKanbanMockData(projectId), [projectId]);
 
   // All task changes flow through the reducer (lib/tasksReducer.ts) - the
   // future WebSocket handler will dispatch these same actions, so board
   // interactions and remote events stay one code path.
-  const [tasks, dispatch] = useReducer(tasksReducer, mock_data.tasks);
+  const [tasks, dispatch] = useReducer(tasksReducer, loaderData.tasks);
+
+  // Mirrors the loader into the reducer, the same way discovery.tsx mirrors it
+  // into useState: useReducer's initial value only seeds the first render, so
+  // without this a router.invalidate() would refetch and change nothing.
+  useEffect(() => {
+    dispatch({ type: "tasks_loaded", tasks: loaderData.tasks });
+  }, [loaderData]);
+
   const [drawer, setDrawer] = useState<DrawerState>({
     // Arbitrary starting target: the drawer is mounted from the very first
     // render (its slide-in only animates if the panel was already there,
@@ -304,100 +109,151 @@ function KanbanPage() {
     setDrawer((current) => ({ ...current, isOpen: false }));
   }
 
-  function handleMoveTask(
+  // Local-only reposition, fired by the board on every column the card crosses
+  // mid-drag. Nothing is persisted here: the drop does that, once.
+  function handlePreviewMove(
     taskId: string,
     toStatus: TaskStatus,
     toIndex: number
-  ) {
+  ): void {
     dispatch({ type: "task_moved", taskId, toStatus, toIndex });
-    // TODO: once the backend exists, persist with
-    // updateTask(projectId, taskId, { status, rank }) from lib/tasks.ts. On
-    // failure: console.error + error toast + dispatch the inverse task_moved
-    // to roll back. No success toast - a toast per drag would be spam, and
-    // the house rule is no success toast for implicit saves.
   }
 
+  // Fired once, on drop. Optimistic: the card is already in its new column (the
+  // previews above put it there) and the PATCH catches up. No success toast -
+  // one per drag would be spam, and the house rule is no toast for autosaves.
+  async function handleMoveTask(
+    taskId: string,
+    toStatus: TaskStatus,
+    toIndex: number,
+    from: { status: TaskStatus; index: number }
+  ): Promise<void> {
+    dispatch({ type: "task_moved", taskId, toStatus, toIndex });
+
+    try {
+      // rank is the destination index: the server shifts the siblings of both
+      // columns to keep them dense, matching what the reducer just did locally.
+      await updateTask(projectId, taskId, { status: toStatus, rank: toIndex });
+    } catch (error) {
+      console.error("Failed to move task", error);
+      // 409 = the server hit a serialization conflict (someone else was
+      // reordering the same column). Our local guess is meaningless then, so
+      // reload instead of rolling back to a state that never existed.
+      if (error instanceof ApiError && error.status === 409) {
+        showToast({
+          type: "error",
+          message: "Board changed while you were dragging, reloading",
+        });
+        await safeInvalidateRouter();
+        return;
+      }
+      showToast({
+        type: "error",
+        message: errorMessage(error, "Failed to move task"),
+      });
+      // Back to where the gesture started, not to where the card sat a moment
+      // ago: the mid-drag previews already moved it. task_moved reindexes both
+      // columns densely, so this reproduces the pre-drag arrangement exactly.
+      dispatch({
+        type: "task_moved",
+        taskId,
+        toStatus: from.status,
+        toIndex: from.index,
+      });
+      return;
+    }
+    await safeInvalidateRouter();
+  }
+
+  // Optimistic too: the card is already behind an inline confirmation, so
+  // making it linger after the user confirmed would read as a broken button.
   async function handleDeleteTask(taskId: string): Promise<boolean> {
-    const task = tasks.find((current) => current.id === taskId);
-    if (task === undefined) {
+    if (!tasks.some((current) => current.id === taskId)) {
       return false;
     }
-    // TODO: once the backend exists, await deleteTask(projectId, taskId) in a
-    // try/catch here; on failure console.error + error toast + return false
-    // (the card keeps its confirmation open).
+    // Snapshot, not a task_created replay: that appends the card and re-sorts
+    // by rank, and since deleting already pulled its old neighbour up to the
+    // freed rank, the restored card ties with it and lands one slot too low.
+    const previous_tasks = tasks;
+
     dispatch({ type: "task_deleted", taskId });
     // The drawer no longer unmounts when it closes, so it can't be left
     // pointing at a task that just disappeared - it would render an empty form.
     if (drawer_target.mode === "edit" && drawer_target.taskId === taskId) {
       closeDrawer();
     }
-    // TODO: await safeInvalidateRouter() here - after the try/catch, never
-    // inside it (see the comment in hooks/useSafeRouterInvalidate.ts).
+
+    try {
+      await deleteTask(projectId, taskId);
+    } catch (error) {
+      console.error("Failed to delete task", error);
+      showToast({
+        type: "error",
+        message: errorMessage(error, "Failed to delete task"),
+      });
+      dispatch({ type: "tasks_loaded", tasks: previous_tasks });
+      return false;
+    }
+    await safeInvalidateRouter();
     showToast({ type: "success", message: "Task deleted" });
     return true;
   }
 
-  function handleSubmitDrawer(draft: TaskDraft) {
-    // The drawer only edits TaskDraft's fields - assignee ids are resolved
-    // back to users here, and fields the form doesn't cover (dates,
-    // description, onCalendar) keep their existing values (create fills
-    // defaults).
-    const draft_assignees = mock_data.members.filter((member) =>
-      draft.assigneeIds.includes(member.id)
-    );
+  // NOT optimistic, unlike the two above: a create has no id until the server
+  // answers, and on failure the drawer has to stay open with the user's input
+  // intact rather than swallow it.
+  async function handleSubmitDrawer(draft: TaskDraft) {
+    if (draft.categoryId === null) {
+      return; // the drawer already blocks this, belt and braces
+    }
 
     if (drawer_target.mode === "create") {
-      dispatch({
-        type: "task_created",
-        task: {
-          // crypto.randomUUID is a mock stand-in for the id the backend will
-          // generate.
-          id: crypto.randomUUID(),
-          projectId,
+      try {
+        const created = await createTask(projectId, {
           title: draft.title,
-          status: draft.status,
           categoryId: draft.categoryId,
-          rank: nextRankForStatus(tasks, draft.status),
+          status: draft.status,
           priority: draft.priority,
-          startAt: null,
-          endAt: null,
-          description: null,
-          notes: draft.notes === "" ? null : draft.notes,
+          // append to the end of its column; the server clamps anyway
+          rank: selectColumnTasks(tasks, draft.status).length,
+          notes: draft.notes === "" ? undefined : draft.notes,
           onCalendar: false,
-          assignees: draft_assignees,
-        },
-      });
-      // TODO: once the backend exists, await createTask(projectId, body) from
-      // lib/tasks.ts in a try/catch; on failure console.error + error toast
-      // and leave the drawer open.
+          assigneeIds: draft.assigneeIds,
+        });
+        dispatch({ type: "task_created", task: created });
+      } catch (error) {
+        console.error("Failed to create task", error);
+        showToast({
+          type: "error",
+          message: errorMessage(error, "Failed to create task"),
+        });
+        return; // drawer stays open
+      }
+      await safeInvalidateRouter();
       showToast({ type: "success", message: "Task created" });
     } else {
-      const submitted_task = tasks.find(
-        (current) => current.id === drawer_target.taskId
-      );
-      if (submitted_task !== undefined) {
-        dispatch({
-          type: "task_updated",
-          taskId: submitted_task.id,
-          changes: {
-            title: draft.title,
-            categoryId: draft.categoryId,
-            status: draft.status,
-            priority: draft.priority,
-            notes: draft.notes === "" ? null : draft.notes,
-            assignees: draft_assignees,
-            // A status change through the drawer sends the task to the end
-            // of its new column (the reducer keeps both columns' ranks dense).
-            ...(draft.status !== submitted_task.status
-              ? { rank: nextRankForStatus(tasks, draft.status) }
-              : {}),
-          },
+      const taskId = drawer_target.taskId;
+      try {
+        const updated = await updateTask(projectId, taskId, {
+          title: draft.title,
+          categoryId: draft.categoryId,
+          status: draft.status,
+          priority: draft.priority,
+          notes: draft.notes,
+          assigneeIds: draft.assigneeIds,
         });
+        // The whole task from the server, not a hand-built patch: it carries
+        // the resolved assignees and any rank the server reshuffled.
+        dispatch({ type: "task_updated", taskId, changes: updated });
+      } catch (error) {
+        console.error("Failed to update task", error);
+        showToast({
+          type: "error",
+          message: errorMessage(error, "Failed to save changes"),
+        });
+        return; // drawer stays open
       }
-      // TODO: once the backend exists, await updateTask(projectId, taskId,
-      // updates) from lib/tasks.ts - note that UpdateTaskDto has no
-      // assigneeIds field yet (see the header comment in lib/tasks.ts), so
-      // member changes need that backend fix to persist.
+      await safeInvalidateRouter();
       showToast({ type: "success", message: "Changes saved" });
     }
     closeDrawer();
@@ -411,10 +267,10 @@ function KanbanPage() {
       : null;
 
   return (
-    // h-full of the tab's content box: the board fills it and the COLUMNS
-    // scroll, not the page. Deliberately NOT `relative` - DrawerShell is
-    // absolute and has to span the whole content area, so its containing block
-    // must stay AuthenticatedLayout's <main>, the nearest positioned ancestor.
+    // h-full of ProjectLayout's scroller: the board exactly fills it, so that
+    // scroller never overflows and the COLUMNS scroll instead of the page.
+    // Deliberately NOT `relative` - DrawerShell is absolute and has to span the
+    // whole tab area, so its containing block must stay ProjectLayout's anchor.
     <div className="flex h-full flex-col">
       <p className="mb-4 shrink-0 text-sm text-text-secondary">
         Drag tasks between columns to track progress.
@@ -422,7 +278,8 @@ function KanbanPage() {
 
       <KanbanBoard
         tasks={tasks}
-        categories={mock_data.categories}
+        categories={loaderData.categories}
+        onPreviewMove={handlePreviewMove}
         onMoveTask={handleMoveTask}
         onAddTask={(status) => openDrawer({ mode: "create", status })}
         onOpenTask={(taskId) => openDrawer({ mode: "edit", taskId })}
@@ -441,8 +298,8 @@ function KanbanPage() {
         initialStatus={
           drawer_target.mode === "create" ? drawer_target.status : "TODO"
         }
-        categories={mock_data.categories}
-        members={mock_data.members}
+        categories={loaderData.categories}
+        members={loaderData.members}
         onClose={closeDrawer}
         onSubmit={handleSubmitDrawer}
       />

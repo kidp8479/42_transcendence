@@ -35,7 +35,7 @@ import {
 } from "react-icons/hi";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { STATUS_STYLES } from "@/lib/taskStatusStyles";
+import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import type { Task } from "@/lib/tasks";
 import type { TaskCategory } from "@/lib/taskCategories";
@@ -100,7 +100,15 @@ export function TaskCard({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [is_confirming_delete]);
 
-  const status_style = STATUS_STYLES[task.status];
+  // An uncategorized task is a real case (Task.categoryId is nullable), and it
+  // must NOT fall back to palette index 0 - that is a real category's colour,
+  // and borrowing it would say something untrue about the card. A muted grey
+  // instead, matching the "Uncategorized" badge's own text-text-muted.
+  const hover_border =
+    category !== null
+      ? (CATEGORY_COLOR_PALETTE[category.color] ?? CATEGORY_COLOR_PALETTE[0])
+          .hoverBorder
+      : "hover:border-text-muted";
 
   // dnd-kit's transform/transition: inline is the standard wiring for
   // per-frame values (same exception as progress-bar widths).
@@ -182,7 +190,10 @@ export function TaskCard({
       {...(isOverlay ? {} : attributes)}
       {...(isOverlay ? {} : listeners)}
       onClick={onOpen}
-      className={`flex cursor-grab flex-col gap-2 rounded-lg border p-3 transition-colors ${status_style.card} ${status_style.cardHover} ${isDragging ? "opacity-40" : ""}`}
+      // Neutral at rest; hovering reveals the CATEGORY's colour on the border,
+      // which is the card's only tie to its category besides the badge. Nothing
+      // here depends on the task's status - the column already states it.
+      className={`flex cursor-grab flex-col gap-2 rounded-lg border border-surface-border bg-surface-raised p-3 transition-colors hover:bg-surface-overlay ${hover_border} ${isDragging ? "opacity-40" : ""}`}
     >
       <div className="flex items-center gap-2">
         <TaskCategoryBadge category={category} />
@@ -238,7 +249,17 @@ export function TaskCard({
         </div>
       </div>
 
-      <p className="text-sm font-semibold text-text-primary">{task.title}</p>
+      {/* Two lines then an ellipsis, same as the confirm state above.
+          wrap-break-word is what handles the pathological case: a title with no
+          space in it can't wrap, so without it the clamp has no line end to put
+          the ellipsis on and the string just runs past the card's edge. The full
+          title stays available as a tooltip. */}
+      <p
+        className="line-clamp-2 text-sm font-semibold wrap-break-word text-text-primary pb-1"
+        title={task.title}
+      >
+        {task.title}
+      </p>
 
       <TaskAssignees assignees={task.assignees} />
     </div>

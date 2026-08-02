@@ -1,15 +1,12 @@
-// Pure state transitions for the project's task list (Kanban board today,
-// List tab later). No React in here on purpose: the route drives it through
-// useReducer now, and the future WebSocket handler can dispatch the exact
-// same actions when "task created/updated/moved/deleted" events arrive - one
-// source of truth for how the task list changes, whatever triggered it.
+// Pure state transitions for the project's task list. No React in here on
+// purpose: the route drives it through useReducer, and the future WebSocket
+// handler will dispatch these same actions, so board interactions and remote
+// events stay one code path.
 //
-// State is the flat Task[] (the shape GET /tasks will return); columns are
-// derived per status with selectColumnTasks. rank is the 0-based position of
-// a task inside its STATUS column. Every transition that touches a column
-// reindexes it to a dense 0..n-1, so ranks never gap and re-dispatching the
-// same action is harmless (the board dispatches task_moved from both dragOver
-// and dragEnd).
+// State is the flat Task[] returned by GET /tasks; columns are derived per
+// status with selectColumnTasks. Every transition touching a column reindexes
+// it to a dense 0..n-1, which also makes repeated dispatches idempotent - the
+// board fires task_moved once per column crossed while dragging.
 import type { Task, TaskStatus } from "@/lib/tasks";
 
 export type TasksAction =
@@ -122,11 +119,6 @@ export function tasksReducer(state: Task[], action: TasksAction): Task[] {
 // One column of the board: the tasks of a status, in rank order.
 export function selectColumnTasks(tasks: Task[], status: TaskStatus): Task[] {
   return tasks.filter((task) => task.status === status).sort(byRank);
-}
-
-// Append position for a task created into a status column.
-export function nextRankForStatus(tasks: Task[], status: TaskStatus): number {
-  return tasks.filter((task) => task.status === status).length;
 }
 
 function byRank(a: Task, b: Task): number {
