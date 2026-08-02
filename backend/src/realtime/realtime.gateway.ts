@@ -1,3 +1,4 @@
+import { Optional } from "@nestjs/common";
 import {
   ConnectedSocket,
   MessageBody,
@@ -7,6 +8,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
+import type { IncomingMessage } from "node:http";
 import { Socket, Server } from "socket.io";
 import { PrismaService } from "../prisma/prisma.service";
 import {
@@ -15,6 +17,21 @@ import {
   FieldLockManager,
   ReleasedFieldLock,
 } from "./field-lock-manager";
+import {
+  WebSocketAdmission,
+  WebSocketAdmissionService,
+} from "./websocket-admission.service";
+
+const webSocketTicketPattern = /^[A-Za-z0-9_-]{43}$/;
+const sessionRevalidationIntervalMs = 30_000;
+const maximumSocketLifetimeMs = 15 * 60_000;
+
+function allowExactOrigin(
+  request: IncomingMessage,
+  callback: (error: string | null | undefined, success: boolean) => void
+): void {
+  callback(null, request.headers.origin === process.env.APP_ORIGIN);
+}
 
 // Resolves the real projectId a lockable resource belongs to, given the id
 // half of its key (the "checklist-item:" / "discovery-block:" prefix is
@@ -25,13 +42,19 @@ import {
 // lockable model (Kanban cards, per useFieldLock's own comment).
 type KeyPrefixValidator = (id: string) => Promise<string | undefined>;
 
-@WebSocketGateway({ path: "/ws" })
+@WebSocketGateway({
+  path: "/ws",
+  transports: ["websocket"],
+  allowRequest: allowExactOrigin,
+})
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fieldLockManager: FieldLockManager
+    private readonly fieldLockManager: FieldLockManager,
+    @Optional()
+    private readonly admissionService?: WebSocketAdmissionService
   ) {
     this.fieldLockManager.setExpirationHandler((released) => {
       this.emitFieldUnlock(released);
@@ -42,6 +65,10 @@ export class RealtimeGateway
 
   // registered by each owning module's service (see keyBelongsToProject)
   private keyPrefixValidators = new Map<string, KeyPrefixValidator>();
+  private socketGuards = new Map<
+    string,
+    { revalidation: NodeJS.Timeout; lifetime: NodeJS.Timeout }
+  >();
 
   registerKeyPrefixValidator(
     prefix: string,
@@ -84,11 +111,11 @@ export class RealtimeGateway
   }
 
   async handleConnection(client: Socket): Promise<void> {
-    // TR-74 will add one-time WebSocket ticket admission. The former
-    // tr_session cookie path is intentionally disabled at the JWT cutover so
-    // realtime cannot silently retain the removed opaque-session fallback.
-    client.data.ready = Promise.resolve(false);
-    client.disconnect(true);
+    const ready = this.admit(client);
+    client.data.ready = ready;
+    if (!(await ready) && client.connected) {
+      client.disconnect(true);
+    }
   }
 
   // locks live in our own Map, not Socket.io's room state - release them
@@ -98,10 +125,118 @@ export class RealtimeGateway
   // lock) while the other's connection drops and reconnects; only the
   // disconnecting socket's own locks should be released.
   async handleDisconnect(@ConnectedSocket() client: Socket): Promise<void> {
+    this.clearSocketGuards(client.id);
     const released = await this.fieldLockManager.releaseSocket(client.id);
     for (const lock of released) {
       this.emitFieldUnlock(lock);
     }
+  }
+
+  private async admit(client: Socket): Promise<boolean> {
+    const ticket = client.handshake.query.ticket;
+    if (
+      !this.admissionService ||
+      typeof ticket !== "string" ||
+      !webSocketTicketPattern.test(ticket)
+    ) {
+      return false;
+    }
+
+    let admission: WebSocketAdmission;
+    try {
+      admission = await this.admissionService.consume(ticket);
+    } catch {
+      return false;
+    }
+    if (!client.connected) {
+      return false;
+    }
+
+    client.data.userId = admission.sub;
+    client.data.sessionId = admission.sid;
+    client.data.username = admission.username;
+    client.data.avatarUrl = admission.avatarUrl;
+
+    await client.join(`user:${admission.sub}`);
+    if (!client.connected) {
+      return false;
+    }
+
+    const memberships = await this.prisma.projectMember.findMany({
+      where: { userId: admission.sub },
+      select: { projectId: true },
+    });
+    for (const membership of memberships) {
+      if (!client.connected) {
+        return false;
+      }
+      await this.fieldLockManager.withProject(
+        membership.projectId,
+        async () => {
+          if (
+            !client.connected ||
+            !(await this.isCurrentProjectMember(
+              admission.sub,
+              membership.projectId
+            ))
+          ) {
+            return;
+          }
+          if (client.connected) {
+            await client.join(`project:${membership.projectId}`);
+          }
+        }
+      );
+    }
+    if (!client.connected) {
+      return false;
+    }
+    this.startSocketGuards(client, admission);
+    return true;
+  }
+
+  private startSocketGuards(
+    client: Socket,
+    admission: WebSocketAdmission
+  ): void {
+    this.clearSocketGuards(client.id);
+    let revalidationInFlight = false;
+    const revalidation = setInterval(() => {
+      if (revalidationInFlight || !client.connected) {
+        return;
+      }
+      revalidationInFlight = true;
+      void this.admissionService!.isSessionActive(admission.sub, admission.sid)
+        .then((active) => {
+          if (!active && client.connected) {
+            client.disconnect(true);
+          }
+        })
+        .catch(() => {
+          if (client.connected) {
+            client.disconnect(true);
+          }
+        })
+        .finally(() => {
+          revalidationInFlight = false;
+        });
+    }, sessionRevalidationIntervalMs);
+    const lifetime = setTimeout(() => {
+      if (client.connected) {
+        client.disconnect(true);
+      }
+    }, maximumSocketLifetimeMs);
+    this.socketGuards.set(client.id, { revalidation, lifetime });
+  }
+
+  private clearSocketGuards(socketId: string): void {
+    const guards = this.socketGuards.get(socketId);
+    if (!guards) {
+      return;
+    }
+    clearInterval(guards.revalidation);
+    clearTimeout(guards.lifetime);
+    this.socketGuards.delete(socketId);
   }
 
   // client wants to start editing key - rejects if client isn't a member

@@ -1,5 +1,5 @@
-# Current TR-70 HTTP bearer and rotating-refresh runtime contract.
-schema_version: "1.1"
+# Current TR-74 HTTP bearer, rotating-refresh, and WebSocket ticket contract.
+schema_version: "1.2"
 status: accepted
 last_updated: "2026-08-02"
 title: Authentication and authorization architecture
@@ -78,6 +78,7 @@ components:
       - send Authorization Bearer on application HTTP requests
       - serialize refresh and one-time 401 retry
       - send the CSRF token only on cookie-authenticated refresh and logout
+      - exchange the access JWT for a one-time WebSocket ticket
     prohibited:
       - store access tokens in localStorage
       - receive provider refresh tokens
@@ -103,6 +104,8 @@ components:
       - mint strict EdDSA access JWTs through Vault Transit
       - require active accounts for local login and access introspection
       - issue and validate CSRF tokens
+      - issue hash-only 60-second WebSocket tickets
+      - atomically consume tickets for the fixed transcendence-ws audience
       - hash local passwords and one-time tokens
       - emit authentication audit events
     prohibited:
@@ -115,26 +118,32 @@ components:
       - populate req.user with the canonical application user ID
       - fail closed when authentication cannot be established
       - enforce global roles and project/resource authorization
-      - reject WebSocket admission until TR-74 one-time tickets are implemented
+      - admit WebSockets only after internal one-time ticket consumption
+      - enforce exact browser Origin on the WebSocket handshake
+      - disconnect sockets after refresh-family or account revocation
     prohibited:
       - validate provider tokens
       - read password hashes
       - trust browser-supplied user identifiers
   websocket:
     handshake:
-      status: disabled-pending-TR-74
+      status: enabled
       legacy_cookie_admission: removed
-      future_credential: one-time-websocket-ticket
-      disabled_features:
-        - notification-push
-        - discovery-and-evaluation-collaboration
-        - field-locks
+      direct_jwt_admission: prohibited
+      credential: one-time-websocket-ticket
+      ticket_storage: sha256-hash-only
+      ticket_lifetime: 60s
+      ticket_audience: transcendence-ws
+      ticket_consumption: atomic-and-one-use
+      origin: exact-APP_ORIGIN
+      maximum_socket_lifetime: 15m
     authorization:
       - verify-project-membership-before-joining-each-room
       - disconnect-when-ticket-or-session-revalidation-fails
     revalidation:
       initial: on-handshake
-      future: periodic-and-on-sensitive-subscription
+      periodic: 30s
+      failure_mode: disconnect
   database:
     initial_ownership:
       migrations: prisma
@@ -146,6 +155,7 @@ components:
       - PasswordCredential
       - RefreshTokenFamily
       - AuthRefreshToken
+      - WebSocketTicket
       - OAuthTransaction
       - AuthToken
       - AuthEvent
@@ -264,6 +274,8 @@ security_requirements:
   - reject-unverified-email-for-automatic-linking
   - apply-object-level-authorization-to-every-project-resource
   - authenticate-and-authorize-websocket-room-subscriptions
+  - accept-only-one-time-websocket-tickets-with-exact-origin
+  - never-accept-cookie-or-jwt-websocket-admission
   - use-separate-rate-limits-for-login-register-callback-and-reset
   - retain-security-audit-events-without-sensitive-token-material
 
