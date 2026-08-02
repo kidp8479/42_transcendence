@@ -19,6 +19,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import "multer";
 import { ApiSecurity } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
+import { detectImageMimetype } from "../common/detect-image-type";
 import { UsersService } from "./users.service";
 // import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
@@ -63,10 +64,21 @@ export class UsersController {
     if (!file) {
       throw new BadRequestException("A file is required");
     }
-    if (!file.mimetype.startsWith("image/")) {
-      throw new BadRequestException("Avatar must be an image");
+    // file.mimetype is the client-declared Content-Type of the multipart
+    // part - not trustworthy on its own (see detectImageMimetype's comment).
+    // Sniffing the real bytes and only accepting a small raster allowlist is
+    // what actually decides the stored/served Content-Type.
+    const detectedMimetype = detectImageMimetype(file.buffer);
+    if (detectedMimetype === undefined) {
+      throw new BadRequestException(
+        "Avatar must be a PNG, JPEG, GIF, or WebP image"
+      );
     }
-    return this.usersService.uploadAvatar(request.user.id, file);
+    return this.usersService.uploadAvatar(
+      request.user.id,
+      file,
+      detectedMimetype
+    );
   }
 
   // Public to any logged-in user, not just the owner: avatars are displayed

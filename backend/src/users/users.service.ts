@@ -56,13 +56,20 @@ export class UsersService {
   // Every upload gets a fresh key (userId + uuid) rather than overwriting a
   // fixed slot per user - simpler, but it means the previous avatar object
   // is left behind in storage instead of being deleted.
-  async uploadAvatar(userId: string, file: Express.Multer.File) {
+  async uploadAvatar(
+    userId: string,
+    file: Express.Multer.File,
+    contentType: string
+  ) {
     await this.findById(userId);
 
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
     const safeOriginalName = file.originalname.replace(/[\\/]/g, "_");
     const key = `avatar-${userId}-${randomUUID()}-${safeOriginalName}`;
-    await this.storage.uploadObject(bucket, key, file.buffer, file.mimetype);
+    // contentType is the sniffed mimetype (see detectImageMimetype), not
+    // file.mimetype - what gets stored here is what downloadAvatar serves
+    // back verbatim, so it must never be the client-declared header.
+    await this.storage.uploadObject(bucket, key, file.buffer, contentType);
 
     // avatarUrl is what the frontend actually reads/renders - stored as the
     // route it can hit directly, not the raw storage key.
