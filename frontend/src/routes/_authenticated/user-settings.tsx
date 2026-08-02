@@ -109,10 +109,10 @@ function UserSettingsPage() {
     // enforces (MAX_AVATAR_BYTES, image/* mimetype), so the user gets an
     // answer immediately instead of after a full upload round trip that was
     // always going to fail
-    if (!file.type.startsWith("image/")) {
+    if (!/^(image\/png|image\/jpeg|image\/gif)$/.test(file.type)) {
       showToast({
         type: "error",
-        message: "Only image files can be used as an avatar.",
+        message: "Avatar must be a PNG, JPEG or GIF image.",
       });
       return;
     }
