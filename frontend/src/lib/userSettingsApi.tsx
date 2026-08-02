@@ -42,13 +42,7 @@ export async function getMe(): Promise<User> {
 // PATCH /users/me
 export async function updateMe(dto: Partial<User>): Promise<User> {
   return apiClient<unknown>(`/users/me`, { method: "PATCH", body: dto }).then(
-    (payload) => {
-      const parsed = parseUser(payload);
-      if (parsed === null) {
-        throw new Error("User response is invalid");
-      }
-      return parsed;
-    }
+    parseUser
   );
 }
 
