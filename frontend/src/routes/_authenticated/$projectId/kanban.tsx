@@ -74,6 +74,15 @@ function KanbanPage() {
   // All task changes flow through the reducer (lib/tasksReducer.ts) - the
   // future WebSocket handler will dispatch these same actions, so board
   // interactions and remote events stay one code path.
+  //
+  // Deliberately NOT calling safeInvalidateRouter() after a successful mutation,
+  // unlike discovery.tsx. Every mutation here already dispatches the task the
+  // server returned, so the refetch added nothing - it just rebuilt all four
+  // columns from scratch, which visibly jolted cards the user never touched. It
+  // is also the wrong shape for the realtime layer to come: the loader hands
+  // back a full SNAPSHOT asynchronously, so once remote events start arriving a
+  // late response would overwrite a change that had just been applied. The only
+  // survivor is the 409 path below, where the local state really is worthless.
   const [tasks, dispatch] = useReducer(tasksReducer, loaderData.tasks);
 
   // Mirrors the loader into the reducer, the same way discovery.tsx mirrors it
@@ -162,7 +171,6 @@ function KanbanPage() {
       });
       return;
     }
-    await safeInvalidateRouter();
   }
 
   // Optimistic too: the card is already behind an inline confirmation, so
@@ -194,7 +202,6 @@ function KanbanPage() {
       dispatch({ type: "tasks_loaded", tasks: previous_tasks });
       return false;
     }
-    await safeInvalidateRouter();
     showToast({ type: "success", message: "Task deleted" });
     return true;
   }
@@ -229,7 +236,6 @@ function KanbanPage() {
         });
         return; // drawer stays open
       }
-      await safeInvalidateRouter();
       showToast({ type: "success", message: "Task created" });
     } else {
       const taskId = drawer_target.taskId;
@@ -253,7 +259,6 @@ function KanbanPage() {
         });
         return; // drawer stays open
       }
-      await safeInvalidateRouter();
       showToast({ type: "success", message: "Changes saved" });
     }
     closeDrawer();

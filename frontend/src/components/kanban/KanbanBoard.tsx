@@ -68,6 +68,10 @@ export function KanbanBoard({
   // Id of the card currently being dragged - drives the DragOverlay copy.
   const [active_task_id, setActiveTaskId] = useState<string | null>(null);
 
+  // The columns row, and the only subtree dnd-kit may auto-scroll (see the
+  // DndContext's autoScroll below).
+  const board_ref = useRef<HTMLDivElement | null>(null);
+
   const categories_by_id = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
     [categories]
@@ -222,12 +226,26 @@ export function KanbanBoard({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
+      // Auto-scroll is confined to the board. By default dnd-kit scrolls the
+      // nearest scrollable ancestor, and AuthenticatedLayout's <main> qualifies:
+      // `overflow-x-hidden` still scrolls programmatically. Dragging to the
+      // right edge slid the whole page sideways onto the closed drawer, which is
+      // parked off-screen in `translate-x-full` and only hidden by that very
+      // overflow - hence the empty area. contains() covers the row itself, so
+      // the board still scrolls sideways when the columns overflow, and each
+      // column's card list still scrolls vertically.
+      autoScroll={{
+        canScroll: (element) => board_ref.current?.contains(element) ?? false,
+      }}
     >
       {/* min-h-0 is what hands a definite height down to the columns (without
           it a flex child refuses to shrink below its content). pb-2 keeps the
           horizontal scrollbar off the columns' bottom edge. dnd-kit
           auto-scrolls this container when a dragged card reaches its edge. */}
-      <div className="scrollbar-thin-surface flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2">
+      <div
+        ref={board_ref}
+        className="scrollbar-thin-surface flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2"
+      >
         {STATUS_ORDER.map((status) => (
           <KanbanColumn
             key={status}
@@ -243,9 +261,16 @@ export function KanbanBoard({
 
       {/* Floating copy of the dragged card. The card is opaque on its own, so
           the wrapper only adds the shadow that lifts it off the board.
-          DragOverlay renders into its own position:fixed wrapper, so neither
-          the row's overflow nor the workspace's stacking context affect it. */}
-      <DragOverlay>
+          DragOverlay renders into its own position:fixed wrapper, so the row's
+          overflow doesn't clip it.
+
+          zIndex is load-bearing: dnd-kit defaults to 999, and the overlay sits
+          in the same stacking context as the drawer (ProjectLayout's `isolate`
+          anchor), so it painted over a drawer that only claims z-40. The click
+          that opens a drawer also counts as a drag once it passes the 8px
+          threshold, so the overlay's drop animation played on top of the panel.
+          30 keeps it above the columns, which claim no z-index at all. */}
+      <DragOverlay zIndex={30}>
         {active_task !== null && (
           <div className="rounded-lg shadow-2xl">
             <TaskCard

@@ -15,7 +15,10 @@ export function TaskPriorityDot({ priority }: TaskPriorityDotProps) {
   const priority_style = PRIORITY_STYLES[priority];
 
   return (
-    <span className="flex items-center gap-1.5">
+    // relative: the sr-only label below is position:absolute, and nothing would
+    // clip it before ProjectLayout's anchor - see the note on AVATAR_CLASS in
+    // TaskAssignees.tsx.
+    <span className="relative flex items-center gap-1.5">
       <span
         className={`h-2 w-2 shrink-0 rounded-full ${priority_style.dot}`}
         aria-hidden="true"

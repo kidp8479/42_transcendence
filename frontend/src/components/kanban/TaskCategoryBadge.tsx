@@ -6,7 +6,7 @@
 // recipe as Team Workload's category tags, colored by the category's palette
 // index. Task.categoryId is nullable in the schema, so a null category is a
 // real case and renders a muted "Uncategorized" pill.
-import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
+import { getCategoryColor } from "@/lib/categoryColorPalette";
 import type { TaskCategory } from "@/lib/taskCategories";
 
 interface TaskCategoryBadgeProps {
@@ -22,14 +22,17 @@ export function TaskCategoryBadge({ category }: TaskCategoryBadgeProps) {
     );
   }
 
-  // Same out-of-range fallback as getCategoryColorByName: index 0 when the
-  // color index is outside the palette's 0-7 range.
-  const category_color =
-    CATEGORY_COLOR_PALETTE[category.color] ?? CATEGORY_COLOR_PALETTE[0];
+  const category_color = getCategoryColor(category.color);
 
   return (
+    // A category name can run to 50 characters (maxTaskCategoryNameLength), so
+    // it gets the same treatment as the card title next to it: clipped with an
+    // ellipsis, full text on hover. min-w-0 is what lets it shrink at all - a
+    // flex item won't go below its content width without it, and truncate would
+    // have nothing to clip against.
     <span
-      className={`rounded-md px-2 py-0.5 text-[10px] ${category_color.badgeBg} ${category_color.text}`}
+      title={category.name}
+      className={`min-w-0 truncate rounded-md px-2 py-0.5 text-[10px] ${category_color.badgeBg} ${category_color.text}`}
     >
       {category.name}
     </span>

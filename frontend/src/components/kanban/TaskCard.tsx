@@ -35,7 +35,7 @@ import {
 } from "react-icons/hi";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
+import { getCategoryColor } from "@/lib/categoryColorPalette";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import type { Task } from "@/lib/tasks";
 import type { TaskCategory } from "@/lib/taskCategories";
@@ -106,8 +106,7 @@ export function TaskCard({
   // instead, matching the "Uncategorized" badge's own text-text-muted.
   const hover_border =
     category !== null
-      ? (CATEGORY_COLOR_PALETTE[category.color] ?? CATEGORY_COLOR_PALETTE[0])
-          .hoverBorder
+      ? getCategoryColor(category.color).hoverBorder
       : "hover:border-text-muted";
 
   // dnd-kit's transform/transition: inline is the standard wiring for
