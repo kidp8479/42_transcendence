@@ -1,9 +1,7 @@
-# Current opaque-session runtime contract. The approved staged target architecture is
-# documented in authentication-authorization.md; keep this file current until its
-# JWT/refresh cutover replaces these runtime semantics.
-schema_version: "1.0"
+# Current TR-70 HTTP bearer and rotating-refresh runtime contract.
+schema_version: "1.1"
 status: accepted
-last_updated: "2026-07-13"
+last_updated: "2026-08-02"
 title: Authentication and authorization architecture
 
 decisions:
@@ -17,18 +15,26 @@ decisions:
     reserved_provider_configuration:
       - github
   browser_session:
-    type: opaque-cookie
-    cookie_name: tr_session
-    http_only: true
-    secure_in_production: true
-    same_site: Lax
-    idle_timeout: 30m
-    absolute_lifetime: 168h
+    access_credential:
+      type: eddsa-jwt
+      storage: javascript-memory-only
+      transport: authorization-bearer
+      lifetime: 15m
+    refresh_credential:
+      type: rotating-opaque-token-family
+      cookie_name: tr_refresh
+      http_only: true
+      secure_in_production: true
+      same_site: Lax
+      idle_timeout: 168h
+      absolute_lifetime: 720h
+      previous_token_grace: 5s
+      grace_recovery: encrypted-successor-only
     rotate_on:
       - login
       - privilege-change
       - account-link
-  initial_session_store:
+  refresh_family_store:
     type: postgresql
     database: application-database
     schema: public
@@ -68,8 +74,10 @@ components:
   browser:
     responsibilities:
       - render authentication UI
-      - send the opaque session cookie automatically
-      - send the CSRF token in X-CSRF-Token on state-changing requests
+      - hold access JWTs in memory only
+      - send Authorization Bearer on application HTTP requests
+      - serialize refresh and one-time 401 retry
+      - send the CSRF token only on cookie-authenticated refresh and logout
     prohibited:
       - store access tokens in localStorage
       - receive provider refresh tokens
@@ -91,8 +99,9 @@ components:
       - fetch the authoritative 42 profile from /v2/me
       - execute the Google OIDC authorization-code flow with PKCE and nonce
       - normalize and link external identities
-      - create, rotate, introspect, and revoke browser sessions
-      - require active accounts for local login and session introspection
+      - create, rotate, introspect, and revoke refresh-token families
+      - mint strict EdDSA access JWTs through Vault Transit
+      - require active accounts for local login and access introspection
       - issue and validate CSRF tokens
       - hash local passwords and one-time tokens
       - emit authentication audit events
@@ -102,26 +111,23 @@ components:
       - expose provider tokens to the browser or NestJS
   backend:
     responsibilities:
-      - call the internal Go session-introspection endpoint from a global guard
+      - forward bearer JWTs to the internal Go introspection endpoint
       - populate req.user with the canonical application user ID
       - fail closed when authentication cannot be established
       - enforce global roles and project/resource authorization
-      - authenticate WebSocket handshakes through Go
+      - reject WebSocket admission until TR-74 one-time tickets are implemented
     prohibited:
       - validate provider tokens
       - read password hashes
       - trust browser-supplied user identifiers
   websocket:
     handshake:
-      session_source: tr_session-cookie
-      validation: call-the-same-go-introspection-endpoint
-      introspection_request_method: GET
-      csrf_required: false
-      origin_required: true
-      origin_enforcement: nestjs-validates-before-introspection
+      status: disabled-pending-TR-74
+      legacy_cookie_admission: removed
+      future_credential: one-time-websocket-ticket
     authorization:
       - verify-project-membership-before-joining-each-room
-      - disconnect-when-session-expires-or-revalidation-fails
+      - disconnect-when-ticket-or-session-revalidation-fails
     revalidation:
       initial: on-handshake
       future: periodic-and-on-sensitive-subscription
@@ -134,7 +140,8 @@ components:
     auth_records:
       - AuthIdentity
       - PasswordCredential
-      - AuthSession
+      - RefreshTokenFamily
+      - AuthRefreshToken
       - OAuthTransaction
       - AuthToken
       - AuthEvent
@@ -156,10 +163,10 @@ trust_boundaries:
       - strict-timeout
       - fail-closed
     operational_notes:
-      secret_env: AUTH_INTERNAL_TOKEN
+      secret_source: vault-kv-internal/backend-auth
       minimum_length: 32
       local_generation: cryptographically-random
-      rotation: recreate-backend-and-auth-with-the-same-new-value
+      rotation: update-vault-bootstrap-value-and-recreate-backend-and-auth
   - name: auth-to-idp
     controls:
       - fixed-provider-endpoints
@@ -175,11 +182,11 @@ provider_flows:
       - validate-password-policy
       - create-User-and-LOCAL-AuthIdentity-transactionally
       - hash-password-with-argon2id
-      - create-session
+      - create-refresh-family-and-access-jwt
     login:
       - rate-limit-by-ip-and-account
       - verify-argon2id-hash
-      - create-rotated-session
+      - create-refresh-family-and-access-jwt
   42:
     protocol: oauth2
     authorize_url: https://api.intra.42.fr/oauth/authorize
@@ -209,22 +216,21 @@ provider_flows:
     notes:
       - provider access and refresh tokens are discarded after profile retrieval in v1
 
-session_introspection:
+access_introspection:
   endpoint: POST /auth/internal/introspect
   caller: backend
   request:
     fields:
-      - sessionToken
-      - requestMethod
-      - origin
-      - csrfToken
-    csrf_rule: csrfToken-and-origin-are-required-unless-requestMethod-is-GET-HEAD-or-OPTIONS
-    websocket_exception: NestJS separately requires an allowed Origin on WebSocket GET upgrades
+      - accessToken
   active_response:
     fields:
       - active
-      - sessionId
-      - userId
+      - sub
+      - sid
+      - jti
+      - exp
+      - auth_time
+      - global_roles
       - authenticationMethod
       - assuranceLevel
       - authenticatedAt
@@ -235,22 +241,22 @@ session_introspection:
     allowed_future_ttl: 15s
     warning: caching delays revocation
   auth_endpoint_responses:
-    invalid_expired_or_revoked_session: 401
+    invalid_access_token: 401-with-code-TOKEN_INVALID
+    inactive_refresh_family: 401-with-code-TOKEN_INACTIVE
     invalid_internal_credentials: 401-with-code-INVALID_INTERNAL_CREDENTIALS
-    invalid_csrf_or_origin: 403
-    note: inactive sessions use a generic 401 and never return active=false
+    dependency_failure: 503-with-code-INTROSPECTION_UNAVAILABLE
   backend_public_mapping:
-    inactive_session: 401
-    invalid_csrf_or_origin: 403
+    invalid_or_inactive_access_token: 401
     auth_service_unavailable_or_invalid_internal_credentials: 503
 
 security_requirements:
-  - never-log-passwords-codes-session-tokens-or-provider-tokens
-  - store-only-sha256-hashes-of-session-and-one-time-tokens
+  - never-log-passwords-codes-access-refresh-or-provider-tokens
+  - store-only-sha256-hashes-of-refresh-and-one-time-tokens
+  - persist-only-authenticated-encryption-of-a-grace-successor
   - use-constant-time-secret-comparisons
   - revoke-all-sessions-after-password-reset
-  - require-active-account-for-local-login-and-session-introspection
-  - rotate-session-after-account-link-or-assurance-change
+  - require-active-account-for-local-login-and-access-introspection
+  - rotate-refresh-family-after-account-link-or-assurance-change
   - reject-unverified-email-for-automatic-linking
   - apply-object-level-authorization-to-every-project-resource
   - authenticate-and-authorize-websocket-room-subscriptions
@@ -266,7 +272,8 @@ implementation_phases:
       - per-ip-and-per-account-rate-limits
       - bounded-password-hash-concurrency
       - timing-resistant-unknown-account-login
-      - opaque-session-cookie
+      - eddsa-access-jwt
+      - rotating-refresh-family
       - internal-introspection
       - nestjs-global-auth-guard
   - id: 2

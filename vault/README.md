@@ -95,8 +95,8 @@ before it is recorded, correct the cause and rerun `make migrate`; if any part
 is recorded, recover through a reviewed corrective migration. TR-69 additionally
 preflights that every project has a member, assigns the oldest `ADMIN` (or
 oldest member) as its deterministic `OWNER`, and rejects a second owner through
-a partial unique index. Its persistence rollout deliberately leaves the legacy
-opaque `AuthSession` path untouched until the later JWT/refresh cutover.
+a partial unique index. TR-70 replaces the legacy `AuthSession` runtime with
+rotating refresh-token families and memory-only bearer access JWTs.
 
 Run `make check-vault-prisma` to verify dynamic credential rotation, runtime
 database-role permissions and denials, and the TR-69 upgrade fixture after
