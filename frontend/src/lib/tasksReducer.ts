@@ -1,7 +1,15 @@
 // Pure state transitions for the project's task list. No React in here on
-// purpose: the route drives it through useReducer, and the future WebSocket
-// handler will dispatch these same actions, so board interactions and remote
-// events stay one code path.
+// purpose: the route drives it through useReducer, and a realtime handler can
+// dispatch these same actions, so board interactions and remote events stay one
+// code path.
+//
+// Not wired to realtime yet: TasksService emits nothing (unlike discovery-blocks,
+// evaluation-checklist-items or project-members, which do). Whoever picks that up
+// dispatches task_created/updated/moved/deleted from the socket handler - but NOT
+// through useLiveItemSync, which takes a Dispatch<SetStateAction<T[]>> and can't
+// drive a reducer. Mind that task_created is not idempotent: the server echoes
+// back a create this client already applied from the POST response, so guard on
+// the id before dispatching.
 //
 // State is the flat Task[] returned by GET /tasks; columns are derived per
 // status with selectColumnTasks. Every transition touching a column reindexes
