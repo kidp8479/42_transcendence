@@ -96,11 +96,11 @@ export class ProjectMembersService {
       select: { name: true },
     });
     await this.notificationsService.create(
-      dto.userId,
+      user.id,
       `You were added to "${project.name}"`,
       `/${projectId}/project-settings`
     );
-    this.realtimeService.joinProjectRoom(dto.userId, projectId);
+    this.realtimeService.joinProjectRoom(user.id, projectId);
 
     return member;
   }
