@@ -14,6 +14,7 @@ import (
 	"github.com/42london/42_transcendence/auth/internal/password"
 	"github.com/42london/42_transcendence/auth/internal/server"
 	"github.com/42london/42_transcendence/auth/internal/store"
+	"github.com/42london/42_transcendence/auth/internal/token"
 	"github.com/42london/42_transcendence/auth/internal/vault"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -72,10 +73,20 @@ func main() {
 			pool.Close()
 		}
 	}()
+	if err := authStore.SetRefreshCipher(secrets.InternalToken); err != nil {
+		log.Fatalf("configure refresh token recovery: %v", err)
+	}
 
 	passwords := password.NewHasher()
-	cfg.InternalToken = secrets.InternalToken
-	handler, err := server.NewWithReadiness(cfg, authStore, passwords, runtime.Ready)
+	tokens, err := token.NewService(token.Config{
+		Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience, Leeway: cfg.JWTLeeway,
+	}, runtime, runtime)
+	if err != nil {
+		log.Fatalf("create access token service: %v", err)
+	}
+	handler, err := server.NewWithReadiness(
+		cfg, secrets.InternalToken, authStore, passwords, tokens, runtime.Ready,
+	)
 	if err != nil {
 		log.Fatalf("create auth server: %v", err)
 	}
