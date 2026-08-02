@@ -78,7 +78,13 @@ export class UsersService {
     await this.findById(userId);
 
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
-    const safeOriginalName = file.originalname.replace(/[\\/]/g, "_");
+    // Restricted to a charset that's always safe unescaped in a URL path
+    // segment. Anything wider (spaces, "%", "#", "?", ...) would land
+    // unencoded in avatarUrl below and either get silently truncated by the
+    // browser (#, ?) or, for a stray "%" followed by non-hex characters,
+    // make Express's decodeURIComponent throw on every subsequent GET of
+    // that exact URL - permanently breaking the avatar until re-upload.
+    const safeOriginalName = file.originalname.replace(/[^A-Za-z0-9._-]/g, "_");
     const key = `avatar-${userId}-${randomUUID()}-${safeOriginalName}`;
     // contentType is the sniffed mimetype (see detectImageMimetype), not
     // file.mimetype - what gets stored here is what downloadAvatar serves
