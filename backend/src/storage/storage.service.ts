@@ -11,6 +11,7 @@ import {
   CreateBucketCommand,
   PutObjectCommand,
   GetObjectCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import type { Readable } from "stream";
 
@@ -38,6 +39,23 @@ export class StorageService {
     });
   }
 
+  async getObject(bucket: string, key: string): Promise<StoredObject> {
+    try {
+      const response = await this.client.send(
+        new GetObjectCommand({ Bucket: bucket, Key: key })
+      );
+      return {
+        body: response.Body as Readable,
+        contentType: response.ContentType,
+      };
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException(`Object not found: ${key}`);
+      }
+      throw error;
+    }
+  }
+
   async uploadObject(
     bucket: string,
     key: string,
@@ -55,15 +73,11 @@ export class StorageService {
     );
   }
 
-  async getObject(bucket: string, key: string): Promise<StoredObject> {
+  async deleteObject(bucket: string, key: string): Promise<void> {
     try {
-      const response = await this.client.send(
-        new GetObjectCommand({ Bucket: bucket, Key: key })
+      await this.client.send(
+        new DeleteObjectCommand({ Bucket: bucket, Key: key })
       );
-      return {
-        body: response.Body as Readable,
-        contentType: response.ContentType,
-      };
     } catch (error) {
       if (this.isNotFoundError(error)) {
         throw new NotFoundException(`Object not found: ${key}`);

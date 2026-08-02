@@ -31,33 +31,45 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get("me")
-  findMe(@Req() request: AuthenticatedRequest) {
+  async findMe(@Req() request: AuthenticatedRequest) {
     return this.usersService.findById(request.user.id);
   }
 
   @ApiSecurity("csrf")
   @Patch("me")
-  update(@Body() dto: UpdateUserDto, @Req() request: AuthenticatedRequest) {
+  async updateMe(
+    @Body() dto: UpdateUserDto,
+    @Req() request: AuthenticatedRequest
+  ) {
     return this.usersService.update(request.user.id, dto);
   }
 
   @ApiSecurity("csrf")
   @Delete("me")
-  remove(@Req() request: AuthenticatedRequest) {
+  async removeMe(@Req() request: AuthenticatedRequest) {
     return this.usersService.remove(request.user.id);
   }
 
   // --- Avatar ---
+
+  // Public to any logged-in user, not just the owner: avatars are displayed
+  // all over the app (project members, calendar events...), so this has to
+  // be readable for whoever the avatar belongs to.
+  @Get("avatar/:key")
+  async downloadAvatar(@Param("key") key: string): Promise<StreamableFile> {
+    const { body, contentType } = await this.usersService.getAvatar(key);
+    return new StreamableFile(body, { type: contentType });
+  }
+
   // Multipart upload, so it can't go through UpdateUserDto/class-validator
   // like the rest of the profile - the file is checked by hand below, and
   // the resulting object key/URL is computed in the service.
-
   @ApiSecurity("csrf")
   @Post("me/avatar")
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: MAX_AVATAR_BYTES } })
   )
-  uploadAvatar(
+  async uploadAvatar(
     @UploadedFile() file: Express.Multer.File,
     @Req() request: AuthenticatedRequest
   ) {
@@ -72,6 +84,7 @@ export class UsersController {
     if (detectedMimetype === undefined) {
       throw new BadRequestException("Avatar must be a PNG, JPEG, GIF image");
     }
+
     return this.usersService.uploadAvatar(
       request.user.id,
       file,
@@ -79,12 +92,9 @@ export class UsersController {
     );
   }
 
-  // Public to any logged-in user, not just the owner: avatars are displayed
-  // all over the app (project members, calendar events...), so this has to
-  // be readable for whoever the avatar belongs to.
-  @Get("avatar/:key")
-  async downloadAvatar(@Param("key") key: string): Promise<StreamableFile> {
-    const { body, contentType } = await this.usersService.getAvatar(key);
-    return new StreamableFile(body, { type: contentType });
+  @ApiSecurity("csrf")
+  @Delete("avatar/:key")
+  async removeAvatar(@Param("key") key: string) {
+    return this.usersService.removeAvatar(key);
   }
 }

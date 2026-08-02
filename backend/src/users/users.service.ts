@@ -36,6 +36,12 @@ const SAFE_USER_SELECT = {
   updatedAt: true,
 } as const;
 
+function throwIfBadRequest(key: string) {
+  if (!AVATAR_KEY_PATTERN.test(key) || key.includes("..")) {
+    throw new BadRequestException("Invalid avatar key");
+  }
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -70,6 +76,14 @@ export class UsersService {
     });
   }
 
+  // --- Avatar ---
+
+  async getAvatar(key: string): Promise<StoredObject> {
+    throwIfBadRequest(key);
+    const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
+    return await this.storage.getObject(bucket, key);
+  }
+
   // Every upload gets a fresh key (userId + uuid) rather than overwriting a
   // fixed slot per user - simpler, but it means the previous avatar object
   // is left behind in storage instead of being deleted.
@@ -78,7 +92,7 @@ export class UsersService {
     file: Express.Multer.File,
     contentType: string
   ) {
-    await this.findById(userId);
+    const user = await this.findById(userId);
 
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
     // Restricted to a charset that's always safe unescaped in a URL path
@@ -98,18 +112,24 @@ export class UsersService {
 
     // avatarUrl is what the frontend actually reads/renders - stored as the
     // route it can hit directly, not the raw storage key.
-    return await this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data: { avatarUrl: `/api/users/avatar/${key}` },
       select: SAFE_USER_SELECT,
     });
+
+    const previousKey = user.avatarUrl?.split("/").pop();
+    if (previousKey) {
+      await this.storage.deleteObject(bucket, previousKey);
+    }
+
+    return updated;
   }
 
-  async getAvatar(key: string): Promise<StoredObject> {
-    if (!AVATAR_KEY_PATTERN.test(key) || key.includes("..")) {
-      throw new BadRequestException("Invalid avatar key");
-    }
-    const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
-    return await this.storage.getObject(bucket, key);
+  async removeAvatar(key: string): Promise<boolean> {
+    throwIfBadRequest(key);
+    const bucket = this.config.getOrThrow<string>("RUSHFS_BUCKET");
+    this.storage.deleteObject(bucket, key);
+    return true;
   }
 }
