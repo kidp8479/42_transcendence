@@ -51,11 +51,17 @@ export class RealtimeService {
   }
 
   assertFieldLockOwnerIfLocked(
+    projectId: string,
     key: string,
     userId: string,
     token: string | undefined
   ): void {
-    this.fieldLockManager.assertLeaseOwnerIfLocked(key, userId, token);
+    this.fieldLockManager.assertLeaseOwnerIfLocked(
+      projectId,
+      key,
+      userId,
+      token
+    );
   }
 
   // lets each owning module teach the gateway how to resolve one of its own
@@ -70,7 +76,7 @@ export class RealtimeService {
 
   // call when a lockable resource is deleted, so a lock nobody will ever
   // release (the resource is gone, findById would now 404) doesn't linger
-  // in the gateway's Map until its holder happens to disconnect
+  // in the lock manager until its holder happens to disconnect
   releaseFieldLockForResource(key: string): ReleasedFieldLock | undefined {
     return this.fieldLockManager.releaseResource(key);
   }

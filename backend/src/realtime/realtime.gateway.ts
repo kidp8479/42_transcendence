@@ -13,6 +13,7 @@ import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   AcquireFieldLockResult,
+  FieldLock,
   FieldLockManager,
   ReleasedFieldLock,
 } from "./field-lock-manager";
@@ -25,20 +26,6 @@ import {
 // knowing about EvaluationChecklistItem, DiscoveryBlock, or any future
 // lockable model (Kanban cards, per useFieldLock's own comment).
 type KeyPrefixValidator = (id: string) => Promise<string | undefined>;
-
-interface FieldLock {
-  userId: string;
-  username: string;
-  avatarUrl: string | null;
-  // so handleDisconnect knows which room to broadcast field:unlocked to
-  projectId: string;
-  // scopes handleDisconnect's cleanup to the socket that actually held the
-  // lock - without this, the same user's other open tab disconnecting (a
-  // network blip, not the tab that's editing) would release this lock too,
-  // since it only checked userId
-  socketId: string;
-  expiresAt: number;
-}
 
 @WebSocketGateway({ path: "/ws" })
 export class RealtimeGateway
@@ -98,15 +85,6 @@ export class RealtimeGateway
   // who's currently editing key, if anyone
   private getLock(key: string): FieldLock | undefined {
     return this.fieldLockManager.get(key);
-  }
-
-  // used by RealtimeService.isLockedByOther, so a REST service (e.g.
-  // EvaluationChecklistItemsService.update) can enforce the same lock a
-  // client's UI already shows as read-only - the field-lock hook is
-  // otherwise only a UI hint, never checked before this on the write path.
-  isLockedByOtherUser(key: string, userId: string): boolean {
-    const lock = this.getLock(key);
-    return lock !== undefined && lock.userId !== userId;
   }
 
   // TEMPORARY auth: validates the socket using the same session cookie +
@@ -456,33 +434,6 @@ export class RealtimeGateway
       return false;
     }
     return (await validator(id)) === projectId;
-  }
-
-  // used when a lockable resource itself is deleted (e.g.
-  // EvaluationChecklistItemsService.remove()) - the holder's own socket
-  // never gets a field:unlock for a resource that no longer exists, so
-  // without this the Map entry would sit there until they disconnect.
-  forceReleaseLock(key: string): void {
-    const released = this.fieldLockManager.releaseResource(key);
-    if (released !== undefined) {
-      this.emitFieldUnlock(released);
-    }
-  }
-
-  // used when a member is removed from a project (ProjectMembersService.
-  // removeMember) - removal only evicts their sockets from the project's
-  // room, it never touched this Map, so without this a removed member who
-  // keeps their tab open would go on holding whatever locks they had,
-  // indefinitely blocking every remaining member from editing those fields
-  // (REST writes still enforce locks by key, independent of room
-  // membership).
-  forceReleaseLocksForUserInProject(userId: string, projectId: string): void {
-    for (const released of this.fieldLockManager.releaseUserInProject(
-      userId,
-      projectId
-    )) {
-      this.emitFieldUnlock(released);
-    }
   }
 
   emitFieldUnlock(released: ReleasedFieldLock): void {

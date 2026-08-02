@@ -233,12 +233,13 @@ export class DiscoveryBlocksService {
         projectId,
         `discovery-block:${id}`,
         async () => {
+          const existingBlock = await this.findById(projectId, id, userId);
           this.realtimeService.assertFieldLockOwnerIfLocked(
+            projectId,
             `discovery-block:${id}`,
             userId,
             fieldLockToken
           );
-          const existingBlock = await this.findById(projectId, id, userId);
           let deletedBlock = existingBlock;
           try {
             deletedBlock = await this.prisma.discoveryBlock.delete({

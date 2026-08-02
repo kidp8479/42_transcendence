@@ -60,6 +60,24 @@ test("fences a protected write with the current lease token", async () => {
   manager.onModuleDestroy();
 });
 
+test("rejects a lease presented under a different project scope", () => {
+  const manager = new FieldLockManager();
+  const acquired = acquireLock(manager);
+  assert.ok(acquired.token);
+
+  assert.throws(
+    () =>
+      manager.assertLeaseOwnerIfLocked(
+        "project-b",
+        "checklist-item:item-a",
+        "user-a",
+        acquired.token
+      ),
+    FieldLockLeaseError
+  );
+  manager.onModuleDestroy();
+});
+
 test("reclaims an expired lease before a different socket acquires it", () => {
   const manager = new FieldLockManager();
   const realNow = Date.now;
@@ -110,5 +128,84 @@ test("serializes a protected write before a competing release", async () => {
 
   assert.equal(completed, true);
   assert.equal(manager.get("checklist-item:item-a"), undefined);
+  manager.onModuleDestroy();
+});
+
+test("allows unrelated resources in the same project to proceed concurrently", async () => {
+  const manager = new FieldLockManager();
+  let releaseFirst: () => void;
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let firstStarted: () => void;
+  const firstReady = new Promise<void>((resolve) => {
+    firstStarted = resolve;
+  });
+
+  const first = manager.withProjectResource(
+    "project-a",
+    "checklist-item:item-a",
+    async () => {
+      firstStarted!();
+      await firstGate;
+    }
+  );
+  await firstReady;
+
+  let secondCompleted = false;
+  await manager.withProjectResource(
+    "project-a",
+    "checklist-item:item-b",
+    async () => {
+      secondCompleted = true;
+    }
+  );
+
+  assert.equal(secondCompleted, true);
+  releaseFirst!();
+  await first;
+  manager.onModuleDestroy();
+});
+
+test("gives project-wide cleanup priority over later resource operations", async () => {
+  const manager = new FieldLockManager();
+  const order: string[] = [];
+  let releaseFirst: () => void;
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let firstStarted: () => void;
+  const firstReady = new Promise<void>((resolve) => {
+    firstStarted = resolve;
+  });
+
+  const first = manager.withProjectResource(
+    "project-a",
+    "checklist-item:item-a",
+    async () => {
+      order.push("first");
+      firstStarted!();
+      await firstGate;
+    }
+  );
+  await firstReady;
+
+  const cleanup = manager.withProject("project-a", async () => {
+    order.push("cleanup");
+  });
+  const second = manager.withProjectResource(
+    "project-a",
+    "checklist-item:item-b",
+    async () => {
+      order.push("second");
+    }
+  );
+
+  await Promise.resolve();
+  assert.deepEqual(order, ["first"]);
+  releaseFirst!();
+  await Promise.all([first, cleanup, second]);
+
+  assert.deepEqual(order, ["first", "cleanup", "second"]);
   manager.onModuleDestroy();
 });
