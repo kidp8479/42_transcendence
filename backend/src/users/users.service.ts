@@ -56,9 +56,6 @@ export class UsersService {
   }
 
   async update(userId: string, dto: UpdateUserDto) {
-    // will throw if user doesn't exist
-    await this.findById(userId);
-
     return await this.prisma.user.update({
       where: { id: userId },
       data: { ...dto },
@@ -67,8 +64,6 @@ export class UsersService {
   }
 
   async remove(userId: string) {
-    await this.findById(userId);
-
     return await this.prisma.user.delete({
       where: { id: userId },
       select: SAFE_USER_SELECT,
