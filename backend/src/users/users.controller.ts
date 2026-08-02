@@ -21,7 +21,6 @@ import { ApiSecurity } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { detectImageMimetype } from "../common/detect-image-type";
 import { UsersService } from "./users.service";
-// import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 
 const MAX_AVATAR_BYTES = 1 * 1024 * 1024;

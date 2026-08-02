@@ -7,7 +7,6 @@ import { randomUUID } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService, StoredObject } from "../storage/storage.service";
-// import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 
 // Matches the exact shape uploadAvatar generates below

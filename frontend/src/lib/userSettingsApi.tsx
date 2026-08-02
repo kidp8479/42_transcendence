@@ -76,13 +76,5 @@ export async function uploadAvatar(file: File): Promise<User> {
 
 // DELETE /users/me
 export async function deleteMe(): Promise<User> {
-  return apiClient<unknown>(`/users/me`, { method: "DELETE" }).then(
-    (payload) => {
-      const parsed = parseUser(payload);
-      if (parsed === null) {
-        throw new Error("User response is invalid");
-      }
-      return parsed;
-    }
-  );
+  return apiClient<unknown>(`/users/me`, { method: "DELETE" }).then(parseUser);
 }

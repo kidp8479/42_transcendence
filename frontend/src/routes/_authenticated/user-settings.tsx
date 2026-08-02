@@ -54,10 +54,10 @@ export const Route = createFileRoute("/_authenticated/user-settings")({
   component: UserSettingsPage,
 });
 
-const rowClass = "flex items-center justify-between gap-6 pb-4";
+const rowClass =
+  "flex flex-col items-start gap-2 pb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6";
 
-const rowClassBorder =
-  "flex items-center justify-between gap-6 pb-4 border-b border-surface-border";
+const rowClassBorder = `${rowClass} border-b border-surface-border`;
 
 const rowUploadButtonClass = `
   bg-surface-overlay
@@ -324,14 +324,22 @@ function UserSettingsPage() {
                 <h3 className="text-lg font-semibold text-text-primary">
                   Last chance
                 </h3>
-                <p className="text-sm text-text-secondary">
+                <p
+                  id="delete-confirm-phrase"
+                  className="text-sm text-text-secondary"
+                >
                   Type{" "}
                   <span className="font-semibold text-text-primary">
                     &quot;{DELETE_CONFIRMATION_PHRASE}&quot;
                   </span>{" "}
                   below to confirm.
                 </p>
+                <Label htmlFor="delete-confirm-input" className="sr-only">
+                  Confirmation phrase
+                </Label>
                 <TextInput
+                  id="delete-confirm-input"
+                  aria-describedby="delete-confirm-phrase"
                   className="w-full"
                   theme={darkSurfaceTextInputTheme}
                   value={deleteConfirmationText}
@@ -388,7 +396,7 @@ function UserSettingsPage() {
             >
               Profile
             </h2>
-            <section className="flex items-center gap-4 pb-4 border-b border-surface-border">
+            <div className="flex items-center gap-4 pb-4 border-b border-surface-border">
               <Avatar
                 size="lg"
                 img={user.avatarUrl || undefined}
@@ -396,12 +404,11 @@ function UserSettingsPage() {
                 rounded
               />
 
-              <section className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2">
                 <Label className="font-semibold text-text-primary">
                   {user.username}
                 </Label>
                 <Button
-                  aria-label="upload-avatar-button"
                   size="sm"
                   className={rowUploadButtonClass}
                   disabled={uploadingAvatar}
@@ -412,15 +419,19 @@ function UserSettingsPage() {
                 >
                   {uploadingAvatar ? "Uploading..." : "Upload photo"}
                 </Button>
-              </section>
-            </section>
+              </div>
+            </div>
 
-            <section className={rowClass}>
-              <Label className="font-semibold text-text-primary shrink-0">
+            <div className={rowClass}>
+              <Label
+                htmlFor="display-name-input"
+                className="font-semibold text-text-primary shrink-0"
+              >
                 Display name
               </Label>
               <TextInput
-                className="w-80"
+                id="display-name-input"
+                className="w-full sm:w-80"
                 theme={darkSurfaceTextInputTheme}
                 defaultValue={user.username}
                 onBlur={(e) => {
@@ -432,32 +443,42 @@ function UserSettingsPage() {
                 }}
                 maxLength={DISPLAY_NAME_MAX_LENGTH}
               />
-            </section>
+            </div>
 
-            <section className={rowClass}>
+            <div className={rowClass}>
               <div>
-                <Label className="font-semibold text-text-primary">Email</Label>
+                <Label
+                  htmlFor="email-input"
+                  className="font-semibold text-text-primary"
+                >
+                  Email
+                </Label>
                 <p className="text-xs text-text-secondary">
                   Used for account recovery
                 </p>
               </div>
               <TextInput
-                className="w-80"
+                id="email-input"
+                className="w-full sm:w-80"
                 theme={darkSurfaceTextInputTheme}
                 type="email"
                 value={user.email}
                 disabled
               />
-            </section>
+            </div>
 
-            <section className={rowClassBorder}>
+            <div className={rowClassBorder}>
               <div>
-                <Label className="font-semibold text-text-primary">
+                <Label
+                  htmlFor="campus-input"
+                  className="font-semibold text-text-primary"
+                >
                   Campus
                 </Label>
               </div>
               <TextInput
-                className="w-80"
+                id="campus-input"
+                className="w-full sm:w-80"
                 theme={darkSurfaceTextInputTheme}
                 type="text"
                 value={user.campus ?? ""}
@@ -466,7 +487,7 @@ function UserSettingsPage() {
                 //   setDisplayedCampus(e.currentTarget.value);
                 // }}
               />
-            </section>
+            </div>
 
             <div>
               <Button
@@ -537,7 +558,7 @@ function UserSettingsPage() {
               Danger zone
             </h2>
 
-            <section className={rowClass}>
+            <div className={rowClass}>
               <div>
                 <Label className="font-semibold text-control-error">
                   Delete account
@@ -558,7 +579,7 @@ function UserSettingsPage() {
               >
                 Delete
               </Button>
-            </section>
+            </div>
           </section>
         </div>
       </div>
