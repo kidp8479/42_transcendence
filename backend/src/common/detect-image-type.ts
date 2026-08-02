@@ -22,10 +22,7 @@ const SIGNATURES: { mimetype: string; matches: (buf: Buffer) => boolean }[] = [
   {
     mimetype: "image/jpeg",
     matches: (buf) =>
-      buf.length >= 3 &&
-      buf[0] === 0xff &&
-      buf[1] === 0xd8 &&
-      buf[2] === 0xff,
+      buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff,
   },
   {
     mimetype: "image/gif",
@@ -45,8 +42,8 @@ const SIGNATURES: { mimetype: string; matches: (buf: Buffer) => boolean }[] = [
       buf[0] === 0x3c &&
       buf[1] === 0x73 &&
       buf[2] === 0x76 &&
-      buf[3] === 0x67
-  }
+      buf[3] === 0x67,
+  },
 ];
 
 export function detectImageMimetype(buffer: Buffer): string | undefined {
