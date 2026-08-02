@@ -9,10 +9,12 @@
 // default list) - revisit if it becomes a real problem.
 //
 // Every class below is written out in full, character for character, even the
-// "/15" and "/30" opacity variants. Tailwind only generates CSS for a class it
-// can see written whole in the source - a class rebuilt at runtime by joining
-// strings (ex: someClass + "/15") never appears in full in the source, so
-// Tailwind silently skips it and the class ends up doing nothing.
+// "/15" and "/30" opacity variants AND the `hover:` prefix. Tailwind only
+// generates CSS for a class it can see written whole in the source - a class
+// rebuilt at runtime by joining strings (ex: someClass + "/15", or
+// `hover:${entry.border}`) never appears in full in the source, so Tailwind
+// silently skips it and the class ends up doing nothing. That is why
+// hoverBorder exists as its own key rather than being derived from `border`.
 export const CATEGORY_COLOR_PALETTE = [
   {
     bg: "bg-category-0",
@@ -22,6 +24,7 @@ export const CATEGORY_COLOR_PALETTE = [
     badgeBg: "bg-category-0/15",
     badgeBorder: "border-category-0/30",
     subtleBg: "bg-category-0/6",
+    hoverBorder: "hover:border-category-0/40",
   },
   {
     // index 1 reuses the brand color, matches the Figma prototype
@@ -32,6 +35,7 @@ export const CATEGORY_COLOR_PALETTE = [
     badgeBg: "bg-brand-500/15",
     badgeBorder: "border-brand-500/30",
     subtleBg: "bg-brand-500/6",
+    hoverBorder: "hover:border-brand-500/40",
   },
   {
     bg: "bg-category-2",
@@ -41,6 +45,7 @@ export const CATEGORY_COLOR_PALETTE = [
     badgeBg: "bg-category-2/15",
     badgeBorder: "border-category-2/30",
     subtleBg: "bg-category-2/6",
+    hoverBorder: "hover:border-category-2/40",
   },
   {
     bg: "bg-category-3",
@@ -50,6 +55,7 @@ export const CATEGORY_COLOR_PALETTE = [
     badgeBg: "bg-category-3/15",
     badgeBorder: "border-category-3/30",
     subtleBg: "bg-category-3/6",
+    hoverBorder: "hover:border-category-3/40",
   },
   {
     bg: "bg-category-4",
@@ -59,6 +65,7 @@ export const CATEGORY_COLOR_PALETTE = [
     badgeBg: "bg-category-4/15",
     badgeBorder: "border-category-4/30",
     subtleBg: "bg-category-4/6",
+    hoverBorder: "hover:border-category-4/40",
   },
   {
     bg: "bg-category-5",
@@ -68,6 +75,7 @@ export const CATEGORY_COLOR_PALETTE = [
     badgeBg: "bg-category-5/15",
     badgeBorder: "border-category-5/30",
     subtleBg: "bg-category-5/6",
+    hoverBorder: "hover:border-category-5/40",
   },
   {
     bg: "bg-category-6",
@@ -77,6 +85,7 @@ export const CATEGORY_COLOR_PALETTE = [
     badgeBg: "bg-category-6/15",
     badgeBorder: "border-category-6/30",
     subtleBg: "bg-category-6/6",
+    hoverBorder: "hover:border-category-6/40",
   },
   {
     bg: "bg-category-7",
@@ -86,6 +95,7 @@ export const CATEGORY_COLOR_PALETTE = [
     badgeBg: "bg-category-7/15",
     badgeBorder: "border-category-7/30",
     subtleBg: "bg-category-7/6",
+    hoverBorder: "hover:border-category-7/40",
   },
 ];
 

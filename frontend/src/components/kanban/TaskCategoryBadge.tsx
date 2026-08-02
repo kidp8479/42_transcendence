@@ -29,7 +29,7 @@ export function TaskCategoryBadge({ category }: TaskCategoryBadgeProps) {
 
   return (
     <span
-      className={`rounded-md border px-2 py-0.5 text-xs ${category_color.badgeBg} ${category_color.badgeBorder} ${category_color.text}`}
+      className={`rounded-md px-2 py-0.5 text-[10px] ${category_color.badgeBg} ${category_color.text}`}
     >
       {category.name}
     </span>

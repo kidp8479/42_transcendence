@@ -14,7 +14,6 @@ interface TaskPriorityStyle {
   label: string;
   // small colored dot (h-2 w-2 rounded-full pattern, see SideBarCmp)
   dot: string;
-  text: string;
   // drawer segmented control, selected state
   segmentActive: string;
 }
@@ -28,21 +27,18 @@ export const PRIORITY_STYLES: Record<TaskPriority, TaskPriorityStyle> = {
   HIGH: {
     label: "High",
     dot: "bg-priority-high",
-    text: "text-priority-high",
     segmentActive:
       "border-priority-high/40 bg-priority-high/15 text-priority-high",
   },
   MEDIUM: {
     label: "Medium",
     dot: "bg-priority-medium",
-    text: "text-priority-medium",
     segmentActive:
       "border-priority-medium/40 bg-priority-medium/15 text-priority-medium",
   },
   LOW: {
     label: "Low",
     dot: "bg-priority-low",
-    text: "text-priority-low",
     segmentActive:
       "border-priority-low/40 bg-priority-low/15 text-priority-low",
   },

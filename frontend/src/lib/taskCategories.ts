@@ -1,12 +1,11 @@
 // Task categories API helpers for the Kanban/List tabs.
 //
-// TODO: not wired yet - the Kanban tab runs on in-memory mock state (see
-// routes/_authenticated/$projectId/kanban.tsx). The backend controller exists
-// but has no route decorators and TaskCategoriesService is empty. Switch the
-// route to this function once GET /api/projects/:projectId/task-categories is
-// implemented.
+// Every project is seeded with the 8 defaults at creation time
+// (backend/src/task-categories/default-task-categories.ts), so this list is
+// never empty - which matters, because the drawer requires a category to
+// create a task.
 //
-// Read-only for now: the controller documents full CRUD, but the Kanban only
+// Read-only for now: the backend only exposes GET, and the Kanban only
 // ever lists categories. create/update/delete get added alongside the UI that
 // needs them, rather than shipping three unused exports.
 import { apiClient } from "@/lib/apiClient";

@@ -1,11 +1,11 @@
 // See DefenseReadiness.tsx (components/summary) for an explanation of the
 // pattern every component here follows.
 //
-// One status column of the kanban board: tinted shell (the status color, see
-// lib/taskStatusStyles.ts), header with icon + title + count + add button,
-// the sortable card list, and a bottom "Add task" button. Receives its tasks
-// already filtered and rank-sorted (selectColumnTasks in the route) - this
-// component does no data shaping of its own.
+// One status column of the kanban board: a neutral outline, a header whose icon
+// and count carry the status colour (see lib/taskStatusStyles.ts), the sortable
+// card list, and a bottom "Add task" button wearing that same colour outright.
+// Receives its tasks already filtered and rank-sorted (selectColumnTasks in the
+// route) - this component does no data shaping of its own.
 //
 // The column is a bounded flex box: the header and the "Add task" footer stay
 // put while the card list scrolls between them. That's the min-h-0 + flex-1 +
@@ -53,21 +53,25 @@ export function KanbanColumn({
   return (
     <section
       aria-labelledby={heading_id}
-      className={`flex min-h-0 min-w-72 flex-1 flex-col gap-3 rounded-lg border p-3 ${status_style.columnContainer}`}
+      className="flex min-h-0 min-w-72 flex-1 flex-col gap-3 rounded-lg border border-surface-border p-3"
     >
-      <div className="flex shrink-0 items-center gap-2">
+      {/* Every edge on the board is this same neutral grey. The status shows on
+          the icon and the count instead; the title stays neutral so the header
+          does not become one block of colour. pb-3 matches the section's gap-3,
+          so the cards start as far below the rule as the title sits above it. */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-surface-border pb-3">
         <status_style.icon
-          className={status_style.headerText}
+          className={status_style.headerIcon}
           aria-hidden="true"
         />
         <h2
           id={heading_id}
-          className={`font-mono text-sm font-semibold ${status_style.headerText}`}
+          className="font-mono text-sm font-semibold text-text-primary"
         >
           {status_style.label}
         </h2>
         <span
-          className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${status_style.countBadge}`}
+          className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${status_style.statusPill}`}
         >
           {tasks.length}
         </span>
@@ -75,7 +79,9 @@ export function KanbanColumn({
           type="button"
           onClick={onAddTask}
           aria-label={`Add task in ${status_style.label}`}
-          className={`ml-auto rounded-md p-1 text-text-secondary transition-colors focus:ring-2 focus:ring-brand-500/40 focus:outline-none ${status_style.addTaskHover}`}
+          // No hover fill on purpose: the glyph alone answers the pointer, by
+          // taking the column's colour.
+          className={`ml-auto rounded-md p-1 text-text-secondary transition-colors focus:ring-2 focus:ring-brand-500/40 focus:outline-none ${status_style.headerAddHover}`}
         >
           <HiPlus aria-hidden="true" />
         </button>
@@ -114,7 +120,7 @@ export function KanbanColumn({
 
       <AddTaskButton
         onClick={onAddTask}
-        hoverClassName={status_style.addTaskHover}
+        statusClassName={status_style.addTask}
       />
     </section>
   );

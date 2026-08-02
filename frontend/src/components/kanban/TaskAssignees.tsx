@@ -1,10 +1,11 @@
 // See DefenseReadiness.tsx (components/summary) for an explanation of the
 // pattern every component here follows.
 //
-// Overlapping row of assignee avatars for a kanban card (small) or the drawer
-// (medium). Same initials-avatar recipe as Team Workload; when a user has an
-// avatarUrl the image is shown instead (User.avatarUrl in schema.prisma:
-// "if null, the frontend generates an avatar from username initials").
+// Overlapping row of assignee avatars, read-only, shown on a kanban card. The
+// drawer needs the same avatars as toggle buttons, so it builds its own from
+// assigneeColorIndex below rather than reusing this. Same initials recipe as
+// Team Workload; a user with an avatarUrl gets the image instead (User.avatarUrl
+// in schema.prisma: "if null, the frontend generates an avatar from initials").
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import type { TaskAssigneeUser } from "@/lib/tasks";
 
@@ -12,16 +13,12 @@ interface TaskAssigneesProps {
   assignees: TaskAssigneeUser[];
   // avatars shown before collapsing the rest into a "+N" chip
   maxVisible?: number;
-  size?: "sm" | "md";
 }
 
-// Both sizes written out whole (no string joining - see the Tailwind note in
 // lib/categoryColorPalette.ts). The ring makes overlapped avatars readable
 // against each other.
-const AVATAR_SIZE_CLASSES = {
-  sm: "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-surface-raised",
-  md: "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ring-2 ring-surface-raised",
-};
+const AVATAR_CLASS =
+  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-surface-raised";
 
 // Deterministic palette index from the username, so a member keeps the same
 // avatar color everywhere on the board. Mock-only shortcut: User has no color
@@ -38,7 +35,6 @@ export function assigneeColorIndex(username: string): number {
 export function TaskAssignees({
   assignees,
   maxVisible = 3,
-  size = "sm",
 }: TaskAssigneesProps) {
   if (assignees.length === 0) {
     return null;
@@ -46,10 +42,9 @@ export function TaskAssignees({
 
   const visible_assignees = assignees.slice(0, maxVisible);
   const hidden_count = assignees.length - visible_assignees.length;
-  const avatar_classes = AVATAR_SIZE_CLASSES[size];
 
   return (
-    <div className="flex -space-x-2">
+    <div className="flex -space-x-1.5">
       {visible_assignees.map((assignee) =>
         assignee.avatarUrl !== null ? (
           <img
@@ -57,13 +52,13 @@ export function TaskAssignees({
             src={assignee.avatarUrl}
             alt={assignee.username}
             title={assignee.username}
-            className={`${avatar_classes} object-cover`}
+            className={`${AVATAR_CLASS} object-cover`}
           />
         ) : (
           <span
             key={assignee.id}
             title={assignee.username}
-            className={`${avatar_classes} ${CATEGORY_COLOR_PALETTE[assigneeColorIndex(assignee.username)].bg}`}
+            className={`${AVATAR_CLASS} ${CATEGORY_COLOR_PALETTE[assigneeColorIndex(assignee.username)].bg}`}
           >
             {assignee.username.slice(0, 2).toUpperCase()}
             <span className="sr-only">{assignee.username}</span>
@@ -72,7 +67,7 @@ export function TaskAssignees({
       )}
       {hidden_count > 0 && (
         <span
-          className={`${avatar_classes} bg-surface-overlay text-text-secondary`}
+          className={`${AVATAR_CLASS} bg-surface-overlay text-text-secondary`}
           title={assignees
             .slice(maxVisible)
             .map((assignee) => assignee.username)

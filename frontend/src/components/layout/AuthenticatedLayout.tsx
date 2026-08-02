@@ -7,11 +7,14 @@ export function AuthenticatedLayout() {
   return (
     <div className="flex min-h-0 flex-1">
       <SideBarCmp />
-      {/* relative: positions drawers (ex: CalendarEventDrawer) to this area,
-      so an expanded drawer stops at the sidebar's edge instead of covering it.
+      {/* The scroller for the pages that own no layout of their own (projects,
+      dashboard, search). Kept a plain block, not a flex column: those pages
+      return fragments of sibling divs that would silently become flex items.
+      Project tabs bring their own bounded scroller (ProjectLayout).
       overflow-x-hidden: a closed drawer still sits translated off-screen to
       the right, which without clipping stretched the page's scrollable area
-      and caused an unwanted horizontal scrollbar. */}
+      and caused an unwanted horizontal scrollbar. It also makes overflow-y
+      compute to auto, which is what lets this scroll at all. */}
       <main className="relative min-w-0 flex-1 min-h-0 overflow-x-hidden">
         <Outlet />
       </main>

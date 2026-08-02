@@ -1,37 +1,17 @@
-// Tasks API helpers for the Kanban/List tabs.
+// Tasks API helpers for the Kanban/List tabs: network + parsing kept out of the
+// routes, mirroring the backend DTOs (backend/src/tasks/dto/*.ts).
 //
-// TODO: not wired yet - the Kanban tab runs on in-memory mock state (see
-// routes/_authenticated/$projectId/kanban.tsx). The backend controller exists
-// but has no route decorators and TasksService is an empty class. Switch the
-// route to these functions once GET/POST/PATCH/DELETE
-// /api/projects/:projectId/tasks are implemented.
-//
-// Why this file exists:
-// - keeps network + parsing logic out of route files/components
-// - gives a single typed contract mirroring the backend DTOs
-//   (backend/src/tasks/dto/create-task.dto.ts, update-task.dto.ts)
-//
-// apiClient handles the /api prefix, the session cookie, the X-CSRF-Token
-// header on mutations, and turns any non-OK response into an ApiError that
-// carries `status` - so there's no bespoke Unauthorized error class here:
-// callers that care check `error instanceof ApiError && error.status === 401`.
-//
-// Known contract gaps to resolve backend-side before wiring:
-// 1. UpdateTaskDto has no assigneeIds field, and the global ValidationPipe
-//    runs with whitelist + forbidNonWhitelisted - a PATCH sending assigneeIds
-//    is rejected with 400. Until the DTO gains the field, editing a task's
-//    members cannot persist.
-// 2. CreateTaskDto documents rank as the position "in its category column",
-//    but the Kanban board groups by STATUS. The frontend treats rank as the
-//    0-based position within the task's status column - to confirm backend-side.
+// `rank` is the 0-based position inside the task's STATUS column. The server
+// owns that invariant - it clamps the rank you send to the column's length and
+// shifts the siblings of both columns - so a drag is one PATCH { status, rank }
+// and a concurrent reorder comes back as 409: reload, don't retry.
 import { apiClient } from "@/lib/apiClient";
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 
-// User info the board needs for an assignee. The GET response shape is TBD
-// until TasksService exists - the board needs assignees flattened to this
-// (TaskAssignee join rows alone carry no username to display).
+// An assignee as the board displays it. TasksService.mapTask flattens the
+// TaskAssignee join rows down to this - the rows themselves carry no username.
 export interface TaskAssigneeUser {
   id: string;
   username: string;
@@ -71,8 +51,7 @@ export interface CreateTaskBody {
   assigneeIds?: string[];
 }
 
-// Mirrors UpdateTaskDto (every field optional). assigneeIds is intentionally
-// absent - see contract gap 1 in the header comment.
+// Mirrors UpdateTaskDto (every field optional).
 export interface UpdateTaskBody {
   title?: string;
   categoryId?: string;
@@ -84,6 +63,9 @@ export interface UpdateTaskBody {
   description?: string;
   notes?: string;
   onCalendar?: boolean;
+  // Replaces the whole assignee set, it isn't a delta. UpdateTaskDto inherits
+  // it from CreateTaskDto via PartialType, so a PATCH carrying it is accepted.
+  assigneeIds?: string[];
 }
 
 export async function listTasks(projectId: string): Promise<Task[]> {
@@ -152,9 +134,9 @@ export async function updateTask(
   return parsed;
 }
 
-// Returns nothing: the controller's comments promise no body, and the reducer
-// only needs the id it already has. If Tasks ends up returning the deleted row
-// like Discovery does, widening this to Promise<Task> is a one-line change.
+// The backend does return the deleted row (200, not 204, same as Discovery),
+// but the reducer only needs the id it already has - so it is dropped here
+// rather than parsed for nothing.
 export async function deleteTask(
   projectId: string,
   taskId: string
@@ -210,11 +192,11 @@ function parseTask(value: unknown): Task | null {
     return null;
   }
 
-  // assignees is tolerated missing (treated as []) since the GET include shape
-  // is TBD until TasksService exists - see the header comment.
-  const parsed_assignees =
-    assignees === undefined ? [] : parseAssignees(assignees);
-  if (parsed_assignees === null) {
+  // Required, not tolerated missing: every read path on the backend applies the
+  // same `taskInclude` (delete included), so an absent array means the contract
+  // broke and the caller should hear about it.
+  const parsedAssignees = parseAssignees(assignees);
+  if (parsedAssignees === null) {
     return null;
   }
 
@@ -231,24 +213,20 @@ function parseTask(value: unknown): Task | null {
     description: description ?? null,
     notes: notes ?? null,
     onCalendar,
-    assignees: parsed_assignees,
+    assignees: parsedAssignees,
   };
 }
 
+// Flattened users only - TasksService.mapTask never sends the raw join rows.
 function parseAssignees(value: unknown): TaskAssigneeUser[] | null {
   if (!Array.isArray(value)) {
     return null;
   }
 
   const parsed: TaskAssigneeUser[] = [];
-  for (const item of value) {
-    if (!isRecord(item)) {
-      return null;
-    }
-    // Accept either a flattened user or a TaskAssignee join row with an
-    // included user relation ({ user: { id, username, avatarUrl } }).
-    const user = isRecord(item.user) ? item.user : item;
+  for (const user of value) {
     if (
+      !isRecord(user) ||
       typeof user.id !== "string" ||
       typeof user.username !== "string" ||
       !isNullableString(user.avatarUrl)
