@@ -179,15 +179,10 @@ export class TasksService {
       (dto.rank !== undefined && dto.rank !== existingTask.rank);
 
     if (isMoving) {
-      await this.moveTask(
-        id,
-        projectId,
-        existingTask.status,
-        existingTask.rank,
-        nextStatus,
-        dto.rank ?? existingTask.rank,
-        taskFields
-      );
+      // dto.rank is forwarded as-is, undefined included: a status change with no
+      // rank means "append to the new column", which moveTask resolves against
+      // the live column length inside its transaction.
+      await this.moveTask(id, projectId, nextStatus, dto.rank, taskFields);
     } else {
       await this.prisma.task.update({
         where: { id: id },
@@ -203,7 +198,8 @@ export class TasksService {
   }
 
   async remove(id: string, projectId: string, userId: string) {
-    const existingTask = await this.findById(id, projectId, userId); // access guard
+    // Access guard only - the position used below comes from the delete itself.
+    await this.findById(id, projectId, userId);
 
     const task = await this.prisma.transaction(
       async (database) => {
@@ -213,13 +209,16 @@ export class TasksService {
           where: { id: id },
           include: taskInclude,
         });
-        // close the gap the deleted task leaves behind, so the column stays
-        // dense 0..n-1
+        // Close the gap the deleted task leaves behind, so the column stays
+        // dense 0..n-1. The position comes from the row delete() just returned,
+        // not from the findById() above: that one ran before the transaction
+        // opened, so a concurrent move could have made it stale and this would
+        // shift the wrong rows.
         await database.task.updateMany({
           where: {
             projectId: projectId,
-            status: existingTask.status,
-            rank: { gt: existingTask.rank },
+            status: deleted.status,
+            rank: { gt: deleted.rank },
           },
           data: { rank: { decrement: 1 } },
         });
@@ -239,25 +238,38 @@ export class TasksService {
   // column at once would otherwise both compute the same slot. A conflict
   // surfaces as P2034, which the global Prisma filter maps to 409 - the client
   // reloads rather than retrying blindly.
+  //
+  // `wantedRank` is undefined when the caller only changed the status: the task
+  // then lands at the END of its new column. Reusing its rank from the OLD
+  // column would drop it in the middle of the new one, at a position that means
+  // nothing there.
   private async moveTask(
     id: string,
     projectId: string,
-    fromStatus: TaskStatus,
-    fromRank: number,
     toStatus: TaskStatus,
-    wantedRank: number,
+    wantedRank: number | undefined,
     taskFields: Prisma.TaskUpdateInput
   ): Promise<void> {
     await this.prisma.transaction(
       async (database) => {
+        // Where the task sits RIGHT NOW, read inside the transaction. Taking it
+        // from a findById() done before the transaction opened was a real race:
+        // Serializable only guards what it reads itself, so a concurrent move
+        // landing in between left this shifting the wrong rows - duplicate
+        // ranks or holes, and no error to show for it.
+        const current = await database.task.findUniqueOrThrow({
+          where: { id: id },
+          select: { status: true, rank: true },
+        });
+
         // 1. close the gap the task leaves in its old column. The task itself
-        //    is untouched: it sits at fromRank, and this only shifts what's
-        //    strictly after it.
+        //    is untouched: it sits at its current rank, and this only shifts
+        //    what's strictly after it.
         await database.task.updateMany({
           where: {
             projectId: projectId,
-            status: fromStatus,
-            rank: { gt: fromRank },
+            status: current.status,
+            rank: { gt: current.rank },
           },
           data: { rank: { decrement: 1 } },
         });
@@ -271,7 +283,10 @@ export class TasksService {
             id: { not: id },
           },
         });
-        const nextRank = Math.min(Math.max(wantedRank, 0), columnLength);
+        const nextRank =
+          wantedRank === undefined
+            ? columnLength
+            : Math.min(Math.max(wantedRank, 0), columnLength);
 
         // 3. open a slot at that position. Excluding this task matters for a
         //    same-column move, where it is still sitting in this column.

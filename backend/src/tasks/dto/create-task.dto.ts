@@ -61,12 +61,17 @@ export class CreateTaskDto {
   @IsDateString()
   endAt?: string;
 
+  // Trimmed like title, so whitespace-only input lands as an empty field rather
+  // than as invisible content. It stays ACCEPTED here, unlike title: @Length
+  // starts at 0 for these two, and "no description" is a legitimate state.
   @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @Length(0, maxTaskDescriptionLength)
   description?: string;
 
   @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @Length(0, maxTaskNotesLength)
   notes?: string;

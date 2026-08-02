@@ -17,10 +17,13 @@
 //
 // Fields intentionally absent (not in the design mockup): startAt/endAt,
 // description, onCalendar. A PATCH is partial, so editing here preserves them.
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { Button, Label, Textarea } from "flowbite-react";
 import { HiOutlineArrowsExpand, HiOutlineX } from "react-icons/hi";
-import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
+import {
+  CATEGORY_COLOR_PALETTE,
+  getCategoryColor,
+} from "@/lib/categoryColorPalette";
 import { darkSurfaceFieldClassName } from "@/lib/flowbite";
 import {
   PRIORITY_ORDER,
@@ -28,11 +31,13 @@ import {
   PRIORITY_STYLES,
 } from "@/lib/taskPriorityStyles";
 import { STATUS_ORDER, STATUS_STYLES } from "@/lib/taskStatusStyles";
-import type {
-  Task,
-  TaskAssigneeUser,
-  TaskPriority,
-  TaskStatus,
+import {
+  TASK_NOTES_MAX_LENGTH,
+  TASK_TITLE_MAX_LENGTH,
+  type Task,
+  type TaskAssigneeUser,
+  type TaskPriority,
+  type TaskStatus,
 } from "@/lib/tasks";
 import type { TaskCategory } from "@/lib/taskCategories";
 import { DrawerShell } from "@/components/drawers/DrawerShell";
@@ -65,7 +70,9 @@ interface KanbanCardDrawerProps {
   categories: TaskCategory[];
   members: TaskAssigneeUser[];
   onClose: () => void;
-  onSubmit: (draft: TaskDraft) => void;
+  // Widened to allow a Promise so the form can await it and lock its buttons
+  // while the request is in flight - the route handler is async.
+  onSubmit: (draft: TaskDraft) => void | Promise<void>;
 }
 
 const DRAWER_HEADING_ID = "kanban-card-drawer-heading";
@@ -147,7 +154,7 @@ interface KanbanCardFormProps {
   categories: TaskCategory[];
   members: TaskAssigneeUser[];
   onClose: () => void;
-  onSubmit: (draft: TaskDraft) => void;
+  onSubmit: (draft: TaskDraft) => void | Promise<void>;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
 }
@@ -166,6 +173,10 @@ function KanbanCardForm({
   // Validation messages only appear after a failed submit attempt, not while
   // the user is still filling the form in.
   const [show_errors, setShowErrors] = useState(false);
+  // Guards against a double click creating two tasks. Safe to reset in the
+  // finally below even after a successful submit closes the drawer: the panel
+  // stays mounted so it can animate out, so this component is still there.
+  const [is_submitting, setIsSubmitting] = useState(false);
 
   const [form_draft, setFormDraft] = useState<TaskDraft>(() =>
     task !== null
@@ -192,22 +203,57 @@ function KanbanCardForm({
       ? (categories.find((category) => category.id === form_draft.categoryId) ??
         null)
       : null;
-  // Same out-of-range fallback as everywhere else in the palette's consumers.
   const selected_category_color =
     selected_category !== null
-      ? (CATEGORY_COLOR_PALETTE[selected_category.color] ??
-        CATEGORY_COLOR_PALETTE[0])
+      ? getCategoryColor(selected_category.color)
       : null;
 
   const title_error = show_errors && form_draft.title.trim() === "";
   const category_error = show_errors && form_draft.categoryId === null;
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    if (is_submitting) {
+      return;
+    }
     if (form_draft.title.trim() === "" || form_draft.categoryId === null) {
       setShowErrors(true);
       return;
     }
-    onSubmit({ ...form_draft, title: form_draft.title.trim() });
+    setIsSubmitting(true);
+    try {
+      await onSubmit({ ...form_draft, title: form_draft.title.trim() });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // Arrow keys move the selection AND the focus, wrapping around, the way a
+  // native radio group behaves. Up/Left go back, Down/Right forward - both pairs
+  // because the group reads as a row but assistive tech may announce either.
+  function handlePriorityKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const step =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (step === 0) {
+      return;
+    }
+    // Otherwise the arrows would also scroll the drawer's content.
+    event.preventDefault();
+
+    const current_index = PRIORITY_ORDER.indexOf(form_draft.priority);
+    const next_priority =
+      PRIORITY_ORDER[
+        (current_index + step + PRIORITY_ORDER.length) % PRIORITY_ORDER.length
+      ];
+    setFormDraft((draft) => ({ ...draft, priority: next_priority }));
+    // The focus has to follow the selection, or the next arrow press would
+    // still be handled from the old button.
+    event.currentTarget
+      .querySelector<HTMLButtonElement>(`[data-priority="${next_priority}"]`)
+      ?.focus();
   }
 
   function toggleMember(memberId: string) {
@@ -265,19 +311,35 @@ function KanbanCardForm({
 
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
         <div>
+          {/* A real label, not just a placeholder: the placeholder vanishes as
+              soon as there is a title, leaving nothing on screen to say what
+              this field is - every other field here keeps its label. */}
+          <Label htmlFor="kanban-drawer-title" className={FIELD_LABEL_CLASS}>
+            Title
+          </Label>
           <input
+            id="kanban-drawer-title"
             type="text"
             value={form_draft.title}
             onChange={(event) =>
               setFormDraft((draft) => ({ ...draft, title: event.target.value }))
             }
             placeholder="Task title"
-            aria-label="Task title"
-            className="w-full bg-transparent font-mono text-lg font-semibold text-text-primary placeholder:text-text-muted focus:outline-none"
+            maxLength={TASK_TITLE_MAX_LENGTH}
+            className="mt-1 w-full bg-transparent font-mono text-lg font-semibold text-text-primary placeholder:text-text-muted focus:outline-none"
           />
-          {title_error && (
-            <p className="mt-1 text-xs text-control-error">Title is required</p>
-          )}
+          <div className="mt-1 flex items-center justify-between gap-2">
+            {title_error ? (
+              <p className="text-xs text-control-error">Title is required</p>
+            ) : (
+              <span />
+            )}
+            {/* maxLength already blocks the 101st character; the counter is
+                what explains why typing stopped. */}
+            <span className="shrink-0 text-xs text-text-muted">
+              {form_draft.title.length} / {TASK_TITLE_MAX_LENGTH}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
@@ -358,14 +420,21 @@ function KanbanCardForm({
           <span id="kanban-drawer-priority-label" className={FIELD_LABEL_CLASS}>
             Priority
           </span>
+          {/* A radiogroup promises native radio behaviour: ONE tab stop for the
+              whole group, then arrows to move between options. That takes both
+              the key handler below and the roving tabindex on each button -
+              either one alone leaves the promise half-kept. */}
           <div
             role="radiogroup"
             aria-labelledby="kanban-drawer-priority-label"
+            onKeyDown={handlePriorityKeyDown}
             className="flex gap-2"
           >
             {PRIORITY_ORDER.map((priority) => (
               <button
                 key={priority}
+                data-priority={priority}
+                tabIndex={form_draft.priority === priority ? 0 : -1}
                 type="button"
                 role="radio"
                 aria-checked={form_draft.priority === priority}
@@ -425,18 +494,24 @@ function KanbanCardForm({
         </div>
 
         <div className="flex flex-1 flex-col gap-2">
-          <Label
-            htmlFor="kanban-drawer-notes"
-            className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
-          >
-            Notes
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label
+              htmlFor="kanban-drawer-notes"
+              className="text-xs font-semibold tracking-wide text-text-secondary uppercase"
+            >
+              Notes
+            </Label>
+            <span className="shrink-0 text-xs text-text-muted">
+              {form_draft.notes.length} / {TASK_NOTES_MAX_LENGTH}
+            </span>
+          </div>
           <Textarea
             id="kanban-drawer-notes"
             value={form_draft.notes}
             onChange={(event) =>
               setFormDraft((draft) => ({ ...draft, notes: event.target.value }))
             }
+            maxLength={TASK_NOTES_MAX_LENGTH}
             placeholder={
               "## Notes\n\n- Implementation details\n- Blockers\n- References"
             }
@@ -453,6 +528,7 @@ function KanbanCardForm({
         <Button
           type="button"
           onClick={onClose}
+          disabled={is_submitting}
           className="mr-auto border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:ring-2 focus:ring-brand-500/40 focus:outline-none! focus-visible:outline-none"
         >
           Discard
@@ -460,9 +536,16 @@ function KanbanCardForm({
         <Button
           type="button"
           onClick={handleSubmit}
+          disabled={is_submitting}
           className="bg-brand-500 text-gray-900 hover:bg-brand-600 focus:ring-4 focus:ring-green-300 dark:bg-brand-500 dark:text-gray-900 dark:hover:bg-brand-600 dark:focus:ring-green-800"
         >
-          {mode === "create" ? "Create" : "Save"}
+          {is_submitting
+            ? mode === "create"
+              ? "Creating..."
+              : "Saving..."
+            : mode === "create"
+              ? "Create"
+              : "Save"}
         </Button>
       </div>
     </>

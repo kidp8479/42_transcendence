@@ -7,6 +7,13 @@
 // and a concurrent reorder comes back as 409: reload, don't retry.
 import { apiClient } from "@/lib/apiClient";
 
+// Mirrors backend/src/tasks/tasks.constants.ts - kept in sync by hand, the two
+// builds share no import (same arrangement as discoveryBlocks.ts). The drawer
+// caps its inputs at these values so a long title stops at the field instead of
+// coming back as a generic 400 on save.
+export const TASK_TITLE_MAX_LENGTH = 100;
+export const TASK_NOTES_MAX_LENGTH = 2000;
+
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 

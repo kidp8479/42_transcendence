@@ -17,8 +17,14 @@ interface TaskAssigneesProps {
 
 // lib/categoryColorPalette.ts). The ring makes overlapped avatars readable
 // against each other.
+// `relative` is load-bearing, not decoration: the sr-only labels inside are
+// position:absolute, and an absolute box is only clipped by a POSITIONED
+// ancestor. The column's card list is deliberately unpositioned (see
+// KanbanColumn), so without this the labels escaped every scroller up to
+// ProjectLayout's anchor, each one parked at its card's un-scrolled offset -
+// enough of them and the whole tab area became scrollable onto empty space.
 const AVATAR_CLASS =
-  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-surface-raised";
+  "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-surface-raised";
 
 // Deterministic palette index from the username, so a member keeps the same
 // avatar color everywhere on the board. Mock-only shortcut: User has no color

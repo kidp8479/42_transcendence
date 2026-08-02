@@ -101,11 +101,18 @@ export const CATEGORY_COLOR_PALETTE = [
 
 export type CategoryColor = (typeof CATEGORY_COLOR_PALETTE)[number];
 
+// Palette entry for a color index, falling back to index 0 when the index is
+// outside the palette's 0-7 range (see the file-level comment above). The
+// backend caps color at 7, so this only guards against data that predates that
+// rule - but every consumer needs the same guard, so it lives here rather than
+// being spelled out at each call site.
+export function getCategoryColor(colorIndex: number): CategoryColor {
+  return CATEGORY_COLOR_PALETTE[colorIndex] ?? CATEGORY_COLOR_PALETTE[0];
+}
+
 // Looks up a category by name (used by Team Workload's tags) and returns its
 // palette entry. Falls back to index 0 if the name doesn't match any known
-// category, or if the matched category's color is outside the palette's
-// 0-7 range (see the file-level comment above) - shouldn't happen with
-// real data, but keeps this from crashing either way.
+// category - shouldn't happen with real data, but keeps this from crashing.
 export function getCategoryColorByName(
   categories: { name: string; color: number }[],
   category_name: string
@@ -113,8 +120,5 @@ export function getCategoryColorByName(
   const found_category = categories.find(
     (category) => category.name === category_name
   );
-  return (
-    CATEGORY_COLOR_PALETTE[found_category?.color ?? 0] ??
-    CATEGORY_COLOR_PALETTE[0]
-  );
+  return getCategoryColor(found_category?.color ?? 0);
 }
