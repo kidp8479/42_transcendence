@@ -13,5 +13,5 @@ import { CreateUserDto } from "./create-user.dto";
 // uploads to storage and derives the URL itself. Allowing it here would let
 // a client point their avatar at an arbitrary URL.
 export class UpdateUserDto extends PartialType(
-  OmitType(CreateUserDto, ["email", "avatarUrl"] as const)
+  OmitType(CreateUserDto, ["email", "avatarUrl", "campus"] as const)
 ) {}
