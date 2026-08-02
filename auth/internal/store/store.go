@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -20,7 +22,11 @@ import (
 var (
 	ErrConflict = errors.New("auth record already exists")
 	ErrNotFound = errors.New("auth record not found")
+	ErrCSRF     = errors.New("CSRF token is invalid")
+	ErrReplay   = errors.New("refresh token replay detected")
 )
+
+const refreshTokenGrace = 5 * time.Second
 
 type AccountStatus string
 
@@ -31,7 +37,8 @@ const (
 )
 
 type Store struct {
-	pool atomic.Pointer[pgxpool.Pool]
+	pool          atomic.Pointer[pgxpool.Pool]
+	refreshCipher *refreshTokenCipher
 }
 
 type User struct {
@@ -42,7 +49,8 @@ type User struct {
 	AvatarURL     *string `json:"avatarUrl"`
 	Campus        *string `json:"campus"`
 	// Status controls authentication eligibility and is not profile response data.
-	Status AccountStatus `json:"-"`
+	Status     AccountStatus `json:"-"`
+	GlobalRole string        `json:"-"`
 }
 
 type LocalCredential struct {
@@ -50,7 +58,7 @@ type LocalCredential struct {
 	PasswordHash string
 }
 
-type Session struct {
+type RefreshFamily struct {
 	ID                   string
 	User                 User
 	AuthenticationMethod string
@@ -61,16 +69,40 @@ type Session struct {
 	CSRFTokenHash        string
 }
 
-type CreatedSession struct {
-	Session
-	Token     string
-	CSRFToken string
+type CreatedRefreshSession struct {
+	RefreshFamily
+	RefreshToken string
+	CSRFToken    string
 }
+
+type AccessState struct {
+	RefreshFamily
+	GlobalRole string
+}
+
+type refreshUse int
+
+const (
+	refreshReplay refreshUse = iota
+	refreshCurrent
+	refreshGrace
+)
 
 func New(pool *pgxpool.Pool) *Store {
 	store := &Store{}
 	store.pool.Store(pool)
 	return store
+}
+
+// SetRefreshCipher installs the process-local key used to recover an already
+// issued successor during the bounded refresh retry grace period.
+func (s *Store) SetRefreshCipher(secret string) error {
+	refreshCipher, err := newRefreshTokenCipher(secret)
+	if err != nil {
+		return err
+	}
+	s.refreshCipher = refreshCipher
+	return nil
 }
 
 // ReplacePool publishes a fully connected pool before its predecessor drains.
@@ -98,10 +130,11 @@ func (s *Store) CreateLocalAccount(
 
 	now := time.Now().UTC()
 	user := User{
-		ID:       uuid.NewString(),
-		Email:    email,
-		Username: username,
-		Status:   AccountStatusActive,
+		ID:         uuid.NewString(),
+		Email:      email,
+		Username:   username,
+		Status:     AccountStatusActive,
+		GlobalRole: "USER",
 	}
 	identityID := uuid.NewString()
 	credentialID := uuid.NewString()
@@ -167,6 +200,7 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 			u."avatarUrl",
 			u."campus",
 			u."status"::text,
+			u."globalRole"::text,
 			pc."passwordHash"
 		 FROM "AuthIdentity" ai
 		 JOIN "User" u ON u."id" = ai."userId"
@@ -182,6 +216,7 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 		&credential.AvatarURL,
 		&credential.Campus,
 		&credential.Status,
+		&credential.GlobalRole,
 		&credential.PasswordHash,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -193,7 +228,7 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 	return credential, nil
 }
 
-func (s *Store) CreateSession(
+func (s *Store) CreateRefreshFamily(
 	ctx context.Context,
 	user User,
 	method string,
@@ -201,21 +236,21 @@ func (s *Store) CreateSession(
 	absoluteTimeout time.Duration,
 	ipHash *string,
 	userAgentHash *string,
-) (CreatedSession, error) {
+) (CreatedRefreshSession, error) {
 	token, err := randomToken(32)
 	if err != nil {
-		return CreatedSession{}, err
+		return CreatedRefreshSession{}, err
 	}
 	csrfToken, err := randomToken(32)
 	if err != nil {
-		return CreatedSession{}, err
+		return CreatedRefreshSession{}, err
 	}
 
 	now := time.Now().UTC()
-	session := CreatedSession{
-		Token:     token,
-		CSRFToken: csrfToken,
-		Session: Session{
+	session := CreatedRefreshSession{
+		RefreshToken: token,
+		CSRFToken:    csrfToken,
+		RefreshFamily: RefreshFamily{
 			ID:                   uuid.NewString(),
 			User:                 user,
 			AuthenticationMethod: method,
@@ -227,20 +262,25 @@ func (s *Store) CreateSession(
 		},
 	}
 
-	_, err = s.currentPool().Exec(
+	tx, err := s.currentPool().BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("begin refresh family transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, err = tx.Exec(
 		ctx,
-		`INSERT INTO "AuthSession"
-			("id", "userId", "tokenHash", "csrfTokenHash", "authenticationMethod",
-			 "assuranceLevel", "authenticatedAt", "lastSeenAt", "idleExpiresAt",
-			 "absoluteExpiresAt", "ipHash", "userAgentHash", "createdAt", "updatedAt")
+		`INSERT INTO "RefreshTokenFamily"
+			("id", "userId", "authenticationMethod", "assuranceLevel", "csrfTokenHash",
+			 "authenticatedAt", "lastUsedAt", "idleExpiresAt", "absoluteExpiresAt",
+			 "ipHash", "userAgentHash", "createdAt", "updatedAt")
 		 VALUES
-			($1, $2, $3, $4, CAST($5 AS "AuthProvider"), $6, $7, $7, $8, $9, $10, $11, $7, $7)`,
+			($1, $2, CAST($3 AS "AuthProvider"), $4, $5, $6, $6, $7, $8, $9, $10, $6, $6)`,
 		session.ID,
 		session.User.ID,
-		hashToken(session.Token),
-		session.CSRFTokenHash,
 		session.AuthenticationMethod,
 		session.AssuranceLevel,
+		session.CSRFTokenHash,
 		session.AuthenticatedAt,
 		session.IdleExpiresAt,
 		session.AbsoluteExpiresAt,
@@ -248,88 +288,341 @@ func (s *Store) CreateSession(
 		userAgentHash,
 	)
 	if err != nil {
-		return CreatedSession{}, fmt.Errorf("create auth session: %w", err)
+		return CreatedRefreshSession{}, fmt.Errorf("create refresh family: %w", err)
 	}
 
+	_, err = tx.Exec(
+		ctx,
+		`INSERT INTO "AuthRefreshToken"
+			("id", "familyId", "tokenHash", "issuedAt", "expiresAt")
+		 VALUES ($1, $2, $3, $4, $5)`,
+		uuid.NewString(),
+		session.ID,
+		hashToken(session.RefreshToken),
+		session.AuthenticatedAt,
+		session.IdleExpiresAt,
+	)
+	if err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("create initial refresh token: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("commit refresh family transaction: %w", err)
+	}
 	return session, nil
 }
 
-func (s *Store) IntrospectSession(
+func (s *Store) RotateRefreshToken(
 	ctx context.Context,
 	token string,
+	csrfToken string,
 	idleTimeout time.Duration,
-) (Session, error) {
-	tokenHash := hashToken(token)
-	var session Session
+) (CreatedRefreshSession, error) {
+	tx, err := s.currentPool().BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("begin refresh rotation: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
-	err := s.currentPool().QueryRow(
-		ctx,
-		`UPDATE "AuthSession" AS s
-		 SET "lastSeenAt" = CURRENT_TIMESTAMP,
-		     "idleExpiresAt" = LEAST(CURRENT_TIMESTAMP + $2::interval, s."absoluteExpiresAt"),
-		     "updatedAt" = CURRENT_TIMESTAMP
-		 FROM "User" AS u
-		 WHERE s."userId" = u."id"
-		   AND s."tokenHash" = $1
-		   AND s."revokedAt" IS NULL
-		   AND s."idleExpiresAt" > CURRENT_TIMESTAMP
-		   AND s."absoluteExpiresAt" > CURRENT_TIMESTAMP
-		   AND u."status" = CAST('ACTIVE' AS "AccountStatus")
-		 RETURNING
-			s."id",
-			u."id",
-			u."email",
-			u."emailVerified",
-			u."username",
-			u."avatarUrl",
-			u."campus",
-			s."authenticationMethod"::text,
-			s."assuranceLevel",
-			s."authenticatedAt",
-			s."idleExpiresAt",
-			s."absoluteExpiresAt",
-			s."csrfTokenHash"`,
-		tokenHash,
-		durationInterval(idleTimeout),
+	type refreshRow struct {
+		id                  string
+		familyID            string
+		replacedByID        *string
+		graceExpiresAt      *time.Time
+		successorCiphertext *string
+		expiresAt           time.Time
+	}
+	var incoming refreshRow
+	var family RefreshFamily
+	var revokedAt *time.Time
+	err = tx.QueryRow(ctx,
+		`SELECT
+			t."id", t."familyId", t."replacedById", t."graceExpiresAt",
+			t."successorCiphertext", t."expiresAt",
+			f."id", f."authenticationMethod"::text, f."assuranceLevel",
+			f."authenticatedAt", f."idleExpiresAt", f."absoluteExpiresAt",
+			f."csrfTokenHash", f."revokedAt",
+			u."id", u."email", u."emailVerified", u."username", u."avatarUrl",
+			u."campus", u."status"::text, u."globalRole"::text
+		 FROM "AuthRefreshToken" t
+		 JOIN "RefreshTokenFamily" f ON f."id" = t."familyId"
+		 JOIN "User" u ON u."id" = f."userId"
+		 WHERE t."tokenHash" = $1
+		 FOR UPDATE OF f`,
+		hashToken(token),
 	).Scan(
-		&session.ID,
-		&session.User.ID,
-		&session.User.Email,
-		&session.User.EmailVerified,
-		&session.User.Username,
-		&session.User.AvatarURL,
-		&session.User.Campus,
-		&session.AuthenticationMethod,
-		&session.AssuranceLevel,
-		&session.AuthenticatedAt,
-		&session.IdleExpiresAt,
-		&session.AbsoluteExpiresAt,
-		&session.CSRFTokenHash,
+		&incoming.id, &incoming.familyID, &incoming.replacedByID,
+		&incoming.graceExpiresAt, &incoming.successorCiphertext, &incoming.expiresAt,
+		&family.ID, &family.AuthenticationMethod, &family.AssuranceLevel,
+		&family.AuthenticatedAt, &family.IdleExpiresAt, &family.AbsoluteExpiresAt,
+		&family.CSRFTokenHash, &revokedAt,
+		&family.User.ID, &family.User.Email, &family.User.EmailVerified,
+		&family.User.Username, &family.User.AvatarURL, &family.User.Campus,
+		&family.User.Status, &family.User.GlobalRole,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Session{}, ErrNotFound
+		return CreatedRefreshSession{}, ErrNotFound
 	}
 	if err != nil {
-		return Session{}, fmt.Errorf("introspect auth session: %w", err)
+		return CreatedRefreshSession{}, fmt.Errorf("lock refresh family: %w", err)
 	}
-	return session, nil
-}
+	now := time.Now().UTC()
+	if revokedAt != nil || !family.IdleExpiresAt.After(now) ||
+		!family.AbsoluteExpiresAt.After(now) || family.User.Status != AccountStatusActive {
+		return CreatedRefreshSession{}, ErrNotFound
+	}
+	if !VerifyTokenHash(csrfToken, family.CSRFTokenHash) {
+		return CreatedRefreshSession{}, ErrCSRF
+	}
 
-func (s *Store) RevokeSession(ctx context.Context, token string) error {
-	command, err := s.currentPool().Exec(
-		ctx,
-		`UPDATE "AuthSession"
-		 SET "revokedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
-		 WHERE "tokenHash" = $1 AND "revokedAt" IS NULL`,
-		hashToken(token),
+	var head refreshRow
+	err = tx.QueryRow(ctx,
+		`SELECT "id", "familyId", "replacedById", "graceExpiresAt",
+		        "successorCiphertext", "expiresAt"
+		 FROM "AuthRefreshToken"
+		 WHERE "familyId" = $1 AND "replacedById" IS NULL
+		 ORDER BY "issuedAt" DESC
+		 LIMIT 1
+		 FOR UPDATE`,
+		family.ID,
+	).Scan(
+		&head.id, &head.familyID, &head.replacedByID,
+		&head.graceExpiresAt, &head.successorCiphertext, &head.expiresAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return CreatedRefreshSession{}, fmt.Errorf("refresh family has no current token")
+	}
+	if err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("lock current refresh token: %w", err)
+	}
+
+	use := classifyRefreshUse(
+		incoming.id, incoming.replacedByID, head.id, incoming.graceExpiresAt, now,
+	)
+	if use == refreshGrace {
+		if incoming.successorCiphertext == nil || s.refreshCipher == nil {
+			return CreatedRefreshSession{}, fmt.Errorf("refresh successor recovery is unavailable")
+		}
+		successor, err := s.refreshCipher.decrypt(*incoming.successorCiphertext)
+		if err != nil {
+			return CreatedRefreshSession{}, fmt.Errorf("decrypt refresh successor: %w", err)
+		}
+		var successorHash string
+		err = tx.QueryRow(ctx,
+			`SELECT "tokenHash" FROM "AuthRefreshToken" WHERE "id" = $1`,
+			head.id,
+		).Scan(&successorHash)
+		if err != nil {
+			return CreatedRefreshSession{}, fmt.Errorf("load refresh successor hash: %w", err)
+		}
+		if !VerifyTokenHash(successor, successorHash) {
+			return CreatedRefreshSession{}, fmt.Errorf("refresh successor ciphertext does not match token chain")
+		}
+		if !head.expiresAt.After(now) {
+			return CreatedRefreshSession{}, ErrNotFound
+		}
+		return CreatedRefreshSession{
+			RefreshFamily: family,
+			RefreshToken:  successor,
+			CSRFToken:     csrfToken,
+		}, nil
+	}
+	if use == refreshReplay {
+		_, revokeErr := tx.Exec(ctx,
+			`UPDATE "RefreshTokenFamily"
+			 SET "revokedAt" = CURRENT_TIMESTAMP,
+			     "revokedReason" = 'REFRESH_TOKEN_REPLAY',
+			     "updatedAt" = CURRENT_TIMESTAMP
+			 WHERE "userId" = $1 AND "revokedAt" IS NULL`,
+			family.User.ID,
+		)
+		if revokeErr != nil {
+			return CreatedRefreshSession{}, fmt.Errorf("revoke families after refresh replay: %w", revokeErr)
+		}
+		_, auditErr := tx.Exec(ctx,
+			`INSERT INTO "AuthEvent"
+				("id", "userId", "eventType", "provider", "sessionId", "createdAt")
+			 VALUES ($1, $2, 'REFRESH_REPLAY_DETECTED', CAST($3 AS "AuthProvider"), $4, CURRENT_TIMESTAMP)`,
+			uuid.NewString(), family.User.ID, family.AuthenticationMethod, family.ID,
+		)
+		if auditErr != nil {
+			return CreatedRefreshSession{}, fmt.Errorf("record refresh replay event: %w", auditErr)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return CreatedRefreshSession{}, fmt.Errorf("commit refresh replay revocation: %w", err)
+		}
+		return CreatedRefreshSession{}, ErrReplay
+	}
+	if !head.expiresAt.After(now) {
+		return CreatedRefreshSession{}, ErrNotFound
+	}
+
+	newToken, err := randomToken(32)
+	if err != nil {
+		return CreatedRefreshSession{}, err
+	}
+	newID := uuid.NewString()
+	if s.refreshCipher == nil {
+		return CreatedRefreshSession{}, fmt.Errorf("refresh successor recovery is unavailable")
+	}
+	successorCiphertext, err := s.refreshCipher.encrypt(newToken)
+	if err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("encrypt refresh successor: %w", err)
+	}
+	idleExpiresAt := minTime(now.Add(idleTimeout), family.AbsoluteExpiresAt)
+	_, err = tx.Exec(ctx,
+		`INSERT INTO "AuthRefreshToken"
+			("id", "familyId", "tokenHash", "issuedAt", "expiresAt")
+		 VALUES ($1, $2, $3, $4, $5)`,
+		newID, family.ID, hashToken(newToken), now, idleExpiresAt,
 	)
 	if err != nil {
-		return fmt.Errorf("revoke auth session: %w", err)
+		return CreatedRefreshSession{}, fmt.Errorf("insert rotated refresh token: %w", err)
+	}
+	command, err := tx.Exec(ctx,
+		`UPDATE "AuthRefreshToken"
+		 SET "usedAt" = $2,
+		     "replacedAt" = $2,
+		     "graceExpiresAt" = $3,
+		     "successorCiphertext" = $4,
+		     "replacedById" = $5
+		 WHERE "id" = $1 AND "replacedById" IS NULL`,
+		head.id, now, now.Add(refreshTokenGrace), successorCiphertext, newID,
+	)
+	if err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("replace current refresh token: %w", err)
+	}
+	if command.RowsAffected() != 1 {
+		return CreatedRefreshSession{}, fmt.Errorf("refresh token chain changed while locked")
+	}
+	_, err = tx.Exec(ctx,
+		`UPDATE "RefreshTokenFamily"
+		 SET "lastUsedAt" = $2, "idleExpiresAt" = $3, "updatedAt" = $2
+		 WHERE "id" = $1`,
+		family.ID, now, idleExpiresAt,
+	)
+	if err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("update refresh family activity: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("commit refresh rotation: %w", err)
+	}
+	family.IdleExpiresAt = idleExpiresAt
+	return CreatedRefreshSession{
+		RefreshFamily: family,
+		RefreshToken:  newToken,
+		CSRFToken:     csrfToken,
+	}, nil
+}
+
+func classifyRefreshUse(
+	incomingID string,
+	replacedByID *string,
+	headID string,
+	graceExpiresAt *time.Time,
+	now time.Time,
+) refreshUse {
+	if incomingID == headID && replacedByID == nil {
+		return refreshCurrent
+	}
+	if replacedByID != nil && *replacedByID == headID &&
+		graceExpiresAt != nil && graceExpiresAt.After(now) {
+		return refreshGrace
+	}
+	return refreshReplay
+}
+
+func (s *Store) GetRefreshFamily(ctx context.Context, token, csrfToken string) (RefreshFamily, error) {
+	var family RefreshFamily
+	var revokedAt *time.Time
+	err := s.currentPool().QueryRow(ctx,
+		`SELECT
+			f."id", f."authenticationMethod"::text, f."assuranceLevel",
+			f."authenticatedAt", f."idleExpiresAt", f."absoluteExpiresAt",
+			f."csrfTokenHash", f."revokedAt",
+			u."id", u."email", u."emailVerified", u."username", u."avatarUrl",
+			u."campus", u."status"::text, u."globalRole"::text
+		 FROM "AuthRefreshToken" t
+		 JOIN "RefreshTokenFamily" f ON f."id" = t."familyId"
+		 JOIN "User" u ON u."id" = f."userId"
+		 WHERE t."tokenHash" = $1
+		   AND t."replacedById" IS NULL
+		   AND t."usedAt" IS NULL
+		   AND t."expiresAt" > CURRENT_TIMESTAMP`,
+		hashToken(token),
+	).Scan(
+		&family.ID, &family.AuthenticationMethod, &family.AssuranceLevel,
+		&family.AuthenticatedAt, &family.IdleExpiresAt, &family.AbsoluteExpiresAt,
+		&family.CSRFTokenHash, &revokedAt,
+		&family.User.ID, &family.User.Email, &family.User.EmailVerified,
+		&family.User.Username, &family.User.AvatarURL, &family.User.Campus,
+		&family.User.Status, &family.User.GlobalRole,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RefreshFamily{}, ErrNotFound
+	}
+	if err != nil {
+		return RefreshFamily{}, fmt.Errorf("get refresh family: %w", err)
+	}
+	now := time.Now().UTC()
+	if revokedAt != nil || !family.IdleExpiresAt.After(now) ||
+		!family.AbsoluteExpiresAt.After(now) || family.User.Status != AccountStatusActive {
+		return RefreshFamily{}, ErrNotFound
+	}
+	if !VerifyTokenHash(csrfToken, family.CSRFTokenHash) {
+		return RefreshFamily{}, ErrCSRF
+	}
+	return family, nil
+}
+
+func (s *Store) RevokeRefreshFamily(ctx context.Context, token, csrfToken, reason string) (RefreshFamily, error) {
+	family, err := s.GetRefreshFamily(ctx, token, csrfToken)
+	if err != nil {
+		return RefreshFamily{}, err
+	}
+	command, err := s.currentPool().Exec(ctx,
+		`UPDATE "RefreshTokenFamily"
+		 SET "revokedAt" = CURRENT_TIMESTAMP, "revokedReason" = $2, "updatedAt" = CURRENT_TIMESTAMP
+		 WHERE "id" = $1 AND "revokedAt" IS NULL`,
+		family.ID, reason,
+	)
+	if err != nil {
+		return RefreshFamily{}, fmt.Errorf("revoke refresh family: %w", err)
 	}
 	if command.RowsAffected() == 0 {
-		return ErrNotFound
+		return RefreshFamily{}, ErrNotFound
 	}
-	return nil
+	return family, nil
+}
+
+func (s *Store) IntrospectAccess(ctx context.Context, userID, familyID string) (AccessState, error) {
+	var state AccessState
+	err := s.currentPool().QueryRow(ctx,
+		`SELECT
+			f."id", f."authenticationMethod"::text, f."assuranceLevel",
+			f."authenticatedAt", f."idleExpiresAt", f."absoluteExpiresAt",
+			f."csrfTokenHash", u."id", u."globalRole"::text
+		 FROM "RefreshTokenFamily" f
+		 JOIN "User" u ON u."id" = f."userId"
+		 WHERE f."id" = $1
+		   AND f."userId" = $2
+		   AND f."revokedAt" IS NULL
+		   AND f."idleExpiresAt" > CURRENT_TIMESTAMP
+		   AND f."absoluteExpiresAt" > CURRENT_TIMESTAMP
+		   AND u."status" = CAST('ACTIVE' AS "AccountStatus")`,
+		familyID, userID,
+	).Scan(
+		&state.ID, &state.AuthenticationMethod, &state.AssuranceLevel,
+		&state.AuthenticatedAt, &state.IdleExpiresAt, &state.AbsoluteExpiresAt,
+		&state.CSRFTokenHash, &state.User.ID, &state.GlobalRole,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AccessState{}, ErrNotFound
+	}
+	if err != nil {
+		return AccessState{}, fmt.Errorf("introspect access token family: %w", err)
+	}
+	state.User.GlobalRole = state.GlobalRole
+	return state, nil
 }
 
 func (s *Store) RecordEvent(
@@ -396,8 +689,56 @@ func subtleEqual(left, right string) bool {
 	return difference == 0
 }
 
-func durationInterval(duration time.Duration) string {
-	return fmt.Sprintf("%f seconds", duration.Seconds())
+func minTime(left, right time.Time) time.Time {
+	if left.Before(right) {
+		return left
+	}
+	return right
+}
+
+type refreshTokenCipher struct {
+	aead cipher.AEAD
+}
+
+func newRefreshTokenCipher(secret string) (*refreshTokenCipher, error) {
+	if len(secret) < 32 {
+		return nil, fmt.Errorf("refresh token encryption secret must be at least 32 characters")
+	}
+	key := sha256.Sum256([]byte("TR-70 refresh successor encryption\x00" + secret))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return nil, fmt.Errorf("create refresh token cipher: %w", err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("create refresh token AEAD: %w", err)
+	}
+	return &refreshTokenCipher{aead: aead}, nil
+}
+
+func (c *refreshTokenCipher) encrypt(token string) (string, error) {
+	nonce := make([]byte, c.aead.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return "", fmt.Errorf("generate refresh token nonce: %w", err)
+	}
+	sealed := c.aead.Seal(nonce, nonce, []byte(token), nil)
+	return base64.RawURLEncoding.EncodeToString(sealed), nil
+}
+
+func (c *refreshTokenCipher) decrypt(value string) (string, error) {
+	sealed, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil || len(sealed) < c.aead.NonceSize()+c.aead.Overhead() {
+		return "", fmt.Errorf("invalid refresh successor ciphertext")
+	}
+	nonce := sealed[:c.aead.NonceSize()]
+	plaintext, err := c.aead.Open(nil, nonce, sealed[c.aead.NonceSize():], nil)
+	if err != nil {
+		return "", fmt.Errorf("authenticate refresh successor ciphertext: %w", err)
+	}
+	if len(plaintext) == 0 {
+		return "", fmt.Errorf("refresh successor is empty")
+	}
+	return string(plaintext), nil
 }
 
 func mapWriteError(operation string, err error) error {
