@@ -20,6 +20,22 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 // scoped to avatar objects instead of "any object in the bucket".
 const AVATAR_KEY_PATTERN = /^avatar-[^/\\]+$/;
 
+// Shared with update()/remove() below so their response shape matches
+// findById()/GET /users/me instead of leaking the raw Prisma row (status,
+// globalRole, ...) - also means a future column added to User doesn't get
+// silently exposed through these endpoints without an explicit opt-in here.
+const SAFE_USER_SELECT = {
+  id: true,
+  email: true,
+  emailVerified: true,
+  username: true,
+  avatarUrl: true,
+  campus: true,
+  twoFactorEnabled: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -31,17 +47,7 @@ export class UsersService {
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: {
-        id: true,
-        email: true,
-        emailVerified: true,
-        username: true,
-        avatarUrl: true,
-        campus: true,
-        twoFactorEnabled: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: SAFE_USER_SELECT,
     });
     if (!user) {
       throw new NotFoundException("User not found");
@@ -56,6 +62,7 @@ export class UsersService {
     return await this.prisma.user.update({
       where: { id: userId },
       data: { ...dto },
+      select: SAFE_USER_SELECT,
     });
   }
 
@@ -64,6 +71,7 @@ export class UsersService {
 
     return await this.prisma.user.delete({
       where: { id: userId },
+      select: SAFE_USER_SELECT,
     });
   }
 
