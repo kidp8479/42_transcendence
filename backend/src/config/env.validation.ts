@@ -8,7 +8,6 @@ import * as Joi from "joi";
 export const envValidationSchema = Joi.object({
   PORT: Joi.number().port().default(3000),
   AUTH_SERVICE_URL: Joi.string().uri().required(),
-  AUTH_SESSION_COOKIE: Joi.string().default("tr_session"),
   VAULT_ADDR: Joi.string().uri().required(),
   VAULT_ROLE_ID_FILE: Joi.string().required(),
   VAULT_SECRET_ID_FILE: Joi.string().required(),

@@ -1,5 +1,4 @@
-import { getSession, type AuthSession } from "./auth";
-import { setApiSession } from "./apiClient";
+import { getSession, setAuthSession, type AuthSession } from "./auth";
 import {
   resetRealtimeSocket,
   disconnectRealtimeSocket,
@@ -43,7 +42,7 @@ export class AuthSessionResource {
         }
         this.state = state;
         this.checkedAt = Date.now();
-        setApiSession(state.status === "authenticated" ? state.session : null);
+        setAuthSession(state.status === "authenticated" ? state.session : null);
         this.notify();
         return state;
       })
@@ -61,7 +60,7 @@ export class AuthSessionResource {
     this.revision += 1;
     this.state = { status: "authenticated", session };
     this.checkedAt = Date.now();
-    setApiSession(session);
+    setAuthSession(session);
     resetRealtimeSocket();
     this.notify();
   }
@@ -70,7 +69,7 @@ export class AuthSessionResource {
     this.revision += 1;
     this.state = { status: "anonymous" };
     this.checkedAt = Date.now();
-    setApiSession(null);
+    setAuthSession(null);
     // no session left to reconnect with - see disconnectRealtimeSocket's own comment
     disconnectRealtimeSocket();
     this.notify();
@@ -81,13 +80,12 @@ export class AuthSessionResource {
     this.state = null;
     this.checkedAt = 0;
     this.inFlight = null;
-    setApiSession(null);
+    setAuthSession(null);
     resetRealtimeSocket();
     this.notify();
   }
 
   async endSession(): Promise<void> {
-    await getSession();
     this.setAnonymous();
   }
 
