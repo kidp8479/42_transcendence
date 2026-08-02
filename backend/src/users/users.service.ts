@@ -92,7 +92,9 @@ export class UsersService {
     // browser (#, ?) or, for a stray "%" followed by non-hex characters,
     // make Express's decodeURIComponent throw on every subsequent GET of
     // that exact URL - permanently breaking the avatar until re-upload.
-    const safeOriginalName = file.originalname.replace(/[^A-Za-z0-9._-]/g, "_");
+    const safeOriginalName = file.originalname
+      .replace(/[^A-Za-z0-9._-]/g, "_")
+      .replace(/\.\.+/g, "_");
     const key = `avatar-${userId}-${randomUUID()}-${safeOriginalName}`;
     // contentType is the sniffed mimetype (see detectImageMimetype), not
     // file.mimetype - what gets stored here is what downloadAvatar serves

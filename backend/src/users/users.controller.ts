@@ -70,9 +70,7 @@ export class UsersController {
     // what actually decides the stored/served Content-Type.
     const detectedMimetype = detectImageMimetype(file.buffer);
     if (detectedMimetype === undefined) {
-      throw new BadRequestException(
-        "Avatar must be a PNG, JPEG, GIF image"
-      );
+      throw new BadRequestException("Avatar must be a PNG, JPEG, GIF image");
     }
     return this.usersService.uploadAvatar(
       request.user.id,
