@@ -283,6 +283,10 @@ format-auth:
 ## validate the authentication integration services
 check-auth-stack: check-auth check-prisma check-backend check-frontend
 
+## verify one-use WebSocket admission, exact Origin, and sid revocation
+check-websocket-e2e:
+	$(COMPOSE) exec -e RUN_WEBSOCKET_E2E=1 frontend npm run test:websocket-e2e
+
 ## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
 check-shell:
 	docker run --rm -v $(CURDIR):/mnt -w /mnt koalaman/shellcheck:stable -s sh \
@@ -384,4 +388,4 @@ help:
         migrate migrate-dev migrate-fix-permissions prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
         check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell \
-        check-vault-policies check-vault-prisma
+        check-vault-policies check-vault-prisma check-websocket-e2e

@@ -28,6 +28,11 @@ type testAuthStore struct {
 	createFamilyCalls int
 	rotateCalls       int
 	revokeCalls       int
+	issueTicketCalls  int
+	consumeCalls      int
+	revalidateCalls   int
+	ticket            string
+	admission         store.WebSocketAdmission
 }
 
 func (s *testAuthStore) CreateLocalAccount(context.Context, string, string, string) (store.User, error) {
@@ -63,6 +68,21 @@ func (s *testAuthStore) RevokeRefreshFamily(context.Context, string, string, str
 
 func (s *testAuthStore) IntrospectAccess(context.Context, string, string) (store.AccessState, error) {
 	return s.access, s.err
+}
+
+func (s *testAuthStore) IssueWebSocketTicket(context.Context, string, string) (string, error) {
+	s.issueTicketCalls++
+	return s.ticket, s.err
+}
+
+func (s *testAuthStore) ConsumeWebSocketTicket(context.Context, string) (store.WebSocketAdmission, error) {
+	s.consumeCalls++
+	return s.admission, s.err
+}
+
+func (s *testAuthStore) ValidateWebSocketSession(context.Context, string, string) error {
+	s.revalidateCalls++
+	return s.err
 }
 
 func (s *testAuthStore) RecordEvent(context.Context, *string, string, *string, *string, *string) error {
@@ -356,4 +376,86 @@ func TestValidateAccessRejectsChangedAuthenticationContext(t *testing.T) {
 	if _, _, err := server.validateAccess(context.Background(), "jwt"); !errors.Is(err, errAccessInactive) {
 		t.Fatalf("validateAccess() error = %v, want inactive", err)
 	}
+}
+
+func TestHandleIssueWebSocketTicketRequiresExactOriginAndActiveAccess(t *testing.T) {
+	family := testFamily()
+	claims := token.Claims{
+		Subject: "user-id", SessionID: "family-id",
+		AuthenticationTime:   family.AuthenticatedAt,
+		AuthenticationMethod: "LOCAL", AssuranceLevel: "aal1",
+	}
+	authStore := &testAuthStore{
+		access: store.AccessState{RefreshFamily: family, GlobalRole: "USER"},
+		ticket: strings.Repeat("a", 43),
+	}
+	server := &Server{
+		cfg: testConfig(), store: authStore, webSockets: authStore,
+		tokens: testTokenService{claims: claims},
+	}
+
+	rejected := httptest.NewRequest(http.MethodPost, "/auth/ws-ticket", nil)
+	rejected.Header.Set("Origin", "http://evil.example")
+	rejected.Header.Set("Authorization", bearerHeader("access-token"))
+	rejectedResponse := httptest.NewRecorder()
+	server.handleIssueWebSocketTicket(rejectedResponse, rejected)
+	if rejectedResponse.Code != http.StatusForbidden || authStore.issueTicketCalls != 0 {
+		t.Fatalf("wrong origin response = %d, issue calls = %d", rejectedResponse.Code, authStore.issueTicketCalls)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/auth/ws-ticket", nil)
+	request.Header.Set("Origin", server.cfg.AppOrigin)
+	request.Header.Set("Authorization", bearerHeader("access-token"))
+	response := httptest.NewRecorder()
+	server.handleIssueWebSocketTicket(response, request)
+	if response.Code != http.StatusCreated ||
+		!strings.Contains(response.Body.String(), `"expiresIn":60`) ||
+		authStore.issueTicketCalls != 1 {
+		t.Fatalf("ticket response = %d %s, issue calls = %d", response.Code, response.Body.String(), authStore.issueTicketCalls)
+	}
+}
+
+func TestHandleConsumeWebSocketTicketAndRevalidateRequireInternalCredential(t *testing.T) {
+	authStore := &testAuthStore{
+		admission: store.WebSocketAdmission{
+			UserID: "user-id", RefreshFamilyID: "family-id",
+			Username: "student",
+		},
+	}
+	server := &Server{
+		internalToken: "internal-token", webSockets: authStore,
+	}
+	ticket := strings.Repeat("a", 43)
+
+	consume := httptest.NewRequest(http.MethodPost, "/auth/internal/ws-ticket/consume",
+		strings.NewReader(fmt.Sprintf(`{"ticket":%q}`, ticket)))
+	consume.Header.Set("Authorization", bearerHeader(server.internalToken))
+	consumeResponse := httptest.NewRecorder()
+	server.handleConsumeWebSocketTicket(consumeResponse, consume)
+	if consumeResponse.Code != http.StatusOK ||
+		!strings.Contains(consumeResponse.Body.String(), `"sid":"family-id"`) ||
+		authStore.consumeCalls != 1 {
+		t.Fatalf("consume response = %d %s, calls = %d", consumeResponse.Code, consumeResponse.Body.String(), authStore.consumeCalls)
+	}
+
+	revalidate := httptest.NewRequest(http.MethodPost, "/auth/internal/ws-session/revalidate",
+		strings.NewReader(`{"sub":"user-id","sid":"family-id"}`))
+	revalidate.Header.Set("Authorization", bearerHeader(server.internalToken))
+	revalidateResponse := httptest.NewRecorder()
+	server.handleRevalidateWebSocketSession(revalidateResponse, revalidate)
+	if revalidateResponse.Code != http.StatusOK || authStore.revalidateCalls != 1 {
+		t.Fatalf("revalidate response = %d %s, calls = %d", revalidateResponse.Code, revalidateResponse.Body.String(), authStore.revalidateCalls)
+	}
+
+	unauthorized := httptest.NewRequest(http.MethodPost, "/auth/internal/ws-ticket/consume",
+		strings.NewReader(fmt.Sprintf(`{"ticket":%q}`, ticket)))
+	unauthorizedResponse := httptest.NewRecorder()
+	server.handleConsumeWebSocketTicket(unauthorizedResponse, unauthorized)
+	if unauthorizedResponse.Code != http.StatusUnauthorized || authStore.consumeCalls != 1 {
+		t.Fatalf("unauthorized response = %d, consume calls = %d", unauthorizedResponse.Code, authStore.consumeCalls)
+	}
+}
+
+func bearerHeader(value string) string {
+	return strings.Join([]string{"Bearer", value}, " ")
 }

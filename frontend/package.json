@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "test:auth-refresh": "trap 'rm -rf dist-test' EXIT; rm -rf dist-test && tsc -p tsconfig.test.json && sed -i 's/from \"\\.\\/auth\"/from \".\\/auth.js\"/; s/from \"\\.\\/realtimeSocket\"/from \".\\/realtimeSocket.js\"/' dist-test/lib/apiClient.js dist-test/lib/authState.js && node --test test/auth-refresh.integration.test.mjs",
     "preview": "vite preview",
+    "test:websocket-e2e": "node --test test/websocket-ticket.e2e.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

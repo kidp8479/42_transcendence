@@ -4,6 +4,7 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -48,7 +49,7 @@ type KeyPrefixValidator = (id: string) => Promise<string | undefined>;
   allowRequest: allowExactOrigin,
 })
 export class RealtimeGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   constructor(
     private readonly prisma: PrismaService,
@@ -75,6 +76,20 @@ export class RealtimeGateway
     validator: KeyPrefixValidator
   ): void {
     this.keyPrefixValidators.set(prefix, validator);
+  }
+
+  afterInit(server: Server): void {
+    server.use((client, next) => {
+      void this.authenticate(client)
+        .then((authenticated) => {
+          next(
+            authenticated
+              ? undefined
+              : new Error("WebSocket ticket admission failed")
+          );
+        })
+        .catch(() => next(new Error("WebSocket ticket admission failed")));
+    });
   }
 
   // grabs the lock for key, only if nobody else already has it - scoped by
@@ -111,7 +126,7 @@ export class RealtimeGateway
   }
 
   async handleConnection(client: Socket): Promise<void> {
-    const ready = this.admit(client);
+    const ready = this.joinRooms(client);
     client.data.ready = ready;
     if (!(await ready) && client.connected) {
       client.disconnect(true);
@@ -132,7 +147,7 @@ export class RealtimeGateway
     }
   }
 
-  private async admit(client: Socket): Promise<boolean> {
+  private async authenticate(client: Socket): Promise<boolean> {
     const ticket = client.handshake.query.ticket;
     if (
       !this.admissionService ||
@@ -148,22 +163,27 @@ export class RealtimeGateway
     } catch {
       return false;
     }
-    if (!client.connected) {
-      return false;
-    }
-
     client.data.userId = admission.sub;
     client.data.sessionId = admission.sid;
     client.data.username = admission.username;
     client.data.avatarUrl = admission.avatarUrl;
+    return true;
+  }
 
-    await client.join(`user:${admission.sub}`);
+  private async joinRooms(client: Socket): Promise<boolean> {
+    const subject = client.data.userId as string | undefined;
+    const sessionId = client.data.sessionId as string | undefined;
+    if (!subject || !sessionId || !this.admissionService) {
+      return false;
+    }
+
+    await client.join(`user:${subject}`);
     if (!client.connected) {
       return false;
     }
 
     const memberships = await this.prisma.projectMember.findMany({
-      where: { userId: admission.sub },
+      where: { userId: subject },
       select: { projectId: true },
     });
     for (const membership of memberships) {
@@ -175,10 +195,7 @@ export class RealtimeGateway
         async () => {
           if (
             !client.connected ||
-            !(await this.isCurrentProjectMember(
-              admission.sub,
-              membership.projectId
-            ))
+            !(await this.isCurrentProjectMember(subject, membership.projectId))
           ) {
             return;
           }
@@ -191,13 +208,14 @@ export class RealtimeGateway
     if (!client.connected) {
       return false;
     }
-    this.startSocketGuards(client, admission);
+    this.startSocketGuards(client, subject, sessionId);
     return true;
   }
 
   private startSocketGuards(
     client: Socket,
-    admission: WebSocketAdmission
+    subject: string,
+    sessionId: string
   ): void {
     this.clearSocketGuards(client.id);
     let revalidationInFlight = false;
@@ -206,7 +224,7 @@ export class RealtimeGateway
         return;
       }
       revalidationInFlight = true;
-      void this.admissionService!.isSessionActive(admission.sub, admission.sid)
+      void this.admissionService!.isSessionActive(subject, sessionId)
         .then((active) => {
           if (!active && client.connected) {
             client.disconnect(true);
