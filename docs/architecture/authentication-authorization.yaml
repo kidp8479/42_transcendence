@@ -92,6 +92,9 @@ components:
     requirements:
       - deny public access to /auth/internal
       - preserve cookies and forwarded headers
+      - redact websocket query parameters from access and routine error logs
+      - rate-limit websocket handshakes per source IP
+      - cap concurrent websocket connections per source IP
       - terminate TLS in production
   go-auth:
     responsibilities:
