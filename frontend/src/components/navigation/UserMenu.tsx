@@ -58,8 +58,6 @@ export function UserMenu({ session }: UserMenuProps) {
           >
             <Avatar
               alt={`${session.user.username}'s avatar`}
-              bordered
-              color="success"
               img={session.user.avatarUrl ?? undefined}
               placeholderInitials={initials}
               rounded
