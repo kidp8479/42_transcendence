@@ -12,7 +12,7 @@ module.exports = [
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: 'tsconfig.json',
+        project: 'tsconfig.eslint.json',
         tsconfigRootDir: __dirname,
         sourceType: 'module',
       },
@@ -22,7 +22,7 @@ module.exports = [
       prettier: prettierPlugin,
     },
     rules: {
-      ...tsPlugin.configs['recommended'].rules,
+      ...tsPlugin.configs["recommended"].rules,
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
       '@typescript-eslint/explicit-function-return-type': 'off',

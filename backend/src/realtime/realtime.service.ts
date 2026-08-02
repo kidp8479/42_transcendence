@@ -1,9 +1,13 @@
 import { Injectable } from "@nestjs/common";
+import { FieldLockManager, ReleasedFieldLock } from "./field-lock-manager";
 import { RealtimeGateway } from "./realtime.gateway";
 
 @Injectable()
 export class RealtimeService {
-  constructor(private readonly gateway: RealtimeGateway) {}
+  constructor(
+    private readonly gateway: RealtimeGateway,
+    private readonly fieldLockManager: FieldLockManager
+  ) {}
 
   emitToProject(projectId: string, event: string, payload: unknown): void {
     this.gateway.server.to(`project:${projectId}`).emit(event, payload);
@@ -13,8 +17,51 @@ export class RealtimeService {
     this.gateway.server.to(`user:${userId}`).emit(event, payload);
   }
 
-  isLockedByOther(key: string, userId: string): boolean {
-    return this.gateway.isLockedByOtherUser(key, userId);
+  async withValidatedFieldLock<T>(
+    projectId: string,
+    key: string,
+    userId: string,
+    token: string | undefined,
+    authorize: () => Promise<void>,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    return this.fieldLockManager.withValidatedLease(
+      projectId,
+      key,
+      userId,
+      token,
+      authorize,
+      operation
+    );
+  }
+
+  async withProjectFieldLock<T>(
+    projectId: string,
+    key: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    return this.fieldLockManager.withProjectResource(projectId, key, operation);
+  }
+
+  async withProjectLock<T>(
+    projectId: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    return this.fieldLockManager.withProject(projectId, operation);
+  }
+
+  assertFieldLockOwnerIfLocked(
+    projectId: string,
+    key: string,
+    userId: string,
+    token: string | undefined
+  ): void {
+    this.fieldLockManager.assertLeaseOwnerIfLocked(
+      projectId,
+      key,
+      userId,
+      token
+    );
   }
 
   // lets each owning module teach the gateway how to resolve one of its own
@@ -29,15 +76,22 @@ export class RealtimeService {
 
   // call when a lockable resource is deleted, so a lock nobody will ever
   // release (the resource is gone, findById would now 404) doesn't linger
-  // in the gateway's Map until its holder happens to disconnect
-  forceReleaseLock(key: string): void {
-    this.gateway.forceReleaseLock(key);
+  // in the lock manager until its holder happens to disconnect
+  releaseFieldLockForResource(key: string): ReleasedFieldLock | undefined {
+    return this.fieldLockManager.releaseResource(key);
   }
 
   // call when a member is removed from a project, so any lock they held
   // there doesn't outlive their membership - see the gateway's own comment
-  forceReleaseLocksForUserInProject(userId: string, projectId: string): void {
-    this.gateway.forceReleaseLocksForUserInProject(userId, projectId);
+  releaseFieldLocksForUserInProject(
+    userId: string,
+    projectId: string
+  ): ReleasedFieldLock[] {
+    return this.fieldLockManager.releaseUserInProject(userId, projectId);
+  }
+
+  emitFieldUnlock(released: ReleasedFieldLock): void {
+    this.gateway.emitFieldUnlock(released);
   }
 
   // handleConnection only joins project rooms from a snapshot taken at

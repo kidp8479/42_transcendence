@@ -124,11 +124,18 @@ export async function createDiscoveryBlock(
 // block's own body (200, not 204), same as deleteDiscoveryBlockItem.
 export async function deleteDiscoveryBlock(
   projectId: string,
-  discoveryBlockId: string
+  discoveryBlockId: string,
+  fieldLockToken?: string
 ): Promise<DiscoveryBlock> {
   const payload = await apiClient<unknown>(
     "/projects/" + projectId + "/discovery-blocks/" + discoveryBlockId,
-    { method: "DELETE" }
+    {
+      method: "DELETE",
+      headers:
+        fieldLockToken === undefined
+          ? undefined
+          : { "X-Field-Lock-Token": fieldLockToken },
+    }
   );
 
   const parsed = parseDiscoveryBlock(payload);
@@ -152,7 +159,8 @@ export async function updateDiscoveryBlock(
     notes?: string;
     color?: number;
     icon?: string;
-  }
+  },
+  fieldLockToken: string
 ): Promise<DiscoveryBlock> {
   // apiClient attaches X-CSRF-Token automatically for mutating requests
   // (PATCH here) and JSON-encodes `body` itself
@@ -161,6 +169,7 @@ export async function updateDiscoveryBlock(
     {
       method: "PATCH",
       body: updates,
+      headers: { "X-Field-Lock-Token": fieldLockToken },
     }
   );
 

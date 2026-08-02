@@ -9,6 +9,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
+import { firstHeaderValue } from "../common/first-header-value";
 import { IS_PUBLIC_KEY } from "./public.decorator";
 import type {
   AuthenticatedRequest,
@@ -175,10 +176,4 @@ function readCookie(
     }
   }
   return undefined;
-}
-
-function firstHeaderValue(
-  value: string | string[] | undefined
-): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
 }

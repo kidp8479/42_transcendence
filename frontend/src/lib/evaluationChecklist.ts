@@ -124,11 +124,19 @@ export async function updateEvaluationChecklistItem(
     isChecked: boolean;
     order: number;
     section: EvaluationChecklistSection;
-  }>
+  }>,
+  fieldLockToken?: string
 ): Promise<EvaluationChecklistItem> {
   return apiClient<unknown>(
     `/projects/${projectId}/evaluation-checklist-items/${id}`,
-    { method: "PATCH", body: dto }
+    {
+      method: "PATCH",
+      body: dto,
+      headers:
+        fieldLockToken === undefined
+          ? undefined
+          : { "X-Field-Lock-Token": fieldLockToken },
+    }
   ).then((payload) => {
     const parsed = parseEvaluationChecklistItem(payload);
     if (parsed === null) {
@@ -144,11 +152,18 @@ export async function updateEvaluationChecklistItem(
 // instead of assuming an empty response.
 export async function deleteEvaluationChecklistItem(
   projectId: string,
-  id: string
+  id: string,
+  fieldLockToken?: string
 ): Promise<EvaluationChecklistItem> {
   return apiClient<unknown>(
     `/projects/${projectId}/evaluation-checklist-items/${id}`,
-    { method: "DELETE" }
+    {
+      method: "DELETE",
+      headers:
+        fieldLockToken === undefined
+          ? undefined
+          : { "X-Field-Lock-Token": fieldLockToken },
+    }
   ).then((payload) => {
     const parsed = parseEvaluationChecklistItem(payload);
     if (parsed === null) {

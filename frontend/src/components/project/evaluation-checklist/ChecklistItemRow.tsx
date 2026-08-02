@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Checkbox, TextInput } from "flowbite-react";
 import { RiDeleteBackFill } from "react-icons/ri";
 import { useFieldLock } from "@/hooks/useFieldLock";
@@ -19,8 +19,8 @@ interface ChecklistItemRowProps {
   // resolves to whether the save actually succeeded - the caller (this
   // component) needs that to decide whether it's safe to release the lock
   // and exit edit mode, or whether to keep both and let the user retry
-  onCommitLabel: (newValue: string) => Promise<boolean>;
-  onDelete: () => void;
+  onCommitLabel: (newValue: string, fieldLockToken: string) => Promise<boolean>;
+  onDelete: (fieldLockToken: string | undefined) => void;
 }
 
 // One item = one lock (keyed by the item's own id), unlike the Discovery
@@ -39,10 +39,8 @@ export function ChecklistItemRow({
   onCommitLabel,
   onDelete,
 }: ChecklistItemRowProps) {
-  const { lock, isLockedByOther, acquire, release } = useFieldLock(
-    projectId,
-    `checklist-item:${item.id}`
-  );
+  const { lock, isLockedByOther, leaseToken, leaseLost, acquire, release } =
+    useFieldLock(projectId, `checklist-item:${item.id}`);
 
   // Enter calls commit() directly, which triggers onCommitLabel -> the
   // parent sets isEditing=false -> this TextInput unmounts -> the browser
@@ -50,6 +48,10 @@ export function ChecklistItemRow({
   // same value. Guards against sending the same commit twice; reset
   // whenever a fresh edit session actually starts.
   const hasCommittedRef = useRef(false);
+  const preserveDraftRef = useRef(false);
+  const suppressBlurSaveRef = useRef(false);
+  const pendingBlurSaveRef = useRef<number | undefined>(undefined);
+  const [draft, setDraft] = useState(item.label);
 
   async function startEdit() {
     if (isLockedByOther) {
@@ -58,9 +60,10 @@ export function ChecklistItemRow({
     // the server can still refuse (someone else won the race) even though
     // isLockedByOther looked false locally - only enter edit mode once it
     // actually confirms the lock is ours
-    const granted = await acquire();
-    if (granted) {
+    const fieldLockToken = await acquire();
+    if (fieldLockToken !== null) {
       hasCommittedRef.current = false;
+      preserveDraftRef.current = false;
       onStartEdit();
     }
   }
@@ -76,8 +79,13 @@ export function ChecklistItemRow({
       return;
     }
     hasCommittedRef.current = true;
-    const success = await onCommitLabel(newValue);
+    if (leaseToken === null) {
+      hasCommittedRef.current = false;
+      return;
+    }
+    const success = await onCommitLabel(newValue, leaseToken);
     if (success) {
+      setDraft(newValue);
       release();
       onStopEdit();
     } else {
@@ -90,6 +98,8 @@ export function ChecklistItemRow({
     // too, and the resulting blur would otherwise still call commit()
     // and save the value the user just chose to discard
     hasCommittedRef.current = true;
+    preserveDraftRef.current = false;
+    setDraft(item.label);
     release();
     onStopEdit();
   }
@@ -101,10 +111,60 @@ export function ChecklistItemRow({
   // with no lock check at all, so without this the user could keep typing
   // into a field someone else now legitimately holds.
   useEffect(() => {
-    if (isEditing && isLockedByOther) {
+    if (isEditing && (isLockedByOther || leaseToken === null)) {
+      preserveDraftRef.current = true;
       onStopEdit();
     }
-  }, [isEditing, isLockedByOther, onStopEdit]);
+  }, [isEditing, isLockedByOther, leaseToken, onStopEdit]);
+
+  useEffect(() => {
+    if (!isEditing && !preserveDraftRef.current) {
+      setDraft(item.label);
+    }
+  }, [isEditing, item.label]);
+
+  useEffect(() => {
+    function suppressBlurSave() {
+      suppressBlurSaveRef.current = true;
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        suppressBlurSave();
+      }
+    }
+
+    window.addEventListener("blur", suppressBlurSave);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", suppressBlurSave);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (pendingBlurSaveRef.current !== undefined) {
+        window.clearTimeout(pendingBlurSaveRef.current);
+      }
+    },
+    []
+  );
+
+  function saveAfterSameTabBlur(value: string) {
+    if (pendingBlurSaveRef.current !== undefined) {
+      window.clearTimeout(pendingBlurSaveRef.current);
+    }
+    pendingBlurSaveRef.current = window.setTimeout(() => {
+      pendingBlurSaveRef.current = undefined;
+      if (suppressBlurSaveRef.current) {
+        return;
+      }
+      if (value.length <= EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH) {
+        void commit(value);
+      }
+    }, 50);
+  }
 
   return (
     <li className="group flex items-center gap-2.5 rounded-md py-2 pr-2 pl-4 text-text-secondary hover:border hover:border-surface-border">
@@ -124,16 +184,18 @@ export function ChecklistItemRow({
           maxLength={EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH}
           className="w-full px-2 text-sm"
           aria-label={`Edit "${item.label}"`}
-          defaultValue={item.label}
+          value={draft}
           autoFocus
           readOnly={isLockedByOther}
-          onBlur={(event) => {
-            if (
-              event.currentTarget.value.length <=
-              EVALUATION_CHECKLIST_ITEM_LABEL_MAX_LENGTH
-            )
-              commit(event.currentTarget.value);
+          onFocus={() => {
+            suppressBlurSaveRef.current = false;
+            if (pendingBlurSaveRef.current !== undefined) {
+              window.clearTimeout(pendingBlurSaveRef.current);
+              pendingBlurSaveRef.current = undefined;
+            }
           }}
+          onBlur={(event) => saveAfterSameTabBlur(event.currentTarget.value)}
+          onChange={(event) => setDraft(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               if (
@@ -169,11 +231,17 @@ export function ChecklistItemRow({
         </button>
       )}
 
+      {leaseLost && !isEditing && draft !== item.label && (
+        <span className="text-xs text-control-error">
+          Connection lost. Your unsaved edit is preserved.
+        </span>
+      )}
+
       <button
         type="button"
         className="opacity-0 transition-opacity group-hover:opacity-50 group-focus-within:opacity-50 focus:opacity-100"
         aria-label={`Delete "${item.label}"`}
-        onClick={onDelete}
+        onClick={() => onDelete(leaseToken ?? undefined)}
       >
         <RiDeleteBackFill aria-hidden="true" className="h-5 w-5" />
       </button>

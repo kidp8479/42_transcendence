@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
 // Mirrors the backend's FieldLock shape (RealtimeGateway).
@@ -10,6 +10,7 @@ export interface FieldLock {
   // account - two tabs signed into the same account are two different
   // sockets, and isLockedByOther below needs to tell them apart
   socketId: string;
+  expiresAt: number;
 }
 
 interface FieldLockedEvent {
@@ -24,10 +25,12 @@ interface FieldUnlockedEvent {
 interface UseFieldLockResult {
   lock: FieldLock | null;
   isLockedByOther: boolean;
+  leaseToken: string | null;
+  leaseLost: boolean;
   // resolves to whether the lock was actually granted - callers must wait
   // for this before treating the resource as editable, the request can
   // still be denied server-side even if the local state looked free
-  acquire: () => Promise<boolean>;
+  acquire: () => Promise<string | null>;
   release: () => void;
 }
 
@@ -39,11 +42,18 @@ export function useFieldLock(
   key: string
 ): UseFieldLockResult {
   const [lock, setLock] = useState<FieldLock | null>(null);
+  const [leaseToken, setLeaseToken] = useState<string | null>(null);
+  const [leaseLost, setLeaseLost] = useState(false);
+  const leaseTokenRef = useRef<string | null>(null);
   // this tab's own socket id - re-read on every "connect" (including
   // reconnects, which socket.io-client assigns a new id to) so
   // isLockedByOther below always compares against the live connection,
   // not a stale id from before a reconnect
   const [mySocketId, setMySocketId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    leaseTokenRef.current = leaseToken;
+  }, [leaseToken]);
 
   useEffect(() => {
     const socket = getRealtimeSocket();
@@ -55,6 +65,9 @@ export function useFieldLock(
         { projectId, key },
         (response: { lock: FieldLock | undefined }) => {
           setLock(response.lock ?? null);
+          if (response.lock?.socketId !== socket.id) {
+            setLeaseToken(null);
+          }
         }
       );
     }
@@ -75,16 +88,28 @@ export function useFieldLock(
     function handleUnlocked(event: FieldUnlockedEvent) {
       if (event.key === key) {
         setLock(null);
+        setLeaseToken(null);
+        setLeaseLost(false);
       }
+    }
+
+    function handleDisconnect() {
+      const heldLease = leaseTokenRef.current !== null;
+      setLock(null);
+      setLeaseToken(null);
+      setLeaseLost(heldLease);
+      setMySocketId(undefined);
     }
 
     socket.on("field:locked", handleLocked);
     socket.on("field:unlocked", handleUnlocked);
+    socket.on("disconnect", handleDisconnect);
 
     return () => {
       socket.off("connect", queryLock);
       socket.off("field:locked", handleLocked);
       socket.off("field:unlocked", handleUnlocked);
+      socket.off("disconnect", handleDisconnect);
       // a component unmounting (navigating away) doesn't close the socket,
       // so the server's disconnect-based cleanup would never fire for this -
       // release explicitly. No-op server-side if this client never held it.
@@ -92,15 +117,50 @@ export function useFieldLock(
     };
   }, [projectId, key]);
 
-  const acquire = useCallback((): Promise<boolean> => {
+  useEffect(() => {
+    if (leaseToken === null) {
+      return;
+    }
+
+    const socket = getRealtimeSocket();
+    const interval = window.setInterval(() => {
+      socket.emit(
+        "field:renew",
+        { projectId, key, leaseToken },
+        (response: { renewed: boolean }) => {
+          if (!response.renewed) {
+            setLeaseToken(null);
+            setLock(null);
+            setLeaseLost(true);
+          }
+        }
+      );
+    }, 10_000);
+
+    return () => window.clearInterval(interval);
+  }, [projectId, key, leaseToken]);
+
+  const acquire = useCallback((): Promise<string | null> => {
     const socket = getRealtimeSocket();
     return new Promise((resolve) => {
       socket.emit(
         "field:lock",
         { projectId, key },
-        (response: { locked: boolean; lock: FieldLock | undefined }) => {
+        (response: {
+          locked: boolean;
+          lock: FieldLock | undefined;
+          leaseToken: string | undefined;
+        }) => {
           setLock(response.lock ?? null);
-          resolve(response.locked);
+          const token =
+            response.locked && typeof response.leaseToken === "string"
+              ? response.leaseToken
+              : null;
+          setLeaseToken(token);
+          if (token !== null) {
+            setLeaseLost(false);
+          }
+          resolve(token);
         }
       );
     });
@@ -110,11 +170,15 @@ export function useFieldLock(
     const socket = getRealtimeSocket();
     socket.emit("field:unlock", { projectId, key });
     setLock(null);
+    setLeaseToken(null);
+    setLeaseLost(false);
   }, [projectId, key]);
 
   return {
     lock,
     isLockedByOther: lock !== null && lock.socketId !== mySocketId,
+    leaseToken,
+    leaseLost,
     acquire,
     release,
   };

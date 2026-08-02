@@ -68,6 +68,8 @@ function DiscoveryBlockEditPage() {
   const {
     lock: editingLock,
     isLockedByOther,
+    leaseToken,
+    leaseLost,
     acquire: acquireFieldLock,
     release: releaseFieldLock,
   } = useFieldLock(
@@ -90,9 +92,9 @@ function DiscoveryBlockEditPage() {
   // skip re-acquiring after this same user saves (releasing the lock) and
   // then edits again on the same page load, or after losing an acquire
   // race once and the other holder later releases it.
-  async function ensureLock(): Promise<boolean> {
-    if (editingLock !== null && !isLockedByOther) {
-      return true;
+  async function ensureLock(): Promise<string | null> {
+    if (editingLock !== null && !isLockedByOther && leaseToken !== null) {
+      return leaseToken;
     }
     setIsAcquiringLock(true);
     const granted = await acquireFieldLock();
@@ -225,14 +227,23 @@ function DiscoveryBlockEditPage() {
     // @Transform) - trimmed here too so the input reflects what actually
     // got saved, since title isn't resynced from loaderData after invalidate
     const trimmedTitle = title.trim();
+    const fieldLockToken = await ensureLock();
+    if (fieldLockToken === null) {
+      return;
+    }
     try {
       // color/icon are autosaved separately (handleColorChange/
       // handleIconChange below) - not sent again here
-      await updateDiscoveryBlock(params.projectId, params.discoveryBlockId, {
-        title: trimmedTitle,
-        description: description,
-        notes: notes,
-      });
+      await updateDiscoveryBlock(
+        params.projectId,
+        params.discoveryBlockId,
+        {
+          title: trimmedTitle,
+          description: description,
+          notes: notes,
+        },
+        fieldLockToken
+      );
     } catch (error) {
       console.error("Failed to save discovery block", error);
       showToast({
@@ -252,15 +263,21 @@ function DiscoveryBlockEditPage() {
   // toggle below - a discrete click, unlike Title/Description/Notes which
   // need a real "saving..." indicator before autosave-while-typing is safe
   async function handleColorChange(newColorIndex: number): Promise<void> {
-    if (!(await ensureLock())) {
+    const fieldLockToken = await ensureLock();
+    if (fieldLockToken === null) {
       return;
     }
     const previousColorIndex = selectedColorIndex;
     setSelectedColorIndex(newColorIndex);
     try {
-      await updateDiscoveryBlock(params.projectId, params.discoveryBlockId, {
-        color: newColorIndex,
-      });
+      await updateDiscoveryBlock(
+        params.projectId,
+        params.discoveryBlockId,
+        {
+          color: newColorIndex,
+        },
+        fieldLockToken
+      );
     } catch (error) {
       console.error("Failed to save discovery block color", error);
       showToast({
@@ -275,15 +292,21 @@ function DiscoveryBlockEditPage() {
   }
 
   async function handleIconChange(newIcon: string): Promise<void> {
-    if (!(await ensureLock())) {
+    const fieldLockToken = await ensureLock();
+    if (fieldLockToken === null) {
       return;
     }
     const previousIcon = selectedIcon;
     setSelectedIcon(newIcon);
     try {
-      await updateDiscoveryBlock(params.projectId, params.discoveryBlockId, {
-        icon: newIcon,
-      });
+      await updateDiscoveryBlock(
+        params.projectId,
+        params.discoveryBlockId,
+        {
+          icon: newIcon,
+        },
+        fieldLockToken
+      );
     } catch (error) {
       console.error("Failed to save discovery block icon", error);
       showToast({
@@ -453,6 +476,13 @@ function DiscoveryBlockEditPage() {
             once they save.
           </span>
         </div>
+      )}
+
+      {leaseLost && !isLockedByOther && (
+        <p className="text-sm text-control-error" role="status">
+          Connection lost. Your unsaved changes are preserved; saving will
+          acquire a new editing lease.
+        </p>
       )}
 
       {/* single column below lg, 2 columns above (fields left, checklist right) */}

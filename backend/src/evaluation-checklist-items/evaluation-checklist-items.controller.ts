@@ -16,10 +16,12 @@ import {
   Delete,
   Req,
   Body,
+  Headers,
   Param,
   ParseUUIDPipe,
 } from "@nestjs/common";
 import { ApiSecurity } from "@nestjs/swagger";
+import { firstHeaderValue } from "../common/first-header-value";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { EvaluationChecklistItemsService } from "./evaluation-checklist-items.service";
 import { CreateEvaluationChecklistItemDto } from "./dto/create-evaluation-checklist-item.dto";
@@ -77,13 +79,16 @@ export class EvaluationChecklistItemsController {
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateEvaluationChecklistItemDto,
+    @Headers("x-field-lock-token")
+    fieldLockToken: string | string[] | undefined,
     @Req() request: AuthenticatedRequest
   ) {
     return this.evaluationChecklistItem.update(
       projectId,
       id,
       dto,
-      request.user.id
+      request.user.id,
+      firstHeaderValue(fieldLockToken)
     );
   }
 
@@ -93,8 +98,15 @@ export class EvaluationChecklistItemsController {
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("id", ParseUUIDPipe) id: string,
+    @Headers("x-field-lock-token")
+    fieldLockToken: string | string[] | undefined,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.evaluationChecklistItem.remove(projectId, id, request.user.id);
+    return this.evaluationChecklistItem.remove(
+      projectId,
+      id,
+      request.user.id,
+      firstHeaderValue(fieldLockToken)
+    );
   }
 }
