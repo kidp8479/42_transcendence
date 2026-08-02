@@ -176,7 +176,7 @@ func TestRuntimeCoalescesAndNegativeCachesUnknownKeyRefresh(t *testing.T) {
 	const callers = 20
 	var wait sync.WaitGroup
 	wait.Add(callers)
-	for range callers {
+	for i := 0; i < callers; i++ {
 		go func() {
 			defer wait.Done()
 			if _, found, err := runtime.PublicKey(context.Background(), "v2"); err != nil || found {
