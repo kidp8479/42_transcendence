@@ -71,7 +71,7 @@ export class UsersController {
     const detectedMimetype = detectImageMimetype(file.buffer);
     if (detectedMimetype === undefined) {
       throw new BadRequestException(
-        "Avatar must be a PNG, JPEG, GIF, or WebP image"
+        "Avatar must be a PNG, JPEG, GIF image"
       );
     }
     return this.usersService.uploadAvatar(

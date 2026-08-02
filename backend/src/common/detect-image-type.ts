@@ -1,6 +1,5 @@
 // Client-declared Content-Type (Express.Multer.File#mimetype) is fully
-// attacker-controlled - a request can label an SVG (which can carry
-// <script>) as "image/svg+xml" and a bare `mimetype.startsWith("image/")`
+// attacker-controlled - a bare `mimetype.startsWith("image/")`
 // check lets it straight through. Sniffing the actual bytes against a small
 // raster allowlist closes that off, and callers should store/serve the
 // sniffed mimetype - never the client's header - so a stored object can
@@ -34,15 +33,6 @@ const SIGNATURES: { mimetype: string; matches: (buf: Buffer) => boolean }[] = [
       buf[3] === 0x38 &&
       (buf[4] === 0x37 || buf[4] === 0x39) &&
       buf[5] === 0x61,
-  },
-  {
-    mimetype: "image/svg",
-    matches: (buf) =>
-      buf.length >= 4 &&
-      buf[0] === 0x3c &&
-      buf[1] === 0x73 &&
-      buf[2] === 0x76 &&
-      buf[3] === 0x67,
   },
 ];
 

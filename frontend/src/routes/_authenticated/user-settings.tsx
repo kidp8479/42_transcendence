@@ -254,7 +254,7 @@ function UserSettingsPage() {
                 and drop
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                SVG, PNG, JPG or GIF
+                PNG, JPG or GIF
               </p>
             </div>
             <FileInput
