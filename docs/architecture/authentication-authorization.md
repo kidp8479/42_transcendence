@@ -2,7 +2,7 @@
 
 **Status:** Accepted target architecture
 **Scope:** ft_transcendence local credentials, 42 OAuth2, Google OIDC, browser/API authentication, authorization, WebSockets, and secret management.
-**Implementation status:** TR-70 delivers the HTTP bearer cutover: memory-only access JWTs, rotating refresh-token families, and authoritative Go introspection. WebSocket ticket admission remains intentionally disabled until TR-74.
+**Implementation status:** TR-70 delivers the HTTP bearer cutover: memory-only access JWTs, rotating refresh-token families, and authoritative Go introspection. WebSocket ticket admission remains intentionally disabled until TR-74. Consequently all realtime delivery is disabled in this interval, including notification pushes, Discovery/Evaluation collaboration updates, and field locks; clients continue to use the HTTP APIs.
 
 ## 1. Executive decisions
 

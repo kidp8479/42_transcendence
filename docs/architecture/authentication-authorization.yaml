@@ -125,6 +125,10 @@ components:
       status: disabled-pending-TR-74
       legacy_cookie_admission: removed
       future_credential: one-time-websocket-ticket
+      disabled_features:
+        - notification-push
+        - discovery-and-evaluation-collaboration
+        - field-locks
     authorization:
       - verify-project-membership-before-joining-each-room
       - disconnect-when-ticket-or-session-revalidation-fails

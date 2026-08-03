@@ -16,7 +16,7 @@ import {
   Param,
   ParseUUIDPipe,
 } from "@nestjs/common";
-import { ApiSecurity } from "@nestjs/swagger";
+import { ApiBearerAuth } from "@nestjs/swagger";
 import { firstHeaderValue } from "../common/first-header-value";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { DiscoveryBlocksService } from "./discovery-blocks.service";
@@ -50,7 +50,7 @@ export class DiscoveryBlocksController {
   }
 
   // POST
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -61,7 +61,7 @@ export class DiscoveryBlocksController {
   }
 
   // PATCH
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -81,7 +81,7 @@ export class DiscoveryBlocksController {
   }
 
   // DELETE
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete(":id")
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,

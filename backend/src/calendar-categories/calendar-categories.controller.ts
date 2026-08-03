@@ -14,7 +14,7 @@ import {
   ParseUUIDPipe,
   Req,
 } from "@nestjs/common";
-import { ApiSecurity } from "@nestjs/swagger";
+import { ApiBearerAuth } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { CalendarCategoriesService } from "./calendar-categories.service";
 import { CreateCalendarCategoryDto } from "./dto/create-calendar-category.dto";
@@ -27,7 +27,7 @@ export class CalendarCategoriesController {
   ) {}
 
   // create a label for this project
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -65,7 +65,7 @@ export class CalendarCategoriesController {
   }
 
   // rename or recolor a label
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -82,7 +82,7 @@ export class CalendarCategoriesController {
   }
 
   // delete a label (returns the deleted row, so 200 not 204)
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete(":id")
   delete(
     @Param("projectId", ParseUUIDPipe) projectId: string,

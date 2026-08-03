@@ -252,7 +252,8 @@ paths:
         Internal endpoint. nginx must not expose this path publicly. Invalid,
         expired JWTs and inactive refresh families return typed 401 responses.
         Vault, database, or other dependency failures return typed 503 responses.
-        WebSocket admission is disabled until TR-74 tickets are implemented.
+        WebSocket admission and all realtime delivery are disabled until TR-74
+        tickets are implemented; HTTP API access remains available.
       security:
         - internalBearer: []
       requestBody:
