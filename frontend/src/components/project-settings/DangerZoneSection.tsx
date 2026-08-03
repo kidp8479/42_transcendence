@@ -7,8 +7,14 @@ import { LiaTrashAltSolid } from "react-icons/lia";
 import { deleteProject } from "@/lib/projectsApi";
 
 // Displays destructive project actions inside the Project Settings page.
-// This section is intentionally isolated from the other settings because these
-// actions have irreversible or high-impact consequences.
+// Isolated from the other settings sections because these actions are
+// irreversible/high-impact - this component owns confirmation UX only for
+// those, not general project settings.
+//
+// OWNER-only (project-settings.tsx gates rendering on role === "OWNER") -
+// ADMIN gets "Leave project" instead, from the cogwheel menu on the Projects
+// grid (ProjectCard.tsx), which has its own separate delete/leave
+// confirmation flow mirroring this one.
 
 interface DangerZoneSectionProps {
   projectId: string;
@@ -37,6 +43,10 @@ export function DangerZoneSection({
     setConfirmText("");
   }
 
+  // DELETE /api/projects/:id (projectsApi.ts) - requires typing the exact
+  // project name first. On success the caller (project-settings.tsx)
+  // redirects back to /projects, which - via the existing "project:deleted"
+  // websocket sync - also disappears live for every other connected member.
   async function handleDeleteProject() {
     if (!canConfirmDelete) {
       return;
@@ -201,30 +211,3 @@ export function DangerZoneSection({
     </SettingsSection>
   );
 }
-
-// Current actions:
-// - Delete project
-//   => permanently removes the project and its related data.
-//   => requires the user to type the exact project name before confirming.
-//   => uses the existing deleteProject API from projectsApi.ts.
-//
-// The delete confirmation UX was previously implemented inside ProjectCard.tsx.
-// The project management flow was changed so that both:
-// - "Manage members"
-// - "Delete project"
-//
-// from the project card dropdown navigate to the Project Settings page.
-// The actual delete action now lives here instead of being performed inline
-// from the projects list.
-//
-// Permissions:
-// - Only ADMIN project members should see and use destructive actions.
-// - The frontend hides/disables the controls for non-ADMIN users.
-// - The backend remains responsible for enforcing authorization.
-//
-// After successful deletion:
-// - the user should be redirected back to the projects list
-// - the deleted project should no longer appear in active project views
-//
-// This component should not contain general project settings logic.
-// It only owns dangerous/destructive actions that require extra confirmation.

@@ -17,17 +17,13 @@ import { getSession } from "@/lib/auth";
 import { RemoveMemberModal } from "./RemoveMemberModal";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
-// Displays the users currently belonging to a project.
-//
-// A project membership is represented by the ProjectMember join table:
-// one row = one User belonging to one Project.
-//
-// This section is responsible for:
-// - fetching and displaying the project's current members
-// - showing basic member information (avatar initials + username)
-// - allowing ADMIN users to remove members
-//
-// API interactions are handled through projectMembersApi.ts:
+// Displays the users currently belonging to a project (the ProjectMember
+// join table: one row = one User in one Project). GET
+// /api/projects/:projectId/members - any project member can view. The
+// frontend permission checks below are for UX only; the backend always
+// re-validates every mutation.
+// TODO: consider preventing removal of the last remaining ADMIN, if that
+// becomes a real product requirement (not currently enforced anywhere).
 interface MembersSectionProps {
   projectId: string;
 }
@@ -103,6 +99,9 @@ export function MembersSection({ projectId }: MembersSectionProps) {
   const canAddMembers =
     currentUserRole === "OWNER" || currentUserRole === "ADMIN";
 
+  // PATCH /api/projects/:projectId/members/:userId (projectMembersApi.ts) -
+  // OWNER or ADMIN can promote a MEMBER to ADMIN; only OWNER can demote an
+  // ADMIN back to MEMBER (both enforced backend-side too).
   const handleRoleChange = async (userId: string, role: "ADMIN" | "MEMBER") => {
     try {
       await updateMemberRole(projectId, userId, role);
@@ -119,6 +118,12 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     }
   };
 
+  // DELETE /api/projects/:projectId/members/:userId (projectMembersApi.ts) -
+  // OWNER/ADMIN can remove someone else. The backend also allows removing
+  // yourself regardless of role ("leave"), but that path isn't exposed here.
+  // TODO: add a self-service "leave project" action to this component too -
+  // currently only reachable via the cogwheel menu on the Projects grid
+  // (ProjectCard.tsx).
   const handleConfirmRemove = async () => {
     if (!memberToRemove) {
       return;
@@ -139,6 +144,8 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     }
   };
 
+  // POST /api/projects/:projectId/members (projectMembersApi.ts) - only
+  // OWNER/ADMIN can add members; body is { username }, resolved server-side.
   async function handleAddMember(event: FormEvent) {
     event.preventDefault();
     try {
@@ -220,27 +227,3 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     </>
   );
 }
-
-// GET /api/projects/:projectId/members
-//      => retrieves all members of the project
-//      => any project member can view the member list
-//
-// DELETE /api/projects/:projectId/members/:userId
-//      => removes a user from the project
-//      => only ADMIN members are allowed to perform this action
-//
-// Permissions:
-// - All project members can view this section.
-// - Only ADMIN users should see the remove controls.
-// - The frontend permission check is only for user experience.
-// - The backend always validates permissions to prevent unauthorized API calls.
-//
-// Member management rules:
-// - A member cannot remove themselves unless the backend allows it.
-// - Removing the last ADMIN should be prevented by backend validation
-//   if that rule exists in the project requirements.
-//
-// UI responsibilities:
-// - Render each member with avatar initials and username.
-// - Provide accessible labels for icon-only remove buttons.
-// - Update the member list after successful mutations.

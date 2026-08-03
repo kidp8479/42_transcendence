@@ -12,9 +12,12 @@ import {
 import { useToast } from "@/hooks/useToast";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 
-// Displays project lifecycle management actions inside the Project Settings page.
-// This section is responsible for actions that change the current state of a
-// project without deleting it.
+// Displays project lifecycle management actions inside the Project Settings
+// page. Both actions below go through PATCH /api/projects/:id
+// (projectsApi.ts), restricted to OWNER/ADMIN backend-side; the frontend
+// hides the buttons for MEMBER as UX only. Member management and destructive
+// actions are handled by MembersSection.tsx and DangerZoneSection.tsx, not
+// here.
 
 interface ProjectStatusSectionProps {
   projectId: string;
@@ -33,6 +36,8 @@ export function ProjectStatusSection({
   const [isUpdatingArchive, setIsUpdatingArchive] = useState(false);
   const { showToast } = useToast();
   const safeInvalidateRouter = useSafeRouterInvalidate();
+  // "Mark as finished" maps to Project.status = COMPLETED; other statuses
+  // (e.g. REVIEW) are set/interpreted elsewhere, not by this component.
   const isFinished = status === "COMPLETED";
   const canManageLifecycle = role === "OWNER" || role === "ADMIN";
 
@@ -174,39 +179,3 @@ export function ProjectStatusSection({
     </SettingsSection>
   );
 }
-// Current actions:
-// - Mark as finished
-//   => updates the project status to COMPLETED.
-//   => uses the existing PATCH /api/projects/:id endpoint.
-//
-// - Archive
-//   => hides the project from active project views while keeping the data.
-//   => uses the existing PATCH /api/projects/:id endpoint with isArchived: true.
-//
-// API interactions are handled through projectsApi.ts:
-//
-// PATCH /api/projects/:id
-//      => updates project fields provided in the request body.
-//      => only ADMIN project members are allowed to perform updates.
-//
-// Permissions:
-// - All project members can view the Settings page.
-// - Only ADMIN and OWNER users should see and use lifecycle controls.
-// - Frontend checks are only for user experience.
-// - Backend authorization remains the source of truth.
-//
-// State updates:
-// - After a successful mutation, the UI should refresh the project data so the
-//   displayed status reflects the backend state.
-// - The component should not directly modify project state locally without
-//   confirmation from the API response.
-//
-// Notes:
-// - "Mark as finished" currently maps to Project.status = COMPLETED.
-// - The meaning of other statuses (for example REVIEW) is handled elsewhere
-//   and is not part of this component.
-//
-// This component only manages project lifecycle actions.
-// Member management and destructive actions are handled by:
-// - MembersSection.tsx
-// - DangerZoneSection.tsx
