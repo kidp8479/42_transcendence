@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Sidebar, SidebarItemGroup, SidebarItems } from "flowbite-react";
 import { Link, useLoaderData } from "@tanstack/react-router";
 import { HiChevronLeft, HiChevronRight, HiX } from "react-icons/hi";
+import { HiOutlineChatBubbleLeftRight } from "react-icons/hi2";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
 import { useSidebar } from "@/hooks/useSidebar";
@@ -57,6 +58,7 @@ const sidebarTheme = {
 const sidebarPrimaryNavigation: NavigationItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: MdOutlineDashboard },
   { to: "/projects", label: "Projects", icon: GoFileDirectory },
+  { to: "/chat", label: "Chat", icon: HiOutlineChatBubbleLeftRight },
 ];
 
 function SidebarNavLink({ to, label, icon: Icon }: NavigationItem) {

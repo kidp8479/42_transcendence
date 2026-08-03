@@ -24,6 +24,7 @@ import { Route as AuthenticatedUserSettingsRouteImport } from './routes/_authent
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedProjectIdRouteRouteImport } from './routes/_authenticated/$projectId/route'
 import { Route as AuthenticatedUsersUsernameRouteImport } from './routes/_authenticated/users/$username'
 import { Route as AuthenticatedProjectIdSummaryRouteImport } from './routes/_authenticated/$projectId/summary'
@@ -109,6 +110,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProjectIdRouteRoute =
   AuthenticatedProjectIdRouteRouteImport.update({
     id: '/$projectId',
@@ -174,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
   '/$': typeof SplatRoute
   '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
+  '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/search': typeof AuthenticatedSearchRoute
@@ -199,6 +206,7 @@ export interface FileRoutesByTo {
   '/': typeof PublicIndexRoute
   '/$': typeof SplatRoute
   '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
+  '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/search': typeof AuthenticatedSearchRoute
@@ -226,6 +234,7 @@ export interface FileRoutesById {
   '/_public': typeof PublicRouteRouteWithChildren
   '/$': typeof SplatRoute
   '/_authenticated/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
+  '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/search': typeof AuthenticatedSearchRoute
@@ -254,6 +263,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/$projectId'
+    | '/chat'
     | '/dashboard'
     | '/projects'
     | '/search'
@@ -279,6 +289,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/$projectId'
+    | '/chat'
     | '/dashboard'
     | '/projects'
     | '/search'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/_public'
     | '/$'
     | '/_authenticated/$projectId'
+    | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/projects'
     | '/_authenticated/search'
@@ -441,6 +453,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/chat': {
+      id: '/_authenticated/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof AuthenticatedChatRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/$projectId': {
       id: '/_authenticated/$projectId'
       path: '/$projectId'
@@ -547,6 +566,7 @@ const AuthenticatedProjectIdRouteRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectIdRouteRoute: typeof AuthenticatedProjectIdRouteRouteWithChildren
+  AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
@@ -557,6 +577,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProjectIdRouteRoute:
     AuthenticatedProjectIdRouteRouteWithChildren,
+  AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
