@@ -36,9 +36,13 @@ interface CalendarPageData {
 async function loadCalendarPageData(
   projectId: string
 ): Promise<CalendarPageData> {
-  const events = await listCalendarEvents(projectId);
-  const categories = await listCalendarCategories(projectId);
-  const members = await getMembers(projectId);
+  // Independent requests, none depends on another's result - run them
+  // together instead of one after another.
+  const [events, categories, members] = await Promise.all([
+    listCalendarEvents(projectId),
+    listCalendarCategories(projectId),
+    getMembers(projectId),
+  ]);
   return { events: events, categories: categories, members: members };
 }
 
