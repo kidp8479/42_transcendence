@@ -155,8 +155,9 @@ export async function deleteTask(
 
 // Converts an untrusted JSON value into a real Task, or null if it doesn't
 // match the shape we expect. Never trust a response body's type just because
-// a TS annotation says so.
-function parseTask(value: unknown): Task | null {
+// a TS annotation says so. Exported: also reused to validate WS payloads in
+// kanban.tsx, same as parseDiscoveryBlockItem is reused by discovery.tsx.
+export function parseTask(value: unknown): Task | null {
   if (!isRecord(value)) {
     return null;
   }

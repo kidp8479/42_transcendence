@@ -10,13 +10,16 @@ import {
   createTask,
   deleteTask,
   listTasks,
+  parseTask,
   updateTask,
   type TaskAssigneeUser,
   type TaskStatus,
   type UpdateTaskBody,
 } from "@/lib/tasks";
+import { STATUS_ORDER } from "@/lib/taskStatusStyles";
 import { listTaskCategories } from "@/lib/taskCategories";
 import { getMembers } from "@/lib/projectMembersApi";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { ApiError } from "@/lib/apiClient";
 
 async function loadKanbanPageData(projectId: string) {
@@ -45,11 +48,12 @@ export const Route = createFileRoute("/_authenticated/$projectId/kanban")({
 // task deleted from under an open drawer resolves to null instead of a dangling
 // object. Note this does NOT make the open FORM fresh: it seeds its draft once at
 // mount and never resyncs, so a change arriving from elsewhere lands in `tasks`
-// and on the card but not in the fields. Save works around it by sending only the
-// fields the user actually changed - see handleSubmitDrawer. Resyncing the draft
-// itself belongs with the realtime wiring: this board subscribes to nothing yet
-// (unlike Discovery and the checklist, which use useLiveItemSync) and
-// TasksService emits nothing either.
+// and on the card but not in the fields (the socket handlers below dispatch into
+// `tasks`, same as a local edit, but nothing re-keys an already-open form). Save
+// works around it by sending only the fields the user actually changed - see
+// handleSubmitDrawer. A live-resyncing draft (like a real per-field lock, the
+// way Discovery/the checklist do it) is still open - see Cricriiii #6 in
+// pr34-tr49-open-findings.
 type DrawerTarget =
   | { mode: "create"; status: TaskStatus }
   | { mode: "edit"; taskId: string };
@@ -72,6 +76,12 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+// Never trust a socket payload's shape just because a TS annotation says so -
+// same convention as every lib/*.ts file's own private isRecord.
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 // Order-insensitive: assigneeIds is a SET server-side (it replaces the whole
 // list), and toggling a member off then back on reorders it without changing it.
 function sameAssignees(current: string[], previous: string[]): boolean {
@@ -88,18 +98,18 @@ function KanbanPage() {
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
-  // All task changes flow through the reducer (lib/tasksReducer.ts) - the
-  // future WebSocket handler will dispatch these same actions, so board
-  // interactions and remote events stay one code path.
+  // All task changes flow through the reducer (lib/tasksReducer.ts) - both
+  // local board interactions AND the WS handler below dispatch these same
+  // actions, so remote events and this client's own edits stay one code path.
   //
   // Deliberately NOT calling safeInvalidateRouter() after a successful mutation,
   // unlike discovery.tsx. Every mutation here already dispatches the task the
   // server returned, so the refetch added nothing - it just rebuilt all four
   // columns from scratch, which visibly jolted cards the user never touched. It
-  // is also the wrong shape for the realtime layer to come: the loader hands
-  // back a full SNAPSHOT asynchronously, so once remote events start arriving a
-  // late response would overwrite a change that had just been applied. The only
-  // survivor is the 409 path below, where the local state really is worthless.
+  // would also actively fight the realtime layer below: the loader hands back a
+  // full SNAPSHOT asynchronously, so a late response could overwrite a remote
+  // change that arrived over the socket in the meantime. The only survivor is
+  // the 409 path below, where the local state really is worthless.
   const [tasks, dispatch] = useReducer(tasksReducer, loaderData.tasks);
 
   // Mirrors the loader into the reducer, the same way discovery.tsx mirrors it
@@ -134,6 +144,85 @@ function KanbanPage() {
   function closeDrawer() {
     setDrawer((current) => ({ ...current, isOpen: false }));
   }
+
+  // Live board sync: remote broadcasts from tasks.service.ts's
+  // emitToProject calls dispatch into the same reducer as local edits, same
+  // pattern as discovery.tsx's own socket.on/off effects. No sender
+  // exclusion server-side, so this client's own actions echo back too -
+  // every action tasksReducer.ts handles is idempotent against that.
+  //
+  // Empty dep array like discovery.tsx's: the handlers below only call
+  // dispatch/setDrawer (both stable setters) via a functional updater, so
+  // they never need a fresh closure over `tasks`/`drawer` to read the
+  // latest state.
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    function handleTaskCreated(payload: unknown) {
+      const task = parseTask(payload);
+      if (task === null) {
+        return;
+      }
+      dispatch({ type: "task_created", task });
+    }
+
+    function handleTaskUpdated(payload: unknown) {
+      if (!isRecord(payload) || typeof payload.taskId !== "string") {
+        return;
+      }
+      const changes = parseTask(payload.changes);
+      if (changes === null) {
+        return;
+      }
+      dispatch({ type: "task_updated", taskId: payload.taskId, changes });
+    }
+
+    function handleTaskMoved(payload: unknown) {
+      if (
+        !isRecord(payload) ||
+        typeof payload.taskId !== "string" ||
+        typeof payload.toStatus !== "string" ||
+        !STATUS_ORDER.includes(payload.toStatus as TaskStatus) ||
+        typeof payload.toIndex !== "number"
+      ) {
+        return;
+      }
+      dispatch({
+        type: "task_moved",
+        taskId: payload.taskId,
+        toStatus: payload.toStatus as TaskStatus,
+        toIndex: payload.toIndex,
+      });
+    }
+
+    function handleTaskDeleted(payload: unknown) {
+      if (!isRecord(payload) || typeof payload.taskId !== "string") {
+        return;
+      }
+      const taskId = payload.taskId;
+      dispatch({ type: "task_deleted", taskId });
+      // Same behavior handleDeleteTask already applies for a local delete -
+      // an open drawer pointed at a task that no longer exists would
+      // otherwise keep rendering a stale form with no way to save or close
+      // it meaningfully.
+      setDrawer((current) =>
+        current.target.mode === "edit" && current.target.taskId === taskId
+          ? { ...current, isOpen: false }
+          : current
+      );
+    }
+
+    socket.on("task:created", handleTaskCreated);
+    socket.on("task:updated", handleTaskUpdated);
+    socket.on("task:moved", handleTaskMoved);
+    socket.on("task:deleted", handleTaskDeleted);
+    return () => {
+      socket.off("task:created", handleTaskCreated);
+      socket.off("task:updated", handleTaskUpdated);
+      socket.off("task:moved", handleTaskMoved);
+      socket.off("task:deleted", handleTaskDeleted);
+    };
+  }, []);
 
   // Local-only reposition, fired by the board on every column the card crosses
   // mid-drag. Nothing is persisted here: the drop does that, once.
