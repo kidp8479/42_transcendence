@@ -196,7 +196,7 @@ function UserSettingsPage() {
 
       const message =
         error instanceof ApiError && error.status === 409
-          ? "You must transfer ownership of your shared projects before deleting your account."
+          ? "You must delete or transfer the ownership of the projects you own before deleting your account."
           : "Account deletion failed. Please retry.";
 
       showToast({ type: "error", message });

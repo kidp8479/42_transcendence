@@ -70,23 +70,17 @@ export class UsersService {
   }
 
   async remove(userId: string) {
-    const ownedProjects = await this.prisma.project.findMany({
-      where: {
-        members: {
-          some: { userId, role: "OWNER" },
-        },
-      },
-      select: {
-        _count: { select: { members: true } },
-      },
+    // There's no ownership-transfer flow yet (TR-91), so an OWNER's project
+    // has no one to fall back to if we let this through - even a project
+    // where they're the sole member would be left behind ownerless (its
+    // ProjectMember row cascades away with the user, but the Project row
+    // itself doesn't), not deleted, and not reachable through any UI.
+    const ownsProject = await this.prisma.projectMember.findFirst({
+      where: { userId, role: "OWNER" },
     });
-
-    const hasBlockingOwnership = ownedProjects.some(
-      (p) => p._count.members > 1
-    );
-    if (hasBlockingOwnership) {
+    if (ownsProject) {
       throw new ConflictException(
-        "Cannot delete account: transfer or resolve ownership of shared projects first"
+        "Cannot delete account while you own a project. Transfer ownership first."
       );
     }
 
