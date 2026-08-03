@@ -99,7 +99,11 @@ export function DefenseReadiness({
         ))}
       </div>
       <p className="mt-5 text-xs text-text-secondary">
-        {checkpointsDone}/{checkpointsTotal} checkpoints
+        {/* "unlocked" instead of a bare total: checkpointsTotal grows as
+        Mandatory/Bonus/Supplemental unlock (see completeAt in
+        evaluationChecklistProgress.ts), so it isn't a fixed target - it's
+        specifically what's currently unlocked. */}
+        {checkpointsDone}/{checkpointsTotal} checkpoints unlocked
       </p>
     </section>
   );
