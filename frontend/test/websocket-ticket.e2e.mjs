@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { io } from "socket.io-client";
-import { realtimeServerOrigin } from "../src/lib/realtimeSocketUrl.ts";
 
 const run = process.env.RUN_WEBSOCKET_E2E === "1";
 const baseUrl = process.env.WEBSOCKET_E2E_URL ?? "http://nginx:8080";
 const configuredSocketUrl =
   process.env.WEBSOCKET_E2E_SOCKET_URL ?? `${baseUrl}/ws`;
 const appOrigin = process.env.WEBSOCKET_E2E_ORIGIN ?? "http://localhost:8080";
+
+function realtimeServerOrigin(socketUrl, expectedOrigin) {
+  const parsed = new URL(socketUrl, expectedOrigin);
+  return parsed.origin.replace(/^http/, "ws");
+}
 
 test("keeps the configured /ws path out of the Socket.IO namespace", () => {
   assert.equal(
