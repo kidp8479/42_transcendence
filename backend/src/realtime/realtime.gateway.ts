@@ -128,6 +128,9 @@ export class RealtimeGateway
   }
 
   async handleConnection(client: Socket): Promise<void> {
+    // Admission consumes the ticket before this cap. Burning a ticket for an
+    // over-cap connection keeps tickets strictly one-use; the client fetches
+    // a new one when it retries after a reconnect storm.
     if (!this.registerSessionSocket(client)) {
       client.data.ready = Promise.resolve(false);
       if (client.connected) {

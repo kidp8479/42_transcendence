@@ -266,7 +266,7 @@ check-frontend:
 
 ## build the backend application inside its Compose service
 check-backend:
-	$(COMPOSE) exec backend sh -c "npm run build && npm run test:field-lock-manager"
+	$(COMPOSE) exec backend sh -c "npm run build && npm run test:unit"
 
 ## run Go tests and static analysis inside the auth Compose service
 check-auth:
