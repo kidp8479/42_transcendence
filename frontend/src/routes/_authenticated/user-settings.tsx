@@ -47,6 +47,15 @@ const darkSurfaceModalTheme = {
     inner:
       "relative flex max-h-[90dvh] flex-col rounded-2xl border border-surface-border bg-surface-raised shadow-2xl",
   },
+  header: {
+    base: "relative flex items-center justify-center rounded-t-2xl p-4",
+    popup: "border-b-0 p-4",
+    title: "text-sm font-semibold text-text-primary text-center",
+    close: {
+      base: "absolute right-4 top-1/2 -translate-y-1/2 inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-text-secondary hover:bg-surface-overlay hover:text-text-primary focus:outline-none",
+      icon: "h-5 w-5",
+    },
+  },
 };
 
 export const Route = createFileRoute("/_authenticated/user-settings")({
@@ -242,10 +251,12 @@ function UserSettingsPage() {
         show={openModalUploadAvatar}
         dismissible
         size="md"
+        theme={darkSurfaceModalTheme}
         onClose={() => setOpenModalUploadAvatar(false)}
         popup
       >
-        <div className="flex w-full items-center justify-center">
+        <ModalHeader>Upload profile photo</ModalHeader>
+        <div className="flex w-full items-center justify-center px-6 pb-6">
           <Label
             htmlFor="dropzone-file"
             className="flex h-64 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 focus-within:ring-2 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600"
