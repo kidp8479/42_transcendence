@@ -13,6 +13,7 @@ import {
   updateTask,
   type TaskAssigneeUser,
   type TaskStatus,
+  type UpdateTaskBody,
 } from "@/lib/tasks";
 import { listTaskCategories } from "@/lib/taskCategories";
 import { getMembers } from "@/lib/projectMembersApi";
@@ -40,9 +41,15 @@ export const Route = createFileRoute("/_authenticated/$projectId/kanban")({
   component: KanbanPage,
 });
 
-// What the drawer is pointed at. Edit stores the task ID (not the task): the
-// rendered drawer resolves the live task from state, so it stays fresh if a
-// future WebSocket update touches the task mid-edit.
+// What the drawer is pointed at. Edit stores the task ID (not the task), so a
+// task deleted from under an open drawer resolves to null instead of a dangling
+// object. Note this does NOT make the open FORM fresh: it seeds its draft once at
+// mount and never resyncs, so a change arriving from elsewhere lands in `tasks`
+// and on the card but not in the fields. Save works around it by sending only the
+// fields the user actually changed - see handleSubmitDrawer. Resyncing the draft
+// itself belongs with the realtime wiring: this board subscribes to nothing yet
+// (unlike Discovery and the checklist, which use useLiveItemSync) and
+// TasksService emits nothing either.
 type DrawerTarget =
   | { mode: "create"; status: TaskStatus }
   | { mode: "edit"; taskId: string };
@@ -63,6 +70,16 @@ interface DrawerState {
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+// Order-insensitive: assigneeIds is a SET server-side (it replaces the whole
+// list), and toggling a member off then back on reorders it without changing it.
+function sameAssignees(current: string[], previous: string[]): boolean {
+  if (current.length !== previous.length) {
+    return false;
+  }
+  const previous_ids = new Set(previous);
+  return current.every((id) => previous_ids.has(id));
 }
 
 function KanbanPage() {
@@ -176,13 +193,11 @@ function KanbanPage() {
   // Optimistic too: the card is already behind an inline confirmation, so
   // making it linger after the user confirmed would read as a broken button.
   async function handleDeleteTask(taskId: string): Promise<boolean> {
-    if (!tasks.some((current) => current.id === taskId)) {
+    // The card itself, not a snapshot of the whole board - see the rollback below.
+    const previous_task = tasks.find((current) => current.id === taskId);
+    if (previous_task === undefined) {
       return false;
     }
-    // Snapshot, not a task_created replay: that appends the card and re-sorts
-    // by rank, and since deleting already pulled its old neighbour up to the
-    // freed rank, the restored card ties with it and lands one slot too low.
-    const previous_tasks = tasks;
 
     dispatch({ type: "task_deleted", taskId });
     // The drawer no longer unmounts when it closes, so it can't be left
@@ -199,7 +214,21 @@ function KanbanPage() {
         type: "error",
         message: errorMessage(error, "Failed to delete task"),
       });
-      dispatch({ type: "tasks_loaded", tasks: previous_tasks });
+      // Put THIS card back, rather than reloading the board from a pre-delete
+      // snapshot: that snapshot also predates anything that succeeded while the
+      // delete was in flight, so restoring it would silently revert a move the
+      // server had already accepted, with no error shown for it.
+      // Two dispatches, because task_created alone appends the card and re-sorts
+      // by rank - and deleting already pulled its old neighbour up to the freed
+      // rank, so the restored card ties with it and lands one slot too low.
+      // task_moved then splices it back at the exact index.
+      dispatch({ type: "task_created", task: previous_task });
+      dispatch({
+        type: "task_moved",
+        taskId,
+        toStatus: previous_task.status,
+        toIndex: previous_task.rank,
+      });
       return false;
     }
     showToast({ type: "success", message: "Task deleted" });
@@ -209,7 +238,10 @@ function KanbanPage() {
   // NOT optimistic, unlike the two above: a create has no id until the server
   // answers, and on failure the drawer has to stay open with the user's input
   // intact rather than swallow it.
-  async function handleSubmitDrawer(draft: TaskDraft) {
+  async function handleSubmitDrawer(
+    draft: TaskDraft,
+    initial_draft: TaskDraft
+  ) {
     if (draft.categoryId === null) {
       return; // the drawer already blocks this, belt and braces
     }
@@ -239,15 +271,42 @@ function KanbanPage() {
       showToast({ type: "success", message: "Task created" });
     } else {
       const taskId = drawer_target.taskId;
+      // Only the fields that actually changed, measured against the draft the
+      // drawer OPENED on. Resending all six would push the form's stale copy over
+      // anything that moved while it was open - the form seeds its draft once and
+      // never resyncs (see DrawerTarget above) - and it contradicts this
+      // endpoint's own contract, which lib/tasks.ts states as "send only what you
+      // mean to change". It matters most for assigneeIds, which REPLACES the whole
+      // set: an untouched member list is now simply not sent.
+      const updates: UpdateTaskBody = {};
+      if (draft.title !== initial_draft.title) {
+        updates.title = draft.title;
+      }
+      if (draft.categoryId !== initial_draft.categoryId) {
+        updates.categoryId = draft.categoryId;
+      }
+      if (draft.status !== initial_draft.status) {
+        updates.status = draft.status;
+      }
+      if (draft.priority !== initial_draft.priority) {
+        updates.priority = draft.priority;
+      }
+      if (draft.notes !== initial_draft.notes) {
+        updates.notes = draft.notes;
+      }
+      if (!sameAssignees(draft.assigneeIds, initial_draft.assigneeIds)) {
+        updates.assigneeIds = draft.assigneeIds;
+      }
+
+      // Save with nothing touched: close, but don't send an empty PATCH and don't
+      // claim a change was saved.
+      if (Object.keys(updates).length === 0) {
+        closeDrawer();
+        return;
+      }
+
       try {
-        const updated = await updateTask(projectId, taskId, {
-          title: draft.title,
-          categoryId: draft.categoryId,
-          status: draft.status,
-          priority: draft.priority,
-          notes: draft.notes,
-          assigneeIds: draft.assigneeIds,
-        });
+        const updated = await updateTask(projectId, taskId, updates);
         // The whole task from the server, not a hand-built patch: it carries
         // the resolved assignees and any rank the server reshuffled.
         dispatch({ type: "task_updated", taskId, changes: updated });

@@ -5,8 +5,11 @@ import { Outlet } from "@tanstack/react-router";
 export function PublicLayout() {
   return (
     // The scroller for the public pages (landing, privacy, terms, about...).
-    // Here min-h-0 + flex-1 are on the app shell column's main axis, so they
-    // give this exactly the height left between the header and the footer.
+    // min-h-0 + flex-1 are on the app shell column's main axis, so this claims
+    // the space left between the header and the footer - but it only BOUNDS that
+    // space when an ancestor carries a real height. __root.tsx is min-h-screen (a
+    // floor, not a height) and its Outlet wrapper has no min-h-0, so on a long
+    // page this grows with its content and the page scrolls rather than this box.
     <main className="scrollbar-thin-surface min-h-0 flex-1 overflow-y-auto">
       <Outlet />
     </main>

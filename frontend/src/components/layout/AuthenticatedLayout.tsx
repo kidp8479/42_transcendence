@@ -14,8 +14,12 @@ export function AuthenticatedLayout() {
       overflow-x-hidden: a closed drawer still sits translated off-screen to
       the right, which without clipping stretched the page's scrollable area
       and caused an unwanted horizontal scrollbar. It also makes overflow-y
-      compute to auto, which is what lets this scroll at all. */}
-      <main className="relative min-w-0 flex-1 min-h-0 overflow-x-hidden">
+      compute to auto, which is what lets this scroll at all - but only once the
+      box has a bounded height, and the shell gives it none (__root.tsx is
+      min-h-screen, a floor rather than a height). On desktop that height comes
+      from the sidebar's md:h-screen forcing this flex row to 100vh; below md
+      nothing bounds it and the page scrolls instead. */}
+      <main className="scrollbar-thin-surface relative min-w-0 flex-1 min-h-0 overflow-x-hidden">
         <Outlet />
       </main>
     </div>
