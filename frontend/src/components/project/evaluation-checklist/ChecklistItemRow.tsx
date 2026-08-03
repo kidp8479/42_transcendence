@@ -151,6 +151,25 @@ export function ChecklistItemRow({
     []
   );
 
+  // document-level, same mechanism DrawerShell already uses for the same
+  // reason: without stopPropagation() here, Escape also bubbles to
+  // SideBarCmp's own window-level Escape listener and collapses the
+  // sidebar at the same time as it exits edit mode.
+  useEffect(() => {
+    if (!isEditing) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        cancel();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cancel() closes over item.label/release/onStopEdit, all stable for the duration of one edit session
+  }, [isEditing]);
+
   function saveAfterSameTabBlur(value: string) {
     if (pendingBlurSaveRef.current !== undefined) {
       window.clearTimeout(pendingBlurSaveRef.current);
@@ -204,9 +223,8 @@ export function ChecklistItemRow({
               )
                 commit(event.currentTarget.value);
             }
-            if (event.key === "Escape") {
-              cancel();
-            }
+            // Escape is handled by a document-level listener below, not
+            // here - see the useEffect for why.
           }}
         />
       ) : isLockedByOther && lock ? (

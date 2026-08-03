@@ -113,6 +113,10 @@ function DiscoveryBlockEditPage() {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // stopPropagation so Escape only leaves this edit screen - without
+        // it the event still bubbles to SideBarCmp's own window-level
+        // Escape listener, which collapses the sidebar at the same time.
+        event.stopPropagation();
         void navigate({
           to: "/$projectId/discovery",
           params: { projectId: params.projectId },
