@@ -29,7 +29,10 @@ function ProjectSettingsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <MembersSection projectId={projectId} />
+      <MembersSection
+        projectId={projectId}
+        onLeaveProjectSuccess={() => navigate({ to: "/projects" })}
+      />
 
       <BehaviorSection />
 

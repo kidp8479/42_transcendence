@@ -191,11 +191,7 @@ export function ProjectCard({
     const canConfirm = confirmText.trim() === project.name;
 
     return (
-      <div
-        className={`flex h-full flex-col gap-3 rounded-lg border bg-surface-raised p-5 ${
-          isDelete ? "border-control-error" : "border-yellow-400"
-        }`}
-      >
+      <div className="flex h-full flex-col gap-3 rounded-lg border border-control-error bg-surface-raised p-5">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-text-primary">
             {isDelete ? "Delete project" : "Leave project"}
@@ -245,11 +241,7 @@ export function ProjectCard({
             type="button"
             onClick={handleConfirmAction}
             disabled={!canConfirm || isConfirmSubmitting}
-            className={
-              isDelete
-                ? "flex-1 bg-control-error !text-white hover:bg-red-700 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-red-300 dark:bg-control-error dark:hover:bg-red-700 dark:focus:ring-red-800"
-                : "flex-1 bg-yellow-500 !text-black hover:bg-yellow-600 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-yellow-300 dark:bg-yellow-500 dark:hover:bg-yellow-600 dark:focus:ring-yellow-800"
-            }
+            className="flex-1 bg-control-error !text-white hover:bg-red-700 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-red-300 dark:bg-control-error dark:hover:bg-red-700 dark:focus:ring-red-800"
           >
             {isConfirmSubmitting
               ? isDelete
@@ -363,7 +355,7 @@ export function ProjectCard({
                 <DropdownItem
                   icon={HiOutlineArrowRightOnRectangle}
                   theme={roundedDropdownItemTheme}
-                  className="text-yellow-400! dark:text-yellow-400!"
+                  className="text-red-700! dark:text-red-700!"
                   onClick={() => setConfirmAction("leave")}
                 >
                   Leave project

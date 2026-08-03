@@ -113,6 +113,10 @@ function ProjectsPage() {
               color="green"
               sizing="sm"
               label=""
+              // Flowbite's default focus ring (group-focus:ring-4) reads as
+              // huge next to this small "sm" toggle - shrink it, scoped to
+              // this instance only.
+              theme={{ toggle: { base: "group-focus:ring-1" } }}
             />
             <span>Include archived</span>
             <span className="rounded-full bg-surface-overlay px-1.5 py-0.5 text-[10px] font-semibold text-text-muted">

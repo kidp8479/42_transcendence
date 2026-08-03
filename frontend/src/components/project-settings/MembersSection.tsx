@@ -12,10 +12,13 @@ import {
 } from "@/lib/projectMembersApi";
 import { Button } from "flowbite-react";
 import { FaUserPlus } from "react-icons/fa";
+import { HiOutlineArrowRightOnRectangle } from "react-icons/hi2";
 import { useToast } from "@/hooks/useToast";
 import { getSession } from "@/lib/auth";
 import { RemoveMemberModal } from "./RemoveMemberModal";
+import { LeaveProjectModal } from "./LeaveProjectModal";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 
 // Displays the users currently belonging to a project (the ProjectMember
 // join table: one row = one User in one Project). GET
@@ -26,16 +29,23 @@ import { getRealtimeSocket } from "@/lib/realtimeSocket";
 // becomes a real product requirement (not currently enforced anywhere).
 interface MembersSectionProps {
   projectId: string;
+  onLeaveProjectSuccess?: () => void;
 }
 
-export function MembersSection({ projectId }: MembersSectionProps) {
+export function MembersSection({
+  projectId,
+  onLeaveProjectSuccess,
+}: MembersSectionProps) {
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [username, setUsername] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [memberToRemove, setMemberToRemove] = useState<ProjectMember | null>(
     null
   );
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
   const { showToast } = useToast();
+  const safeInvalidateRouter = useSafeRouterInvalidate();
 
   const loadMembers = useCallback(async () => {
     try {
@@ -98,10 +108,13 @@ export function MembersSection({ projectId }: MembersSectionProps) {
 
   const canAddMembers =
     currentUserRole === "OWNER" || currentUserRole === "ADMIN";
+  // Anyone but OWNER can leave (backend requires exactly one OWNER per
+  // project, so they'd need to delete/transfer it instead - see
+  // DangerZoneSection.tsx). Requires currentUserRole to already be resolved,
+  // so it doesn't flash true before loadMembers() finishes.
+  const canLeave = currentUserRole !== undefined && currentUserRole !== "OWNER";
 
-  // PATCH /api/projects/:projectId/members/:userId (projectMembersApi.ts) -
-  // OWNER or ADMIN can promote a MEMBER to ADMIN; only OWNER can demote an
-  // ADMIN back to MEMBER (both enforced backend-side too).
+  // PATCH /api/projects/:projectId/members/:userId - changes a member's role.
   const handleRoleChange = async (userId: string, role: "ADMIN" | "MEMBER") => {
     try {
       await updateMemberRole(projectId, userId, role);
@@ -118,12 +131,7 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     }
   };
 
-  // DELETE /api/projects/:projectId/members/:userId (projectMembersApi.ts) -
-  // OWNER/ADMIN can remove someone else. The backend also allows removing
-  // yourself regardless of role ("leave"), but that path isn't exposed here.
-  // TODO: add a self-service "leave project" action to this component too -
-  // currently only reachable via the cogwheel menu on the Projects grid
-  // (ProjectCard.tsx).
+  // DELETE /api/projects/:projectId/members/:userId - removes memberToRemove.
   const handleConfirmRemove = async () => {
     if (!memberToRemove) {
       return;
@@ -144,8 +152,7 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     }
   };
 
-  // POST /api/projects/:projectId/members (projectMembersApi.ts) - only
-  // OWNER/ADMIN can add members; body is { username }, resolved server-side.
+  // POST /api/projects/:projectId/members - adds a member by username.
   async function handleAddMember(event: FormEvent) {
     event.preventDefault();
     try {
@@ -167,12 +174,44 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     }
   }
 
+  // DELETE /api/projects/:projectId/members/:userId - removes yourself,
+  // except OWNER.
+  async function handleLeaveProject() {
+    if (!currentUserId) {
+      return;
+    }
+    setIsLeaving(true);
+    try {
+      await removeMember(projectId, currentUserId);
+    } catch {
+      showToast({
+        message: "Failed to leave project",
+        type: "error",
+      });
+      setIsLeaving(false);
+      return;
+    }
+    showToast({
+      message: "You left the project.",
+      type: "success",
+    });
+    // Navigating away right after this unmounts the component before the
+    // "project:member-removed" websocket round-trip reliably invalidates the
+    // sidebar's data for us - invalidate directly so it's already fresh.
+    await safeInvalidateRouter();
+    onLeaveProjectSuccess?.();
+  }
+
   function handleRemoveClick(member: ProjectMember) {
     setMemberToRemove(member);
   }
 
   function handleCloseRemoveModal() {
     setMemberToRemove(null);
+  }
+
+  function handleCloseLeaveModal() {
+    setShowLeaveModal(false);
   }
 
   return (
@@ -217,12 +256,31 @@ export function MembersSection({ projectId }: MembersSectionProps) {
               </div>
             </form>
           )}
+          {canLeave && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                color="none"
+                onClick={() => setShowLeaveModal(true)}
+                className="!h-9 !rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 inline-flex items-center gap-2"
+              >
+                <HiOutlineArrowRightOnRectangle className="h-4 w-4" />
+                Leave project
+              </Button>
+            </div>
+          )}
         </div>
       </SettingsSection>
       <RemoveMemberModal
         member={memberToRemove}
         onClose={handleCloseRemoveModal}
         onConfirm={handleConfirmRemove}
+      />
+      <LeaveProjectModal
+        show={showLeaveModal}
+        isLeaving={isLeaving}
+        onClose={handleCloseLeaveModal}
+        onConfirm={handleLeaveProject}
       />
     </>
   );

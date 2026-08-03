@@ -55,7 +55,7 @@ export function MemberListItem({
         <span
           className={`rounded-full border px-1.5 py-0 text-[9.5px] font-medium ${
             role === "OWNER"
-              ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-400"
+              ? "border-teal-500/30 bg-teal-500/10 text-teal-400"
               : role === "ADMIN"
                 ? "border-purple-500/30 bg-purple-500/10 text-purple-400"
                 : "border-blue-500/30 bg-blue-500/10 text-blue-400"
