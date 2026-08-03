@@ -27,8 +27,17 @@ export function tasksReducer(state: Task[], action: TasksAction): Task[] {
     case "tasks_loaded":
       return action.tasks;
 
-    case "task_created":
+    case "task_created": {
+      // Idempotency guard: the creating client already dispatched this
+      // locally right after its own POST resolved. The WS broadcast (no
+      // sender exclusion, same convention Discovery/checklist already use)
+      // then delivers the same task back to that same client - without this
+      // check it would append a second, duplicate card.
+      if (state.some((task) => task.id === action.task.id)) {
+        return state;
+      }
       return reindexStatus([...state, action.task], action.task.status);
+    }
 
     case "task_updated": {
       const existing = state.find((task) => task.id === action.taskId);
@@ -113,6 +122,14 @@ export function tasksReducer(state: Task[], action: TasksAction): Task[] {
         existing.status
       );
     }
+
+    // Belt and braces now that real WS payloads reach this reducer.
+    // TypeScript's exhaustiveness check is no protection against a runtime
+    // message with an unrecognized `type` - without this, that case falls
+    // out of the switch and returns undefined, blanking the board's state
+    // and crashing the next render.
+    default:
+      return state;
   }
 }
 
