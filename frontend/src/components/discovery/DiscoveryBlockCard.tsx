@@ -190,11 +190,16 @@ export function DiscoveryBlockCard({
           >
             {isDeleting ? "Deleting..." : "Delete"}
           </Button>
+          {/* dark:focus:ring-brand-500/40 is required, not just the
+          base one: Flowbite's <Button> injects its own
+          dark:focus:ring-primary-800 (blue), which otherwise wins the
+          cascade since dark: variants apply after plain ones regardless
+          of class order in the source. */}
           <Button
             type="button"
             onClick={handleCancelDelete}
             disabled={isDeleting}
-            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40"
+            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40 dark:focus:ring-brand-500/40"
           >
             Cancel
           </Button>
