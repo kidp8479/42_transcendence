@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -69,6 +70,24 @@ export class UsersService {
   }
 
   async remove(userId: string) {
+    const ownedProjects = await this.prisma.project.findMany({
+      where: {
+        members: {
+          some: { userId, role: "OWNER" },
+        },
+      },
+      select: {
+        _count: { select: { members: true } },
+      },
+    });
+
+    const hasBlockingOwnership = ownedProjects.some((p) => p._count.members > 1);
+    if (hasBlockingOwnership) {
+      throw new ConflictException(
+        "Cannot delete account: transfer or resolve ownership of shared projects first"
+      );
+    }
+
     return await this.prisma.user.delete({
       where: { id: userId },
       select: SAFE_USER_SELECT,
@@ -92,6 +111,8 @@ export class UsersService {
     contentType: string
   ) {
     const user = await this.findById(userId);
+
+    
 
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
     // Restricted to a charset that's always safe unescaped in a URL path

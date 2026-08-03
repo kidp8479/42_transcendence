@@ -179,19 +179,22 @@ function UserSettingsPage() {
       authSessionResource.setAnonymous();
       await navigate({ to: "/" });
     } catch (error) {
-      // same reasoning as handleUpload's 401 branch above
       if (error instanceof ApiError && error.status === 401) {
         await authSessionResource.endSession();
         await navigate({ to: "/" });
         return;
       }
-      showToast({
-        type: "error",
-        message: "Account deletion failed. Please retry.",
-      });
+
+      const message =
+        error instanceof ApiError && error.status === 409
+          ? "You must transfer ownership of your shared projects before deleting your account."
+          : "Account deletion failed. Please retry.";
+
+      showToast({ type: "error", message });
       setDeleting(false);
     }
   }
+
 
   async function handleSaveChanges() {
     if (savingChanges) return;
