@@ -211,11 +211,23 @@ function UserSettingsPage() {
 
     setSavingChanges(true);
     try {
-      await updateMe({
+      const updated = await updateMe({
         username: changes.username,
         email: changes.email,
         campus: changes.campus,
       });
+
+      // safeInvalidateRouter() below only refreshes this page's own `user`
+      // (from the route loader). UserMenu reads the display name from
+      // authSessionResource instead, a separate store, so it needs to be
+      // patched here directly or it stays stale until the session refetches.
+      const authState = authSessionResource.getState();
+      if (authState?.status === "authenticated") {
+        authSessionResource.setAuthenticated({
+          ...authState.session,
+          user: { ...authState.session.user, username: updated.username },
+        });
+      }
       safeInvalidateRouter();
       showToast({ type: "success", message: "Changes saved." });
     } catch {
