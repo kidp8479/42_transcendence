@@ -37,6 +37,8 @@ model User {
   initiatedOAuthTransactions OAuthTransaction[] @relation("OAuthTransactionInitiator")
   authEventsAsActor  AuthEvent[]         @relation("AuthEventActor")
   authEventsAsTarget AuthEvent[]         @relation("AuthEventTarget")
+  chatMessages     ChatMessage[]
+  chatReadStates   ChatReadState[]
 }
 
 enum AuthProvider {
@@ -309,6 +311,8 @@ model Project {
   discoveryBlocks          DiscoveryBlock[] // one Project => many DiscoveryBlock rows
   evaluationChecklistItems EvaluationChecklistItem[] // one Project => many EvaluationChecklistItem rows
   apiTokens                ProjectApiToken[]
+  chatMessages             ChatMessage[]
+  chatReadStates           ChatReadState[]  
 }
 
 // Machine credential metadata. The raw credential is never persisted: selector
@@ -541,4 +545,29 @@ model EvaluationChecklistItem {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+model ChatMessage {
+  id        String    @id @default(uuid())
+  userId    String?
+  projectId String
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+model ChatReadState {
+  id            String  @id @default(uuid())
+  userId        String
+  projectId     String
+  lastReadAt    DateTime @default(now())
+  user          User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
 }
