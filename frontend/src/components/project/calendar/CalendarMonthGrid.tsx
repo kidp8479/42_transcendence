@@ -38,7 +38,11 @@ export function CalendarMonthGrid({
     // the header row stays a fixed height (shrink-0) and the weeks share
     // the remaining space evenly (flex-1 each), so a short month doesn't
     // leave empty space below it on a tall viewport.
-    <div className="flex h-full flex-1 flex-col overflow-hidden rounded-lg border-t border-l border-surface-border">
+    // overflow-y-auto, not overflow-hidden: a constrained-height container
+    // with overflow-hidden and no scroll fallback silently clips content
+    // that doesn't fit instead of ever making it reachable - overflow-x
+    // stays clipped for the rounded corners.
+    <div className="flex h-full flex-1 flex-col overflow-x-hidden overflow-y-auto rounded-lg border-t border-l border-surface-border">
       <div className="grid shrink-0 grid-cols-7 border-b border-surface-border bg-surface-overlay">
         {WEEKDAY_LABELS.map((label) => (
           <div
