@@ -218,6 +218,7 @@ function UserSettingsPage() {
       showToast({ type: "error", message: "Saving failed. Please retry." });
     } finally {
       setSavingChanges(false);
+      showToast({ type: "success", message: "Changes saved."});
     }
   }
 
