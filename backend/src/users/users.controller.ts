@@ -98,9 +98,13 @@ export class UsersController {
     );
   }
 
+  // Scoped to the caller's own avatar (no :key param) - a key wasn't a
+  // capability token, just the storage object name, and it leaks straight
+  // out through any user's avatarUrl. Accepting one from the client let any
+  // authenticated caller delete another user's avatar object.
   @ApiBearerAuth()
-  @Delete("avatar/:key")
-  async removeAvatar(@Param("key") key: string) {
-    return this.usersService.removeAvatar(key);
+  @Delete("me/avatar")
+  async removeAvatar(@Req() request: AuthenticatedRequest) {
+    return this.usersService.removeAvatar(request.user.id);
   }
 }

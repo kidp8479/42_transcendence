@@ -140,10 +140,25 @@ export class UsersService {
     return updated;
   }
 
-  async removeAvatar(key: string): Promise<boolean> {
+  async removeAvatar(userId: string): Promise<boolean> {
+    const user = await this.findById(userId);
+    const key = user.avatarUrl?.split("/").pop();
+    if (!key) {
+      return true;
+    }
     throwIfBadRequest(key);
+
+    // Clear the DB reference first: if the storage delete below fails, the
+    // user is left with no avatar (falls back to initials) instead of a
+    // dangling avatarUrl pointing at an object that may or may not exist.
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: null },
+      select: SAFE_USER_SELECT,
+    });
+
     const bucket = this.config.getOrThrow<string>("RUSTFS_BUCKET");
-    this.storage.deleteObject(bucket, key);
+    await this.storage.deleteObject(bucket, key);
     return true;
   }
 }
