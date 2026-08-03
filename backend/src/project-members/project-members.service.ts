@@ -137,7 +137,7 @@ export class ProjectMembersService {
           "Only the project owner can remove an admin"
         );
       }
-      // KNOWN GAP (TR-B): this deletes the membership row and nothing else.
+      // KNOWN GAP: this deletes the membership row and nothing else.
       // TaskAssignee/CalendarAssignee only cascade on User deletion, not on a
       // member leaving a project, so their rows survive and keep pointing at a
       // non-member. TasksService.assertAssigneesAreProjectMembers then rejects

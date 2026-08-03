@@ -195,8 +195,9 @@ function buildInitialDraft(
     // the server keeps returning that user in task.assignees. The picker below
     // renders one button per CURRENT member, so a stale id has no control to
     // remove it, and the server rejects any assigneeId that isn't a current
-    // member: the task became impossible to save at all, for any field. TR-B
-    // closes this at the source and makes the filter redundant.
+    // member: the task became impossible to save at all, for any field. This is
+    // a workaround - purging those rows in ProjectMembersService.removeMember
+    // (see the KNOWN GAP comment there) is what would make it redundant.
     assigneeIds: task.assignees
       .filter((assignee) => members.some((member) => member.id === assignee.id))
       .map((assignee) => assignee.id),

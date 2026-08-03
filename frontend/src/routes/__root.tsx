@@ -42,7 +42,7 @@ function RootLayout() {
                 authUnavailable={authState.status === "unavailable"}
               />
             )}
-            <div className="flex flex-1 flex-col">
+            <div className="flex flex-col flex-1 min-h-0">
               <Outlet />
             </div>
             <Footer />
