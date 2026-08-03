@@ -16,6 +16,11 @@ export type AuthState =
   | { status: "anonymous" }
   | { status: "unavailable"; error: Error };
 
+interface RealtimeSessionLifecycle {
+  reset(): void;
+  disconnect(): void;
+}
+
 export class AuthSessionResource {
   private state: AuthState | null = null;
   private checkedAt = 0;
@@ -24,7 +29,12 @@ export class AuthSessionResource {
   private listeners = new Set<() => void>();
   private publishing = false;
 
-  constructor() {
+  constructor(
+    private readonly realtime: RealtimeSessionLifecycle = {
+      reset: resetRealtimeSocket,
+      disconnect: disconnectRealtimeSocket,
+    }
+  ) {
     subscribeAuthSession((session) => {
       if (!this.publishing) {
         this.applySession(session);
@@ -74,7 +84,7 @@ export class AuthSessionResource {
     this.state = { status: "authenticated", session };
     this.checkedAt = Date.now();
     this.publishSession(session);
-    resetRealtimeSocket();
+    this.realtime.reset();
     this.notify();
   }
 
@@ -83,8 +93,7 @@ export class AuthSessionResource {
     this.state = { status: "anonymous" };
     this.checkedAt = Date.now();
     this.publishSession(null);
-    // no session left to reconnect with - see disconnectRealtimeSocket's own comment
-    disconnectRealtimeSocket();
+    this.realtime.disconnect();
     this.notify();
   }
 
@@ -94,7 +103,7 @@ export class AuthSessionResource {
     this.checkedAt = 0;
     this.inFlight = null;
     this.publishSession(null);
-    resetRealtimeSocket();
+    this.realtime.reset();
     this.notify();
   }
 
@@ -129,10 +138,19 @@ export class AuthSessionResource {
   }
 
   private applySession(session: AuthSession | null): void {
+    const previous = this.state;
     this.state = session
       ? { status: "authenticated", session }
       : { status: "anonymous" };
     this.checkedAt = Date.now();
+    if (!session) {
+      this.realtime.disconnect();
+    } else if (
+      previous?.status !== "authenticated" ||
+      previous.session.user.id !== session.user.id
+    ) {
+      this.realtime.reset();
+    }
     this.notify();
   }
 

@@ -392,6 +392,9 @@ func TestHandleIssueWebSocketTicketRequiresExactOriginAndActiveAccess(t *testing
 	server := &Server{
 		cfg: testConfig(), store: authStore, webSockets: authStore,
 		tokens: testTokenService{claims: claims},
+		ticketAccountLimiter: middleware.NewFixedWindowLimiter(
+			ticketRequestsPerAccount, rateLimitWindow, maxRateLimitEntries,
+		),
 	}
 
 	rejected := httptest.NewRequest(http.MethodPost, "/auth/ws-ticket", nil)
@@ -412,6 +415,50 @@ func TestHandleIssueWebSocketTicketRequiresExactOriginAndActiveAccess(t *testing
 		!strings.Contains(response.Body.String(), `"expiresIn":60`) ||
 		authStore.issueTicketCalls != 1 {
 		t.Fatalf("ticket response = %d %s, issue calls = %d", response.Code, response.Body.String(), authStore.issueTicketCalls)
+	}
+}
+
+func TestHandleIssueWebSocketTicketRateLimitsBySubject(t *testing.T) {
+	family := testFamily()
+	claims := token.Claims{
+		Subject: "user-id", SessionID: "family-id",
+		AuthenticationTime:   family.AuthenticatedAt,
+		AuthenticationMethod: "LOCAL", AssuranceLevel: "aal1",
+	}
+	authStore := &testAuthStore{
+		access: store.AccessState{RefreshFamily: family, GlobalRole: "USER"},
+		ticket: strings.Repeat("a", 43),
+	}
+	server := &Server{
+		cfg: testConfig(), store: authStore, webSockets: authStore,
+		tokens: testTokenService{claims: claims},
+		ticketAccountLimiter: middleware.NewFixedWindowLimiter(
+			ticketRequestsPerAccount, rateLimitWindow, maxRateLimitEntries,
+		),
+	}
+
+	for range ticketRequestsPerAccount {
+		request := httptest.NewRequest(http.MethodPost, "/auth/ws-ticket", nil)
+		request.Header.Set("Origin", server.cfg.AppOrigin)
+		request.Header.Set("Authorization", bearerHeader("access-token"))
+		response := httptest.NewRecorder()
+		server.handleIssueWebSocketTicket(response, request)
+		if response.Code != http.StatusCreated {
+			t.Fatalf("allowed ticket status = %d, want 201", response.Code)
+		}
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/auth/ws-ticket", nil)
+	request.Header.Set("Origin", server.cfg.AppOrigin)
+	request.Header.Set("Authorization", bearerHeader("access-token"))
+	response := httptest.NewRecorder()
+	server.handleIssueWebSocketTicket(response, request)
+	if response.Code != http.StatusTooManyRequests ||
+		authStore.issueTicketCalls != ticketRequestsPerAccount {
+		t.Fatalf(
+			"limited response = %d, issue calls = %d; want 429 and %d",
+			response.Code, authStore.issueTicketCalls, ticketRequestsPerAccount,
+		)
 	}
 }
 

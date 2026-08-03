@@ -26,6 +26,7 @@ import {
 const webSocketTicketPattern = /^[A-Za-z0-9_-]{43}$/;
 const sessionRevalidationIntervalMs = 30_000;
 const maximumSocketLifetimeMs = 15 * 60_000;
+const maximumSocketsPerSession = 5;
 
 function allowExactOrigin(
   request: IncomingMessage,
@@ -70,6 +71,7 @@ export class RealtimeGateway
     string,
     { revalidation: NodeJS.Timeout; lifetime: NodeJS.Timeout }
   >();
+  private sessionSockets = new Map<string, Set<string>>();
 
   registerKeyPrefixValidator(
     prefix: string,
@@ -126,10 +128,20 @@ export class RealtimeGateway
   }
 
   async handleConnection(client: Socket): Promise<void> {
-    const ready = this.joinRooms(client);
+    if (!this.registerSessionSocket(client)) {
+      client.data.ready = Promise.resolve(false);
+      if (client.connected) {
+        client.disconnect(true);
+      }
+      return;
+    }
+    const ready = this.joinRooms(client).catch(() => false);
     client.data.ready = ready;
-    if (!(await ready) && client.connected) {
-      client.disconnect(true);
+    if (!(await ready)) {
+      this.unregisterSessionSocket(client);
+      if (client.connected) {
+        client.disconnect(true);
+      }
     }
   }
 
@@ -140,6 +152,7 @@ export class RealtimeGateway
   // lock) while the other's connection drops and reconnects; only the
   // disconnecting socket's own locks should be released.
   async handleDisconnect(@ConnectedSocket() client: Socket): Promise<void> {
+    this.unregisterSessionSocket(client);
     this.clearSocketGuards(client.id);
     const released = await this.fieldLockManager.releaseSocket(client.id);
     for (const lock of released) {
@@ -245,6 +258,36 @@ export class RealtimeGateway
       }
     }, maximumSocketLifetimeMs);
     this.socketGuards.set(client.id, { revalidation, lifetime });
+  }
+
+  private registerSessionSocket(client: Socket): boolean {
+    const subject = client.data.userId as string | undefined;
+    const sessionId = client.data.sessionId as string | undefined;
+    if (!subject || !sessionId) {
+      return false;
+    }
+    const key = `${subject}:${sessionId}`;
+    const sockets = this.sessionSockets.get(key) ?? new Set<string>();
+    if (sockets.size >= maximumSocketsPerSession) {
+      return false;
+    }
+    sockets.add(client.id);
+    this.sessionSockets.set(key, sockets);
+    client.data.sessionSocketKey = key;
+    return true;
+  }
+
+  private unregisterSessionSocket(client: Socket): void {
+    const key = client.data.sessionSocketKey as string | undefined;
+    if (!key) {
+      return;
+    }
+    const sockets = this.sessionSockets.get(key);
+    sockets?.delete(client.id);
+    if (sockets?.size === 0) {
+      this.sessionSockets.delete(key);
+    }
+    delete client.data.sessionSocketKey;
   }
 
   private clearSocketGuards(socketId: string): void {

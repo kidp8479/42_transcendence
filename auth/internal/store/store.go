@@ -657,7 +657,20 @@ func (s *Store) IssueWebSocketTicket(
 	now := time.Now().UTC()
 	command, err := s.currentPool().Exec(
 		ctx,
-		`INSERT INTO "WebSocketTicket"
+		`WITH expired AS (
+			SELECT "id"
+			FROM "WebSocketTicket"
+			WHERE "expiresAt" <= $4
+			ORDER BY "expiresAt"
+			LIMIT 100
+		 ),
+		 deleted AS (
+			DELETE FROM "WebSocketTicket" t
+			USING expired
+			WHERE t."id" = expired."id"
+			RETURNING t."id"
+		 )
+		 INSERT INTO "WebSocketTicket"
 			("id", "ticketHash", "userId", "refreshFamilyId", "audience", "issuedAt", "expiresAt")
 		 SELECT $1, $2, f."userId", f."id", $3, $4, $5
 		 FROM "RefreshTokenFamily" f

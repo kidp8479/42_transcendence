@@ -262,7 +262,7 @@ lint-backend:
 
 ## build the frontend application inside its Compose service
 check-frontend:
-	$(COMPOSE) exec frontend npm run build
+	$(COMPOSE) exec frontend sh -c "npm run build && npm run test:auth-refresh"
 
 ## build the backend application inside its Compose service
 check-backend:

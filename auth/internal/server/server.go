@@ -23,13 +23,14 @@ import (
 )
 
 const (
-	maxRequestBody          = 16 * 1024
-	rateLimitWindow         = time.Minute
-	maxRateLimitEntries     = 10_000
-	registerRequestsPerIP   = 20
-	loginRequestsPerIP      = 10
-	loginRequestsPerAccount = 5
-	passwordConcurrency     = 2
+	maxRequestBody           = 16 * 1024
+	rateLimitWindow          = time.Minute
+	maxRateLimitEntries      = 10_000
+	registerRequestsPerIP    = 20
+	loginRequestsPerIP       = 10
+	loginRequestsPerAccount  = 5
+	ticketRequestsPerAccount = 30
+	passwordConcurrency      = 2
 )
 
 var (
@@ -43,18 +44,19 @@ var (
 )
 
 type Server struct {
-	cfg                 config.Config
-	internalToken       string
-	store               authStore
-	webSockets          webSocketStore
-	tokens              tokenService
-	passwords           *password.Hasher
-	registerIPLimiter   *middleware.FixedWindowLimiter
-	loginIPLimiter      *middleware.FixedWindowLimiter
-	loginAccountLimiter *middleware.FixedWindowLimiter
-	passwordSlots       chan struct{}
-	decoyPasswordHash   string
-	ready               func() bool
+	cfg                  config.Config
+	internalToken        string
+	store                authStore
+	webSockets           webSocketStore
+	tokens               tokenService
+	passwords            *password.Hasher
+	registerIPLimiter    *middleware.FixedWindowLimiter
+	loginIPLimiter       *middleware.FixedWindowLimiter
+	loginAccountLimiter  *middleware.FixedWindowLimiter
+	ticketAccountLimiter *middleware.FixedWindowLimiter
+	passwordSlots        chan struct{}
+	decoyPasswordHash    string
+	ready                func() bool
 }
 
 type authStore interface {
@@ -180,18 +182,19 @@ func NewWithReadiness(
 	}
 
 	server := &Server{
-		cfg:                 cfg,
-		internalToken:       internalToken,
-		store:               authStore,
-		webSockets:          authStore,
-		tokens:              tokens,
-		passwords:           passwords,
-		registerIPLimiter:   middleware.NewFixedWindowLimiter(registerRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
-		loginIPLimiter:      middleware.NewFixedWindowLimiter(loginRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
-		loginAccountLimiter: middleware.NewFixedWindowLimiter(loginRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
-		passwordSlots:       make(chan struct{}, passwordConcurrency),
-		decoyPasswordHash:   decoyPasswordHash,
-		ready:               ready,
+		cfg:                  cfg,
+		internalToken:        internalToken,
+		store:                authStore,
+		webSockets:           authStore,
+		tokens:               tokens,
+		passwords:            passwords,
+		registerIPLimiter:    middleware.NewFixedWindowLimiter(registerRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
+		loginIPLimiter:       middleware.NewFixedWindowLimiter(loginRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
+		loginAccountLimiter:  middleware.NewFixedWindowLimiter(loginRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
+		ticketAccountLimiter: middleware.NewFixedWindowLimiter(ticketRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
+		passwordSlots:        make(chan struct{}, passwordConcurrency),
+		decoyPasswordHash:    decoyPasswordHash,
+		ready:                ready,
 	}
 
 	mux := http.NewServeMux()
@@ -462,6 +465,10 @@ func (s *Server) handleIssueWebSocketTicket(w http.ResponseWriter, r *http.Reque
 			w, http.StatusServiceUnavailable, "Service Unavailable",
 			"websocket ticket could not be issued", "TICKET_ISSUE_UNAVAILABLE",
 		)
+		return
+	}
+	if !s.ticketAccountLimiter.Allow(claims.Subject, time.Now()) {
+		writeRateLimited(w)
 		return
 	}
 	ticket, err := s.webSockets.IssueWebSocketTicket(

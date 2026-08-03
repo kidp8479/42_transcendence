@@ -46,6 +46,30 @@ test("background refresh transport failure synchronizes anonymous state", async 
   assert.deepEqual(authSessionResource.getState(), { status: "anonymous" });
 });
 
+test("background auth publications update the realtime lifecycle", async () => {
+  installBrowserGlobals([]);
+  const { setAuthSession } = await import("../dist-test/lib/auth.js");
+  const { AuthSessionResource } = await import("../dist-test/lib/authState.js");
+  let resets = 0;
+  let disconnects = 0;
+  const resource = new AuthSessionResource({
+    reset: () => {
+      resets += 1;
+    },
+    disconnect: () => {
+      disconnects += 1;
+    },
+  });
+
+  resource.setAuthenticated(initialSession);
+  setAuthSession(refreshedSession);
+  assert.equal(resets, 1);
+
+  setAuthSession(null);
+  assert.equal(disconnects, 1);
+  assert.deepEqual(resource.getState(), { status: "anonymous" });
+});
+
 test("bearerFetch rejects cross-origin URLs before attaching a bearer", async () => {
   let called = false;
   installBrowserGlobals([]);

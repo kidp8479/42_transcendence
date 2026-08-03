@@ -139,3 +139,74 @@ test("preserves membership admission and disconnects after sid revocation", asyn
   manager.onModuleDestroy();
   t.mock.timers.reset();
 });
+
+test("disconnects when post-admission room initialization fails", async () => {
+  const manager = new FieldLockManager();
+  const gateway = new RealtimeGateway(
+    {
+      projectMember: {
+        findMany: async () => {
+          throw new Error("database unavailable");
+        },
+      },
+    } as never,
+    manager,
+    {
+      consume: async () => {
+        throw new Error("middleware already authenticated this client");
+      },
+      isSessionActive: async () => true,
+    } as never
+  );
+  const client = createClient();
+  Object.assign(client.data, {
+    userId: "user-a",
+    sessionId: "family-a",
+  });
+
+  await gateway.handleConnection(client as never);
+
+  assert.equal(await client.data.ready, false);
+  assert.equal(client.connected, false);
+  manager.onModuleDestroy();
+});
+
+test("limits concurrent sockets for one refresh session", async () => {
+  const manager = new FieldLockManager();
+  const gateway = new RealtimeGateway(
+    {
+      projectMember: {
+        findMany: async () => [],
+      },
+    } as never,
+    manager,
+    {
+      consume: async () => {
+        throw new Error("middleware already authenticated this client");
+      },
+      isSessionActive: async () => true,
+    } as never
+  );
+  const clients = Array.from({ length: 6 }, (_, index) => {
+    const client = createClient();
+    client.id = `socket-${index}`;
+    Object.assign(client.data, {
+      userId: "user-a",
+      sessionId: "family-a",
+    });
+    return client;
+  });
+
+  for (const client of clients) {
+    await gateway.handleConnection(client as never);
+  }
+
+  for (const client of clients.slice(0, 5)) {
+    assert.equal(await client.data.ready, true);
+    assert.equal(client.connected, true);
+    await gateway.handleDisconnect(client as never);
+  }
+  assert.equal(await clients[5].data.ready, false);
+  assert.equal(clients[5].connected, false);
+  manager.onModuleDestroy();
+});

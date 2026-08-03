@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -54,9 +55,31 @@ func TestWebSocketTicketIsHashOnlyAndAtomicallyConsumed(t *testing.T) {
 	}
 
 	authStore := New(pool)
+	expiredTicketID := uuid.NewString()
+	_, err = pool.Exec(ctx,
+		`INSERT INTO "WebSocketTicket"
+			("id", "ticketHash", "userId", "refreshFamilyId", "audience", "issuedAt", "expiresAt")
+		 VALUES ($1, $2, $3, $4, $5, $6, $6)`,
+		expiredTicketID, strings.Repeat("0", 64), userID, familyID,
+		WebSocketTicketAudience, now.Add(-time.Minute),
+	)
+	if err != nil {
+		t.Fatalf("insert expired ticket: %v", err)
+	}
 	ticket, err := authStore.IssueWebSocketTicket(ctx, userID, familyID)
 	if err != nil {
 		t.Fatalf("issue ticket: %v", err)
+	}
+	var expiredCount int
+	if err := pool.QueryRow(
+		ctx,
+		`SELECT COUNT(*) FROM "WebSocketTicket" WHERE "id" = $1`,
+		expiredTicketID,
+	).Scan(&expiredCount); err != nil {
+		t.Fatalf("check expired ticket cleanup: %v", err)
+	}
+	if expiredCount != 0 {
+		t.Fatal("expired ticket was not removed during issuance")
 	}
 	var storedHash, audience string
 	var issuedAt, expiresAt time.Time

@@ -138,8 +138,11 @@ components:
       ticket_lifetime: 60s
       ticket_audience: transcendence-ws
       ticket_consumption: atomic-and-one-use
+      ticket_issue_limit: 30-per-user-per-minute
+      expired_ticket_cleanup: bounded-on-issuance
       origin: exact-APP_ORIGIN
       maximum_socket_lifetime: 15m
+      maximum_sockets_per_refresh_session: 5
     authorization:
       - verify-project-membership-before-joining-each-room
       - disconnect-when-ticket-or-session-revalidation-fails
