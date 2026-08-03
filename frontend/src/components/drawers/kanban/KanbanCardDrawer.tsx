@@ -535,7 +535,7 @@ function KanbanCardForm({
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
             <Label
               htmlFor="kanban-drawer-notes"
@@ -547,6 +547,11 @@ function KanbanCardForm({
               {form_draft.notes.length} / {TASK_NOTES_MAX_LENGTH}
             </span>
           </div>
+          {/* No flex-1 here on purpose: this used to stretch to fill whatever
+              vertical space the drawer happened to have, which on a tall
+              screen ballooned a mostly-empty notes field to hundreds of
+              pixels tall. min-h-40 keeps the original starting size; resize-y
+              still lets someone grow it by hand for a genuinely long note. */}
           <Textarea
             id="kanban-drawer-notes"
             value={form_draft.notes}
@@ -561,7 +566,7 @@ function KanbanCardForm({
             // forms. placeholder: is spelled out because
             // darkSurfaceFieldClassName sets no placeholder color and
             // Flowbite's own default would win.
-            className={`min-h-40 flex-1 resize-y font-mono text-sm placeholder:!text-text-muted ${darkSurfaceFieldClassName}`}
+            className={`min-h-40 resize-y font-mono text-sm placeholder:!text-text-muted ${darkSurfaceFieldClassName}`}
           />
         </div>
       </div>
