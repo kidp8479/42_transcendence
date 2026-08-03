@@ -1,10 +1,4 @@
-import { getSession } from "./auth";
-import {
-  apiClient,
-  ApiError,
-  getCsrfToken,
-  readErrorMessage,
-} from "./apiClient";
+import { apiClient } from "./apiClient";
 
 export interface User {
   username: string;
@@ -46,32 +40,18 @@ export async function updateMe(dto: Partial<User>): Promise<User> {
   );
 }
 
-// --- Avatar ---
-// POST /users/me/avatar, bypassing apiClient(): it always JSON-encodes the
-// body and force-sets Content-Type, which breaks multipart/form-data (the
-// browser needs to set its own boundary in Content-Type). CSRF/error
-// handling below mirrors what apiClient() does for its own requests.
+// POST /users/me/avatar (matches @Post("me/avatar") in users.controller.ts).
+// apiClient() now special-cases FormData bodies (see apiClient.ts) so this
+// goes through the same bearer-token + refresh-on-401 path as every other
+// call here instead of hand-rolling its own fetch.
 export async function uploadAvatar(file: File): Promise<User> {
-  const token = getCsrfToken() ?? (await getSession())?.csrfToken;
-  if (!token) {
-    throw new Error("An active session is required");
-  }
-
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch("/api/users/me/avatar", {
+  return apiClient<unknown>(`/users/me/avatar`, {
     method: "POST",
-    credentials: "include",
-    headers: { "X-CSRF-Token": token },
     body: formData,
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, await readErrorMessage(response));
-  }
-
-  return parseUser(await response.json());
+  }).then(parseUser);
 }
 
 // DELETE /users/me

@@ -12,12 +12,13 @@ import {
   BadRequestException,
   StreamableFile,
 } from "@nestjs/common";
+import { ApiBearerAuth } from "@nestjs/swagger";
 import { FileInterceptor } from "@nestjs/platform-express";
 // tsconfig restricts automatic @types inclusion to "node" only, so
 // @types/multer's global Express.Multer.File augmentation needs an explicit
 // import to be picked up by the compiler.
 import "multer";
-import { ApiSecurity } from "@nestjs/swagger";
+import { Public } from "../auth/public.decorator";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { detectImageMimetype } from "../common/detect-image-type";
 import { UsersService } from "./users.service";
@@ -34,7 +35,7 @@ export class UsersController {
     return this.usersService.findById(request.user.id);
   }
 
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Patch("me")
   async updateMe(
     @Body() dto: UpdateUserDto,
@@ -43,7 +44,7 @@ export class UsersController {
     return this.usersService.update(request.user.id, dto);
   }
 
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete("me")
   async removeMe(@Req() request: AuthenticatedRequest) {
     return this.usersService.remove(request.user.id);
@@ -51,9 +52,15 @@ export class UsersController {
 
   // --- Avatar ---
 
-  // Public to any logged-in user, not just the owner: avatars are displayed
-  // all over the app (project members, calendar events...), so this has to
-  // be readable for whoever the avatar belongs to.
+  // Genuinely @Public(): avatars are rendered via plain <img src> tags all
+  // over the app (project members, calendar events...) and, since TR-70,
+  // AuthGuard is Bearer-only with no cookie fallback - a browser-issued
+  // <img> request has no way to attach an Authorization header, so this
+  // route can't require one. The key is a per-upload random UUID
+  // (avatar-{userId}-{uuid}-{name}, see uploadAvatar below), not an
+  // enumerable id, so this doesn't expose anything beyond "whoever has the
+  // exact key can view that one image".
+  @Public()
   @Get("avatar/:key")
   async downloadAvatar(@Param("key") key: string): Promise<StreamableFile> {
     const { body, contentType } = await this.usersService.getAvatar(key);
@@ -63,7 +70,7 @@ export class UsersController {
   // Multipart upload, so it can't go through UpdateUserDto/class-validator
   // like the rest of the profile - the file is checked by hand below, and
   // the resulting object key/URL is computed in the service.
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Post("me/avatar")
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: MAX_AVATAR_BYTES } })
@@ -91,7 +98,7 @@ export class UsersController {
     );
   }
 
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete("avatar/:key")
   async removeAvatar(@Param("key") key: string) {
     return this.usersService.removeAvatar(key);
