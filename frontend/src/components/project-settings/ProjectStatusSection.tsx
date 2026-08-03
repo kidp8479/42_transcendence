@@ -34,7 +34,7 @@ export function ProjectStatusSection({
   const { showToast } = useToast();
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const isFinished = status === "COMPLETED";
-  const canMarkFinished = role === "OWNER" || role === "ADMIN";
+  const canManageLifecycle = role === "OWNER" || role === "ADMIN";
 
   async function handleToggleFinished() {
     setIsUpdatingStatus(true);
@@ -103,7 +103,7 @@ export function ProjectStatusSection({
               : undefined
           }
         >
-          {canMarkFinished && (
+          {canManageLifecycle && (
             <Button
               onClick={handleToggleFinished}
               disabled={isUpdatingStatus}
@@ -140,10 +140,11 @@ export function ProjectStatusSection({
               : undefined
           }
         >
-          <Button
-            onClick={handleToggleArchive}
-            disabled={isUpdatingArchive}
-            className="
+          {canManageLifecycle && (
+            <Button
+              onClick={handleToggleArchive}
+              disabled={isUpdatingArchive}
+              className="
 			  !border
 		      !border-surface-border
 			  !bg-surface-overlay
@@ -159,14 +160,15 @@ export function ProjectStatusSection({
 			  items-center
 			  gap-2
 			"
-          >
-            <HiOutlineArchive className="h-4 w-4" />
-            {isUpdatingArchive
-              ? "Saving..."
-              : isArchived
-                ? "Restore"
-                : "Archive"}
-          </Button>
+            >
+              <HiOutlineArchive className="h-4 w-4" />
+              {isUpdatingArchive
+                ? "Saving..."
+                : isArchived
+                  ? "Restore"
+                  : "Archive"}
+            </Button>
+          )}
         </SettingsActionRow>
       </div>
     </SettingsSection>
