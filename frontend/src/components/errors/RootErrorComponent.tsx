@@ -1,11 +1,12 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { ApiError } from "@/lib/apiClient";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
+import { ErrorScreen } from "./ErrorScreen";
 
 // Bubbles up from any route's loader/component that doesn't define its own
 // errorComponent - mounted once on __root.tsx, covers every route in the app.
 export function RootErrorComponent({ error, reset }: ErrorComponentProps) {
-  const message = buildErrorMessage(error);
+  const { message, action } = classifyError(error);
   const safeInvalidateRouter = useSafeRouterInvalidate();
 
   // reset() alone only clears this boundary's local error state - it never
@@ -21,29 +22,11 @@ export function RootErrorComponent({ error, reset }: ErrorComponentProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-8">
-      {/* same color tokens as the error toast (ToastProvider.tsx) - full-page
-      and centered instead of a corner popup, since this replaces a page that
-      failed to load rather than reacting to a transient action.
-      Centered with m-auto on the card rather than justify-center on the
-      parent: with a scrollable parent, justify-center pushes the top of an
-      overflowing child out of the scrollable region, where it can't be
-      reached. m-auto centers the same way without that failure mode. */}
-      <div
-        role="alert"
-        className="m-auto flex max-w-md flex-col items-center gap-3 rounded-lg border border-control-error bg-red-950 p-6 text-center text-red-100 shadow-lg"
-      >
-        <p className="font-mono text-lg font-semibold">Something went wrong</p>
-        <p className="text-sm">{message}</p>
-        <button
-          type="button"
-          onClick={() => void handleRetry()}
-          className="rounded-md border border-red-100 px-4 py-2 text-sm font-medium hover:bg-red-900"
-        >
-          Try again
-        </button>
-      </div>
-    </div>
+    <ErrorScreen
+      message={message}
+      onRetry={action === "retry" ? () => void handleRetry() : undefined}
+      showGoHome={action === "navigate-home"}
+    />
   );
 }
 
@@ -51,18 +34,36 @@ export function RootErrorComponent({ error, reset }: ErrorComponentProps) {
 // status-specific branches below only override it where a generic backend
 // message would be confusing out of context (ex: a raw "Not found" with no
 // mention of what wasn't found).
-function buildErrorMessage(error: unknown): string {
+//
+// "retry" reruns the same loader - correct for transient failures (network
+// blip, a temporary 500). "navigate-home" is for errors where a retry would
+// just fail again forever: any 4xx means this specific request is
+// permanently invalid (resource gone, access revoked, a malformed id in the
+// URL...), not something that becomes valid on a second try.
+function classifyError(error: unknown): {
+  message: string;
+  action: "retry" | "navigate-home";
+} {
   if (error instanceof ApiError) {
     if (error.status === 404) {
-      return "This page could not be found.";
+      return {
+        message: "This page could not be found.",
+        action: "navigate-home",
+      };
     }
     if (error.status === 401 || error.status === 403) {
-      return "You don't have access to this page.";
+      return {
+        message: "You don't have access to this page.",
+        action: "navigate-home",
+      };
     }
-    return error.message;
+    if (error.status >= 400 && error.status < 500) {
+      return { message: error.message, action: "navigate-home" };
+    }
+    return { message: error.message, action: "retry" };
   }
   if (error instanceof Error) {
-    return error.message;
+    return { message: error.message, action: "retry" };
   }
-  return "An unexpected error occurred.";
+  return { message: "An unexpected error occurred.", action: "retry" };
 }
