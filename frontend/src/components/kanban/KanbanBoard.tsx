@@ -14,10 +14,12 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  pointerWithin,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import type {
+  CollisionDetection,
   DragCancelEvent,
   DragEndEvent,
   DragOverEvent,
@@ -278,10 +280,28 @@ export function KanbanBoard({
     onMoveTask(task_id, target.status, target.index, origin);
   }
 
+  // closestCorners alone measures every droppable board-wide by corner
+  // distance, with no notion of "which container is the pointer actually
+  // over." An empty column's droppable is the whole (generously sized) card
+  // list area, but a card sitting in the NEXT column over can still have a
+  // numerically closer corner - especially near the boundary between
+  // columns - so the empty column was sometimes unreachable, landing the
+  // drop in a neighbour instead. pointerWithin checks literal containment
+  // (is the pointer actually inside this rect?) first, which has no such
+  // cross-column ambiguity; closestCorners is the fallback because
+  // pointerWithin returns nothing for keyboard-driven drags (no pointer
+  // coordinates to test).
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointer_collisions = pointerWithin(args);
+    return pointer_collisions.length > 0
+      ? pointer_collisions
+      : closestCorners(args);
+  };
+
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
