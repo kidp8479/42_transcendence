@@ -11,6 +11,7 @@ import {
 import { HiOutlineChatBubbleLeftRight } from "react-icons/hi2";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
+import { HiOutlineChatBubbleLeftRight, HiOutlineUsers } from "react-icons/hi2";
 import { useSidebar } from "@/hooks/useSidebar";
 import { useChatUnread } from "@/hooks/useChatUnread";
 import type { Project } from "@/lib/projectsApi";
