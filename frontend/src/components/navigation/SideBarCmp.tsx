@@ -16,10 +16,17 @@ interface NavigationItem {
   icon: IconType;
 }
 
-// md:z-50: now that <main> is a positioned element (see AuthenticatedLayout),
-// it would otherwise paint over the sidebar's collapse toggle button, which
-// pokes out past the sidebar's own edge. Also needs to beat DrawerShell's
-// z-40, since an expanded CalendarEventDrawer starts right under that button.
+// z-50 at every size, matching HeaderShell. Two reasons, one per breakpoint:
+// on desktop <main> is a positioned element (see AuthenticatedLayout) and would
+// otherwise paint over the collapse toggle, which pokes out past the sidebar's
+// own edge; on mobile the panel has to beat an open DrawerShell.
+// Not z-40 + DOM order any more: ProjectLayout wraps its Outlet in a
+// `relative isolate` anchor, and `isolate` makes that anchor a stacking context
+// at z-index auto, so the z-40 a drawer claims INSIDE it no longer competes with
+// anything outside - the anchor as a whole does, and it loses to any positive
+// z-index. The winner has to be stated, it can no longer be inherited from where
+// the elements sit in the tree.
+// The mobile backdrop below stays z-30: it already paints above that anchor.
 const sidebarContainerClasses =
   "fixed inset-y-0 left-0 z-50 w-full transition-transform duration-300";
 const sidebarInnerClasses = "font-mono relative h-full w-full overflow-hidden";
@@ -147,7 +154,7 @@ export function SideBarCmp() {
         className={`
           ${sidebarContainerClasses}
           ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
-          md:sticky md:top-0 md:h-screen md:z-50 md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
+          md:sticky md:top-0 md:h-screen md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
           ${isCollapsed ? "md:w-0" : "md:w-64"}
         `}
       >

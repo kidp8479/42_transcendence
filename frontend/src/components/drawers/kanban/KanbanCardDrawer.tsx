@@ -72,7 +72,12 @@ interface KanbanCardDrawerProps {
   onClose: () => void;
   // Widened to allow a Promise so the form can await it and lock its buttons
   // while the request is in flight - the route handler is async.
-  onSubmit: (draft: TaskDraft) => void | Promise<void>;
+  //
+  // Two drafts, not one: `initialDraft` is what the drawer opened on, and the
+  // route sends only the fields that differ from it. The drawer stays dumb about
+  // the API - it just reports "here is where this started, here is where it is
+  // now" - and the route keeps owning the request shape.
+  onSubmit: (draft: TaskDraft, initialDraft: TaskDraft) => void | Promise<void>;
 }
 
 const DRAWER_HEADING_ID = "kanban-card-drawer-heading";
@@ -154,9 +159,49 @@ interface KanbanCardFormProps {
   categories: TaskCategory[];
   members: TaskAssigneeUser[];
   onClose: () => void;
-  onSubmit: (draft: TaskDraft) => void | Promise<void>;
+  onSubmit: (draft: TaskDraft, initialDraft: TaskDraft) => void | Promise<void>;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+}
+
+// The draft a freshly opened form starts from. Pulled out of the component so the
+// edited draft and the untouched reference below are the same value by
+// construction - the diff on save is only meaningful if its comparison point
+// never moved.
+function buildInitialDraft(
+  task: Task | null,
+  members: TaskAssigneeUser[],
+  initialStatus: TaskStatus
+): TaskDraft {
+  if (task === null) {
+    return {
+      title: "",
+      categoryId: null,
+      status: initialStatus,
+      priority: "MEDIUM",
+      assigneeIds: [],
+      notes: "",
+    };
+  }
+
+  return {
+    title: task.title,
+    categoryId: task.categoryId,
+    status: task.status,
+    priority: task.priority,
+    // Assignees who are no longer members of the project are dropped here.
+    // Removing a member deletes the ProjectMember row and nothing else - the
+    // TaskAssignee row survives, since its only cascade is on User deletion - so
+    // the server keeps returning that user in task.assignees. The picker below
+    // renders one button per CURRENT member, so a stale id has no control to
+    // remove it, and the server rejects any assigneeId that isn't a current
+    // member: the task became impossible to save at all, for any field. TR-B
+    // closes this at the source and makes the filter redundant.
+    assigneeIds: task.assignees
+      .filter((assignee) => members.some((member) => member.id === assignee.id))
+      .map((assignee) => assignee.id),
+    notes: task.notes ?? "",
+  };
 }
 
 function KanbanCardForm({
@@ -178,25 +223,14 @@ function KanbanCardForm({
   // stays mounted so it can animate out, so this component is still there.
   const [is_submitting, setIsSubmitting] = useState(false);
 
-  const [form_draft, setFormDraft] = useState<TaskDraft>(() =>
-    task !== null
-      ? {
-          title: task.title,
-          categoryId: task.categoryId,
-          status: task.status,
-          priority: task.priority,
-          assigneeIds: task.assignees.map((assignee) => assignee.id),
-          notes: task.notes ?? "",
-        }
-      : {
-          title: "",
-          categoryId: null,
-          status: initialStatus,
-          priority: "MEDIUM",
-          assigneeIds: [],
-          notes: "",
-        }
+  // Two states, one value. initial_draft is frozen at mount - this component is
+  // keyed on `session`, so mounting IS opening - and form_draft starts as a copy
+  // of it. Save diffs the two, which is what keeps an untouched field from being
+  // resent and silently reverting a change made elsewhere in the meantime.
+  const [initial_draft] = useState<TaskDraft>(() =>
+    buildInitialDraft(task, members, initialStatus)
   );
+  const [form_draft, setFormDraft] = useState<TaskDraft>(initial_draft);
 
   const selected_category =
     form_draft.categoryId !== null
@@ -221,7 +255,10 @@ function KanbanCardForm({
     }
     setIsSubmitting(true);
     try {
-      await onSubmit({ ...form_draft, title: form_draft.title.trim() });
+      await onSubmit(
+        { ...form_draft, title: form_draft.title.trim() },
+        initial_draft
+      );
     } finally {
       setIsSubmitting(false);
     }

@@ -10,7 +10,7 @@ function NotFoundPage() {
   // Renders straight into the app shell, with no layout in between - so
   // unlike every other page it has to own its scroller.
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto p-6">
+    <div className="scrollbar-thin-surface min-h-0 flex-1 overflow-y-auto p-6">
       404 - Page not found
     </div>
   );
