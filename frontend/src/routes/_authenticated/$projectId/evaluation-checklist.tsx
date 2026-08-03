@@ -686,9 +686,12 @@ function EvaluationChecklistPage() {
                           if (e.key === "Enter") addChecklistItem();
                         }}
                       />
+                      {/* color="gray"'s default focus ring renders with a
+                      0px spread (invisible) in this theme - no visible
+                      focus indicator at all without an explicit ring here. */}
                       <Button
                         color="gray"
-                        className={style.addButtonHover}
+                        className={`${style.addButtonHover} focus:outline-none focus:ring-2! focus:ring-brand-500/40 dark:focus:ring-brand-500/40`}
                         disabled={
                           isCategoryFull || newItemLabels[i].trim().length === 0
                         }
