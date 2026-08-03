@@ -366,6 +366,15 @@ func (s *Store) RotateRefreshToken(
 		return CreatedRefreshSession{}, fmt.Errorf("lock refresh family: %w", err)
 	}
 	now := time.Now().UTC()
+	if _, err := tx.Exec(ctx,
+		`UPDATE "AuthRefreshToken"
+		 SET "successorCiphertext" = NULL
+		 WHERE "successorCiphertext" IS NOT NULL
+		   AND "graceExpiresAt" <= $1`,
+		now,
+	); err != nil {
+		return CreatedRefreshSession{}, fmt.Errorf("clear expired refresh successors: %w", err)
+	}
 	if revokedAt != nil || !family.IdleExpiresAt.After(now) ||
 		!family.AbsoluteExpiresAt.After(now) || family.User.Status != AccountStatusActive {
 		return CreatedRefreshSession{}, ErrNotFound

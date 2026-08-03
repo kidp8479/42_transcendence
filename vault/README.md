@@ -50,13 +50,14 @@ and set the `vault_db_admin` password from `VAULT_DB_ADMIN_PASSWORD`.
 
 Go auth uses its mounted `role_id` and `secret_id` to authenticate directly
 with AppRole. It keeps the resulting Vault token, KV values, and dynamic
-PostgreSQL credentials only in process memory. It reads the OAuth credentials
-and backend-to-auth credential from KV, asks Vault for the `auth-runtime`
-database lease, and swaps to a freshly connected pool whenever that lease is
-renewed. Its health endpoint returns `503` and request handling stops when
-Vault credentials cannot be renewed with a one-minute safety margin. At that
-point the auth process exits non-zero so its supervisor can restart it; it
-does not remain indefinitely unhealthy.
+PostgreSQL credentials only in process memory. It reads the OAuth credentials,
+backend-to-auth credential, and the separate refresh-successor encryption key
+from distinct KV paths, asks Vault for the `auth-runtime` database lease, and
+swaps to a freshly connected pool whenever that lease is renewed. Its health
+endpoint returns `503` and request handling stops when Vault credentials
+cannot be renewed with a one-minute safety margin. At that point the auth
+process exits non-zero so its supervisor can restart it; it does not remain
+indefinitely unhealthy.
 
 The AppRole token has a nine-hour maximum TTL to bound a leaked in-memory
 token. Before that maximum is reached, the auth process re-authenticates using

@@ -44,9 +44,11 @@ deny "$migration_token" vault read database/creds/auth-runtime
 # KV isolation: only auth and backend may read their shared internal credential;
 # the OAuth credentials stay exclusively with Go auth.
 allow "$auth_token" vault read kv/data/auth/oauth
+allow "$auth_token" vault read kv/data/auth/refresh-successor
 allow "$auth_token" vault read kv/data/internal/backend-auth
 allow "$backend_token" vault read kv/data/internal/backend-auth
 deny "$backend_token" vault read kv/data/auth/oauth
+deny "$backend_token" vault read kv/data/auth/refresh-successor
 deny "$migration_token" vault read kv/data/internal/backend-auth
 
 # Transit can sign and verify but can never export the private signing key.

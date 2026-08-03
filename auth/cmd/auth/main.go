@@ -73,7 +73,7 @@ func main() {
 			pool.Close()
 		}
 	}()
-	if err := authStore.SetRefreshCipher(secrets.InternalToken); err != nil {
+	if err := authStore.SetRefreshCipher(secrets.RefreshSuccessorCipherKey); err != nil {
 		log.Fatalf("configure refresh token recovery: %v", err)
 	}
 

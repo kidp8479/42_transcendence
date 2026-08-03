@@ -23,6 +23,7 @@ const (
 	maxNegativeKeyIDs   = 64
 	negativeKeyTTL      = 30 * time.Second
 	keySetTTL           = time.Minute
+	maxKeyCatchUp       = maxCachedPublicKeys
 )
 
 type RuntimeConfig struct {
@@ -49,6 +50,7 @@ type Runtime struct {
 	latestKeyVersion  int
 	keySetRefreshedAt time.Time
 	negativeKeyIDs    map[string]time.Time
+	unknownKeyChecked time.Time
 	keyRefreshDone    chan struct{}
 	keyRefreshErr     error
 }
@@ -185,12 +187,17 @@ func (r *Runtime) PublicKey(ctx context.Context, keyID string) (ed25519.PublicKe
 		return nil, false, nil
 	}
 	latest := r.latestKeyVersion
+	unknownKeyChecked := r.unknownKeyChecked
 	r.keyMu.Unlock()
 
-	// Only the immediately following version can represent a legitimate key
-	// rotation that this process has not observed yet. Old omitted versions and
-	// implausible future versions never trigger Vault traffic.
-	if latest > 0 && (version <= latest || version != latest+1) {
+	// A verifier-only replica may miss several rotations. Permit one coalesced
+	// Vault refresh within the bounded retained-key window; old or implausibly
+	// distant versions never trigger Vault traffic.
+	if latest > 0 && (version <= latest || version > latest+maxKeyCatchUp) {
+		r.rememberUnknownKey(keyID, now)
+		return nil, false, nil
+	}
+	if !unknownKeyChecked.IsZero() && now.Sub(unknownKeyChecked) < negativeKeyTTL {
 		r.rememberUnknownKey(keyID, now)
 		return nil, false, nil
 	}
@@ -229,6 +236,9 @@ func (r *Runtime) refreshPublicKeys(ctx context.Context, force bool, unknownKeyI
 	}
 	done := make(chan struct{})
 	r.keyRefreshDone = done
+	if unknownKeyID != "" {
+		r.unknownKeyChecked = time.Now()
+	}
 	r.keyMu.Unlock()
 
 	info, err := r.client.TransitKeyInfo(ctx)

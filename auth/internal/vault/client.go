@@ -58,8 +58,9 @@ type OAuthCredentials struct {
 }
 
 type Secrets struct {
-	OAuth         OAuthCredentials
-	InternalToken string
+	OAuth                     OAuthCredentials
+	InternalToken             string
+	RefreshSuccessorCipherKey string
 }
 
 // TransitPublicKeys contains only verification material. Vault never exposes
@@ -127,6 +128,10 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 	if err != nil {
 		return Secrets{}, fmt.Errorf("read internal credential: %w", err)
 	}
+	refreshSuccessor, err := c.readKV(ctx, "kv/data/auth/refresh-successor")
+	if err != nil {
+		return Secrets{}, fmt.Errorf("read refresh successor credential: %w", err)
+	}
 	secrets := Secrets{
 		OAuth: OAuthCredentials{
 			FortyTwoClientID:     oauth["oauth_42_client_id"],
@@ -134,10 +139,14 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 			GoogleClientID:       oauth["oauth_google_client_id"],
 			GoogleClientSecret:   oauth["oauth_google_client_secret"],
 		},
-		InternalToken: internal["internal_token"],
+		InternalToken:             internal["internal_token"],
+		RefreshSuccessorCipherKey: refreshSuccessor["cipher_key"],
 	}
 	if len(secrets.InternalToken) < 32 {
 		return Secrets{}, fmt.Errorf("Vault internal credential must be at least 32 characters")
+	}
+	if len(secrets.RefreshSuccessorCipherKey) < 32 {
+		return Secrets{}, fmt.Errorf("Vault refresh successor credential must be at least 32 characters")
 	}
 	return secrets, nil
 }

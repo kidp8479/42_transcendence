@@ -16,6 +16,7 @@ SECRETS_DIR=${SECRETS_DIR:-/run/secrets}
 : "${VAULT_DB_ADMIN_PASSWORD:?VAULT_DB_ADMIN_PASSWORD is required}"
 : "${POSTGRES_DB:?POSTGRES_DB is required}"
 : "${AUTH_INTERNAL_TOKEN:?AUTH_INTERNAL_TOKEN is required}"
+: "${AUTH_REFRESH_SUCCESSOR_KEY:?AUTH_REFRESH_SUCCESSOR_KEY is required}"
 
 on_exit() {
 	rc=$?
@@ -77,6 +78,7 @@ if [ -z "${OAUTH_42_CLIENT_ID:-}" ] || [ -z "${OAUTH_GOOGLE_CLIENT_ID:-}" ]; the
 	echo "WARNING: OAuth client credentials are empty in kv/auth/oauth" >&2
 fi
 quiet vault kv put kv/internal/backend-auth internal_token="$AUTH_INTERNAL_TOKEN"
+quiet vault kv put kv/auth/refresh-successor cipher_key="$AUTH_REFRESH_SUCCESSOR_KEY"
 
 step "configuring PostgreSQL database secrets engine"
 # vault_db_admin (created by db/init/01-vault-roles.sql) is a dedicated
