@@ -35,6 +35,12 @@ interface FakeTaskRow {
   description: string | null;
   notes: string | null;
   onCalendar: boolean;
+  // Not part of tasks.service.ts's `data` object on create() (assignees are
+  // a separate join table, synced through TaskAssigneeService, stubbed out
+  // as a no-op for these tests) - tests that care about notification
+  // recipients set this directly on `store.rows[i]`, same as ranksIn()/
+  // idsInRankOrder() below are test-only helpers, not real Prisma calls.
+  assignees: { id: string; username: string; avatarUrl: string | null }[];
 }
 
 type Where = Record<string, unknown>;
@@ -71,6 +77,19 @@ function matches(row: FakeTaskRow, where: Where): boolean {
   return true;
 }
 
+// Real Prisma's `assignees: { include: { user: {...} } }` returns TaskAssignee
+// join rows, each wrapping its user - mapTask() in tasks.service.ts then
+// unwraps them (`assignee.user`). FakeTaskRow stores the flat user shape
+// directly (nicer for tests to set: `row.assignees = [{id, username,
+// avatarUrl}]`), so findFirst()/delete() re-wrap it here before returning -
+// otherwise mapTask's own unwrap reads `.user` off a user object that has no
+// such property, and gets back a list of undefined.
+function toJoinRows(
+  assignees: FakeTaskRow["assignees"]
+): { user: FakeTaskRow["assignees"][number] }[] {
+  return assignees.map((user) => ({ user }));
+}
+
 class FakeTaskStore {
   rows: FakeTaskRow[] = [];
   private nextId = 0;
@@ -98,8 +117,12 @@ class FakeTaskStore {
     return { count: matched.length };
   }
 
-  async create({ data }: { data: Omit<FakeTaskRow, "id"> }) {
-    const row: FakeTaskRow = { id: `task-${this.nextId++}`, ...data };
+  async create({ data }: { data: Omit<FakeTaskRow, "id" | "assignees"> }) {
+    const row: FakeTaskRow = {
+      id: `task-${this.nextId++}`,
+      assignees: [],
+      ...data,
+    };
     this.rows.push(row);
     return row;
   }
@@ -156,7 +179,7 @@ class FakeTaskStore {
       throw new Error(`FakeTaskStore: task ${where.id} not found`);
     }
     const [row] = this.rows.splice(index, 1);
-    return { ...row, category: null, assignees: [] };
+    return { ...row, category: null, assignees: toJoinRows(row.assignees) };
   }
 
   async findFirst({ where }: { where: Where }) {
@@ -164,7 +187,7 @@ class FakeTaskStore {
     if (!row) {
       return null;
     }
-    return { ...row, category: null, assignees: [] };
+    return { ...row, category: null, assignees: toJoinRows(row.assignees) };
   }
 
   // Test helper, not a Prisma method: ranks of every task in a column, in
@@ -193,6 +216,14 @@ function createFakePrisma(store: FakeTaskStore) {
   const db = {
     task: store,
     taskCategory: { findFirst: async () => ({ id: "cat-a" }) },
+    project: { findUniqueOrThrow: async () => ({ name: "Project A" }) },
+    // assertAssigneesAreProjectMembers only cares that this count matches
+    // the length of the ids it sent - tests don't need real membership rows,
+    // just for the check to pass.
+    projectMember: {
+      count: async ({ where }: { where: { userId: { in: string[] } } }) =>
+        where.userId.in.length,
+    },
   };
   return {
     ...db,
@@ -204,11 +235,50 @@ function createFakePrisma(store: FakeTaskStore) {
 const projectAssignedStub = { assertMembership: async () => undefined };
 const noopTaskAssignees = { replaceAssignees: async () => undefined };
 
-function createService(store: FakeTaskStore) {
+interface RealtimeSpy {
+  emitted: { projectId: string; event: string; payload: unknown }[];
+  emitToProject: (projectId: string, event: string, payload: unknown) => void;
+}
+
+function createRealtimeSpy(): RealtimeSpy {
+  const emitted: RealtimeSpy["emitted"] = [];
+  return {
+    emitted,
+    emitToProject: (projectId, event, payload) => {
+      emitted.push({ projectId, event, payload });
+    },
+  };
+}
+
+interface NotificationsSpy {
+  created: { userId: string; message: string; link?: string }[];
+  create: (userId: string, message: string, link?: string) => Promise<void>;
+}
+
+function createNotificationsSpy(): NotificationsSpy {
+  const created: NotificationsSpy["created"] = [];
+  return {
+    created,
+    create: async (userId, message, link) => {
+      created.push({ userId, message, link });
+    },
+  };
+}
+
+// realtime/notifications default to fresh no-op spies when not supplied, so
+// the 11 pre-existing rank-invariant tests above don't need to know these
+// dependencies exist at all - only the emit/notification-focused tests below
+// pass their own spy in and inspect it afterward.
+function createService(
+  store: FakeTaskStore,
+  overrides: { realtime?: RealtimeSpy; notifications?: NotificationsSpy } = {}
+) {
   return new TasksService(
     createFakePrisma(store) as never,
     noopTaskAssignees as never,
-    projectAssignedStub as never
+    projectAssignedStub as never,
+    (overrides.realtime ?? createRealtimeSpy()) as never,
+    (overrides.notifications ?? createNotificationsSpy()) as never
   );
 }
 
@@ -490,7 +560,9 @@ test("create() propagates a transaction failure instead of swallowing it", async
   const service = new TasksService(
     fakePrisma as never,
     noopTaskAssignees as never,
-    projectAssignedStub as never
+    projectAssignedStub as never,
+    createRealtimeSpy() as never,
+    createNotificationsSpy() as never
   );
 
   await assert.rejects(
@@ -512,7 +584,9 @@ test("update() moving a task propagates a transaction failure instead of swallow
   const brokenService = new TasksService(
     fakePrisma as never,
     noopTaskAssignees as never,
-    projectAssignedStub as never
+    projectAssignedStub as never,
+    createRealtimeSpy() as never,
+    createNotificationsSpy() as never
   );
 
   // rank must actually differ from the task's current rank (0, from the
@@ -539,11 +613,218 @@ test("remove() propagates a transaction failure instead of swallowing it", async
   const brokenService = new TasksService(
     fakePrisma as never,
     noopTaskAssignees as never,
-    projectAssignedStub as never
+    projectAssignedStub as never,
+    createRealtimeSpy() as never,
+    createNotificationsSpy() as never
   );
 
   await assert.rejects(
     () => brokenService.remove(task.id, projectId, userId),
     (error: { code?: string }) => error.code === "P2034"
   );
+});
+
+// -- Realtime broadcasts and move notifications ------------------------------
+
+test("create() broadcasts task:created with the full mapped task", async () => {
+  const store = new FakeTaskStore();
+  const realtime = createRealtimeSpy();
+  const service = createService(store, { realtime });
+
+  const created = await service.create(
+    projectId,
+    baseCreateDto({ title: "A" }),
+    userId
+  );
+
+  assert.deepEqual(realtime.emitted, [
+    { projectId, event: "task:created", payload: created },
+  ]);
+});
+
+test("update() reordering within a column broadcasts task:moved and sends no notification", async () => {
+  const store = new FakeTaskStore();
+  const realtime = createRealtimeSpy();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { realtime, notifications });
+
+  for (const title of ["A", "B"]) {
+    await service.create(
+      projectId,
+      baseCreateDto({
+        title,
+        rank: store.ranksIn(projectId, TaskStatus.TODO).length,
+      }),
+      userId
+    );
+  }
+  realtime.emitted.length = 0; // drop the 2 task:created events from setup
+  const taskA = store.rows.find((row) => row.title === "A")!;
+
+  await service.update(taskA.id, { rank: 1 } as never, projectId, userId);
+
+  assert.deepEqual(realtime.emitted, [
+    {
+      projectId,
+      event: "task:moved",
+      payload: { taskId: taskA.id, toStatus: TaskStatus.TODO, toIndex: 1 },
+    },
+  ]);
+  assert.equal(notifications.created.length, 0);
+});
+
+test("update() moving a task to another column broadcasts task:moved and notifies the other assignees, excluding the mover", async () => {
+  const store = new FakeTaskStore();
+  const realtime = createRealtimeSpy();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { realtime, notifications });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+  taskA.assignees = [
+    { id: userId, username: "mover", avatarUrl: null },
+    { id: "user-b", username: "B", avatarUrl: null },
+  ];
+  realtime.emitted.length = 0;
+
+  await service.update(
+    taskA.id,
+    { status: TaskStatus.IN_PROGRESS } as never,
+    projectId,
+    userId
+  );
+
+  assert.deepEqual(realtime.emitted, [
+    {
+      projectId,
+      event: "task:moved",
+      payload: {
+        taskId: taskA.id,
+        toStatus: TaskStatus.IN_PROGRESS,
+        toIndex: 0,
+      },
+    },
+  ]);
+  assert.equal(notifications.created.length, 1);
+  assert.equal(notifications.created[0].userId, "user-b");
+  assert.match(notifications.created[0].message, /moved to In Progress/);
+  assert.equal(notifications.created[0].link, `/${projectId}/kanban`);
+});
+
+test("update() moving a task whose only assignee is the mover sends no notification", async () => {
+  const store = new FakeTaskStore();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { notifications });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+  taskA.assignees = [{ id: userId, username: "mover", avatarUrl: null }];
+
+  await service.update(
+    taskA.id,
+    { status: TaskStatus.IN_PROGRESS } as never,
+    projectId,
+    userId
+  );
+
+  assert.equal(notifications.created.length, 0);
+});
+
+test("update() editing a field with no status/rank change broadcasts task:updated, not task:moved, with no notification", async () => {
+  const store = new FakeTaskStore();
+  const realtime = createRealtimeSpy();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { realtime, notifications });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+  taskA.assignees = [{ id: "user-b", username: "B", avatarUrl: null }];
+  realtime.emitted.length = 0;
+
+  const updated = await service.update(
+    taskA.id,
+    { title: "A renamed" } as never,
+    projectId,
+    userId
+  );
+
+  assert.deepEqual(realtime.emitted, [
+    {
+      projectId,
+      event: "task:updated",
+      payload: { taskId: taskA.id, changes: updated },
+    },
+  ]);
+  assert.equal(notifications.created.length, 0);
+});
+
+test("remove() broadcasts task:deleted", async () => {
+  const store = new FakeTaskStore();
+  const realtime = createRealtimeSpy();
+  const service = createService(store, { realtime });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+  realtime.emitted.length = 0;
+
+  await service.remove(taskA.id, projectId, userId);
+
+  assert.deepEqual(realtime.emitted, [
+    { projectId, event: "task:deleted", payload: { taskId: taskA.id } },
+  ]);
+});
+
+test("create() with assigneeIds notifies the new assignees, excluding a self-assign", async () => {
+  const store = new FakeTaskStore();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { notifications });
+
+  await service.create(
+    projectId,
+    baseCreateDto({ title: "A", assigneeIds: [userId, "user-b"] }),
+    userId
+  );
+
+  assert.equal(notifications.created.length, 1);
+  assert.equal(notifications.created[0].userId, "user-b");
+  assert.match(notifications.created[0].message, /assigned to "A"/);
+  assert.equal(notifications.created[0].link, `/${projectId}/kanban`);
+});
+
+test("update() adding an assignee notifies only the newly added one", async () => {
+  const store = new FakeTaskStore();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { notifications });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+  taskA.assignees = [{ id: "user-b", username: "B", avatarUrl: null }];
+
+  await service.update(
+    taskA.id,
+    { assigneeIds: ["user-b", "user-c"] } as never,
+    projectId,
+    userId
+  );
+
+  assert.equal(notifications.created.length, 1);
+  assert.equal(notifications.created[0].userId, "user-c");
+});
+
+test("update() self-assigning sends no notification", async () => {
+  const store = new FakeTaskStore();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { notifications });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+
+  await service.update(
+    taskA.id,
+    { assigneeIds: [userId] } as never,
+    projectId,
+    userId
+  );
+
+  assert.equal(notifications.created.length, 0);
 });

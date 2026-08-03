@@ -9,9 +9,22 @@ import {
 import { Prisma, TaskStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
+import { RealtimeService } from "../realtime/realtime.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { TaskAssigneeService } from "./task-assignees.service";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
+
+// Backend has no shared import path to the frontend, so this is a short
+// hand-kept copy of frontend/src/lib/taskStatusStyles.ts's labels - same
+// arrangement as TASK_TITLE_MAX_LENGTH/TASK_NOTES_MAX_LENGTH, which
+// tasks.ts's own comment already documents as mirrored by hand.
+const statusLabels: Record<TaskStatus, string> = {
+  TODO: "To Do",
+  IN_PROGRESS: "In Progress",
+  REVIEW: "Review",
+  COMPLETED: "Completed",
+};
 
 // shared include so every read path returns the same shape: the category (for
 // the card's label and colour) and each assignee's user info (for the avatars).
@@ -46,7 +59,9 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly taskAssigneeService: TaskAssigneeService,
-    private readonly projectsService: ProjectsService
+    private readonly projectsService: ProjectsService,
+    private readonly realtimeService: RealtimeService,
+    private readonly notificationsService: NotificationsService
   ) {}
 
   async create(projectId: string, dto: CreateTaskDto, userId: string) {
@@ -105,9 +120,19 @@ export class TasksService {
     // correctly-ranked task with no assignees rather than a corrupt column.
     if (dto.assigneeIds) {
       await this.taskAssigneeService.replaceAssignees(task.id, dto.assigneeIds);
+      // Everything is "new" on create - no previous assignees to diff against.
+      await this.notifyNewAssignees(
+        projectId,
+        [],
+        dto.assigneeIds,
+        userId,
+        dto.title
+      );
     }
 
-    return this.findById(task.id, projectId, userId);
+    const created = await this.findById(task.id, projectId, userId);
+    this.realtimeService.emitToProject(projectId, "task:created", created);
+    return created;
   }
 
   async findAll(projectId: string, userId: string) {
@@ -183,6 +208,20 @@ export class TasksService {
       // rank means "append to the new column", which moveTask resolves against
       // the live column length inside its transaction.
       await this.moveTask(id, projectId, nextStatus, dto.rank, taskFields);
+
+      // Only a real column change is notification-worthy - a same-column
+      // drag (isMoving from a rank change alone) isn't news to anyone.
+      // existingTask.assignees is who was assigned BEFORE this PATCH, not
+      // whatever assigneeIds (if any) this same request also carries.
+      if (dto.status !== undefined && dto.status !== existingTask.status) {
+        await this.notifyStatusChange(
+          projectId,
+          existingTask.assignees,
+          userId,
+          existingTask.title,
+          nextStatus
+        );
+      }
     } else {
       await this.prisma.task.update({
         where: { id: id },
@@ -192,9 +231,28 @@ export class TasksService {
 
     if (assigneeIds) {
       await this.taskAssigneeService.replaceAssignees(id, assigneeIds);
+      await this.notifyNewAssignees(
+        projectId,
+        existingTask.assignees.map((assignee) => assignee.id),
+        assigneeIds,
+        userId,
+        existingTask.title
+      );
     }
 
-    return this.findById(id, projectId, userId);
+    const updated = await this.findById(id, projectId, userId);
+    // A moving update already broadcast task:moved above - this covers the
+    // rest (title/notes/priority/category/assignees with no status/rank
+    // change). `changes` carries the whole task, same as the frontend's own
+    // local dispatch after a drawer save already does. Silent state-sync
+    // only, no notification - see notifyStatusChange above for that.
+    if (!isMoving) {
+      this.realtimeService.emitToProject(projectId, "task:updated", {
+        taskId: id,
+        changes: updated,
+      });
+    }
+    return updated;
   }
 
   async remove(id: string, projectId: string, userId: string) {
@@ -227,6 +285,9 @@ export class TasksService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
 
+    this.realtimeService.emitToProject(projectId, "task:deleted", {
+      taskId: id,
+    });
     return mapTask(task);
   }
 
@@ -250,7 +311,11 @@ export class TasksService {
     wantedRank: number | undefined,
     taskFields: Prisma.TaskUpdateInput
   ): Promise<void> {
-    await this.prisma.transaction(
+    // nextRank is computed inside the transaction (it depends on the live
+    // column length) but is exactly the "toIndex" the frontend's task_moved
+    // reducer action needs - returned here so the broadcast below can use it
+    // straight, no second lookup.
+    const nextRank = await this.prisma.transaction(
       async (database) => {
         // Where the task sits RIGHT NOW, read inside the transaction. Taking it
         // from a findById() done before the transaction opened was a real race:
@@ -305,8 +370,93 @@ export class TasksService {
           where: { id: id },
           data: { ...taskFields, status: toStatus, rank: nextRank },
         });
+
+        return nextRank;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+
+    // Covers both a drag-and-drop move and a drawer status change - this is
+    // the single call site for moveTask(), so one broadcast here reaches
+    // both. No sender exclusion: task_moved is idempotent (see its own
+    // comment in tasksReducer.ts), so the acting client harmlessly
+    // re-applies its own already-optimistic move.
+    this.realtimeService.emitToProject(projectId, "task:moved", {
+      taskId: id,
+      toStatus,
+      toIndex: nextRank,
+    });
+  }
+
+  // Notifies a task's assignees when it changes column, same shape as
+  // CalendarEventsService.notifyNewAssignees but a different trigger (a
+  // status change, not a new assignee). Excludes whoever made the move -
+  // you don't need to be told about your own action.
+  private async notifyStatusChange(
+    projectId: string,
+    assignees: { id: string }[],
+    actingUserId: string,
+    taskTitle: string,
+    nextStatus: TaskStatus
+  ): Promise<void> {
+    const recipientIds = assignees
+      .map((assignee) => assignee.id)
+      .filter((assigneeId) => assigneeId !== actingUserId);
+    if (recipientIds.length === 0) {
+      return;
+    }
+
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { name: true },
+    });
+    const message = `Task "${taskTitle}" moved to ${statusLabels[nextStatus]} in "${project.name}"`;
+
+    await Promise.all(
+      recipientIds.map((recipientId) =>
+        this.notificationsService.create(
+          recipientId,
+          message,
+          `/${projectId}/kanban`
+        )
+      )
+    );
+  }
+
+  // Same shape as CalendarEventsService.notifyNewAssignees: notifies whoever
+  // was newly added to a task's assignee list, excluding self-assignment.
+  // previousAssigneeIds is [] on create() (everything is "new"); on update()
+  // it's the task's assignees BEFORE this PATCH, fetched before
+  // replaceAssignees wipes the join rows.
+  private async notifyNewAssignees(
+    projectId: string,
+    previousAssigneeIds: string[],
+    newAssigneeIds: string[],
+    actingUserId: string,
+    taskTitle: string
+  ): Promise<void> {
+    const addedUserIds = newAssigneeIds.filter(
+      (assigneeId) =>
+        !previousAssigneeIds.includes(assigneeId) && assigneeId !== actingUserId
+    );
+    if (addedUserIds.length === 0) {
+      return;
+    }
+
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { name: true },
+    });
+    const message = `You were assigned to "${taskTitle}" in "${project.name}"`;
+
+    await Promise.all(
+      addedUserIds.map((addedUserId) =>
+        this.notificationsService.create(
+          addedUserId,
+          message,
+          `/${projectId}/kanban`
+        )
+      )
     );
   }
 
