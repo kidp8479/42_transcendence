@@ -527,7 +527,10 @@ function EvaluationChecklistPage() {
           ].map((threshold) => (
             <span
               key={threshold}
-              className="absolute -translate-x-1/2 text-text-muted/70"
+              // text-muted-on-surface, not text-muted/70: the 70% opacity
+              // on an already-dim color was 1.76:1 on this surface-raised
+              // background, needs 4.5:1
+              className="absolute -translate-x-1/2 text-text-muted-on-surface"
               style={{
                 left: `${(threshold / READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
               }}
