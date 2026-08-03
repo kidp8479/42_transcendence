@@ -30,15 +30,25 @@ export class AuthRequestError extends Error {
 const csrfCookieName = "tr_csrf";
 let currentSession: AuthSession | null = null;
 let refreshInFlight: Promise<AuthSession | null> | null = null;
+const sessionListeners = new Set<(session: AuthSession | null) => void>();
 
 export function setAuthSession(session: AuthSession | null): void {
-  currentSession = session;
+  publishAuthSession(session);
 }
 
 export function getAuthSession(): AuthSession | null {
   return currentSession;
 }
 
+export function subscribeAuthSession(
+  listener: (session: AuthSession | null) => void
+): () => void {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
+}
+
+// Session discovery is a refresh operation because the access token is
+// intentionally memory-only and cannot be restored after a page load.
 export async function getSession(): Promise<AuthSession | null> {
   return refreshSession();
 }
@@ -71,7 +81,7 @@ export async function logout(csrfToken?: string): Promise<void> {
   const token =
     csrfToken ?? currentSession?.csrfToken ?? readCookie(csrfCookieName);
   if (!token) {
-    currentSession = null;
+    publishAuthSession(null);
     return;
   }
 
@@ -85,7 +95,7 @@ export async function logout(csrfToken?: string): Promise<void> {
   });
 
   if (response.status === 401) {
-    currentSession = null;
+    publishAuthSession(null);
     return;
   }
   if (response.status !== 204) {
@@ -94,7 +104,7 @@ export async function logout(csrfToken?: string): Promise<void> {
       await readErrorMessage(response)
     );
   }
-  currentSession = null;
+  publishAuthSession(null);
 }
 
 function refreshSession(): Promise<AuthSession | null> {
@@ -104,7 +114,7 @@ function refreshSession(): Promise<AuthSession | null> {
 
   const csrfToken = currentSession?.csrfToken ?? readCookie(csrfCookieName);
   if (!csrfToken) {
-    currentSession = null;
+    publishAuthSession(null);
     return Promise.resolve(null);
   }
 
@@ -118,10 +128,14 @@ function refreshSession(): Promise<AuthSession | null> {
   })
     .then(async (response) => {
       if (response.status === 401) {
-        currentSession = null;
+        publishAuthSession(null);
         return null;
       }
       return parseSessionResponse(response);
+    })
+    .catch((error: unknown) => {
+      publishAuthSession(null);
+      throw error;
     })
     .finally(() => {
       if (refreshInFlight === request) {
@@ -162,8 +176,15 @@ async function parseSessionResponse(response: Response): Promise<AuthSession> {
   if (!isAuthSession(payload)) {
     throw new Error("Authentication service returned invalid credentials");
   }
-  currentSession = payload;
+  publishAuthSession(payload);
   return payload;
+}
+
+function publishAuthSession(session: AuthSession | null): void {
+  currentSession = session;
+  for (const listener of sessionListeners) {
+    listener(session);
+  }
 }
 
 async function readErrorMessage(response: Response): Promise<string> {

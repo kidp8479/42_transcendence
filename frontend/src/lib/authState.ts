@@ -1,4 +1,9 @@
-import { getSession, setAuthSession, type AuthSession } from "./auth";
+import {
+  getSession,
+  setAuthSession,
+  subscribeAuthSession,
+  type AuthSession,
+} from "./auth";
 import {
   resetRealtimeSocket,
   disconnectRealtimeSocket,
@@ -17,6 +22,15 @@ export class AuthSessionResource {
   private inFlight: Promise<AuthState> | null = null;
   private revision = 0;
   private listeners = new Set<() => void>();
+  private publishing = false;
+
+  constructor() {
+    subscribeAuthSession((session) => {
+      if (!this.publishing) {
+        this.applySession(session);
+      }
+    });
+  }
 
   async resolve(): Promise<AuthState> {
     if (this.hasFreshState()) {
@@ -42,7 +56,6 @@ export class AuthSessionResource {
         }
         this.state = state;
         this.checkedAt = Date.now();
-        setAuthSession(state.status === "authenticated" ? state.session : null);
         this.notify();
         return state;
       })
@@ -60,7 +73,7 @@ export class AuthSessionResource {
     this.revision += 1;
     this.state = { status: "authenticated", session };
     this.checkedAt = Date.now();
-    setAuthSession(session);
+    this.publishSession(session);
     resetRealtimeSocket();
     this.notify();
   }
@@ -69,7 +82,7 @@ export class AuthSessionResource {
     this.revision += 1;
     this.state = { status: "anonymous" };
     this.checkedAt = Date.now();
-    setAuthSession(null);
+    this.publishSession(null);
     // no session left to reconnect with - see disconnectRealtimeSocket's own comment
     disconnectRealtimeSocket();
     this.notify();
@@ -80,7 +93,7 @@ export class AuthSessionResource {
     this.state = null;
     this.checkedAt = 0;
     this.inFlight = null;
-    setAuthSession(null);
+    this.publishSession(null);
     resetRealtimeSocket();
     this.notify();
   }
@@ -112,6 +125,23 @@ export class AuthSessionResource {
   private notify(): void {
     for (const listener of this.listeners) {
       listener();
+    }
+  }
+
+  private applySession(session: AuthSession | null): void {
+    this.state = session
+      ? { status: "authenticated", session }
+      : { status: "anonymous" };
+    this.checkedAt = Date.now();
+    this.notify();
+  }
+
+  private publishSession(session: AuthSession | null): void {
+    this.publishing = true;
+    try {
+      setAuthSession(session);
+    } finally {
+      this.publishing = false;
     }
   }
 }

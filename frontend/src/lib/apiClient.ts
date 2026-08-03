@@ -43,6 +43,7 @@ export async function bearerFetch(
   input: FetchInput,
   init: FetchOptions = {}
 ): Promise<Response> {
+  assertSameOrigin(input);
   const session = getAuthSession() ?? (await getSession());
   if (!session) {
     throw new ApiError(401, "An active session is required");
@@ -59,6 +60,24 @@ export async function bearerFetch(
   }
   response = await fetchWithAccessToken(input, init, refreshed.accessToken);
   return response;
+}
+
+function assertSameOrigin(input: FetchInput): void {
+  const rawURL =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+  if (typeof window === "undefined") {
+    if (/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(rawURL)) {
+      throw new TypeError("bearerFetch only accepts same-origin URLs");
+    }
+    return;
+  }
+  if (new URL(rawURL, window.location.href).origin !== window.location.origin) {
+    throw new TypeError("bearerFetch only accepts same-origin URLs");
+  }
 }
 
 function fetchWithAccessToken(
