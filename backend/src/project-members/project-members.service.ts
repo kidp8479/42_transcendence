@@ -228,8 +228,9 @@ export class ProjectMembersService {
     if (memberToUpdate.role === newRole) {
       throw new BadRequestException("Member already has this role");
     }
+
     // update role
-    return this.prisma.projectMember.update({
+    const updateMember = await this.prisma.projectMember.update({
       where: {
         userId_projectId: {
           userId,
@@ -250,5 +251,14 @@ export class ProjectMembersService {
         },
       },
     });
+    this.realtimeService.emitToProject(
+      projectId,
+      "project:member-role-changed",
+      {
+        userId,
+        role: newRole,
+      }
+    );
+    return updateMember;
   }
 }

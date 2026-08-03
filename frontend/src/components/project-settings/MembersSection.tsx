@@ -15,6 +15,7 @@ import { FaUserPlus } from "react-icons/fa";
 import { useToast } from "@/hooks/useToast";
 import { getSession } from "@/lib/auth";
 import { RemoveMemberModal } from "./RemoveMemberModal";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
 // Displays the users currently belonging to a project.
 //
@@ -55,6 +56,30 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     loadMembers();
   }, [loadMembers]);
 
+  // listen for realtime member role updates
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    socket.on(
+      "project:member-role-changed",
+      (data: { userId: string; role: "OWNER" | "ADMIN" | "MEMBER" }) => {
+        setMembers((currentMembers) =>
+          currentMembers.map((member) =>
+            member.userId === data.userId
+              ? {
+                  ...member,
+                  role: data.role,
+                }
+              : member
+          )
+        );
+      }
+    );
+    return () => {
+      socket.off("project:member-role-changed");
+    };
+  }, [projectId]);
+
   const currentUserRole = members.find(
     (member) => member.userId === currentUserId
   )?.role;
@@ -65,6 +90,9 @@ export function MembersSection({ projectId }: MembersSectionProps) {
   const handleRoleChange = async (userId: string, role: "ADMIN" | "MEMBER") => {
     try {
       await updateMemberRole(projectId, userId, role);
+
+      // keep this for now while testing realtime
+      // remove once the websocket update is confirmed working
       await loadMembers();
 
       showToast({
