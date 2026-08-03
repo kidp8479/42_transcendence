@@ -39,7 +39,8 @@ function ProjectSettingsPage() {
 
       <BehaviorSection />
 
-      <ProjectStatusSection />
+      <ProjectStatusSection projectId={projectId} />
+
       {project.role === "OWNER" && (
         <DangerZoneSection
           projectId={projectId}

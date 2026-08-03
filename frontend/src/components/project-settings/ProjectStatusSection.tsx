@@ -3,13 +3,28 @@ import { Button } from "flowbite-react";
 import { SettingsActionRow } from "./SettingsActionRow";
 import { SettingsSection } from "./SettingsSection";
 import { HiOutlineArchive, HiOutlineShieldCheck } from "react-icons/hi";
+import { updateProject } from "@/lib/projectsApi";
 
 // Displays project lifecycle management actions inside the Project Settings page.
-//
 // This section is responsible for actions that change the current state of a
 // project without deleting it.
 
-export function ProjectStatusSection() {
+interface ProjectStatusSectionProps {
+  projectId: string;
+}
+
+export function ProjectStatusSection({ projectId }: ProjectStatusSectionProps) {
+  async function handleMarkFinished() {
+    await updateProject(projectId, {
+      status: "COMPLETED",
+    });
+  }
+
+  async function handleArchive() {
+    await updateProject(projectId, {
+      isArchived: true,
+    });
+  }
   return (
     <SettingsSection
       title="Project Status"
@@ -22,6 +37,7 @@ export function ProjectStatusSection() {
           icon={<HiOutlineShieldCheck className="h-5 w-5" />}
         >
           <Button
+            onClick={handleMarkFinished}
             className="
 			  !border
 			  !border-surface-border
@@ -46,6 +62,7 @@ export function ProjectStatusSection() {
           icon={<HiOutlineArchive className="h-5 w-5" />}
         >
           <Button
+            onClick={handleArchive}
             className="
 			  !border
 		      !border-surface-border
@@ -88,7 +105,7 @@ export function ProjectStatusSection() {
 //
 // Permissions:
 // - All project members can view the Settings page.
-// - Only ADMIN users should see and use lifecycle controls.
+// - Only ADMIN and OWNER users should see and use lifecycle controls.
 // - Frontend checks are only for user experience.
 // - Backend authorization remains the source of truth.
 //

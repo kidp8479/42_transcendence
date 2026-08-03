@@ -1,9 +1,35 @@
 // Wrapper for all authenticated pages (login required).
 // The root application shell owns the authentication-aware header and footer.
-import { Outlet } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { Outlet, useRouter } from "@tanstack/react-router";
 import { SideBarCmp } from "@/components/navigation/SideBarCmp";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
 export function AuthenticatedLayout() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+
+    socket.on("project:updated", () => {
+      router.invalidate();
+    });
+
+    socket.on("project:member-added", () => {
+      router.invalidate();
+    });
+
+    socket.on("project:member-removed", () => {
+      router.invalidate();
+    });
+
+    return () => {
+      socket.off("project:updated");
+      socket.off("project:member-added");
+      socket.off("project:member-removed");
+    };
+  }, [router]);
+
   return (
     <div className="flex min-h-0 flex-1">
       <SideBarCmp />

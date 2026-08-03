@@ -102,6 +102,12 @@ export class ProjectMembersService {
     );
     this.realtimeService.joinProjectRoom(user.id, projectId);
 
+    this.realtimeService.emitToProject(
+      projectId,
+      "project:member-added",
+      member
+    );
+
     return member;
   }
 
@@ -112,6 +118,9 @@ export class ProjectMembersService {
     return this.prisma.projectMember.findMany({
       where: {
         projectId,
+      },
+      orderBy: {
+        createdAt: "asc",
       },
       include: {
         user: {
@@ -177,6 +186,9 @@ export class ProjectMembersService {
             projectId,
           },
         },
+      });
+      this.realtimeService.emitToProject(projectId, "project:member-removed", {
+        userId,
       });
       this.realtimeService.leaveProjectRoom(userId, projectId);
       for (const released of this.realtimeService.releaseFieldLocksForUserInProject(

@@ -78,8 +78,21 @@ export function MembersSection({ projectId }: MembersSectionProps) {
         );
       }
     );
+
+    socket.on("project:member-removed", (data: { userId: string }) => {
+      setMembers((currentMembers) =>
+        currentMembers.filter((member) => member.userId !== data.userId)
+      );
+    });
+
+    socket.on("project:member-added", (member: ProjectMember) => {
+      setMembers((currentMembers) => [...currentMembers, member]);
+    });
+
     return () => {
       socket.off("project:member-role-changed");
+      socket.off("project:member-removed");
+      socket.off("project:member-added");
     };
   }, [projectId]);
 
@@ -113,7 +126,6 @@ export function MembersSection({ projectId }: MembersSectionProps) {
 
     try {
       await removeMember(projectId, memberToRemove.userId);
-      await loadMembers();
       showToast({
         message: "Member removed",
         type: "success",
@@ -138,7 +150,6 @@ export function MembersSection({ projectId }: MembersSectionProps) {
         type: "success",
       });
 
-      await loadMembers();
       setUsername("");
     } catch (error) {
       showToast({

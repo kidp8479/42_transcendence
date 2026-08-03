@@ -260,7 +260,16 @@ export class ProjectsService {
       );
     }
 
-    await this.prisma.project.update({ where: { id }, data: dto });
+    // Broadcast project changes to all connected project members so their UI
+    // (ex: sidebar project list) can refresh without requiring a page reload.
+    // Used for status changes (COMPLETED), archiving, and other project updates.
+    const updatedProject = await this.prisma.project.update({
+      where: { id },
+      data: dto,
+    });
+
+    this.realtimeService.emitToProject(id, "project:updated", updatedProject);
+
     return this.findById(id, userId);
   }
 
