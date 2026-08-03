@@ -49,8 +49,10 @@ const sidebarNavLinkClasses =
 const sidebarNavLinkActiveClasses = "bg-brand-500/10 text-brand-500";
 const activeSidebarLinkClasses = `${sidebarNavLinkClasses} ${sidebarNavLinkActiveClasses}`;
 const sidebarGroupClasses = "font-mono tracking-tight text-sm lg:text-base";
+// text-muted-on-surface, not text-muted: text-muted is only 2.38:1 on the
+// sidebar's surface-raised background, well under WCAG AA's 4.5:1 minimum.
 const sidebarSectionLabelClasses =
-  "px-3 pb-2 font-mono text-xs tracking-wider text-text-muted uppercase";
+  "px-3 pb-2 font-mono text-xs tracking-wider text-text-muted-on-surface uppercase";
 const sidebarToggleBaseClasses =
   "absolute top-1/2 right-0 hidden h-10 w-4 translate-x-full -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-surface-border bg-surface-raised text-text-muted hover:bg-surface-overlay hover:text-text-primary md:flex";
 
@@ -117,23 +119,27 @@ function ProjectRow({ project }: { project: Project }) {
   const { isDesktop, closeSidebar } = useSidebar();
 
   return (
-    <Link
-      // Each project needs its own route target so only one row can be active at a time.
-      to="/$projectId/summary"
-      params={{ projectId: project.id }}
-      // Mobile-only close-on-navigate, same reasoning as SidebarNavLink above.
-      onClick={() => {
-        if (!isDesktop) closeSidebar();
-      }}
-      activeProps={{ className: activeSidebarLinkClasses }}
-      inactiveProps={{ className: sidebarNavLinkClasses }}
-    >
-      <span className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${statusColorClass}`} />
-        <span className="truncate">{project.name}</span>
-        <HiChevronRight className="h-4 w-4 text-text-muted" />
-      </span>
-    </Link>
+    <li>
+      <Link
+        // Each project needs its own route target so only one row can be active at a time.
+        to="/$projectId/summary"
+        params={{ projectId: project.id }}
+        // Mobile-only close-on-navigate, same reasoning as SidebarNavLink above.
+        onClick={() => {
+          if (!isDesktop) closeSidebar();
+        }}
+        activeProps={{ className: activeSidebarLinkClasses }}
+        inactiveProps={{ className: sidebarNavLinkClasses }}
+      >
+        <span className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${statusColorClass}`}
+          />
+          <span className="truncate">{project.name}</span>
+          <HiChevronRight className="h-4 w-4 text-text-muted" />
+        </span>
+      </Link>
+    </li>
   );
 }
 

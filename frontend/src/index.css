@@ -37,6 +37,11 @@
   /* text-muted fails contrast on surface-base (#0f0f0f, 2.48:1) - this is the
      surface-base-safe variant, 4.66:1. */
   --color-text-muted-on-base: #7c7c89;
+  /* text-muted (#52525b) only reaches 2.38:1 on surface-raised, well under
+  WCAG AA's 4.5:1 - a dedicated token instead of raising text-muted itself,
+  since that one is reused in 10 other files for other backgrounds/contexts
+  not audited yet. */
+  --color-text-muted-on-surface: #7e7e8b;
 
   /* Task status, used for dashboards, kanban, list etc - matches the Figma prototype's COLUMN_ACCENTS */
   --color-status-todo: #7a8aa8;

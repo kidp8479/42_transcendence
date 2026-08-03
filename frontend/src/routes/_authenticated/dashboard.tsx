@@ -32,7 +32,10 @@ function DashboardPage() {
       </h1>
 
       <div className="mt-6 grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-surface-border bg-surface-raised p-4">
+        <Link
+          to="/projects"
+          className="rounded-lg border border-surface-border bg-surface-raised p-4 transition hover:border-brand-500"
+        >
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-secondary">Active Projects</span>
             <HiOutlineFolder className="size-5 text-brand-500" />
@@ -43,7 +46,7 @@ function DashboardPage() {
           <p className="mt-1 text-xs text-text-secondary">
             {reviewCount} in review
           </p>
-        </div>
+        </Link>
 
         {/* Draft tiles, agreed with the team on Discord 2026-08-03: chat and
         friends aren't built yet, these just link to their (stub) pages so
