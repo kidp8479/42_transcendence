@@ -20,7 +20,7 @@ import {
   Param,
   ParseUUIDPipe,
 } from "@nestjs/common";
-import { ApiSecurity } from "@nestjs/swagger";
+import { ApiBearerAuth } from "@nestjs/swagger";
 import { firstHeaderValue } from "../common/first-header-value";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { EvaluationChecklistItemsService } from "./evaluation-checklist-items.service";
@@ -61,7 +61,7 @@ export class EvaluationChecklistItemsController {
 
   // POST - creates a new item in the given section, rejected once that
   // section already has EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION items.
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -73,7 +73,7 @@ export class EvaluationChecklistItemsController {
 
   // PATCH - partial update (label, isChecked, or order); section can't be
   // changed here, see UpdateEvaluationChecklistItemDto.
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -93,7 +93,7 @@ export class EvaluationChecklistItemsController {
   }
 
   // DELETE - permanently removes the item.
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete(":id")
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,

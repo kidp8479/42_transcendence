@@ -8,6 +8,9 @@ export interface AuthenticatedUser {
 }
 
 export interface AuthSession {
+  accessToken: string;
+  tokenType: "Bearer";
+  expiresIn: number;
   user: AuthenticatedUser;
   csrfToken: string;
   idleExpiresAt: string;
@@ -24,17 +27,39 @@ export class AuthRequestError extends Error {
   }
 }
 
+const csrfCookieName = "tr_csrf";
+let currentSession: AuthSession | null = null;
+let refreshInFlight: Promise<AuthSession | null> | null = null;
+const sessionListeners = new Set<(session: AuthSession | null) => void>();
+
+export function setAuthSession(session: AuthSession | null): void {
+  publishAuthSession(session);
+}
+
+export function getAuthSession(): AuthSession | null {
+  return currentSession;
+}
+
+export function subscribeAuthSession(
+  listener: (session: AuthSession | null) => void
+): () => void {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
+}
+
+// Session discovery is a refresh operation because the access token is
+// intentionally memory-only and cannot be restored after a page load.
 export async function getSession(): Promise<AuthSession | null> {
-  const response = await fetch("/auth/session", {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
+  return refreshSession();
+}
 
-  if (response.status === 401) {
-    return null;
+export async function refreshAfterUnauthorized(
+  rejectedAccessToken: string
+): Promise<AuthSession | null> {
+  if (currentSession && currentSession.accessToken !== rejectedAccessToken) {
+    return currentSession;
   }
-
-  return parseSessionResponse(response);
+  return refreshSession();
 }
 
 export async function login(
@@ -53,8 +78,10 @@ export async function register(
 }
 
 export async function logout(csrfToken?: string): Promise<void> {
-  const token = csrfToken ?? (await getSession())?.csrfToken;
+  const token =
+    csrfToken ?? currentSession?.csrfToken ?? readCookie(csrfCookieName);
   if (!token) {
+    publishAuthSession(null);
     return;
   }
 
@@ -67,12 +94,57 @@ export async function logout(csrfToken?: string): Promise<void> {
     },
   });
 
+  if (response.status === 401) {
+    publishAuthSession(null);
+    return;
+  }
   if (response.status !== 204) {
     throw new AuthRequestError(
       response.status,
       await readErrorMessage(response)
     );
   }
+  publishAuthSession(null);
+}
+
+function refreshSession(): Promise<AuthSession | null> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  const csrfToken = currentSession?.csrfToken ?? readCookie(csrfCookieName);
+  if (!csrfToken) {
+    publishAuthSession(null);
+    return Promise.resolve(null);
+  }
+
+  const request = fetch("/auth/refresh", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "X-CSRF-Token": csrfToken,
+    },
+  })
+    .then(async (response) => {
+      if (response.status === 401) {
+        publishAuthSession(null);
+        return null;
+      }
+      return parseSessionResponse(response);
+    })
+    .catch((error: unknown) => {
+      publishAuthSession(null);
+      throw error;
+    })
+    .finally(() => {
+      if (refreshInFlight === request) {
+        refreshInFlight = null;
+      }
+    });
+
+  refreshInFlight = request;
+  return request;
 }
 
 async function authRequest(
@@ -102,9 +174,17 @@ async function parseSessionResponse(response: Response): Promise<AuthSession> {
 
   const payload: unknown = await response.json();
   if (!isAuthSession(payload)) {
-    throw new Error("Authentication service returned an invalid session");
+    throw new Error("Authentication service returned invalid credentials");
   }
+  publishAuthSession(payload);
   return payload;
+}
+
+function publishAuthSession(session: AuthSession | null): void {
+  currentSession = session;
+  for (const listener of sessionListeners) {
+    listener(session);
+  }
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
@@ -125,6 +205,24 @@ async function readErrorMessage(response: Response): Promise<string> {
   return fallback;
 }
 
+function readCookie(name: string): string | undefined {
+  if (typeof document === "undefined") {
+    return undefined;
+  }
+  for (const part of document.cookie.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator === -1 || part.slice(0, separator).trim() !== name) {
+      continue;
+    }
+    try {
+      return decodeURIComponent(part.slice(separator + 1).trim());
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 function isAuthSession(value: unknown): value is AuthSession {
   if (!isRecord(value) || !isRecord(value.user)) {
     return false;
@@ -132,6 +230,9 @@ function isAuthSession(value: unknown): value is AuthSession {
 
   const { user } = value;
   return (
+    typeof value.accessToken === "string" &&
+    value.tokenType === "Bearer" &&
+    typeof value.expiresIn === "number" &&
     typeof value.csrfToken === "string" &&
     typeof value.idleExpiresAt === "string" &&
     typeof value.absoluteExpiresAt === "string" &&

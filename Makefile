@@ -39,6 +39,7 @@ $(ENV_FILE):
 recreate-env:
 	sed \
 		-e "s|^AUTH_INTERNAL_TOKEN=.*|AUTH_INTERNAL_TOKEN=$$(openssl rand -hex 32)|" \
+		-e "s|^AUTH_REFRESH_SUCCESSOR_KEY=.*|AUTH_REFRESH_SUCCESSOR_KEY=$$(openssl rand -hex 32)|" \
 		-e "s|^VAULT_DEV_ROOT_TOKEN=.*|VAULT_DEV_ROOT_TOKEN=$$(openssl rand -hex 32)|" \
 		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD=$$(openssl rand -hex 32)|" \
 		.env.example > $(ENV_FILE)
@@ -261,11 +262,11 @@ lint-backend:
 
 ## build the frontend application inside its Compose service
 check-frontend:
-	$(COMPOSE) exec frontend npm run build
+	$(COMPOSE) exec frontend sh -c "npm run build && npm run test:auth-refresh"
 
 ## build the backend application inside its Compose service
 check-backend:
-	$(COMPOSE) exec backend sh -c "npm run build && npm run test:field-lock-manager"
+	$(COMPOSE) exec backend sh -c "npm run build && npm run test:unit"
 
 ## run Go tests and static analysis inside the auth Compose service
 check-auth:
@@ -281,6 +282,10 @@ format-auth:
 
 ## validate the authentication integration services
 check-auth-stack: check-auth check-prisma check-backend check-frontend
+
+## verify one-use WebSocket admission, exact Origin, and sid revocation
+check-websocket-e2e:
+	$(COMPOSE) exec -e RUN_WEBSOCKET_E2E=1 frontend npm run test:websocket-e2e
 
 ## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
 check-shell:
@@ -383,4 +388,4 @@ help:
         migrate migrate-dev migrate-fix-permissions prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
         check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell \
-        check-vault-policies check-vault-prisma
+        check-vault-policies check-vault-prisma check-websocket-e2e

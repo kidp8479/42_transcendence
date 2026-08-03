@@ -1,15 +1,16 @@
+import { Optional } from "@nestjs/common";
 import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
-import { ConfigService } from "@nestjs/config";
+import type { IncomingMessage } from "node:http";
 import { Socket, Server } from "socket.io";
-import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   AcquireFieldLockResult,
@@ -17,6 +18,22 @@ import {
   FieldLockManager,
   ReleasedFieldLock,
 } from "./field-lock-manager";
+import {
+  WebSocketAdmission,
+  WebSocketAdmissionService,
+} from "./websocket-admission.service";
+
+const webSocketTicketPattern = /^[A-Za-z0-9_-]{43}$/;
+const sessionRevalidationIntervalMs = 30_000;
+const maximumSocketLifetimeMs = 15 * 60_000;
+const maximumSocketsPerSession = 5;
+
+function allowExactOrigin(
+  request: IncomingMessage,
+  callback: (error: string | null | undefined, success: boolean) => void
+): void {
+  callback(null, request.headers.origin === process.env.APP_ORIGIN);
+}
 
 // Resolves the real projectId a lockable resource belongs to, given the id
 // half of its key (the "checklist-item:" / "discovery-block:" prefix is
@@ -27,15 +44,19 @@ import {
 // lockable model (Kanban cards, per useFieldLock's own comment).
 type KeyPrefixValidator = (id: string) => Promise<string | undefined>;
 
-@WebSocketGateway({ path: "/ws" })
+@WebSocketGateway({
+  path: "/ws",
+  transports: ["websocket"],
+  allowRequest: allowExactOrigin,
+})
 export class RealtimeGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   constructor(
-    private readonly configService: ConfigService,
-    private readonly vaultRuntime: VaultRuntimeService,
     private readonly prisma: PrismaService,
-    private readonly fieldLockManager: FieldLockManager
+    private readonly fieldLockManager: FieldLockManager,
+    @Optional()
+    private readonly admissionService?: WebSocketAdmissionService
   ) {
     this.fieldLockManager.setExpirationHandler((released) => {
       this.emitFieldUnlock(released);
@@ -46,12 +67,31 @@ export class RealtimeGateway
 
   // registered by each owning module's service (see keyBelongsToProject)
   private keyPrefixValidators = new Map<string, KeyPrefixValidator>();
+  private socketGuards = new Map<
+    string,
+    { revalidation: NodeJS.Timeout; lifetime: NodeJS.Timeout }
+  >();
+  private sessionSockets = new Map<string, Set<string>>();
 
   registerKeyPrefixValidator(
     prefix: string,
     validator: KeyPrefixValidator
   ): void {
     this.keyPrefixValidators.set(prefix, validator);
+  }
+
+  afterInit(server: Server): void {
+    server.use((client, next) => {
+      void this.authenticate(client)
+        .then((authenticated) => {
+          next(
+            authenticated
+              ? undefined
+              : new Error("WebSocket ticket admission failed")
+          );
+        })
+        .catch(() => next(new Error("WebSocket ticket admission failed")));
+    });
   }
 
   // grabs the lock for key, only if nobody else already has it - scoped by
@@ -87,152 +127,25 @@ export class RealtimeGateway
     return this.fieldLockManager.get(key);
   }
 
-  // TEMPORARY auth: validates the socket using the same session cookie +
-  // introspection endpoint as AuthGuard (backend/src/auth/auth.guard.ts),
-  // deliberately duplicated instead of shared. Andrei's WebSocket ticket
-  // system (auth ticket 7.7) will replace this entirely - delete this
-  // check once that lands, don't extract/reuse it in the meantime.
-  // nginx.conf only routes "/ws" to the backend (Socket.io's default path is
-  // "/socket.io", which nginx never forwards) - without this, no client could
-  // ever reach this gateway through nginx.
   async handleConnection(client: Socket): Promise<void> {
-    // handleConnection is async (auth fetch + 2 Prisma calls + room joins
-    // below), but a client can emit field:lock/unlock/query the instant it
-    // connects - before any of that has finished. Handlers await this so
-    // they never run against a socket that hasn't joined its rooms yet
-    // (isMember would wrongly read as "not a member"). Left unresolved
-    // forever on an early-disconnect return path below, which is fine: a
-    // disconnected socket's own handlers never get their response delivered
-    // either way.
-    let resolveReady: (ready: boolean) => void;
-    client.data.ready = new Promise<boolean>((resolve) => {
-      resolveReady = resolve;
-    });
-
-    const appOrigin = this.configService.getOrThrow<string>("APP_ORIGIN");
-    // Only enforce a match when Origin is actually sent. Socket.io's first
-    // handshake goes through plain HTTP long-polling, and browsers don't
-    // set Origin on a same-origin fetch/XHR - only cross-origin requests
-    // reliably carry it, which is exactly the case this check needs to
-    // catch. Rejecting on a missing header blocked every real connection.
-    const origin = client.handshake.headers.origin;
-    if (origin !== undefined && origin !== appOrigin) {
-      resolveReady!(false);
-      client.disconnect(true);
-      return;
-    }
-    const sessionCookieName = this.configService.getOrThrow<string>(
-      "AUTH_SESSION_COOKIE"
-    );
-    const sessionToken = readCookie(
-      client.handshake.headers.cookie,
-      sessionCookieName
-    );
-    if (!sessionToken) {
-      resolveReady!(false);
-      client.disconnect(true);
-      return;
-    }
-
-    const authServiceUrl =
-      this.configService.getOrThrow<string>("AUTH_SERVICE_URL");
-    let response: Response;
-    try {
-      response = await fetch(`${authServiceUrl}/auth/internal/introspect`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.vaultRuntime.getInternalToken()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sessionToken,
-          requestMethod: "GET",
-          origin: client.handshake.headers.origin,
-        }),
-        signal: AbortSignal.timeout(2000),
-      });
-    } catch {
-      resolveReady!(false);
-      client.disconnect(true);
-      return;
-    }
-
-    if (!response.ok) {
-      resolveReady!(false);
-      client.disconnect(true);
-      return;
-    }
-
-    const result = (await response.json()) as {
-      active?: boolean;
-      userId?: string;
-    };
-    if (result.active !== true || typeof result.userId !== "string") {
-      resolveReady!(false);
-      client.disconnect(true);
-      return;
-    }
-
-    client.data.userId = result.userId;
-
-    // cached on the socket, avoids a DB query on every field:lock message
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: result.userId },
-      select: { username: true, avatarUrl: true },
-    });
-    if (!client.connected) {
-      resolveReady!(false);
-      return;
-    }
-    client.data.username = user.username;
-    client.data.avatarUrl = user.avatarUrl;
-
-    // Join the user room before reading memberships. Member removal selects
-    // sockets through this room, so it can evict a connection that is still
-    // being admitted to project rooms.
-    await client.join(`user:${result.userId}`);
-    if (!client.connected) {
-      resolveReady!(false);
-      return;
-    }
-
-    // WS-specific logic starts here: auth above is just "who is this",
-    // this part is "what should this connection receive". Joining a room
-    // per project means we can later broadcast to everyone on a project
-    // (client.join is the same Socket.io method any future feature will use).
-    // A plain membership lookup, not ProjectsService.findAll - that one
-    // joins members/evaluationChecklistItems/_count to compute progress for
-    // the projects list page, all of it wasted work here since only the
-    // project ids are needed to join rooms.
-    const memberships = await this.prisma.projectMember.findMany({
-      where: { userId: result.userId },
-      select: { projectId: true },
-    });
-    for (const membership of memberships) {
-      if (!client.connected) {
-        resolveReady!(false);
-        return;
+    // Admission consumes the ticket before this cap. Burning a ticket for an
+    // over-cap connection keeps tickets strictly one-use; the client fetches
+    // a new one when it retries after a reconnect storm.
+    if (!this.registerSessionSocket(client)) {
+      client.data.ready = Promise.resolve(false);
+      if (client.connected) {
+        client.disconnect(true);
       }
-      await this.fieldLockManager.withProject(
-        membership.projectId,
-        async () => {
-          if (
-            !client.connected ||
-            !(await this.isCurrentProjectMember(
-              result.userId,
-              membership.projectId
-            ))
-          ) {
-            return;
-          }
-          if (!client.connected) {
-            return;
-          }
-          await client.join(`project:${membership.projectId}`);
-        }
-      );
+      return;
     }
-    resolveReady!(client.connected);
+    const ready = this.joinRooms(client).catch(() => false);
+    client.data.ready = ready;
+    if (!(await ready)) {
+      this.unregisterSessionSocket(client);
+      if (client.connected) {
+        client.disconnect(true);
+      }
+    }
   }
 
   // locks live in our own Map, not Socket.io's room state - release them
@@ -242,10 +155,152 @@ export class RealtimeGateway
   // lock) while the other's connection drops and reconnects; only the
   // disconnecting socket's own locks should be released.
   async handleDisconnect(@ConnectedSocket() client: Socket): Promise<void> {
+    this.unregisterSessionSocket(client);
+    this.clearSocketGuards(client.id);
     const released = await this.fieldLockManager.releaseSocket(client.id);
     for (const lock of released) {
       this.emitFieldUnlock(lock);
     }
+  }
+
+  private async authenticate(client: Socket): Promise<boolean> {
+    const ticket = client.handshake.query.ticket;
+    if (
+      !this.admissionService ||
+      typeof ticket !== "string" ||
+      !webSocketTicketPattern.test(ticket)
+    ) {
+      return false;
+    }
+
+    let admission: WebSocketAdmission;
+    try {
+      admission = await this.admissionService.consume(ticket);
+    } catch {
+      return false;
+    }
+    client.data.userId = admission.sub;
+    client.data.sessionId = admission.sid;
+    client.data.username = admission.username;
+    client.data.avatarUrl = admission.avatarUrl;
+    return true;
+  }
+
+  private async joinRooms(client: Socket): Promise<boolean> {
+    const subject = client.data.userId as string | undefined;
+    const sessionId = client.data.sessionId as string | undefined;
+    if (!subject || !sessionId || !this.admissionService) {
+      return false;
+    }
+
+    await client.join(`user:${subject}`);
+    if (!client.connected) {
+      return false;
+    }
+
+    const memberships = await this.prisma.projectMember.findMany({
+      where: { userId: subject },
+      select: { projectId: true },
+    });
+    for (const membership of memberships) {
+      if (!client.connected) {
+        return false;
+      }
+      await this.fieldLockManager.withProject(
+        membership.projectId,
+        async () => {
+          if (
+            !client.connected ||
+            !(await this.isCurrentProjectMember(subject, membership.projectId))
+          ) {
+            return;
+          }
+          if (client.connected) {
+            await client.join(`project:${membership.projectId}`);
+          }
+        }
+      );
+    }
+    if (!client.connected) {
+      return false;
+    }
+    this.startSocketGuards(client, subject, sessionId);
+    return true;
+  }
+
+  private startSocketGuards(
+    client: Socket,
+    subject: string,
+    sessionId: string
+  ): void {
+    this.clearSocketGuards(client.id);
+    let revalidationInFlight = false;
+    const revalidation = setInterval(() => {
+      if (revalidationInFlight || !client.connected) {
+        return;
+      }
+      revalidationInFlight = true;
+      void this.admissionService!.isSessionActive(subject, sessionId)
+        .then((active) => {
+          if (!active && client.connected) {
+            client.disconnect(true);
+          }
+        })
+        .catch(() => {
+          if (client.connected) {
+            client.disconnect(true);
+          }
+        })
+        .finally(() => {
+          revalidationInFlight = false;
+        });
+    }, sessionRevalidationIntervalMs);
+    const lifetime = setTimeout(() => {
+      if (client.connected) {
+        client.disconnect(true);
+      }
+    }, maximumSocketLifetimeMs);
+    this.socketGuards.set(client.id, { revalidation, lifetime });
+  }
+
+  private registerSessionSocket(client: Socket): boolean {
+    const subject = client.data.userId as string | undefined;
+    const sessionId = client.data.sessionId as string | undefined;
+    if (!subject || !sessionId) {
+      return false;
+    }
+    const key = `${subject}:${sessionId}`;
+    const sockets = this.sessionSockets.get(key) ?? new Set<string>();
+    if (sockets.size >= maximumSocketsPerSession) {
+      return false;
+    }
+    sockets.add(client.id);
+    this.sessionSockets.set(key, sockets);
+    client.data.sessionSocketKey = key;
+    return true;
+  }
+
+  private unregisterSessionSocket(client: Socket): void {
+    const key = client.data.sessionSocketKey as string | undefined;
+    if (!key) {
+      return;
+    }
+    const sockets = this.sessionSockets.get(key);
+    sockets?.delete(client.id);
+    if (sockets?.size === 0) {
+      this.sessionSockets.delete(key);
+    }
+    delete client.data.sessionSocketKey;
+  }
+
+  private clearSocketGuards(socketId: string): void {
+    const guards = this.socketGuards.get(socketId);
+    if (!guards) {
+      return;
+    }
+    clearInterval(guards.revalidation);
+    clearTimeout(guards.lifetime);
+    this.socketGuards.delete(socketId);
   }
 
   // client wants to start editing key - rejects if client isn't a member
@@ -473,29 +528,4 @@ export class RealtimeGateway
       .to(`project:${released.lock.projectId}`)
       .emit("field:unlocked", { key: released.key });
   }
-}
-
-function readCookie(
-  cookieHeader: string | undefined,
-  cookieName: string
-): string | undefined {
-  if (!cookieHeader) {
-    return undefined;
-  }
-
-  for (const part of cookieHeader.split(";")) {
-    const separator = part.indexOf("=");
-    if (separator === -1) {
-      continue;
-    }
-    const name = part.slice(0, separator).trim();
-    if (name === cookieName) {
-      try {
-        return decodeURIComponent(part.slice(separator + 1).trim());
-      } catch {
-        return undefined;
-      }
-    }
-  }
-  return undefined;
 }

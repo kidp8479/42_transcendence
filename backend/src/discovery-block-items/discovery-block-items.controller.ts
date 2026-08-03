@@ -15,7 +15,7 @@ import {
   Param,
   ParseUUIDPipe,
 } from "@nestjs/common";
-import { ApiSecurity } from "@nestjs/swagger";
+import { ApiBearerAuth } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { DiscoveryBlockItemsService } from "./discovery-block-items.service";
 import { CreateDiscoveryBlockItemDto } from "./dto/create-discovery-block-item.dto";
@@ -59,7 +59,7 @@ export class DiscoveryBlockItemsController {
   }
 
   // POST
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -76,7 +76,7 @@ export class DiscoveryBlockItemsController {
   }
 
   // PATCH
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -95,7 +95,7 @@ export class DiscoveryBlockItemsController {
   }
 
   // DELETE
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete(":id")
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,

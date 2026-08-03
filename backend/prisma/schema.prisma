@@ -151,6 +151,7 @@ model AuthRefreshToken {
   usedAt           DateTime?
   replacedAt       DateTime?
   graceExpiresAt   DateTime?
+  successorCiphertext String?
   expiresAt        DateTime
   replacedById     String?            @unique
   family           RefreshTokenFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
@@ -158,6 +159,7 @@ model AuthRefreshToken {
   replaces         AuthRefreshToken?  @relation("RefreshTokenReplacement")
 
   @@index([familyId, issuedAt])
+  @@index([graceExpiresAt])
   @@index([expiresAt])
 }
 

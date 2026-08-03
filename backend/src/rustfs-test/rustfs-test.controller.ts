@@ -17,7 +17,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 // @types/multer's global Express.Multer.File augmentation needs an explicit
 // import to be picked up by the compiler.
 import "multer";
-import { ApiSecurity } from "@nestjs/swagger";
+import { ApiBearerAuth } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "crypto";
 import { StorageService } from "../storage/storage.service";
@@ -31,7 +31,7 @@ export class RustfsTestController {
     private readonly config: ConfigService
   ) {}
 
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Post("upload")
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: MAX_TEST_UPLOAD_BYTES } })

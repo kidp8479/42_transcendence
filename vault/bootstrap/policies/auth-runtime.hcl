@@ -16,6 +16,10 @@ path "kv/data/auth/oauth" {
   capabilities = ["read"]
 }
 
+path "kv/data/auth/refresh-successor" {
+  capabilities = ["read"]
+}
+
 path "kv/data/internal/backend-auth" {
   capabilities = ["read"]
 }

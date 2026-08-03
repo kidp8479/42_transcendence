@@ -39,8 +39,12 @@ Local routes:
 
 - Frontend: [http://localhost:8080/](http://localhost:8080/)
 - Backend API: [http://localhost:8080/api](http://localhost:8080/api)
-- Backend WebSocket: [ws://localhost:8080/ws](ws://localhost:8080/ws)
+- Backend WebSocket: disabled until TR-74 adds one-time ticket admission
 - Auth service: [http://localhost:8080/auth](http://localhost:8080/auth)
+
+Realtime notifications, Discovery/Evaluation collaboration updates, and field
+locks are unavailable during this deliberate TR-70-to-TR-74 cutover window.
+HTTP APIs remain available.
 
 If [http://localhost:8080](http://localhost:8080) does not load, check that the stack is running:
 

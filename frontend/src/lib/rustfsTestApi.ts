@@ -1,5 +1,4 @@
-import { getSession } from "./auth";
-import { ApiError, getCsrfToken, readErrorMessage } from "./apiClient";
+import { ApiError, bearerFetch, readErrorMessage } from "./apiClient";
 
 export interface UploadTestFileResult {
   bucket: string;
@@ -13,18 +12,11 @@ export interface UploadTestFileResult {
 export async function uploadTestFile(
   file: File
 ): Promise<UploadTestFileResult> {
-  const token = getCsrfToken() ?? (await getSession())?.csrfToken;
-  if (!token) {
-    throw new Error("An active session is required");
-  }
-
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch("/api/rustfs-test/upload", {
+  const response = await bearerFetch("/api/rustfs-test/upload", {
     method: "POST",
-    credentials: "include",
-    headers: { "X-CSRF-Token": token },
     body: formData,
   });
 
@@ -35,6 +27,12 @@ export async function uploadTestFile(
   return response.json();
 }
 
-export function testFileDownloadUrl(key: string): string {
-  return `/api/rustfs-test/${encodeURIComponent(key)}`;
+export async function downloadTestFile(key: string): Promise<Blob> {
+  const response = await bearerFetch(
+    `/api/rustfs-test/${encodeURIComponent(key)}`
+  );
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorMessage(response));
+  }
+  return response.blob();
 }

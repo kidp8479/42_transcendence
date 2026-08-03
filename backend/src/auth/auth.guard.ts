@@ -1,25 +1,24 @@
 import {
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
-import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import { firstHeaderValue } from "../common/first-header-value";
-import { IS_PUBLIC_KEY } from "./public.decorator";
+import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import type {
   AuthenticatedRequest,
   AuthenticatedUser,
 } from "./authenticated-request";
+import { IS_PUBLIC_KEY } from "./public.decorator";
 
 interface IntrospectionResponse {
   active: true;
-  sessionId: string;
-  userId: string;
+  sub: string;
+  sid: string;
   authenticationMethod: "LOCAL" | "FORTY_TWO" | "GOOGLE";
   assuranceLevel: number;
   authenticatedAt: string;
@@ -34,7 +33,6 @@ interface IntrospectionError {
 @Injectable()
 export class AuthGuard implements CanActivate {
   private readonly authServiceUrl: string;
-  private readonly sessionCookieName: string;
 
   constructor(
     private readonly reflector: Reflector,
@@ -42,9 +40,6 @@ export class AuthGuard implements CanActivate {
     private readonly vaultRuntime: VaultRuntimeService
   ) {
     this.authServiceUrl = configService.getOrThrow<string>("AUTH_SERVICE_URL");
-    this.sessionCookieName = configService.getOrThrow<string>(
-      "AUTH_SESSION_COOKIE"
-    );
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -57,24 +52,17 @@ export class AuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const sessionToken = readCookie(
-      request.headers.cookie,
-      this.sessionCookieName
+    const accessToken = readBearerToken(
+      firstHeaderValue(request.headers.authorization)
     );
-    if (!sessionToken) {
-      throw new UnauthorizedException("Active session required");
+    if (!accessToken) {
+      throw new UnauthorizedException("Bearer access token required");
     }
 
-    const response = await this.introspect({
-      sessionToken,
-      requestMethod: request.method,
-      origin: firstHeaderValue(request.headers.origin),
-      csrfToken: firstHeaderValue(request.headers["x-csrf-token"]),
-    });
-
+    const response = await this.introspect(accessToken);
     const user: AuthenticatedUser = {
-      id: response.userId,
-      sessionId: response.sessionId,
+      id: response.sub,
+      sessionId: response.sid,
       authenticationMethod: response.authenticationMethod,
       assuranceLevel: response.assuranceLevel,
       authenticatedAt: new Date(response.authenticatedAt),
@@ -85,12 +73,9 @@ export class AuthGuard implements CanActivate {
     return true;
   }
 
-  private async introspect(body: {
-    sessionToken: string;
-    requestMethod: string;
-    origin?: string;
-    csrfToken?: string;
-  }): Promise<IntrospectionResponse> {
+  private async introspect(
+    accessToken: string
+  ): Promise<IntrospectionResponse> {
     let response: Response;
     try {
       response = await fetch(
@@ -101,7 +86,7 @@ export class AuthGuard implements CanActivate {
             Authorization: `Bearer ${this.vaultRuntime.getInternalToken()}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ accessToken }),
           signal: AbortSignal.timeout(2000),
         }
       );
@@ -118,32 +103,24 @@ export class AuthGuard implements CanActivate {
           "Authentication service credentials are invalid"
         );
       }
-      throw new UnauthorizedException("Active session required");
-    }
-
-    async function readIntrospectionError(
-      response: Response
-    ): Promise<IntrospectionError> {
-      try {
-        return (await response.json()) as IntrospectionError;
-      } catch {
-        return {};
-      }
-    }
-    if (response.status === 403) {
-      throw new ForbiddenException("CSRF validation failed");
+      throw new UnauthorizedException("Access token is invalid or inactive");
     }
     if (!response.ok) {
       throw new ServiceUnavailableException(
-        "Authentication service could not validate the session"
+        "Authentication service could not validate the access token"
       );
     }
 
     const result = (await response.json()) as Partial<IntrospectionResponse>;
     if (
       result.active !== true ||
-      typeof result.userId !== "string" ||
-      typeof result.sessionId !== "string"
+      typeof result.sub !== "string" ||
+      typeof result.sid !== "string" ||
+      typeof result.authenticationMethod !== "string" ||
+      typeof result.assuranceLevel !== "number" ||
+      typeof result.authenticatedAt !== "string" ||
+      typeof result.idleExpiresAt !== "string" ||
+      typeof result.absoluteExpiresAt !== "string"
     ) {
       throw new ServiceUnavailableException(
         "Authentication service returned an invalid response"
@@ -153,27 +130,20 @@ export class AuthGuard implements CanActivate {
   }
 }
 
-function readCookie(
-  cookieHeader: string | undefined,
-  cookieName: string
-): string | undefined {
-  if (!cookieHeader) {
+function readBearerToken(value: string | undefined): string | undefined {
+  if (!value?.startsWith("Bearer ")) {
     return undefined;
   }
+  const token = value.slice("Bearer ".length);
+  return token && !token.includes(" ") ? token : undefined;
+}
 
-  for (const part of cookieHeader.split(";")) {
-    const separator = part.indexOf("=");
-    if (separator === -1) {
-      continue;
-    }
-    const name = part.slice(0, separator).trim();
-    if (name === cookieName) {
-      try {
-        return decodeURIComponent(part.slice(separator + 1).trim());
-      } catch {
-        return undefined;
-      }
-    }
+async function readIntrospectionError(
+  response: Response
+): Promise<IntrospectionError> {
+  try {
+    return (await response.json()) as IntrospectionError;
+  } catch {
+    return {};
   }
-  return undefined;
 }

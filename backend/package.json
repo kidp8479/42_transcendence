@@ -7,7 +7,7 @@
     "build": "nest build",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
-    "test:field-lock-manager": "tsx --test test/field-lock-manager.spec.ts",
+    "test:unit": "tsx --test test/*.spec.ts",
     "lint": "eslint \"{src,test,scripts}/**/*.ts\"",
     "format": "prettier --write \"{src,test,scripts}/**/*.ts\"",
     "format:check": "prettier --check \"{src,test,scripts}/**/*.ts\""

@@ -1,8 +1,5 @@
-import { getSession, type AuthSession } from "./auth";
+import { getAuthSession, getSession, refreshAfterUnauthorized } from "./auth";
 
-// Carries the HTTP status code so callers can react to specific cases (ex:
-// 401 meaning "session expired" vs any other failure) without parsing the
-// error message string.
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -13,71 +10,90 @@ export class ApiError extends Error {
   }
 }
 
-let csrfToken: string | undefined;
-
-export function setApiSession(session: AuthSession | null) {
-  csrfToken = session?.csrfToken;
-}
-
-// Exposed for callers that can't use apiClient() directly (ex: multipart
-// uploads, which can't use its JSON-only body handling).
-export function getCsrfToken(): string | undefined {
-  return csrfToken;
-}
-
 // eslint-disable-next-line no-undef -- RequestInit is a TypeScript DOM ambient type.
 type ApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
+type FetchInput = Parameters<typeof fetch>[0];
+type FetchOptions = NonNullable<Parameters<typeof fetch>[1]>;
 
-// Single fetch wrapper for every /api call: attaches the CSRF token for
-// mutating requests, JSON-encodes the body, and normalizes non-OK responses
-// into ApiError instead of every caller re-implementing this.
 export async function apiClient<T>(
   path: string,
   { body, ...options }: ApiOptions = {}
 ): Promise<T> {
-  const method = options.method?.toUpperCase() ?? "GET";
-  // CSRF only matters for state-changing requests - safe methods are exempt.
-  const isMutation = !["GET", "HEAD", "OPTIONS"].includes(method);
   const headers = new Headers(options.headers);
-
-  if (isMutation) {
-    // Current opaque-session model: the browser sends tr_session automatically.
-    // We add the separate CSRF value required by Go/NestJS.
-    const token = csrfToken ?? (await getSession())?.csrfToken;
-    if (!token) {
-      throw new Error("An active session is required");
-    }
-    csrfToken = token;
-    headers.set("X-CSRF-Token", token);
-  }
-
   if (body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
   headers.set("Accept", "application/json");
 
-  // nginx proxies /api/* to the backend (see nginx/nginx.conf) - not a Vite dev-proxy.
-  const response = await fetch(`/api${path}`, {
+  const response = await bearerFetch(`/api${path}`, {
     ...options,
-    method,
     headers,
-    credentials: "include",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   if (!response.ok) {
     throw new ApiError(response.status, await readErrorMessage(response));
   }
-
-  // 204 responses (ex: deleteProject) have no body - response.json() would
-  // throw on empty input, so short-circuit to undefined instead.
   return response.status === 204 ? (undefined as T) : response.json();
 }
 
-// Exported so callers that can't use apiClient() (ex: multipart uploads)
-// still normalize backend error bodies the same way.
+export async function bearerFetch(
+  input: FetchInput,
+  init: FetchOptions = {}
+): Promise<Response> {
+  assertSameOrigin(input);
+  const session = getAuthSession() ?? (await getSession());
+  if (!session) {
+    throw new ApiError(401, "An active session is required");
+  }
+
+  let response = await fetchWithAccessToken(input, init, session.accessToken);
+  if (response.status !== 401) {
+    return response;
+  }
+
+  const refreshed = await refreshAfterUnauthorized(session.accessToken);
+  if (!refreshed) {
+    return response;
+  }
+  response = await fetchWithAccessToken(input, init, refreshed.accessToken);
+  return response;
+}
+
+function assertSameOrigin(input: FetchInput): void {
+  const rawURL =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+  if (typeof window === "undefined") {
+    if (/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(rawURL)) {
+      throw new TypeError("bearerFetch only accepts same-origin URLs");
+    }
+    return;
+  }
+  if (new URL(rawURL, window.location.href).origin !== window.location.origin) {
+    throw new TypeError("bearerFetch only accepts same-origin URLs");
+  }
+}
+
+function fetchWithAccessToken(
+  input: FetchInput,
+  init: FetchOptions,
+  accessToken: string
+): Promise<Response> {
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${accessToken}`);
+  return fetch(input, {
+    ...init,
+    headers,
+    credentials: "omit",
+  });
+}
+
 export async function readErrorMessage(response: Response): Promise<string> {
   const fallback = `API request failed (${response.status})`;
   if (!response.headers.get("content-type")?.includes("application/json")) {

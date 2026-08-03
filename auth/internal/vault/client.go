@@ -4,12 +4,16 @@ package vault
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,8 +58,18 @@ type OAuthCredentials struct {
 }
 
 type Secrets struct {
-	OAuth         OAuthCredentials
-	InternalToken string
+	OAuth                     OAuthCredentials
+	InternalToken             string
+	RefreshSuccessorCipherKey string
+}
+
+// TransitPublicKeys contains only verification material. Vault never exposes
+// the Transit private key to the auth process.
+type TransitPublicKeys map[string]ed25519.PublicKey
+
+type TransitKeyInfo struct {
+	LatestVersion int
+	PublicKeys    TransitPublicKeys
 }
 
 func NewClient(address string) (*Client, error) {
@@ -114,6 +128,10 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 	if err != nil {
 		return Secrets{}, fmt.Errorf("read internal credential: %w", err)
 	}
+	refreshSuccessor, err := c.readKV(ctx, "kv/data/auth/refresh-successor")
+	if err != nil {
+		return Secrets{}, fmt.Errorf("read refresh successor credential: %w", err)
+	}
 	secrets := Secrets{
 		OAuth: OAuthCredentials{
 			FortyTwoClientID:     oauth["oauth_42_client_id"],
@@ -121,10 +139,14 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 			GoogleClientID:       oauth["oauth_google_client_id"],
 			GoogleClientSecret:   oauth["oauth_google_client_secret"],
 		},
-		InternalToken: internal["internal_token"],
+		InternalToken:             internal["internal_token"],
+		RefreshSuccessorCipherKey: refreshSuccessor["cipher_key"],
 	}
 	if len(secrets.InternalToken) < 32 {
 		return Secrets{}, fmt.Errorf("Vault internal credential must be at least 32 characters")
+	}
+	if len(secrets.RefreshSuccessorCipherKey) < 32 {
+		return Secrets{}, fmt.Errorf("Vault refresh successor credential must be at least 32 characters")
 	}
 	return secrets, nil
 }
@@ -159,14 +181,19 @@ func (c *Client) RenewDatabaseCredentials(ctx context.Context, credentials Datab
 
 // Sign delegates Ed25519 signing to Vault Transit. The private key is never
 // returned by this API.
-func (c *Client) Sign(ctx context.Context, value []byte) (string, error) {
+func (c *Client) Sign(ctx context.Context, keyID string, value []byte) (string, error) {
+	version, ok := transitKeyVersion(keyID)
+	if !ok {
+		return "", fmt.Errorf("invalid Transit key ID")
+	}
 	var response struct {
 		Data struct {
 			Signature string `json:"signature"`
 		} `json:"data"`
 	}
 	if err := c.request(ctx, http.MethodPost, "transit/sign/auth-access-jwt", c.tokenValue(), map[string]string{
-		"input": base64.StdEncoding.EncodeToString(value),
+		"input":       base64.StdEncoding.EncodeToString(value),
+		"key_version": strconv.Itoa(version),
 	}, &response); err != nil {
 		return "", fmt.Errorf("sign with Vault Transit: %w", err)
 	}
@@ -174,6 +201,91 @@ func (c *Client) Sign(ctx context.Context, value []byte) (string, error) {
 		return "", fmt.Errorf("Vault Transit returned an empty signature")
 	}
 	return response.Data.Signature, nil
+}
+
+func (c *Client) TransitKeyInfo(ctx context.Context) (TransitKeyInfo, error) {
+	var response struct {
+		Data struct {
+			LatestVersion int `json:"latest_version"`
+			Keys          map[string]struct {
+				PublicKey string `json:"public_key"`
+			} `json:"keys"`
+		} `json:"data"`
+	}
+	if err := c.request(ctx, http.MethodGet, "transit/keys/auth-access-jwt", c.tokenValue(), nil, &response); err != nil {
+		return TransitKeyInfo{}, fmt.Errorf("read Transit public keys: %w", err)
+	}
+	if len(response.Data.Keys) == 0 {
+		return TransitKeyInfo{}, fmt.Errorf("Transit returned no public keys")
+	}
+	if response.Data.LatestVersion <= 0 {
+		return TransitKeyInfo{}, fmt.Errorf("Transit returned no latest signing key version")
+	}
+
+	keys := make(TransitPublicKeys, len(response.Data.Keys))
+	for version, key := range response.Data.Keys {
+		parsedVersion, err := strconv.Atoi(version)
+		if err != nil || parsedVersion <= 0 || strconv.Itoa(parsedVersion) != version ||
+			parsedVersion > response.Data.LatestVersion {
+			return TransitKeyInfo{}, fmt.Errorf("invalid Transit public key version %q", version)
+		}
+		publicKey, err := parseTransitEd25519PublicKey(key.PublicKey)
+		if err != nil {
+			return TransitKeyInfo{}, fmt.Errorf("decode Transit public key version %q: %w", version, err)
+		}
+		keys["v"+version] = publicKey
+	}
+
+	if _, ok := keys[fmt.Sprintf("v%d", response.Data.LatestVersion)]; !ok {
+		return TransitKeyInfo{}, fmt.Errorf("Transit latest signing key has no public key")
+	}
+	return TransitKeyInfo{LatestVersion: response.Data.LatestVersion, PublicKeys: keys}, nil
+}
+
+func parseTransitEd25519PublicKey(value string) (ed25519.PublicKey, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, fmt.Errorf("public key is empty")
+	}
+
+	if block, rest := pem.Decode([]byte(value)); block != nil {
+		if block.Type != "PUBLIC KEY" || len(bytes.TrimSpace(rest)) != 0 {
+			return nil, fmt.Errorf("public key PEM is invalid")
+		}
+		return parsePKIXEd25519PublicKey(block.Bytes)
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		return nil, fmt.Errorf("public key is neither PEM nor base64: %w", err)
+	}
+	if len(decoded) == ed25519.PublicKeySize {
+		return append(ed25519.PublicKey(nil), decoded...), nil
+	}
+	return parsePKIXEd25519PublicKey(decoded)
+}
+
+func parsePKIXEd25519PublicKey(der []byte) (ed25519.PublicKey, error) {
+	parsed, err := x509.ParsePKIXPublicKey(der)
+	if err != nil {
+		return nil, fmt.Errorf("parse PKIX public key: %w", err)
+	}
+	publicKey, ok := parsed.(ed25519.PublicKey)
+	if !ok || len(publicKey) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("public key is not Ed25519")
+	}
+	return append(ed25519.PublicKey(nil), publicKey...), nil
+}
+
+func transitKeyVersion(keyID string) (int, bool) {
+	if len(keyID) < 2 || keyID[0] != 'v' {
+		return 0, false
+	}
+	version, err := strconv.Atoi(keyID[1:])
+	if err != nil || version <= 0 || "v"+strconv.Itoa(version) != keyID {
+		return 0, false
+	}
+	return version, true
 }
 
 func (c *Client) readKV(ctx context.Context, path string) (map[string]string, error) {

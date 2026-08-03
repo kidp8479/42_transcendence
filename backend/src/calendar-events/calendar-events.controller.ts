@@ -15,7 +15,7 @@ import {
   ParseUUIDPipe,
   Req,
 } from "@nestjs/common";
-import { ApiSecurity } from "@nestjs/swagger";
+import { ApiBearerAuth } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { CalendarEventsService } from "./calendar-events.service";
 import { CreateCalendarEventDto } from "./dto/create-calendar-event.dto";
@@ -26,7 +26,7 @@ export class CalendarEventsController {
   constructor(private readonly calendarEventsService: CalendarEventsService) {}
 
   // create a new event
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -56,7 +56,7 @@ export class CalendarEventsController {
   }
 
   // update an existing event
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -73,7 +73,7 @@ export class CalendarEventsController {
   }
 
   // delete an event (returns the deleted row, so 200 not 204)
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete(":id")
   delete(
     @Param("projectId", ParseUUIDPipe) projectId: string,

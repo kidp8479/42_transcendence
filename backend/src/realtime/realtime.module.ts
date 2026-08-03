@@ -4,11 +4,17 @@ import { Module } from "@nestjs/common";
 import { FieldLockManager } from "./field-lock-manager";
 import { RealtimeGateway } from "./realtime.gateway";
 import { RealtimeService } from "./realtime.service";
+import { WebSocketAdmissionService } from "./websocket-admission.service";
 
 @Module({
   imports: [],
   controllers: [],
-  providers: [FieldLockManager, RealtimeGateway, RealtimeService],
+  providers: [
+    FieldLockManager,
+    RealtimeGateway,
+    RealtimeService,
+    WebSocketAdmissionService,
+  ],
   exports: [RealtimeService],
 })
 export class RealtimeModule {}

@@ -1,5 +1,9 @@
-import { getSession, type AuthSession } from "./auth";
-import { setApiSession } from "./apiClient";
+import {
+  getSession,
+  setAuthSession,
+  subscribeAuthSession,
+  type AuthSession,
+} from "./auth";
 import {
   resetRealtimeSocket,
   disconnectRealtimeSocket,
@@ -12,12 +16,31 @@ export type AuthState =
   | { status: "anonymous" }
   | { status: "unavailable"; error: Error };
 
+interface RealtimeSessionLifecycle {
+  reset(): void;
+  disconnect(): void;
+}
+
 export class AuthSessionResource {
   private state: AuthState | null = null;
   private checkedAt = 0;
   private inFlight: Promise<AuthState> | null = null;
   private revision = 0;
   private listeners = new Set<() => void>();
+  private publishing = false;
+
+  constructor(
+    private readonly realtime: RealtimeSessionLifecycle = {
+      reset: resetRealtimeSocket,
+      disconnect: disconnectRealtimeSocket,
+    }
+  ) {
+    subscribeAuthSession((session) => {
+      if (!this.publishing) {
+        this.applySession(session);
+      }
+    });
+  }
 
   async resolve(): Promise<AuthState> {
     if (this.hasFreshState()) {
@@ -43,7 +66,6 @@ export class AuthSessionResource {
         }
         this.state = state;
         this.checkedAt = Date.now();
-        setApiSession(state.status === "authenticated" ? state.session : null);
         this.notify();
         return state;
       })
@@ -61,8 +83,8 @@ export class AuthSessionResource {
     this.revision += 1;
     this.state = { status: "authenticated", session };
     this.checkedAt = Date.now();
-    setApiSession(session);
-    resetRealtimeSocket();
+    this.publishSession(session);
+    this.realtime.reset();
     this.notify();
   }
 
@@ -70,9 +92,8 @@ export class AuthSessionResource {
     this.revision += 1;
     this.state = { status: "anonymous" };
     this.checkedAt = Date.now();
-    setApiSession(null);
-    // no session left to reconnect with - see disconnectRealtimeSocket's own comment
-    disconnectRealtimeSocket();
+    this.publishSession(null);
+    this.realtime.disconnect();
     this.notify();
   }
 
@@ -81,13 +102,12 @@ export class AuthSessionResource {
     this.state = null;
     this.checkedAt = 0;
     this.inFlight = null;
-    setApiSession(null);
-    resetRealtimeSocket();
+    this.publishSession(null);
+    this.realtime.reset();
     this.notify();
   }
 
   async endSession(): Promise<void> {
-    await getSession();
     this.setAnonymous();
   }
 
@@ -114,6 +134,32 @@ export class AuthSessionResource {
   private notify(): void {
     for (const listener of this.listeners) {
       listener();
+    }
+  }
+
+  private applySession(session: AuthSession | null): void {
+    const previous = this.state;
+    this.state = session
+      ? { status: "authenticated", session }
+      : { status: "anonymous" };
+    this.checkedAt = Date.now();
+    if (!session) {
+      this.realtime.disconnect();
+    } else if (
+      previous?.status !== "authenticated" ||
+      previous.session.user.id !== session.user.id
+    ) {
+      this.realtime.reset();
+    }
+    this.notify();
+  }
+
+  private publishSession(session: AuthSession | null): void {
+    this.publishing = true;
+    try {
+      setAuthSession(session);
+    } finally {
+      this.publishing = false;
     }
   }
 }

@@ -36,7 +36,7 @@ paths:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
         "201":
-          $ref: "#/components/responses/SessionResponse"
+          $ref: "#/components/responses/TokenResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "409":
@@ -55,7 +55,7 @@ paths:
               $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
-          $ref: "#/components/responses/SessionResponse"
+          $ref: "#/components/responses/TokenResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -66,26 +66,55 @@ paths:
     post:
       operationId: logout
       security:
-        - sessionCookie: []
+        - refreshCookie: []
       parameters:
         - $ref: "#/components/parameters/CsrfHeader"
       responses:
         "204":
-          description: Session revoked and cookie cleared.
+          description: Refresh-token family revoked and cookies cleared.
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
-  /session:
-    get:
-      operationId: getSession
+  /refresh:
+    post:
+      operationId: refreshAccessToken
       security:
-        - sessionCookie: []
+        - refreshCookie: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
       responses:
         "200":
-          $ref: "#/components/responses/SessionResponse"
+          $ref: "#/components/responses/TokenResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /ws-ticket:
+    post:
+      operationId: issueWebSocketTicket
+      description: >
+        Exchanges an active access JWT for a hash-only, one-use ticket with the
+        fixed transcendence-ws audience and a 60-second lifetime.
+      security:
+        - accessBearer: []
+      responses:
+        "201":
+          description: One-time WebSocket admission ticket.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebSocketTicketResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /oauth/42/start:
     get:
       x-implementation-status: planned
@@ -159,9 +188,7 @@ paths:
       x-implementation-status: planned
       operationId: requestEmailVerification
       security:
-        - sessionCookie: []
-      parameters:
-        - $ref: "#/components/parameters/CsrfHeader"
+        - accessBearer: []
       responses:
         "202":
           description: Verification delivery accepted.
@@ -225,9 +252,8 @@ paths:
       operationId: startAccountLink
       description: The normal provider callback completes the link using the OAuthTransaction purpose.
       security:
-        - sessionCookie: []
+        - accessBearer: []
       parameters:
-        - $ref: "#/components/parameters/CsrfHeader"
         - in: path
           name: provider
           required: true
@@ -244,12 +270,11 @@ paths:
           $ref: "#/components/responses/Conflict"
   /internal/introspect:
     post:
-      operationId: introspectSession
+      operationId: introspectAccessToken
       description: >
         Internal endpoint. nginx must not expose this path publicly. Invalid,
-        expired, and revoked sessions all return the same generic 401; active=false
-        is not used. NestJS also calls this during WebSocket handshakes and maps
-        auth-service connection failures or 5xx responses to 503.
+        expired JWTs and inactive refresh families return typed 401 responses.
+        Vault, database, or other dependency failures return typed 503 responses.
       security:
         - internalBearer: []
       requestBody:
@@ -260,23 +285,69 @@ paths:
               $ref: "#/components/schemas/IntrospectionRequest"
       responses:
         "200":
-          description: Active authenticated session.
+          description: Active bearer access token and refresh-token family.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/IntrospectionResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /internal/ws-ticket/consume:
+    post:
+      operationId: consumeWebSocketTicket
+      description: >
+        Internal endpoint. Atomically consumes exactly one unexpired ticket and
+        returns its active user and refresh-family identity.
+      security:
+        - internalBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebSocketTicketRequest"
+      responses:
+        "200":
+          description: Ticket consumed and connection identity established.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebSocketAdmissionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /internal/ws-session/revalidate:
+    post:
+      operationId: revalidateWebSocketSession
+      description: Internal endpoint used to disconnect sockets after family or user revocation.
+      security:
+        - internalBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebSocketSessionRequest"
+      responses:
+        "200":
+          description: Refresh family and user remain active.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 components:
   securitySchemes:
-    sessionCookie:
+    refreshCookie:
       type: apiKey
       in: cookie
-      name: tr_session
+      name: tr_refresh
+    accessBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
     internalBearer:
       type: http
       scheme: bearer
@@ -320,10 +391,18 @@ components:
           type: string
           minLength: 1
           maxLength: 128
-    SessionResponseBody:
+    TokenResponseBody:
       type: object
-      required: [user, csrfToken, idleExpiresAt, absoluteExpiresAt]
+      required:
+        [accessToken, tokenType, expiresIn, user, csrfToken, idleExpiresAt, absoluteExpiresAt]
       properties:
+        accessToken:
+          type: string
+        tokenType:
+          const: Bearer
+        expiresIn:
+          type: integer
+          minimum: 1
         user:
           $ref: "#/components/schemas/AuthenticatedUser"
         csrfToken:
@@ -356,39 +435,68 @@ components:
     IntrospectionRequest:
       type: object
       additionalProperties: false
-      required: [sessionToken, requestMethod]
+      required: [accessToken]
       properties:
-        sessionToken:
+        accessToken:
           type: string
-        requestMethod:
+    WebSocketTicketResponse:
+      type: object
+      additionalProperties: false
+      required: [ticket, expiresIn]
+      properties:
+        ticket:
           type: string
-          enum: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]
-          description: origin and csrfToken are required unless this is GET, HEAD, or OPTIONS.
-        origin:
+          minLength: 43
+          maxLength: 43
+        expiresIn:
+          const: 60
+    WebSocketTicketRequest:
+      type: object
+      additionalProperties: false
+      required: [ticket]
+      properties:
+        ticket:
+          type: string
+          minLength: 43
+          maxLength: 43
+    WebSocketSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [sub, sid]
+      properties:
+        sub:
+          type: string
+          format: uuid
+        sid:
+          type: string
+          format: uuid
+    WebSocketAdmissionResponse:
+      type: object
+      additionalProperties: false
+      required: [active, sub, sid, username, avatarUrl]
+      properties:
+        active:
+          const: true
+        sub:
+          type: string
+          format: uuid
+        sid:
+          type: string
+          format: uuid
+        username:
+          type: string
+        avatarUrl:
           type: [string, "null"]
-        csrfToken:
-          type: [string, "null"]
-      allOf:
-        - if:
-            properties:
-              requestMethod:
-                enum: [POST, PUT, PATCH, DELETE]
-            required: [requestMethod]
-          then:
-            required: [origin, csrfToken]
-            properties:
-              origin:
-                type: string
-                minLength: 1
-              csrfToken:
-                type: string
-                minLength: 1
     IntrospectionResponse:
       type: object
       required:
         - active
-        - sessionId
-        - userId
+        - sub
+        - sid
+        - jti
+        - exp
+        - auth_time
+        - global_roles
         - authenticationMethod
         - assuranceLevel
         - authenticatedAt
@@ -397,12 +505,23 @@ components:
       properties:
         active:
           const: true
-        sessionId:
+        sub:
           type: string
           format: uuid
-        userId:
+        sid:
           type: string
           format: uuid
+        jti:
+          type: string
+        exp:
+          type: integer
+        auth_time:
+          type: integer
+        global_roles:
+          type: array
+          minItems: 1
+          items:
+            enum: [USER, PLATFORM_ADMIN]
         authenticationMethod:
           enum: [LOCAL, FORTY_TWO, GOOGLE]
           description: LOCAL maps to local-password, FORTY_TWO to 42-oauth2, and GOOGLE to google-oidc.
@@ -435,7 +554,13 @@ components:
           enum:
             - INVALID_INTERNAL_CREDENTIALS
             - SESSION_INACTIVE
-            - CSRF_VALIDATION_FAILED
+            - TOKEN_INVALID
+            - TOKEN_INACTIVE
+            - INTROSPECTION_UNAVAILABLE
+            - TICKET_INVALID
+            - TICKET_ISSUE_UNAVAILABLE
+            - TICKET_CONSUME_UNAVAILABLE
+            - SESSION_REVALIDATION_UNAVAILABLE
           description: Present when callers must distinguish an internal introspection failure.
     OneTimeTokenRequest:
       type: object
@@ -467,8 +592,8 @@ components:
           minLength: 12
           maxLength: 128
   responses:
-    SessionResponse:
-      description: Authenticated session.
+    TokenResponse:
+      description: Access JWT plus refresh-family metadata.
       headers:
         Set-Cookie:
           schema:
@@ -476,7 +601,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/SessionResponseBody"
+            $ref: "#/components/schemas/TokenResponseBody"
     BadRequest:
       description: Invalid request.
       content:
@@ -509,6 +634,12 @@ components:
             $ref: "#/components/schemas/Error"
     InternalServerError:
       description: Authentication storage or processing failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServiceUnavailable:
+      description: A signing, key, database, or auth-service dependency is unavailable.
       content:
         application/json:
           schema:

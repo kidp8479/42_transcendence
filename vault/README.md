@@ -50,13 +50,14 @@ and set the `vault_db_admin` password from `VAULT_DB_ADMIN_PASSWORD`.
 
 Go auth uses its mounted `role_id` and `secret_id` to authenticate directly
 with AppRole. It keeps the resulting Vault token, KV values, and dynamic
-PostgreSQL credentials only in process memory. It reads the OAuth credentials
-and backend-to-auth credential from KV, asks Vault for the `auth-runtime`
-database lease, and swaps to a freshly connected pool whenever that lease is
-renewed. Its health endpoint returns `503` and request handling stops when
-Vault credentials cannot be renewed with a one-minute safety margin. At that
-point the auth process exits non-zero so its supervisor can restart it; it
-does not remain indefinitely unhealthy.
+PostgreSQL credentials only in process memory. It reads the OAuth credentials,
+backend-to-auth credential, and the separate refresh-successor encryption key
+from distinct KV paths, asks Vault for the `auth-runtime` database lease, and
+swaps to a freshly connected pool whenever that lease is renewed. Its health
+endpoint returns `503` and request handling stops when Vault credentials
+cannot be renewed with a one-minute safety margin. At that point the auth
+process exits non-zero so its supervisor can restart it; it does not remain
+indefinitely unhealthy.
 
 The AppRole token has a nine-hour maximum TTL to bound a leaked in-memory
 token. Before that maximum is reached, the auth process re-authenticates using
@@ -95,8 +96,8 @@ before it is recorded, correct the cause and rerun `make migrate`; if any part
 is recorded, recover through a reviewed corrective migration. TR-69 additionally
 preflights that every project has a member, assigns the oldest `ADMIN` (or
 oldest member) as its deterministic `OWNER`, and rejects a second owner through
-a partial unique index. Its persistence rollout deliberately leaves the legacy
-opaque `AuthSession` path untouched until the later JWT/refresh cutover.
+a partial unique index. TR-70 replaces the legacy `AuthSession` runtime with
+rotating refresh-token families and memory-only bearer access JWTs.
 
 Run `make check-vault-prisma` to verify dynamic credential rotation, runtime
 database-role permissions and denials, and the TR-69 upgrade fixture after

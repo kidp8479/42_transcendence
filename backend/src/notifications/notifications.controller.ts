@@ -17,7 +17,7 @@ import {
   Param,
   ParseUUIDPipe,
 } from "@nestjs/common";
-import { ApiSecurity } from "@nestjs/swagger";
+import { ApiBearerAuth } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { NotificationsService } from "./notifications.service";
 
@@ -36,14 +36,14 @@ export class NotificationsController {
 
   // PATCH (mark every unread notification as read - no request body, no id:
   // it always applies to the whole authenticated user's set)
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Patch("read-all")
   markAllAsRead(@Req() request: AuthenticatedRequest) {
     return this.notificationsService.markAllAsRead(request.user.id);
   }
 
   // PATCH (mark as read - no request body, the URL says it all)
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Patch(":id/read")
   markAsRead(
     @Param("id", ParseUUIDPipe) id: string,
@@ -54,14 +54,14 @@ export class NotificationsController {
 
   // DELETE (every notification belonging to the authenticated user, read
   // or unread - no id, same "no body, URL says it all" shape as read-all)
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete()
   removeAll(@Req() request: AuthenticatedRequest) {
     return this.notificationsService.removeAll(request.user.id);
   }
 
   // DELETE (one)
-  @ApiSecurity("csrf")
+  @ApiBearerAuth()
   @Delete(":id")
   remove(
     @Param("id", ParseUUIDPipe) id: string,

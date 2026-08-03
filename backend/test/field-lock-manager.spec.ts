@@ -222,8 +222,6 @@ test("does not acquire a lease after the socket disconnects during validation", 
     signalMembershipLookup = resolve;
   });
   const gateway = new RealtimeGateway(
-    {} as never,
-    {} as never,
     {
       projectMember: {
         count: () => {

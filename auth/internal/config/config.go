@@ -10,48 +10,51 @@ import (
 )
 
 const (
-	defaultPort            = "3001"
-	defaultCookieName      = "tr_session"
-	defaultCSRFCookieName  = "tr_csrf"
-	defaultIdleTimeout     = 30 * time.Minute
-	defaultAbsoluteTimeout = 7 * 24 * time.Hour
-	defaultVaultDBHost     = "db"
-	defaultVaultDBPort     = "5432"
+	defaultPort           = "3001"
+	maxRefreshIdleTTL     = 7 * 24 * time.Hour
+	maxRefreshAbsoluteTTL = 30 * 24 * time.Hour
+	maxJWTAccessTTL       = 15 * time.Minute
+	maxJWTLeeway          = time.Minute
+	defaultVaultDBHost    = "db"
+	defaultVaultDBPort    = "5432"
 )
 
 type Config struct {
-	Port                   string
-	AppOrigin              string
-	InternalToken          string
-	SessionCookieName      string
-	CSRFCookieName         string
-	CookieSecure           bool
-	SessionIdleTimeout     time.Duration
-	SessionAbsoluteTimeout time.Duration
-	VaultAddress           string
-	VaultRoleIDFile        string
-	VaultSecretIDFile      string
-	VaultDatabaseRole      string
-	VaultDatabaseHost      string
-	VaultDatabasePort      string
-	VaultDatabaseName      string
+	Port               string
+	AppOrigin          string
+	RefreshCookieName  string
+	CSRFCookieName     string
+	CookieSecure       bool
+	RefreshIdleTTL     time.Duration
+	RefreshAbsoluteTTL time.Duration
+	JWTIssuer          string
+	JWTAudience        string
+	JWTAccessTTL       time.Duration
+	JWTLeeway          time.Duration
+	VaultAddress       string
+	VaultRoleIDFile    string
+	VaultSecretIDFile  string
+	VaultDatabaseRole  string
+	VaultDatabaseHost  string
+	VaultDatabasePort  string
+	VaultDatabaseName  string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Port:                   envOrDefault("PORT", defaultPort),
-		AppOrigin:              strings.TrimRight(strings.TrimSpace(os.Getenv("APP_ORIGIN")), "/"),
-		SessionCookieName:      envOrDefault("AUTH_SESSION_COOKIE", defaultCookieName),
-		CSRFCookieName:         envOrDefault("AUTH_CSRF_COOKIE", defaultCSRFCookieName),
-		SessionIdleTimeout:     defaultIdleTimeout,
-		SessionAbsoluteTimeout: defaultAbsoluteTimeout,
-		VaultAddress:           strings.TrimRight(strings.TrimSpace(os.Getenv("VAULT_ADDR")), "/"),
-		VaultRoleIDFile:        strings.TrimSpace(os.Getenv("VAULT_ROLE_ID_FILE")),
-		VaultSecretIDFile:      strings.TrimSpace(os.Getenv("VAULT_SECRET_ID_FILE")),
-		VaultDatabaseRole:      strings.TrimSpace(os.Getenv("VAULT_DB_ROLE")),
-		VaultDatabaseHost:      envOrDefault("VAULT_DB_HOST", defaultVaultDBHost),
-		VaultDatabasePort:      envOrDefault("VAULT_DB_PORT", defaultVaultDBPort),
-		VaultDatabaseName:      strings.TrimSpace(os.Getenv("VAULT_DB_NAME")),
+		Port:              envOrDefault("PORT", defaultPort),
+		AppOrigin:         strings.TrimRight(strings.TrimSpace(os.Getenv("APP_ORIGIN")), "/"),
+		RefreshCookieName: strings.TrimSpace(os.Getenv("AUTH_REFRESH_COOKIE")),
+		CSRFCookieName:    strings.TrimSpace(os.Getenv("AUTH_CSRF_COOKIE")),
+		JWTIssuer:         strings.TrimSpace(os.Getenv("AUTH_JWT_ISSUER")),
+		JWTAudience:       strings.TrimSpace(os.Getenv("AUTH_JWT_AUDIENCE")),
+		VaultAddress:      strings.TrimRight(strings.TrimSpace(os.Getenv("VAULT_ADDR")), "/"),
+		VaultRoleIDFile:   strings.TrimSpace(os.Getenv("VAULT_ROLE_ID_FILE")),
+		VaultSecretIDFile: strings.TrimSpace(os.Getenv("VAULT_SECRET_ID_FILE")),
+		VaultDatabaseRole: strings.TrimSpace(os.Getenv("VAULT_DB_ROLE")),
+		VaultDatabaseHost: envOrDefault("VAULT_DB_HOST", defaultVaultDBHost),
+		VaultDatabasePort: envOrDefault("VAULT_DB_PORT", defaultVaultDBPort),
+		VaultDatabaseName: strings.TrimSpace(os.Getenv("VAULT_DB_NAME")),
 	}
 
 	if err := validateVaultConfig(cfg); err != nil {
@@ -61,26 +64,50 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("APP_ORIGIN is required")
 	}
 	origin, err := url.Parse(cfg.AppOrigin)
-	if err != nil || origin.Scheme == "" || origin.Host == "" || origin.Path != "" {
+	if err != nil || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host == "" || origin.Path != "" ||
+		origin.RawQuery != "" || origin.Fragment != "" || origin.User != nil {
 		return Config{}, fmt.Errorf("APP_ORIGIN must be an origin such as http://localhost:8080")
 	}
-	cfg.CookieSecure, err = parseBool("AUTH_COOKIE_SECURE", false)
+	cfg.CookieSecure, err = parseRequiredBool("AUTH_COOKIE_SECURE")
 	if err != nil {
 		return Config{}, err
 	}
 	if origin.Scheme == "https" && !cfg.CookieSecure {
 		return Config{}, fmt.Errorf("AUTH_COOKIE_SECURE must be true when APP_ORIGIN uses https")
 	}
-	cfg.SessionIdleTimeout, err = parseDuration("AUTH_SESSION_IDLE_TIMEOUT", defaultIdleTimeout)
+	cfg.RefreshIdleTTL, err = parseRequiredDuration("AUTH_REFRESH_IDLE_TTL")
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.SessionAbsoluteTimeout, err = parseDuration("AUTH_SESSION_ABSOLUTE_TIMEOUT", defaultAbsoluteTimeout)
+	cfg.RefreshAbsoluteTTL, err = parseRequiredDuration("AUTH_REFRESH_ABSOLUTE_TTL")
 	if err != nil {
 		return Config{}, err
 	}
-	if cfg.SessionIdleTimeout <= 0 || cfg.SessionAbsoluteTimeout <= cfg.SessionIdleTimeout {
-		return Config{}, fmt.Errorf("session timeouts must be positive and absolute timeout must exceed idle timeout")
+	if cfg.RefreshIdleTTL <= 0 || cfg.RefreshIdleTTL > maxRefreshIdleTTL {
+		return Config{}, fmt.Errorf("AUTH_REFRESH_IDLE_TTL must be positive and no more than 7d")
+	}
+	if cfg.RefreshAbsoluteTTL <= cfg.RefreshIdleTTL || cfg.RefreshAbsoluteTTL > maxRefreshAbsoluteTTL {
+		return Config{}, fmt.Errorf("AUTH_REFRESH_ABSOLUTE_TTL must exceed idle lifetime and be no more than 30d")
+	}
+	cfg.JWTAccessTTL, err = parseRequiredDuration("AUTH_JWT_ACCESS_TTL")
+	if err != nil {
+		return Config{}, err
+	}
+	if cfg.JWTAccessTTL <= 0 || cfg.JWTAccessTTL > maxJWTAccessTTL {
+		return Config{}, fmt.Errorf("AUTH_JWT_ACCESS_TTL must be positive and no more than 15m")
+	}
+	cfg.JWTLeeway, err = parseRequiredDuration("AUTH_JWT_LEEWAY")
+	if err != nil {
+		return Config{}, err
+	}
+	if cfg.JWTLeeway < 0 || cfg.JWTLeeway > maxJWTLeeway {
+		return Config{}, fmt.Errorf("AUTH_JWT_LEEWAY must be between 0 and 1m")
+	}
+	if cfg.JWTIssuer == "" || cfg.JWTAudience == "" {
+		return Config{}, fmt.Errorf("AUTH_JWT_ISSUER and AUTH_JWT_AUDIENCE are required")
+	}
+	if cfg.RefreshCookieName == "" || cfg.CSRFCookieName == "" || cfg.RefreshCookieName == cfg.CSRFCookieName {
+		return Config{}, fmt.Errorf("refresh and CSRF cookie names must be distinct and non-empty")
 	}
 
 	return cfg, nil
@@ -116,10 +143,10 @@ func envOrDefault(name, fallback string) string {
 	return fallback
 }
 
-func parseBool(name string, fallback bool) (bool, error) {
+func parseRequiredBool(name string) (bool, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback, nil
+		return false, fmt.Errorf("%s is required", name)
 	}
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
@@ -128,10 +155,10 @@ func parseBool(name string, fallback bool) (bool, error) {
 	return parsed, nil
 }
 
-func parseDuration(name string, fallback time.Duration) (time.Duration, error) {
+func parseRequiredDuration(name string) (time.Duration, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback, nil
+		return 0, fmt.Errorf("%s is required", name)
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil {

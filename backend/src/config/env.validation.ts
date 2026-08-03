@@ -7,8 +7,28 @@ import * as Joi from "joi";
 
 export const envValidationSchema = Joi.object({
   PORT: Joi.number().port().default(3000),
+  APP_ORIGIN: Joi.string()
+    .required()
+    .custom((value: string, helpers) => {
+      try {
+        const origin = new URL(value);
+        if (
+          (origin.protocol !== "http:" && origin.protocol !== "https:") ||
+          origin.username !== "" ||
+          origin.password !== "" ||
+          origin.pathname !== "/" ||
+          origin.search !== "" ||
+          origin.hash !== "" ||
+          origin.origin !== value
+        ) {
+          return helpers.error("any.invalid");
+        }
+        return value;
+      } catch {
+        return helpers.error("any.invalid");
+      }
+    }, "exact HTTP origin"),
   AUTH_SERVICE_URL: Joi.string().uri().required(),
-  AUTH_SESSION_COOKIE: Joi.string().default("tr_session"),
   VAULT_ADDR: Joi.string().uri().required(),
   VAULT_ROLE_ID_FILE: Joi.string().required(),
   VAULT_SECRET_ID_FILE: Joi.string().required(),
