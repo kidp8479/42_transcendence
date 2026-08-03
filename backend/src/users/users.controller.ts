@@ -108,4 +108,10 @@ export class UsersController {
   async removeAvatar(@Req() request: AuthenticatedRequest) {
     return this.usersService.removeAvatar(request.user.id);
   }
+
+  @ApiBearerAuth()
+  @Patch("me")
+  update(@Body() dto: UpdateUserDto, @Req() request: AuthenticatedRequest) {
+    return this.usersService.update(request.user.id, dto);
+  }  
 }
