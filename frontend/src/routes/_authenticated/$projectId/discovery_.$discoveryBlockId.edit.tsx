@@ -249,7 +249,6 @@ function DiscoveryBlockEditPage() {
         fieldLockToken
       );
     } catch (error) {
-      console.error("Failed to save discovery block", error);
       showToast({
         type: "error",
         message:
@@ -283,7 +282,6 @@ function DiscoveryBlockEditPage() {
         fieldLockToken
       );
     } catch (error) {
-      console.error("Failed to save discovery block color", error);
       showToast({
         type: "error",
         message:
@@ -312,7 +310,6 @@ function DiscoveryBlockEditPage() {
         fieldLockToken
       );
     } catch (error) {
-      console.error("Failed to save discovery block icon", error);
       showToast({
         type: "error",
         message: error instanceof Error ? error.message : "Failed to save icon",
@@ -350,7 +347,6 @@ function DiscoveryBlockEditPage() {
       );
       setNewItemLabel("");
     } catch (error) {
-      console.error("Failed to create discovery block item", error);
       showToast({
         type: "error",
         message: error instanceof Error ? error.message : "Failed to add item",
@@ -373,7 +369,6 @@ function DiscoveryBlockEditPage() {
       // is exactly what this user wanted too, so treat it as success
       // instead of showing an error for an outcome they actually asked for
       if (!(error instanceof ApiError && error.status === 404)) {
-        console.error("Failed to delete discovery block item", error);
         showToast({
           type: "error",
           message:
@@ -408,7 +403,6 @@ function DiscoveryBlockEditPage() {
         { isChecked: newIsChecked }
       );
     } catch (error) {
-      console.error("Failed to update discovery block item", error);
       showToast({
         type: "error",
         message:

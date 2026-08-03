@@ -159,7 +159,6 @@ function DiscoveryPage() {
         { isChecked: newIsChecked }
       );
     } catch (error) {
-      console.error("Failed to update discovery block item", error);
       showToast({
         type: "error",
         message:
@@ -195,7 +194,6 @@ function DiscoveryPage() {
         { discoveryBlock: createdBlock, items: [] },
       ]);
     } catch (error) {
-      console.error("Failed to create discovery block", error);
       showToast({
         type: "error",
         message:
@@ -217,7 +215,6 @@ function DiscoveryPage() {
       // is exactly what this user wanted too, so treat it as success
       // instead of showing an error for an outcome they actually asked for
       if (!(error instanceof ApiError && error.status === 404)) {
-        console.error("Failed to delete discovery block", error);
         showToast({
           type: "error",
           message:
