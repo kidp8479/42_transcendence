@@ -2,7 +2,7 @@ import type { IconType } from "react-icons";
 import { useEffect } from "react";
 import { Sidebar, SidebarItemGroup, SidebarItems } from "flowbite-react";
 import { Link, useLoaderData } from "@tanstack/react-router";
-import { HiChevronLeft, HiChevronRight, HiX } from "react-icons/hi";
+import { HiChevronLeft, HiChevronRight, HiX, HiOutlineUsers } from "react-icons/hi";
 import { HiOutlineChatBubbleLeftRight } from "react-icons/hi2";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
@@ -59,6 +59,7 @@ const sidebarPrimaryNavigation: NavigationItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: MdOutlineDashboard },
   { to: "/projects", label: "Projects", icon: GoFileDirectory },
   { to: "/chat", label: "Chat", icon: HiOutlineChatBubbleLeftRight },
+  { to: "/friends", label: "Friends", icon: HiOutlineUsers },
 ];
 
 function SidebarNavLink({ to, label, icon: Icon }: NavigationItem) {
