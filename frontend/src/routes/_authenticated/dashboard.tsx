@@ -1,8 +1,6 @@
 // Dashboard (/dashboard). Kept intentionally light for now - just the
 // welcome header plus the one stat card backed by real data (project
 // count + review count, both already loaded by the _authenticated loader).
-// The other 3 stat cards from the Figma mock (tickets closed, due this
-// week, team velocity) need Kanban/task data that isn't wired up yet.
 import { createFileRoute, Link, useLoaderData } from "@tanstack/react-router";
 import {
   HiOutlineChatBubbleLeftRight,

@@ -296,10 +296,11 @@ export function ProjectCard({
         <div className="flex flex-1 flex-col justify-center gap-3">
           <p className="text-sm text-text-secondary">
             Type{" "}
-            <span
-              title={project.name}
-              className="inline-block max-w-full truncate align-bottom font-semibold text-text-primary"
-            >
+            {/* break-words, not truncate: this name is exactly what the
+            user has to retype below to confirm - hiding part of it behind
+            an ellipsis makes that impossible to do accurately, especially
+            for a long/random name. */}
+            <span className="break-words font-semibold text-text-primary">
               {project.name}
             </span>{" "}
             to confirm {isDelete ? "deletion" : "leaving"}.{" "}

@@ -19,11 +19,16 @@ export function ProjectLayout() {
     // normally, exactly like before this change.
     <div className="flex h-full flex-col">
       <div className="shrink-0 px-6 pt-6 mb-5">
-        <h1 className="text-xl font-bold font-mono text-text-primary">
+        {/* break-words: an unbroken long name/description (up to 100/1000
+        chars, see projectsApi.ts) has nothing else to wrap on and was
+        overflowing the page horizontally, dragging the tabs along with it. */}
+        <h1 className="break-words text-xl font-bold font-mono text-text-primary">
           {project.name}
         </h1>
         {project.description && (
-          <p className="text-xs text-text-secondary">{project.description}</p>
+          <p className="break-words text-xs text-text-secondary">
+            {project.description}
+          </p>
         )}
       </div>
       <div className="shrink-0">
