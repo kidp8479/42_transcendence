@@ -23,8 +23,12 @@ function ProjectSettingsPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    getProject(projectId).then(setProject).catch(console.error);
-  }, [projectId]);
+    getProject(projectId)
+      .then(setProject)
+      .catch(() => {
+        navigate({ to: "/projects" });
+      });
+  }, [projectId, navigate]);
 
   if (!project) {
     return null;
