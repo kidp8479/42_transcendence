@@ -22,7 +22,13 @@ export async function apiClient<T>(
   { body, ...options }: ApiOptions = {}
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  if (body !== undefined) {
+  // FormData bodies (ex: avatar upload) must go through untouched: the
+  // browser sets its own multipart boundary in Content-Type when it sees
+  // the body is a FormData instance, and that boundary can't be reproduced
+  // by hand - forcing application/json here or JSON.stringify()-ing a
+  // FormData instance (which just yields "{}") silently corrupts the upload.
+  const isFormData = body instanceof FormData;
+  if (body !== undefined && !isFormData) {
     headers.set("Content-Type", "application/json");
   }
   headers.set("Accept", "application/json");
@@ -30,7 +36,8 @@ export async function apiClient<T>(
   const response = await bearerFetch(`/api${path}`, {
     ...options,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body:
+      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   });
 
   if (!response.ok) {

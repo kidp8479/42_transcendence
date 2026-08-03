@@ -6,23 +6,12 @@
 
 // All fields are optional in the update DTO file, the user can update only one field at a time.
 
-import { IsEmail, IsOptional, IsString } from "class-validator";
+import { PartialType, OmitType } from "@nestjs/mapped-types";
+import { CreateUserDto } from "./create-user.dto";
 
-export class UpdateUserDto {
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  username?: string;
-
-  @IsOptional()
-  @IsString()
-  avatarUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  campus?: string;
-  // twoFactorEnabled is not here - managed by the auth team, not this service
-}
+// avatarUrl is excluded: it's only ever set by POST /users/me/avatar, which
+// uploads to storage and derives the URL itself. Allowing it here would let
+// a client point their avatar at an arbitrary URL.
+export class UpdateUserDto extends PartialType(
+  OmitType(CreateUserDto, ["email", "avatarUrl", "campus"] as const)
+) {}
