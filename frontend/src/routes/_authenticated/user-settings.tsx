@@ -405,7 +405,7 @@ function UserSettingsPage() {
               />
 
               <div className="flex min-w-0 flex-col gap-2">
-                <Label className="font-semibold text-text-primary break-words">
+                <Label className="font-semibold text-text-primary wrap-break-word">
                   {user.username}
                 </Label>
                 <Button
