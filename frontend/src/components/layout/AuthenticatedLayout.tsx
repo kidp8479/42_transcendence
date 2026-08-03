@@ -23,10 +23,15 @@ export function AuthenticatedLayout() {
       router.invalidate();
     });
 
+    socket.on("project:deleted", () => {
+      router.invalidate();
+    });
+
     return () => {
       socket.off("project:updated");
       socket.off("project:member-added");
       socket.off("project:member-removed");
+      socket.off("project:deleted");
     };
   }, [router]);
 

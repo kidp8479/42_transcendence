@@ -249,6 +249,7 @@ export class ProjectsService {
     // CalendarEvent, CalendarCategory, DiscoveryBlock, and EvaluationChecklistItem
     // row for this project is deleted too. Permanent, no soft-delete/undo.
     // No return value: the controller responds 204 No Content (see delete() there).
+    this.realtimeService.emitToProject(id, "project:deleted", { id });
     await this.prisma.project.delete({ where: { id } });
   }
 
