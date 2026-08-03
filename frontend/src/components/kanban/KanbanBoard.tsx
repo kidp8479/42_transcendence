@@ -93,21 +93,48 @@ export function KanbanBoard({
   // A drop target is either a card (over.id = task id -> that card's column
   // and index) or a column's droppable area (over.id = status -> append at
   // the end, which is how empty columns accept drops).
+  //
+  // Both branches exclude the dragged card from the column before counting:
+  // the backend's moveTask() computes `nextRank` the same way (`id: { not: id
+  // }` on every rank query, see tasks.service.ts), since a same-column move
+  // still has the card sitting in its old slot when the target column is
+  // read. Counting it here too shifted every target after the card's own
+  // position one slot too far - dropping card 1 of [1,2,3,4] onto 3 landed it
+  // after 3 instead of before, because index 2 (3's position with card 1
+  // still in the list) is where 3 sits once card 1 is actually removed.
   function resolveDropTarget(
+    active_id: string,
     over_id: string
   ): { status: TaskStatus; index: number } | null {
     const over_status = STATUS_ORDER.find((status) => status === over_id);
     if (over_status !== undefined) {
       return {
         status: over_status,
-        index: selectColumnTasks(tasks, over_status).length,
+        index: selectColumnTasks(tasks, over_status).filter(
+          (task) => task.id !== active_id
+        ).length,
       };
     }
     const over_task = tasks.find((task) => task.id === over_id);
     if (over_task === undefined) {
       return null;
     }
-    const column = selectColumnTasks(tasks, over_task.status);
+    // Hovering the dragged card's own slot - this happens crossing into a
+    // column where it ends up the sole/closest item (an empty column, or one
+    // it now occupies alone after a preview move), so dnd-kit reports it as
+    // its own collision target. Excluding it from the column like every other
+    // case would findIndex() it out of existence (-1, sent to the backend as
+    // a negative rank). Its current index is already the right answer here -
+    // there's no other card to land before or after.
+    if (over_id === active_id) {
+      return {
+        status: over_task.status,
+        index: columnIndexOf(active_id, over_task.status),
+      };
+    }
+    const column = selectColumnTasks(tasks, over_task.status).filter(
+      (task) => task.id !== active_id
+    );
     return {
       status: over_task.status,
       index: column.findIndex((task) => task.id === over_task.id),
@@ -178,7 +205,7 @@ export function KanbanBoard({
       return;
     }
     const dragged_task = tasks.find((task) => task.id === active.id);
-    const target = resolveDropTarget(String(over.id));
+    const target = resolveDropTarget(String(active.id), String(over.id));
     if (dragged_task === undefined || target === null) {
       return;
     }
@@ -200,7 +227,7 @@ export function KanbanBoard({
       return;
     }
     const dragged_task = tasks.find((task) => task.id === task_id);
-    const target = resolveDropTarget(String(over.id));
+    const target = resolveDropTarget(task_id, String(over.id));
     // Unresolvable drop (or no origin recorded at dragStart, in which case
     // restoreOrigin is a no-op): treat it as a non-move.
     if (dragged_task === undefined || target === null || origin === null) {
