@@ -260,17 +260,22 @@ export function DiscoveryBlockCard({
                   >
                     <DiscoveryBlockIcon />
                   </div>
-                  {/* text-base: matches every other card/section title's explicit
-                size convention in the app (summary/*.tsx). pointer-events-auto:
-                enables the title= tooltip on hover - trades away
-                click-to-navigate on this exact text (the rest of the header
-                still navigates) */}
-                  <h5
+                  {/* h2, not h5: heading level is purely semantic (Tailwind's
+                preflight strips all default heading styling, size/weight
+                here comes entirely from the className below), and h5 skipped
+                straight past h1 with nothing in between - h2 matches how
+                every other card/section title in the app nests directly
+                under the page's own h1 (see summary/*.tsx). text-base:
+                matches that same convention's explicit size.
+                pointer-events-auto: enables the title= tooltip on hover -
+                trades away click-to-navigate on this exact text (the rest of
+                the header still navigates) */}
+                  <h2
                     className="pointer-events-auto truncate font-mono text-base font-semibold text-text-primary"
                     title={discoveryBlock.title}
                   >
                     {discoveryBlock.title}
-                  </h5>
+                  </h2>
                 </div>
                 <div className="pointer-events-auto flex shrink-0 items-center gap-1">
                   <span
