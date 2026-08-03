@@ -48,10 +48,13 @@ export function MembersSection({ projectId }: MembersSectionProps) {
 
       const data = await getMembers(projectId);
       setMembers(data);
-    } catch (error) {
-      console.error(error);
+    } catch {
+      showToast({
+        message: "Failed to load members",
+        type: "error",
+      });
     }
-  }, [projectId]);
+  }, [projectId, showToast]);
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
@@ -91,17 +94,11 @@ export function MembersSection({ projectId }: MembersSectionProps) {
     try {
       await updateMemberRole(projectId, userId, role);
 
-      // keep this for now while testing realtime
-      // remove once the websocket update is confirmed working
-      await loadMembers();
-
       showToast({
         message: "Member role updated",
         type: "success",
       });
-    } catch (error) {
-      console.error(error);
-
+    } catch {
       showToast({
         message: "Failed to update member role",
         type: "error",
@@ -122,9 +119,7 @@ export function MembersSection({ projectId }: MembersSectionProps) {
         type: "success",
       });
       setMemberToRemove(null);
-    } catch (error) {
-      console.error(error);
-
+    } catch {
       showToast({
         message: "Failed to remove member",
         type: "error",
@@ -146,8 +141,6 @@ export function MembersSection({ projectId }: MembersSectionProps) {
       await loadMembers();
       setUsername("");
     } catch (error) {
-      console.error(error);
-
       showToast({
         message:
           error instanceof Error ? error.message : "Failed to add member",
