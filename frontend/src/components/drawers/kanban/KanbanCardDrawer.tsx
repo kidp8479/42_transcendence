@@ -346,7 +346,12 @@ function KanbanCardForm({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
+      {/* min-h-0 is load-bearing: a flex item defaults to min-height:auto,
+          which refuses to shrink below its content (title + fields + the
+          notes textarea's min-h-40) - without it this grew past the drawer's
+          own height instead of scrolling internally, pushing Discard/Save
+          off-screen on any viewport shorter than the form. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
         <div>
           {/* A real label, not just a placeholder: the placeholder vanishes as
               soon as there is a title, leaving nothing on screen to say what
