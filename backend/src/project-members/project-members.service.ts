@@ -136,7 +136,9 @@ export class ProjectMembersService {
   }
 
   // same requester + role check as addMember (const requester = ...; if (requester.role is neither "OWNER" nor "ADMIN") throw ...)
-  // delete the ProjectMember row that links this user to this project
+  // delete the ProjectMember row that links this user to this project.
+  // A user removing themselves ("leave project") is always allowed regardless
+  // of their own role - only removing someone ELSE requires OWNER/ADMIN.
   async removeMember(
     projectId: string,
     userId: string,
@@ -148,8 +150,13 @@ export class ProjectMembersService {
         projectId,
         requestingUserId
       );
-      // only OWNER or ADMIN can remove members
-      if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
+      const isSelfRemoval = requestingUserId === userId;
+      // only OWNER or ADMIN can remove someone else
+      if (
+        !isSelfRemoval &&
+        requester.role !== "OWNER" &&
+        requester.role !== "ADMIN"
+      ) {
         throw new ForbiddenException(
           "Only the project owner or admin can remove members"
         );
@@ -159,14 +166,20 @@ export class ProjectMembersService {
         projectId,
         userId
       );
-      // prevent removing the OWNER - every project has exactly one, enforced in DB (TR-69)
+      // prevent removing the OWNER - every project has exactly one, enforced in
+      // DB (TR-69). Also blocks an owner from "leaving" through this endpoint.
       if (memberToRemove.role === "OWNER") {
         throw new ForbiddenException("Cannot remove the project owner");
       }
       // an ADMIN can remove a MEMBER, but not a fellow ADMIN - only the OWNER
       // can remove an ADMIN (flagged in TR-80's cross-branch review: without
-      // this, any two admins could remove each other)
-      if (memberToRemove.role === "ADMIN" && requester.role !== "OWNER") {
+      // this, any two admins could remove each other). Doesn't apply when an
+      // admin is removing themselves.
+      if (
+        !isSelfRemoval &&
+        memberToRemove.role === "ADMIN" &&
+        requester.role !== "OWNER"
+      ) {
         throw new ForbiddenException(
           "Only the project owner can remove an admin"
         );

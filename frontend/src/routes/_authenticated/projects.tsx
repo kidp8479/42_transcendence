@@ -12,12 +12,16 @@ import {
   useLoaderData,
   useNavigate,
 } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { ToggleSwitch } from "flowbite-react";
 import {
   NewProjectCard,
   type NewProjectFormValues,
 } from "@/components/projects/NewProjectCard";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { createProject, deleteProject, type Project } from "@/lib/projectsApi";
+import { removeMember } from "@/lib/projectMembersApi";
+import { getSession } from "@/lib/auth";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 import { useToast } from "@/hooks/useToast";
 
@@ -34,6 +38,18 @@ function ProjectsPage() {
   const navigate = useNavigate();
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
+  const [showArchived, setShowArchived] = useState(false);
+  const archivedProjects = projects.filter((project) => project.isArchived);
+  const visibleProjects = (
+    showArchived
+      ? projects.slice()
+      : projects.filter((project) => !project.isArchived)
+  ).sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSession().then((session) => setCurrentUserId(session?.user.id ?? null));
+  }, []);
 
   async function handleCreateProject(values: NewProjectFormValues) {
     try {
@@ -62,35 +78,67 @@ function ProjectsPage() {
     return true;
   }
 
+  async function handleLeaveProject(project: Project) {
+    if (!currentUserId) {
+      return false;
+    }
+    try {
+      await removeMember(project.id, currentUserId);
+      showToast({ type: "success", message: "Left project" });
+    } catch (error) {
+      showToast({ type: "error", message: errorMessage(error) });
+      return false;
+    }
+    await safeInvalidateRouter();
+    return true;
+  }
+
   return (
     <>
-      <div className="p-6 mb-2 border-b border-surface-border">
-        <h1 className="text-xl font-bold font-mono text-text-primary">
-          Projects
-        </h1>
-        <p className="text-xs text-text-secondary">
-          Create, manage, and track all your projects in one place.
-        </p>
+      <div className="p-6 mb-2 border-b border-surface-border flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold font-mono text-text-primary">
+            Projects
+          </h1>
+          <p className="text-xs text-text-secondary">
+            Create, manage, and track all your projects in one place.
+          </p>
+        </div>
+
+        {archivedProjects.length > 0 && (
+          <label className="flex shrink-0 items-center gap-2 text-xs text-text-secondary">
+            <ToggleSwitch
+              checked={showArchived}
+              onChange={setShowArchived}
+              color="green"
+              sizing="sm"
+              label=""
+            />
+            <span>Include archived</span>
+            <span className="rounded-full bg-surface-overlay px-1.5 py-0.5 text-[10px] font-semibold text-text-muted">
+              {archivedProjects.length}
+            </span>
+          </label>
+        )}
       </div>
       <div className="p-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project) => (
+          {visibleProjects.map((project) => (
             <ProjectCard
               key={project.id}
               project={{
                 ...project,
                 description: project.description ?? "No description yet.",
               }}
-              canManageProject={
-                project.role === "OWNER" || project.role === "ADMIN"
-              }
-              onManageMembers={() =>
+              role={project.role}
+              onOpenSettings={() =>
                 navigate({
                   to: "/$projectId/project-settings",
                   params: { projectId: project.id },
                 })
               }
               onDeleteProject={() => handleDeleteProject(project)}
+              onLeaveProject={() => handleLeaveProject(project)}
             />
           ))}
           <NewProjectCard onCreate={handleCreateProject} />

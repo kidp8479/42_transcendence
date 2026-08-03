@@ -10,15 +10,17 @@
 // stacks on top and stays independently clickable without needing to nest
 // inside, or stop propagation from, that link.
 //
-// The "..." menu (Manage members / Delete project, added to the Figma
-// 2026-07-20) only renders when canManageProject is true - the parent
-// derives that from the caller's own project role (see
-// routes/_authenticated/projects.tsx).
+// The "..." menu (added to the Figma 2026-07-20, later reworked so the cog
+// trigger itself is never hidden - only its second item changes by role):
+// "Project settings" always shows; OWNER sees "Delete project", everyone
+// else sees "Leave project" instead, since the backend enforces exactly one
+// OWNER per project (TR-69) who can't leave without deleting/transferring it.
 //
-// "Delete project" doesn't call onDeleteProject right away - it swaps the
-// whole card for an inline "type the project name to confirm" view first
-// (same open/closed toggle idea as NewProjectCard's create form), and only
-// fires onDeleteProject once the typed text matches project.name exactly.
+// Neither "Delete project" nor "Leave project" fires its action right away -
+// both swap the whole card for the same inline "type the project name to
+// confirm" view first (same open/closed toggle idea as NewProjectCard's
+// create form), and only fire once the typed text matches project.name
+// exactly.
 import { Link } from "@tanstack/react-router";
 import {
   Button,
@@ -29,11 +31,11 @@ import {
 } from "flowbite-react";
 import { useId, useState } from "react";
 import {
+  HiOutlineArrowRightOnRectangle,
   HiOutlineCalendar,
   HiOutlineCog6Tooth,
   HiOutlineFolder,
   HiOutlineTrash,
-  HiOutlineUserGroup,
   HiOutlineUsers,
   HiOutlineXMark,
 } from "react-icons/hi2";
@@ -48,9 +50,9 @@ const roundedDropdownItemTheme = {
   base: "rounded-md",
 };
 
-// Scoped to the delete-confirmation input only - same black-background
+// Scoped to the delete/leave confirmation input only - same black-background
 // treatment as NewProjectCard's projectFormInputTheme.
-const confirmDeleteInputTheme = {
+const confirmInputTheme = {
   field: {
     input: {
       colors: {
@@ -109,42 +111,50 @@ export interface ProjectCardData {
   // ISO date string - null when the project has no deadline set yet
   // (Project.deadline is nullable in schema.prisma and unseeded today).
   deadline: string | null;
+  isArchived: boolean;
 }
 
 interface ProjectCardProps {
   project: ProjectCardData;
-  canManageProject: boolean;
-  onManageMembers?: () => void;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  onOpenSettings?: () => void;
   onDeleteProject?: () => Promise<boolean>;
+  onLeaveProject?: () => Promise<boolean>;
 }
 
 export function ProjectCard({
   project,
-  canManageProject,
-  onManageMembers,
+  role,
+  onOpenSettings,
   onDeleteProject,
+  onLeaveProject,
 }: ProjectCardProps) {
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"delete" | "leave" | null>(
+    null
+  );
   const [confirmText, setConfirmText] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isConfirmSubmitting, setIsConfirmSubmitting] = useState(false);
   const confirmInputId = useId();
+  const isOwner = role === "OWNER";
 
-  function handleCancelDelete() {
-    setIsConfirmingDelete(false);
+  function handleCancelConfirm() {
+    setConfirmAction(null);
     setConfirmText("");
   }
 
-  async function handleConfirmDelete() {
-    if (!onDeleteProject) {
+  async function handleConfirmAction() {
+    const action =
+      confirmAction === "delete" ? onDeleteProject : onLeaveProject;
+    if (!action) {
       return;
     }
-    setIsDeleting(true);
+    setIsConfirmSubmitting(true);
     try {
-      if (await onDeleteProject()) {
-        handleCancelDelete();
+      if (await action()) {
+        handleCancelConfirm();
       }
     } finally {
-      setIsDeleting(false);
+      setIsConfirmSubmitting(false);
     }
   }
 
@@ -174,17 +184,26 @@ export function ProjectCard({
         ? `J-${daysUntilDeadline}`
         : `J+${Math.abs(daysUntilDeadline)}`;
 
-  if (isConfirmingDelete) {
-    const canConfirmDelete = confirmText.trim() === project.name;
+  if (confirmAction) {
+    const isDelete = confirmAction === "delete";
+    const canConfirm = confirmText.trim() === project.name;
 
     return (
-      <div className="flex h-full flex-col gap-3 rounded-lg border border-control-error bg-surface-raised p-5">
+      <div
+        className={`flex h-full flex-col gap-3 rounded-lg border bg-surface-raised p-5 ${
+          isDelete ? "border-control-error" : "border-yellow-400"
+        }`}
+      >
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-text-primary">Delete project</h3>
+          <h3 className="font-semibold text-text-primary">
+            {isDelete ? "Delete project" : "Leave project"}
+          </h3>
           <button
             type="button"
-            aria-label="Cancel delete project"
-            onClick={handleCancelDelete}
+            aria-label={
+              isDelete ? "Cancel delete project" : "Cancel leave project"
+            }
+            onClick={handleCancelConfirm}
             className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40"
           >
             <HiOutlineXMark className="h-5 w-5" />
@@ -200,7 +219,10 @@ export function ProjectCard({
             >
               {project.name}
             </span>{" "}
-            to confirm deletion. This cannot be undone.
+            to confirm {isDelete ? "deletion" : "leaving"}.{" "}
+            {isDelete
+              ? "This cannot be undone."
+              : "You'll need to be re-invited to rejoin."}
           </p>
 
           <label htmlFor={confirmInputId} className="sr-only">
@@ -211,7 +233,7 @@ export function ProjectCard({
             autoFocus
             onChange={(event) => setConfirmText(event.target.value)}
             placeholder={project.name}
-            theme={confirmDeleteInputTheme}
+            theme={confirmInputTheme}
             value={confirmText}
           />
         </div>
@@ -219,16 +241,26 @@ export function ProjectCard({
         <div className="flex gap-2 pt-1">
           <Button
             type="button"
-            onClick={handleConfirmDelete}
-            disabled={!canConfirmDelete || isDeleting}
-            className="flex-1 bg-control-error !text-white hover:bg-red-700 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-red-300 dark:bg-control-error dark:hover:bg-red-700 dark:focus:ring-red-800"
+            onClick={handleConfirmAction}
+            disabled={!canConfirm || isConfirmSubmitting}
+            className={
+              isDelete
+                ? "flex-1 bg-control-error !text-white hover:bg-red-700 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-red-300 dark:bg-control-error dark:hover:bg-red-700 dark:focus:ring-red-800"
+                : "flex-1 bg-yellow-500 !text-black hover:bg-yellow-600 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-yellow-300 dark:bg-yellow-500 dark:hover:bg-yellow-600 dark:focus:ring-yellow-800"
+            }
           >
-            {isDeleting ? "Deleting..." : "Delete"}
+            {isConfirmSubmitting
+              ? isDelete
+                ? "Deleting..."
+                : "Leaving..."
+              : isDelete
+                ? "Delete"
+                : "Leave"}
           </Button>
           <Button
             type="button"
-            onClick={handleCancelDelete}
-            disabled={isDeleting}
+            onClick={handleCancelConfirm}
+            disabled={isConfirmSubmitting}
             className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40"
           >
             Cancel
@@ -265,59 +297,73 @@ export function ProjectCard({
             />
           </div>
 
-          <div className="pl-1 pt-2 flex flex-1 items-center justify-between gap-2">
+          <div className="pl-1 pt-2 flex flex-1 items-center gap-2">
             <span
               className={`rounded-md px-1 py-0.5 text-[10px] font-semibold ${status.badgeBg} ${status.text}`}
             >
               {status.label}
             </span>
+            {project.isArchived && (
+              <span className="rounded-md bg-yellow-400/15 px-1 py-0.5 text-[10px] font-semibold text-yellow-400">
+                Archived
+              </span>
+            )}
           </div>
 
           <div className="pointer-events-auto flex items-center gap-1">
-            {canManageProject && (
-              <Dropdown
-                arrowIcon={false}
-                inline
-                placement="bottom-end"
-                theme={darkDropdownTheme}
-                // flowbite-react's own default theme sets floating.style.auto to
-                // "...dark:border-none..." (see node_modules/flowbite-react/.../
-                // Dropdown/theme.js), which silently deletes the border-style
-                // darkDropdownTheme's floating.base sets. Needs border-solid
-                // specifically, not bare border/dark:border: verified via
-                // resolveTheme+twMerge directly that bare "border" only carries
-                // border-width for tailwind-merge, so it never conflicts with
-                // (or removes) "border-none" - only the border-style utility
-                // itself (border-solid) does.
-                className="border-solid dark:border-solid"
-                renderTrigger={() => (
-                  <button
-                    type="button"
-                    aria-label={`Open actions for ${project.name}`}
-                    className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                  >
-                    <HiOutlineCog6Tooth className="h-5 w-5" />
-                  </button>
-                )}
-              >
-                <DropdownItem
-                  icon={HiOutlineUserGroup}
-                  theme={roundedDropdownItemTheme}
-                  onClick={() => onManageMembers?.()}
+            <Dropdown
+              arrowIcon={false}
+              inline
+              placement="bottom-end"
+              theme={darkDropdownTheme}
+              // flowbite-react's own default theme sets floating.style.auto to
+              // "...dark:border-none..." (see node_modules/flowbite-react/.../
+              // Dropdown/theme.js), which silently deletes the border-style
+              // darkDropdownTheme's floating.base sets. Needs border-solid
+              // specifically, not bare border/dark:border: verified via
+              // resolveTheme+twMerge directly that bare "border" only carries
+              // border-width for tailwind-merge, so it never conflicts with
+              // (or removes) "border-none" - only the border-style utility
+              // itself (border-solid) does.
+              className="border-solid dark:border-solid"
+              renderTrigger={() => (
+                <button
+                  type="button"
+                  aria-label={`Open actions for ${project.name}`}
+                  className="rounded-md p-1 text-text-muted hover:bg-surface-overlay hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                 >
-                  Manage members
-                </DropdownItem>
-                <DropdownDivider />
+                  <HiOutlineCog6Tooth className="h-5 w-5" />
+                </button>
+              )}
+            >
+              <DropdownItem
+                icon={HiOutlineCog6Tooth}
+                theme={roundedDropdownItemTheme}
+                onClick={() => onOpenSettings?.()}
+              >
+                Project settings
+              </DropdownItem>
+              <DropdownDivider />
+              {isOwner ? (
                 <DropdownItem
                   icon={HiOutlineTrash}
                   theme={roundedDropdownItemTheme}
                   className="text-control-error! dark:text-control-error!"
-                  onClick={() => setIsConfirmingDelete(true)}
+                  onClick={() => setConfirmAction("delete")}
                 >
                   Delete project
                 </DropdownItem>
-              </Dropdown>
-            )}
+              ) : (
+                <DropdownItem
+                  icon={HiOutlineArrowRightOnRectangle}
+                  theme={roundedDropdownItemTheme}
+                  className="text-yellow-400! dark:text-yellow-400!"
+                  onClick={() => setConfirmAction("leave")}
+                >
+                  Leave project
+                </DropdownItem>
+              )}
+            </Dropdown>
           </div>
         </div>
 

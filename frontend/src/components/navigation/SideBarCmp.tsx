@@ -123,7 +123,7 @@ export function SideBarCmp() {
   // This keeps sidebar data fetching at layout level instead of per page.
   const projects = useLoaderData({ from: "/_authenticated" });
   const visibleProjects = projects.filter(
-    (project) => project.status !== "COMPLETED"
+    (project) => project.status !== "COMPLETED" && !project.isArchived
   );
   const { isCollapsed, toggleSidebar, closeSidebar } = useSidebar();
 

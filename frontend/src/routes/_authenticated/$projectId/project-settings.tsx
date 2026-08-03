@@ -37,6 +37,7 @@ function ProjectSettingsPage() {
         projectId={projectId}
         status={project.status}
         role={project.role}
+        isArchived={project.isArchived}
       />
 
       {project.role === "OWNER" && (

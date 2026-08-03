@@ -19,6 +19,7 @@ export interface Project {
   progress: number;
   // count of ProjectMember rows for this project.
   memberCount: number;
+  isArchived: boolean;
 }
 
 // GET /projects => every project the authenticated user is a member of
@@ -77,7 +78,8 @@ function parseProject(value: unknown): Project {
     (value.deadline !== null && typeof value.deadline !== "string") ||
     !isProjectMemberRole(value.role) ||
     typeof value.progress !== "number" ||
-    typeof value.memberCount !== "number"
+    typeof value.memberCount !== "number" ||
+    typeof value.isArchived !== "boolean"
   ) {
     throw new Error("Projects API returned an invalid project");
   }
@@ -90,6 +92,7 @@ function parseProject(value: unknown): Project {
     role: value.role,
     progress: value.progress,
     memberCount: value.memberCount,
+    isArchived: value.isArchived,
   };
 }
 

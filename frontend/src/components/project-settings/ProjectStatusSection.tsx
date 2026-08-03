@@ -20,14 +20,17 @@ interface ProjectStatusSectionProps {
   projectId: string;
   status: ProjectStatus;
   role: Project["role"];
+  isArchived: boolean;
 }
 
 export function ProjectStatusSection({
   projectId,
   status,
   role,
+  isArchived,
 }: ProjectStatusSectionProps) {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isUpdatingArchive, setIsUpdatingArchive] = useState(false);
   const { showToast } = useToast();
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const isFinished = status === "COMPLETED";
@@ -60,10 +63,29 @@ export function ProjectStatusSection({
     setIsUpdatingStatus(false);
   }
 
-  async function handleArchive() {
-    await updateProject(projectId, {
-      isArchived: true,
+  async function handleToggleArchive() {
+    setIsUpdatingArchive(true);
+    try {
+      await updateProject(projectId, {
+        isArchived: !isArchived,
+      });
+    } catch (error) {
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update project status",
+      });
+      setIsUpdatingArchive(false);
+      return;
+    }
+    showToast({
+      type: "success",
+      message: isArchived ? "Project restored" : "Project archived",
     });
+    await safeInvalidateRouter();
+    setIsUpdatingArchive(false);
   }
   return (
     <SettingsSection
@@ -112,9 +134,15 @@ export function ProjectStatusSection({
           title="Archive project"
           description="Hide from active views without deleting data. Can be restored anytime."
           icon={<HiOutlineArchive className="h-5 w-5" />}
+          iconClassName={
+            isArchived
+              ? "!border-yellow-400/30 !bg-yellow-400/10 !text-yellow-400"
+              : undefined
+          }
         >
           <Button
-            onClick={handleArchive}
+            onClick={handleToggleArchive}
+            disabled={isUpdatingArchive}
             className="
 			  !border
 		      !border-surface-border
@@ -133,7 +161,11 @@ export function ProjectStatusSection({
 			"
           >
             <HiOutlineArchive className="h-4 w-4" />
-            Archive
+            {isUpdatingArchive
+              ? "Saving..."
+              : isArchived
+                ? "Restore"
+                : "Archive"}
           </Button>
         </SettingsActionRow>
       </div>
