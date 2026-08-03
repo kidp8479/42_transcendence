@@ -1,9 +1,16 @@
 // ProjectStatusSection.tsx
+import { useState } from "react";
 import { Button } from "flowbite-react";
 import { SettingsActionRow } from "./SettingsActionRow";
 import { SettingsSection } from "./SettingsSection";
 import { HiOutlineArchive, HiOutlineShieldCheck } from "react-icons/hi";
-import { updateProject } from "@/lib/projectsApi";
+import {
+  updateProject,
+  type Project,
+  type ProjectStatus,
+} from "@/lib/projectsApi";
+import { useToast } from "@/hooks/useToast";
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 
 // Displays project lifecycle management actions inside the Project Settings page.
 // This section is responsible for actions that change the current state of a
@@ -11,13 +18,46 @@ import { updateProject } from "@/lib/projectsApi";
 
 interface ProjectStatusSectionProps {
   projectId: string;
+  status: ProjectStatus;
+  role: Project["role"];
 }
 
-export function ProjectStatusSection({ projectId }: ProjectStatusSectionProps) {
-  async function handleMarkFinished() {
-    await updateProject(projectId, {
-      status: "COMPLETED",
+export function ProjectStatusSection({
+  projectId,
+  status,
+  role,
+}: ProjectStatusSectionProps) {
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const { showToast } = useToast();
+  const safeInvalidateRouter = useSafeRouterInvalidate();
+  const isFinished = status === "COMPLETED";
+  const canMarkFinished = role === "OWNER" || role === "ADMIN";
+
+  async function handleToggleFinished() {
+    setIsUpdatingStatus(true);
+    try {
+      await updateProject(projectId, {
+        status: isFinished ? "IN_PROGRESS" : "COMPLETED",
+      });
+    } catch (error) {
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update project status",
+      });
+      setIsUpdatingStatus(false);
+      return;
+    }
+    showToast({
+      type: "success",
+      message: isFinished
+        ? "Project marked as unfinished"
+        : "Project marked as finished",
     });
+    await safeInvalidateRouter();
+    setIsUpdatingStatus(false);
   }
 
   async function handleArchive() {
@@ -35,10 +75,17 @@ export function ProjectStatusSection({ projectId }: ProjectStatusSectionProps) {
           title="Mark project as finished"
           description="Flags the project as complete on the dashboard and projects page. Removes it from the sidebar."
           icon={<HiOutlineShieldCheck className="h-5 w-5" />}
+          iconClassName={
+            isFinished
+              ? "!border-brand-500/30 !bg-brand-500/10 !text-brand-500"
+              : undefined
+          }
         >
-          <Button
-            onClick={handleMarkFinished}
-            className="
+          {canMarkFinished && (
+            <Button
+              onClick={handleToggleFinished}
+              disabled={isUpdatingStatus}
+              className="
 			  !border
 			  !border-surface-border
 			  !bg-surface-overlay
@@ -51,9 +98,14 @@ export function ProjectStatusSection({ projectId }: ProjectStatusSectionProps) {
 		      focus-visible:!ring-brand-500/20
 			  dark:focus:!ring-brand-800
 			"
-          >
-            Mark as finished
-          </Button>
+            >
+              {isUpdatingStatus
+                ? "Saving..."
+                : isFinished
+                  ? "Mark as unfinished"
+                  : "Mark as finished"}
+            </Button>
+          )}
         </SettingsActionRow>
 
         <SettingsActionRow
