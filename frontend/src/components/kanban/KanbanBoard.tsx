@@ -90,9 +90,28 @@ export function KanbanBoard({
       ? (tasks.find((task) => task.id === active_task_id) ?? null)
       : null;
 
-  // A drop target is either a card (over.id = task id -> that card's column
-  // and index) or a column's droppable area (over.id = status -> append at
-  // the end, which is how empty columns accept drops).
+  // Whether the dragged card should land after (not before) the card it's
+  // hovering, based on which half of that card the pointer is currently over.
+  // Without this, resolveDropTarget could only ever insert before the
+  // hovered card - dropping on your very next neighbour was a no-op (already
+  // immediately before it), and dropping on a column's last card could never
+  // reach the end of the column, only just above it.
+  function isPastMidpoint(
+    active_rect: { top: number; height: number } | null,
+    over_rect: { top: number; height: number }
+  ): boolean {
+    if (active_rect === null) {
+      return false;
+    }
+    const active_center = active_rect.top + active_rect.height / 2;
+    const over_center = over_rect.top + over_rect.height / 2;
+    return active_center > over_center;
+  }
+
+  // A drop target is either a card (over.id = task id -> that card's column,
+  // landing just before or after it depending on insert_after) or a column's
+  // droppable area (over.id = status -> append at the end, which is how
+  // empty columns accept drops).
   //
   // Both branches exclude the dragged card from the column before counting:
   // the backend's moveTask() computes `nextRank` the same way (`id: { not: id
@@ -104,7 +123,8 @@ export function KanbanBoard({
   // still in the list) is where 3 sits once card 1 is actually removed.
   function resolveDropTarget(
     active_id: string,
-    over_id: string
+    over_id: string,
+    insert_after: boolean
   ): { status: TaskStatus; index: number } | null {
     const over_status = STATUS_ORDER.find((status) => status === over_id);
     if (over_status !== undefined) {
@@ -135,9 +155,10 @@ export function KanbanBoard({
     const column = selectColumnTasks(tasks, over_task.status).filter(
       (task) => task.id !== active_id
     );
+    const over_index = column.findIndex((task) => task.id === over_task.id);
     return {
       status: over_task.status,
-      index: column.findIndex((task) => task.id === over_task.id),
+      index: insert_after ? over_index + 1 : over_index,
     };
   }
 
@@ -205,7 +226,15 @@ export function KanbanBoard({
       return;
     }
     const dragged_task = tasks.find((task) => task.id === active.id);
-    const target = resolveDropTarget(String(active.id), String(over.id));
+    const insert_after = isPastMidpoint(
+      active.rect.current.translated,
+      over.rect
+    );
+    const target = resolveDropTarget(
+      String(active.id),
+      String(over.id),
+      insert_after
+    );
     if (dragged_task === undefined || target === null) {
       return;
     }
@@ -227,7 +256,11 @@ export function KanbanBoard({
       return;
     }
     const dragged_task = tasks.find((task) => task.id === task_id);
-    const target = resolveDropTarget(task_id, String(over.id));
+    const insert_after = isPastMidpoint(
+      active.rect.current.translated,
+      over.rect
+    );
+    const target = resolveDropTarget(task_id, String(over.id), insert_after);
     // Unresolvable drop (or no origin recorded at dragStart, in which case
     // restoreOrigin is a no-op): treat it as a non-move.
     if (dragged_task === undefined || target === null || origin === null) {
