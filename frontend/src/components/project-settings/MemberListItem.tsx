@@ -1,7 +1,23 @@
-import { Avatar, Dropdown, DropdownItem } from "flowbite-react";
+import {
+  Avatar,
+  Dropdown,
+  DropdownDivider,
+  DropdownItem,
+} from "flowbite-react";
 import { RiMoreLine } from "react-icons/ri";
 import { LiaTrashAltSolid } from "react-icons/lia";
 import { LuShieldPlus, LuShieldMinus } from "react-icons/lu";
+import { darkDropdownTheme } from "@/lib/flowbite";
+
+// Scoped to this row's "..." menu only - rounds the item hover highlight
+// and insets it from the panel edges (rectangular/edge-to-edge by default in
+// darkDropdownTheme, shared with NotificationBell and UserMenu) to match the
+// cogwheel dropdown (components/projects/ProjectCard.tsx), without touching
+// that shared theme.
+const roundedDropdownItemTheme = {
+  container: "mx-1",
+  base: "rounded-md text-xs",
+};
 
 interface MemberListItemProps {
   username: string;
@@ -53,7 +69,12 @@ export function MemberListItem({
         <Dropdown
           inline
           arrowIcon={false}
-          className="!bg-surface-raised"
+          theme={darkDropdownTheme}
+          // Scoped here instead of the shared darkDropdownTheme, which other
+          // consumers still rely on - see the matching comment in
+          // components/projects/ProjectCard.tsx for why border-solid and
+          // !border-surface-border both need to be spelled out locally.
+          className="border-solid !border-surface-border dark:border-solid dark:!border-surface-border"
           label={
             <RiMoreLine className="h-4 w-4 text-text-secondary hover:text-text-primary" />
           }
@@ -61,7 +82,7 @@ export function MemberListItem({
           {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") &&
             role === "MEMBER" && (
               <DropdownItem
-                className="!text-xs hover:!bg-transparent focus:!bg-transparent"
+                theme={roundedDropdownItemTheme}
                 onClick={() => onRoleChange(userId, "ADMIN")}
               >
                 <div className="flex items-center gap-2">
@@ -72,7 +93,7 @@ export function MemberListItem({
             )}
           {currentUserRole === "OWNER" && role === "ADMIN" && (
             <DropdownItem
-              className="hover:!bg-transparent focus:!bg-transparent"
+              theme={roundedDropdownItemTheme}
               onClick={() => onRoleChange(userId, "MEMBER")}
             >
               <div className="flex items-center gap-2">
@@ -81,8 +102,10 @@ export function MemberListItem({
               </div>
             </DropdownItem>
           )}
+          <DropdownDivider />
           <DropdownItem
-            className="!text-xs !text-red-700 hover:!bg-transparent focus:!bg-transparent"
+            theme={roundedDropdownItemTheme}
+            className="!text-red-700"
             onClick={() => onRemove(userId)}
           >
             <div className="flex items-center gap-2 text-red-700">

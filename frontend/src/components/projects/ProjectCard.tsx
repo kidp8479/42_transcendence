@@ -35,19 +35,21 @@ import {
   HiOutlineCalendar,
   HiOutlineCog6Tooth,
   HiOutlineFolder,
-  HiOutlineTrash,
   HiOutlineUsers,
   HiOutlineXMark,
 } from "react-icons/hi2";
+import { LiaTrashAltSolid } from "react-icons/lia";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import type { ProjectStatus } from "@/lib/projectsApi";
 
 // Scoped to this card's "..." menu only - rounds the item hover highlight
 // (rectangular by default in darkDropdownTheme, shared with NotificationBell
-// and UserMenu) without touching that shared theme.
+// and UserMenu) and shrinks the text to match the project settings page's
+// member-row dropdown (MemberListItem.tsx), without touching that shared
+// theme.
 const roundedDropdownItemTheme = {
   container: "mx-1",
-  base: "rounded-md",
+  base: "rounded-md text-xs",
 };
 
 // Scoped to the delete/leave confirmation input only - same black-background
@@ -324,8 +326,12 @@ export function ProjectCard({
               // resolveTheme+twMerge directly that bare "border" only carries
               // border-width for tailwind-merge, so it never conflicts with
               // (or removes) "border-none" - only the border-style utility
-              // itself (border-solid) does.
-              className="border-solid dark:border-solid"
+              // itself (border-solid) does. !border-surface-border overrides
+              // flowbite's own default border-gray-200 (too light against
+              // this app's dark surfaces) with the same border token every
+              // card/tile in the app uses - scoped here instead of the
+              // shared darkDropdownTheme, which other consumers still rely on.
+              className="border-solid !border-surface-border dark:border-solid dark:!border-surface-border"
               renderTrigger={() => (
                 <button
                   type="button"
@@ -346,9 +352,9 @@ export function ProjectCard({
               <DropdownDivider />
               {isOwner ? (
                 <DropdownItem
-                  icon={HiOutlineTrash}
+                  icon={LiaTrashAltSolid}
                   theme={roundedDropdownItemTheme}
-                  className="text-control-error! dark:text-control-error!"
+                  className="text-red-700! dark:text-red-700!"
                   onClick={() => setConfirmAction("delete")}
                 >
                   Delete project
