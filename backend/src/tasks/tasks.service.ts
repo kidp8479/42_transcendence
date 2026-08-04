@@ -115,7 +115,11 @@ export class TasksService {
     // rows aren't part of the ordering invariant, so a failure here leaves a
     // correctly-ranked task with no assignees rather than a corrupt column.
     if (dto.assigneeIds) {
-      await this.taskAssigneeService.replaceAssignees(task.id, dto.assigneeIds);
+      await this.taskAssigneeService.replaceAssignees(
+        task.id,
+        projectId,
+        dto.assigneeIds
+      );
       // Everything is "new" on create - no previous assignees to diff against.
       await this.notifyNewAssignees(
         projectId,
@@ -236,7 +240,11 @@ export class TasksService {
     }
 
     if (assigneeIds) {
-      await this.taskAssigneeService.replaceAssignees(id, assigneeIds);
+      await this.taskAssigneeService.replaceAssignees(
+        id,
+        projectId,
+        assigneeIds
+      );
       await this.notifyNewAssignees(
         projectId,
         existingTask.assignees.map((assignee) => assignee.id),
