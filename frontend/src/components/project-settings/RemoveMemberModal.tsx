@@ -66,7 +66,7 @@ export function RemoveMemberModal({
 
           <Button
             color="none"
-            onClick={onConfirm}
+            onClick={() => void onConfirm()}
             disabled={isRemoving}
             className="
 			  !h-8

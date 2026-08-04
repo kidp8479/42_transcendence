@@ -4,7 +4,7 @@ interface LeaveProjectModalProps {
   show: boolean;
   isLeaving: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void>;
 }
 
 export function LeaveProjectModal({
@@ -62,7 +62,7 @@ export function LeaveProjectModal({
 
           <Button
             color="none"
-            onClick={onConfirm}
+            onClick={() => void onConfirm()}
             disabled={isLeaving}
             className="
 				  !h-8
