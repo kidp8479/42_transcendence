@@ -24,7 +24,10 @@ export function Footer() {
   return (
     <FlowbiteFooter
       container
-      className="w-full !rounded-none !bg-surface-base !p-0 !shadow-none border-t border-surface-border"
+      // shrink-0: on project tabs (__root.tsx's bounded shell) this stops the
+      // footer from being squashed by the flex-1 middle area. Elsewhere the
+      // shell isn't height-bounded, so this is inert - harmless either way.
+      className="w-full shrink-0 !rounded-none !bg-surface-base !p-0 !shadow-none border-t border-surface-border"
     >
       <LayoutContainer className="flex w-full flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
         <FooterCopyright

@@ -34,12 +34,22 @@
   --color-text-primary: #f4f4f5;
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #52525b;
+  /* text-muted fails contrast on surface-base (#0f0f0f, 2.48:1) - this is the
+     surface-base-safe variant, 4.66:1. */
+  --color-text-muted-on-base: #7c7c89;
 
   /* Task status, used for dashboards, kanban, list etc - matches the Figma prototype's COLUMN_ACCENTS */
   --color-status-todo: #7a8aa8;
   --color-status-in-progress: #22d3ee;
   --color-status-review: #f59e0b;
   --color-status-completed: #10b981;
+
+  /* Task priority (LOW/MEDIUM/HIGH), used for the kanban/list priority dot and
+     the drawer's priority selector. Low is deliberately NOT green: green
+     already means brand + "completed", a green priority would read as "done". */
+  --color-priority-high: #ef4444;
+  --color-priority-medium: #f59e0b;
+  --color-priority-low: #7a8aa8;
 
   /* Category palette - unnamed/numbered, not tied to specific category names since
      TaskCategory is created freely per-project. Matches the Figma prototype's
@@ -83,8 +93,9 @@ input[data-auth-field]:-webkit-autofill:focus {
 }
 
 /*
- * Thin, theme-colored scrollbar for horizontally-scrolling UI (ex: ProjectTabs
- * on narrow screens, where 7 tabs don't fit and overflow-x-auto kicks in).
+ * Thin, theme-colored scrollbar for scrolling UI, on either axis: ProjectTabs
+ * on narrow screens (7 tabs don't fit, overflow-x-auto kicks in), the Kanban
+ * board's horizontal column row, and each Kanban column's own vertical list.
  * Without this, the browser falls back to its bulky default OS scrollbar,
  * which looks out of place against the dark surface palette. Two separate
  * rule sets are needed: scrollbar-width/scrollbar-color for Firefox, the
@@ -96,6 +107,9 @@ input[data-auth-field]:-webkit-autofill:focus {
   scrollbar-color: var(--color-surface-border) transparent;
 }
 .scrollbar-thin-surface::-webkit-scrollbar {
+  /* width applies to vertical scrollers, height to horizontal ones - a
+     scroller can be either, so both are set. */
+  width: 6px;
   height: 6px;
 }
 .scrollbar-thin-surface::-webkit-scrollbar-track {

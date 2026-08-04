@@ -4,7 +4,7 @@
 //
 // Handles the shared structure: slide-in animation, backdrop, click-outside
 // and Escape to close, scroll area. It does NOT render its own close button
-// or know what content it displays - each drawer (KanBanCardDrawer,
+// or know what content it displays - each drawer (KanbanCardDrawer,
 // CalendarEventDrawer...) renders its own header and passes children in.
 //
 // Similar to ModalLayer, but anchored to the side instead of centered, and

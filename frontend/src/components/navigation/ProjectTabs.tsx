@@ -49,7 +49,10 @@ export function ProjectTabs() {
   return (
     <nav
       aria-label="Project tabs"
-      className="scrollbar-thin-surface flex overflow-x-auto border-b border-surface-border"
+      // shrink-0 is not optional here: overflow-x-auto makes min-height resolve
+      // to 0 (no content-based floor), so in the bounded column this bar could
+      // be crushed to nothing.
+      className="scrollbar-thin-surface flex shrink-0 overflow-x-auto border-b border-surface-border"
     >
       {tabs_links.map((created_link) => (
         <Link

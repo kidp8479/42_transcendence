@@ -2,28 +2,33 @@
 // called by the controller, never called directly by the frontend
 
 import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { ProjectsService } from "../projects/projects.service";
 
 @Injectable()
 export class TaskCategoriesService {
-  // all methods below will use PrismaService to query the database
-  // none of these are called directly by the frontend - always via the controller
-  // TODO: inject PrismaService here via constructor
-  // the constructor is called automatically by NestJS at startup - never called manually
-  // TODO: inject ProjectsService here via constructor (for assertMembership below)
-  // TODO: create(projectId: string, dto: CreateTaskCategoryDto, userId: string)
-  //       => call projectsService.assertMembership(projectId, userId) first (shared check,
-  //          throws NotFoundException if not a member - no role required, any member can do this)
-  //       => insert a new task category in the database, linked to projectId from the URL
-  // TODO: findAll(projectId: string, userId: string)
-  //       => same assertMembership call as create
-  //       => fetch all task categories belonging to a given project
-  // TODO: findById(id: string, projectId: string, userId: string)
-  //       => same assertMembership call as create, then fetch with where: { id, projectId }
-  //          (see DiscoveryBlocksService.findById for a full example of this pattern)
-  // TODO: update(id: string, dto: UpdateTaskCategoryDto, projectId: string, userId: string)
-  //       => same membership check as findById
-  //       => update a category (name or color)
-  // TODO: remove(id: string, projectId: string, userId: string)
-  //       => same membership check as findById
-  //       => permanently delete a task category
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectsService: ProjectsService
+  ) {}
+
+  // Read-only for now, on purpose: a project's categories are the defaults
+  // seeded by ProjectsService.create() (DEFAULT_TASK_CATEGORIES), and no screen
+  // lets anyone add or rename one yet. create/findById/update/remove land with
+  // the project-settings screen - CalendarCategoriesService already has the
+  // exact shape they should take, including the findById-as-access-guard trick.
+  async findAll(projectId: string, userId: string) {
+    // Membership first: :projectId alone proves nothing, so without this any
+    // authenticated user could read another project's categories just by
+    // editing the URL (IDOR). It throws NotFoundException rather than
+    // Forbidden, so a non-member can't even confirm the project exists.
+    await this.projectsService.assertMembership(projectId, userId);
+    return this.prisma.taskCategory.findMany({
+      where: { projectId: projectId },
+      // Postgres guarantees no order without this. Alphabetical rather than by
+      // color index: it stays sensible once the settings screen lets people
+      // pick their own colors, and it matches CalendarCategoriesService.
+      orderBy: { name: "asc" },
+    });
+  }
 }

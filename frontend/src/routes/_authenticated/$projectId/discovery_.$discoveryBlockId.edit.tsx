@@ -467,7 +467,10 @@ function DiscoveryBlockEditPage() {
             discoveryBlockColor.border
           }
         >
-          <LockOwnerAvatar lock={editingLock} />
+          <LockOwnerAvatar
+            username={editingLock.username}
+            avatarUrl={editingLock.avatarUrl}
+          />
           <span>
             <span className="font-semibold text-text-primary">
               {editingLock.username}

@@ -29,8 +29,28 @@ export function ProjectLayout() {
       <div className="shrink-0">
         <ProjectTabs />
       </div>
-      <div className="flex-1 p-6">
-        <Outlet />
+      {/* Split in two on purpose.
+          The ANCHOR carries no padding: min-h-0 keeps title/tabs from being
+          pushed along by a tall tab. `relative` makes it the containing block
+          for the drawers (DrawerShell is absolute), spanning tab bar to footer.
+          Internal (non-page) scrolling only happens for tabs short enough to
+          fit main's real rendered height - main has no hard cap (see
+          AuthenticatedLayout.tsx), so a taller tab just grows the page and the
+          document scrolls, same as any page without this wrapper. Kanban's own
+          per-column scrolling is separate and unrelated to this anchor.
+
+          z-40, not left at auto: `isolate` makes this anchor its own stacking
+          context, so a drawer's own z-40 (claimed INSIDE it) no longer competes
+          with anything outside - the anchor as a whole does now, per its own
+          (previously unstated) z-index, and lost to the mobile sidebar's z-30
+          backdrop (see SideBarCmp.tsx's own comment on this same tradeoff).
+          z-40 matches the drawer's own value and sits below the header/sidebar's
+          z-50, so an open drawer still beats that backdrop without covering
+          the header or an open sidebar. */}
+      <div className="relative isolate z-40 min-h-0 flex-1">
+        <div className="scrollbar-thin-surface h-full overflow-y-auto p-6">
+          <Outlet />
+        </div>
       </div>
     </div>
   );

@@ -211,7 +211,10 @@ export function ChecklistItemRow({
         />
       ) : isLockedByOther && lock ? (
         <span className="flex w-full min-w-0 items-center gap-2 px-2 text-left text-sm">
-          <LockOwnerAvatar lock={lock} />
+          <LockOwnerAvatar
+            username={lock.username}
+            avatarUrl={lock.avatarUrl}
+          />
           <span className="min-w-0 wrap-break-word">{item.label}</span>
         </span>
       ) : (
