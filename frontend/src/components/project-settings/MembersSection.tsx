@@ -1,6 +1,7 @@
 // MembersSection.tsx
 
 import { SettingsSection } from "./SettingsSection";
+import { SettingsActionRow } from "./SettingsActionRow";
 import { MemberListItem } from "./MemberListItem";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
@@ -256,8 +257,14 @@ export function MembersSection({
               </div>
             </form>
           )}
-          {canLeave && (
-            <div className="flex justify-end">
+        </div>
+        {canLeave && (
+          <div className="mt-4 border-t border-surface-border pt-4">
+            <SettingsActionRow
+              title="Leave this project"
+              description="You will no longer have access to this project once you leave."
+              icon={<HiOutlineArrowRightOnRectangle className="h-5 w-5" />}
+            >
               <Button
                 type="button"
                 color="none"
@@ -267,9 +274,9 @@ export function MembersSection({
                 <HiOutlineArrowRightOnRectangle className="h-4 w-4" />
                 Leave project
               </Button>
-            </div>
-          )}
-        </div>
+            </SettingsActionRow>
+          </div>
+        )}
       </SettingsSection>
       <RemoveMemberModal
         member={memberToRemove}

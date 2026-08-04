@@ -1,5 +1,7 @@
 // Project settings tab (/:projectId/project-settings).
-// Configures a specific project: visibility toggles, behaviour, project status (finish/archive), danger zone (delete).
+// Configures a specific project: members, project status (finish/archive),
+// danger zone (delete). Behavior settings are deactivated for now (see
+// BehaviorSection import comment below).
 // Not to be confused with user-settings.tsx which is for personal account settings.
 import {
   createFileRoute,
@@ -9,7 +11,11 @@ import {
 
 import { ProjectStatusSection } from "@/components/project-settings/ProjectStatusSection";
 import { MembersSection } from "@/components/project-settings/MembersSection";
-import { BehaviorSection } from "@/components/project-settings/BehaviorSection";
+// BehaviorSection is deactivated (not deleted) for now - time constraint,
+// and it can't persist anything until Task-level archive support and the
+// Kanban board exist (see BehaviorSection.tsx). Re-enable this import and
+// the <BehaviorSection /> usage below once that backend work lands.
+// import { BehaviorSection } from "@/components/project-settings/BehaviorSection";
 import { DangerZoneSection } from "@/components/project-settings/DangerZoneSection";
 
 export const Route = createFileRoute(
@@ -34,7 +40,7 @@ function ProjectSettingsPage() {
         onLeaveProjectSuccess={() => navigate({ to: "/projects" })}
       />
 
-      <BehaviorSection />
+      {/* <BehaviorSection /> - deactivated, see import comment above */}
 
       <ProjectStatusSection
         projectId={projectId}
