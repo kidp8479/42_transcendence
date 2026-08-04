@@ -511,6 +511,49 @@ test("update() with a status change but no rank appends to the end of the new co
   );
 });
 
+test("update() a rank-only PATCH doesn't revert a status change that landed concurrently", async () => {
+  // Client A sends a plain rank PATCH (same-column reorder) while client B
+  // moves the same task to another column in between A's initial read and
+  // A's own transaction opening. Simulated by mutating the row's status the
+  // moment moveTask's transaction does its own fresh read - after
+  // existingTask (read earlier, outside the transaction) already saw the
+  // old status.
+  const store = new FakeTaskStore();
+  const service = createService(store);
+
+  for (const title of ["A", "B"]) {
+    await service.create(
+      projectId,
+      baseCreateDto({
+        title,
+        rank: store.ranksIn(projectId, TaskStatus.TODO).length,
+      }),
+      userId
+    );
+  }
+  const taskA = store.rows.find((row) => row.title === "A")!;
+  const originalFindUniqueOrThrow = store.findUniqueOrThrow.bind(store);
+  let landedConcurrentMove = false;
+  store.findUniqueOrThrow = (async (
+    args: Parameters<typeof originalFindUniqueOrThrow>[0]
+  ) => {
+    if (!landedConcurrentMove) {
+      landedConcurrentMove = true;
+      taskA.status = TaskStatus.IN_PROGRESS;
+    }
+    return originalFindUniqueOrThrow(args);
+  }) as typeof originalFindUniqueOrThrow;
+
+  // A plain reorder (A was rank 0, moves to rank 1) - no status in the DTO.
+  await service.update(taskA.id, { rank: 1 } as never, projectId, userId);
+
+  assert.equal(
+    taskA.status,
+    TaskStatus.IN_PROGRESS,
+    "the concurrent move to IN_PROGRESS must survive, not get silently reverted to TODO"
+  );
+});
+
 // -- Deletion -----------------------------------------------------------------
 
 test("remove() closes the gap left in the middle of a column", async () => {
@@ -689,12 +732,17 @@ test("update() reordering within a column broadcasts task:moved and task:updated
     {
       projectId,
       event: "task:moved",
-      payload: { taskId: taskA.id, toStatus: TaskStatus.TODO, toIndex: 1 },
+      payload: {
+        taskId: taskA.id,
+        projectId,
+        toStatus: TaskStatus.TODO,
+        toIndex: 1,
+      },
     },
     {
       projectId,
       event: "task:updated",
-      payload: { taskId: taskA.id, changes: updated },
+      payload: { taskId: taskA.id, projectId, changes: updated },
     },
   ]);
   assert.equal(notifications.created.length, 0);
@@ -727,6 +775,7 @@ test("update() moving a task to another column broadcasts task:moved and task:up
       event: "task:moved",
       payload: {
         taskId: taskA.id,
+        projectId,
         toStatus: TaskStatus.IN_PROGRESS,
         toIndex: 0,
       },
@@ -734,7 +783,7 @@ test("update() moving a task to another column broadcasts task:moved and task:up
     {
       projectId,
       event: "task:updated",
-      payload: { taskId: taskA.id, changes: updated },
+      payload: { taskId: taskA.id, projectId, changes: updated },
     },
   ]);
   assert.equal(notifications.created.length, 1);
@@ -784,7 +833,7 @@ test("update() editing a field with no status/rank change broadcasts task:update
     {
       projectId,
       event: "task:updated",
-      payload: { taskId: taskA.id, changes: updated },
+      payload: { taskId: taskA.id, projectId, changes: updated },
     },
   ]);
   assert.equal(notifications.created.length, 0);
@@ -815,6 +864,7 @@ test("update() moving a task AND editing a field in the same PATCH broadcasts bo
       event: "task:moved",
       payload: {
         taskId: taskA.id,
+        projectId,
         toStatus: TaskStatus.IN_PROGRESS,
         toIndex: 0,
       },
@@ -822,7 +872,7 @@ test("update() moving a task AND editing a field in the same PATCH broadcasts bo
     {
       projectId,
       event: "task:updated",
-      payload: { taskId: taskA.id, changes: updated },
+      payload: { taskId: taskA.id, projectId, changes: updated },
     },
   ]);
 });
@@ -839,7 +889,11 @@ test("remove() broadcasts task:deleted", async () => {
   await service.remove(taskA.id, projectId, userId);
 
   assert.deepEqual(realtime.emitted, [
-    { projectId, event: "task:deleted", payload: { taskId: taskA.id } },
+    {
+      projectId,
+      event: "task:deleted",
+      payload: { taskId: taskA.id, projectId },
+    },
   ]);
 });
 

@@ -68,12 +68,19 @@ export class TasksService {
   ) {}
 
   async create(projectId: string, dto: CreateTaskDto, userId: string) {
+    // Membership first, on its own: an authorization gate, not just another
+    // independent check - a non-member shouldn't trigger category/assignee
+    // validation at all, in parallel or otherwise.
     await this.projectsService.assertMembership(projectId, userId);
     this.assertValidDateRange(dto.startAt, dto.endAt);
-    await this.assertCategoryBelongsToProject(projectId, dto.categoryId);
-    if (dto.assigneeIds) {
-      await this.assertAssigneesAreProjectMembers(projectId, dto.assigneeIds);
-    }
+    // Independent of each other once membership holds - no reason to await
+    // them one at a time.
+    await Promise.all([
+      this.assertCategoryBelongsToProject(projectId, dto.categoryId),
+      dto.assigneeIds
+        ? this.assertAssigneesAreProjectMembers(projectId, dto.assigneeIds)
+        : Promise.resolve(),
+    ]);
 
     // Serializable: this counts the column and then writes based on that count,
     // so two concurrent creates on the same column would otherwise both read
@@ -131,6 +138,11 @@ export class TasksService {
     // Membership already asserted at the top of create() - no need for
     // findById()'s own second check.
     const created = await this.getTaskOrThrow(task.id, projectId);
+    // created carries its own projectId (a real Task field) - the frontend
+    // checks it before dispatching. A socket joins every project room a
+    // user is a MEMBER of, not just the one they're currently viewing, so
+    // without that check a board open in one tab could get corrupted by
+    // events from an unrelated project open in another.
     this.realtimeService.emitToProject(projectId, "task:created", created);
     return created;
   }
@@ -182,15 +194,19 @@ export class TasksService {
       dto.startAt ?? existingTask.startAt?.toISOString(),
       dto.endAt ?? existingTask.endAt?.toISOString()
     );
-    if (dto.categoryId) {
-      await this.assertCategoryBelongsToProject(projectId, dto.categoryId);
-    }
-
-    // assigneeIds isn't a column on Task, handle it separately below
+    // assigneeIds isn't a column on Task, handle it separately below.
+    // Membership already holds by this point (findById()'s access guard
+    // above), so these two are independent of each other - no reason to
+    // await them one at a time.
     const assigneeIds = dto.assigneeIds;
-    if (assigneeIds) {
-      await this.assertAssigneesAreProjectMembers(projectId, assigneeIds);
-    }
+    await Promise.all([
+      dto.categoryId
+        ? this.assertCategoryBelongsToProject(projectId, dto.categoryId)
+        : Promise.resolve(),
+      assigneeIds
+        ? this.assertAssigneesAreProjectMembers(projectId, assigneeIds)
+        : Promise.resolve(),
+    ]);
     const taskFields = {
       title: dto.title,
       categoryId: dto.categoryId,
@@ -212,8 +228,11 @@ export class TasksService {
     if (isMoving) {
       // dto.rank is forwarded as-is, undefined included: a status change with no
       // rank means "append to the new column", which moveTask resolves against
-      // the live column length inside its transaction.
-      await this.moveTask(id, projectId, nextStatus, dto.rank, taskFields);
+      // the live column length inside its transaction. dto.status, not
+      // nextStatus: moveTask needs to know whether a status change was
+      // actually REQUESTED (vs. just defaulted from a stale pre-transaction
+      // read) to resolve the race described in its own comment.
+      await this.moveTask(id, projectId, dto.status, dto.rank, taskFields);
 
       // Only a real column change is notification-worthy - a same-column
       // drag (isMoving from a rank change alone) isn't news to anyone.
@@ -265,6 +284,7 @@ export class TasksService {
     // after a save.
     this.realtimeService.emitToProject(projectId, "task:updated", {
       taskId: id,
+      projectId: projectId,
       changes: updated,
     });
     return updated;
@@ -282,17 +302,14 @@ export class TasksService {
           where: { id: id },
           include: taskInclude,
         });
-        // Closes the gap left behind, keeping the column dense 0..n-1. Uses
-        // delete()'s own returned rank, not findById() above - that ran
+        // Uses delete()'s own returned rank, not findById() above - that ran
         // before the transaction opened and could be stale by now.
-        await database.task.updateMany({
-          where: {
-            projectId: projectId,
-            status: deleted.status,
-            rank: { gt: deleted.rank },
-          },
-          data: { rank: { decrement: 1 } },
-        });
+        await this.closeRankGap(
+          database,
+          projectId,
+          deleted.status,
+          deleted.rank
+        );
         return deleted;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
@@ -300,8 +317,28 @@ export class TasksService {
 
     this.realtimeService.emitToProject(projectId, "task:deleted", {
       taskId: id,
+      projectId: projectId,
     });
     return mapTask(task);
+  }
+
+  // Shared by remove() and moveTask(): shifts every row after the vacated
+  // rank down one, closing the gap and keeping the column dense 0..n-1 -
+  // the mirror image of openRankSlot below.
+  private async closeRankGap(
+    database: ApplicationDatabaseTransaction,
+    projectId: string,
+    status: TaskStatus,
+    vacatedRank: number
+  ): Promise<void> {
+    await database.task.updateMany({
+      where: {
+        projectId: projectId,
+        status: status,
+        rank: { gt: vacatedRank },
+      },
+      data: { rank: { decrement: 1 } },
+    });
   }
 
   // Shared by create() and moveTask(): clamps wantedRank to the column's
@@ -348,13 +385,14 @@ export class TasksService {
   private async moveTask(
     id: string,
     projectId: string,
-    toStatus: TaskStatus,
+    requestedStatus: TaskStatus | undefined,
     wantedRank: number | undefined,
     taskFields: Prisma.TaskUpdateInput
   ): Promise<void> {
-    // nextRank depends on the live column length, computed inside the
-    // transaction, then reused as-is below for task_moved's toIndex.
-    const nextRank = await this.prisma.transaction(
+    // Both depend on the live state read inside the transaction (rank on
+    // column length, status on the race above) - reused as-is below for
+    // task_moved's payload.
+    const result = await this.prisma.transaction(
       async (database) => {
         // Read inside the transaction, not from a findById() before it
         // opened - Serializable only guards what it reads itself, so a
@@ -363,18 +401,23 @@ export class TasksService {
           where: { id: id },
           select: { status: true, rank: true },
         });
+        // Same reasoning as reading current.rank above: a plain rank-only
+        // PATCH (no explicit status) has to stay wherever the task actually,
+        // freshly, is - not wherever it was when this request was built.
+        // Resolving this from the pre-transaction requestedStatus instead
+        // used to let a concurrent status change get silently reverted: this
+        // call would still write the stale target column with no error.
+        const targetStatus = requestedStatus ?? current.status;
 
-        // 1. close the gap the task leaves in its old column. The task itself
-        //    is untouched: it sits at its current rank, and this only shifts
-        //    what's strictly after it.
-        await database.task.updateMany({
-          where: {
-            projectId: projectId,
-            status: current.status,
-            rank: { gt: current.rank },
-          },
-          data: { rank: { decrement: 1 } },
-        });
+        // 1. close the gap the task leaves in its old column. The task
+        //    itself is untouched: it sits at its current rank, and this
+        //    only shifts what's strictly after it.
+        await this.closeRankGap(
+          database,
+          projectId,
+          current.status,
+          current.rank
+        );
 
         // 2-3. clamp inside the target column as it stands WITHOUT this task
         //    (dropping past the last card appends instead of leaving a hole)
@@ -383,7 +426,7 @@ export class TasksService {
         const nextRank = await this.openRankSlot(
           database,
           projectId,
-          toStatus,
+          targetStatus,
           wantedRank,
           id
         );
@@ -391,10 +434,10 @@ export class TasksService {
         // 4. drop the task into the slot, with the rest of the PATCH's fields
         await database.task.update({
           where: { id: id },
-          data: { ...taskFields, status: toStatus, rank: nextRank },
+          data: { ...taskFields, status: targetStatus, rank: nextRank },
         });
 
-        return nextRank;
+        return { nextRank, targetStatus };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
@@ -404,8 +447,9 @@ export class TasksService {
     // tasksReducer.ts), so the acting client just re-applies its own move.
     this.realtimeService.emitToProject(projectId, "task:moved", {
       taskId: id,
-      toStatus,
-      toIndex: nextRank,
+      projectId: projectId,
+      toStatus: result.targetStatus,
+      toIndex: result.nextRank,
     });
   }
 

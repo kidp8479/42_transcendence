@@ -3,6 +3,7 @@
 // are only ever set through the assigneeIds array on CreateTaskDto/UpdateTaskDto, never their
 // own standalone endpoint (unlike ProjectMember, which needs one - see project-members module)
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -22,32 +23,42 @@ export class TaskAssigneeService {
   // first - but that check runs outside any transaction, so a membership
   // change landing in the gap would go undetected (same TOCTOU family as
   // the rank race in moveTask()). Re-checking fresh, inside this same
-  // transaction, is what actually closes it.
+  // transaction, is what actually closes it - Serializable, matching the
+  // other rank/membership transactions in tasks.service.ts, since the
+  // default ReadCommitted only guarantees each statement its own snapshot,
+  // not the whole transaction against a concurrent removal landing between
+  // the count and the insert.
   async replaceAssignees(
     taskId: string,
     projectId: string,
     userIds: string[]
   ): Promise<void> {
-    await this.prisma.transaction(async (transactionPrisma) => {
-      if (userIds.length > 0) {
-        const memberCount = await transactionPrisma.projectMember.count({
-          where: { projectId: projectId, userId: { in: userIds } },
-        });
-        if (memberCount !== userIds.length) {
-          throw new BadRequestException(
-            "assigneeIds must all be members of this project"
-          );
+    await this.prisma.transaction(
+      async (transactionPrisma) => {
+        if (userIds.length > 0) {
+          const memberCount = await transactionPrisma.projectMember.count({
+            where: { projectId: projectId, userId: { in: userIds } },
+          });
+          if (memberCount !== userIds.length) {
+            throw new BadRequestException(
+              "assigneeIds must all be members of this project"
+            );
+          }
         }
-      }
 
-      await transactionPrisma.taskAssignee.deleteMany({
-        where: { taskId: taskId },
-      });
-      if (userIds.length > 0) {
-        await transactionPrisma.taskAssignee.createMany({
-          data: userIds.map((userId) => ({ userId: userId, taskId: taskId })),
+        await transactionPrisma.taskAssignee.deleteMany({
+          where: { taskId: taskId },
         });
-      }
-    });
+        if (userIds.length > 0) {
+          await transactionPrisma.taskAssignee.createMany({
+            data: userIds.map((userId) => ({
+              userId: userId,
+              taskId: taskId,
+            })),
+          });
+        }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
   }
 }
