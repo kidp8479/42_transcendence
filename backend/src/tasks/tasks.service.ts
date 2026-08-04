@@ -219,12 +219,14 @@ export class TasksService {
       // drag (isMoving from a rank change alone) isn't news to anyone.
       // existingTask.assignees is who was assigned BEFORE this PATCH, not
       // whatever assigneeIds (if any) this same request also carries.
+      // Title: dto.title if this same PATCH also renamed it, otherwise the
+      // notification would quote the stale pre-update title.
       if (dto.status !== undefined && dto.status !== existingTask.status) {
         await this.notifyStatusChange(
           projectId,
           existingTask.assignees,
           userId,
-          existingTask.title,
+          dto.title ?? existingTask.title,
           nextStatus
         );
       }
@@ -241,12 +243,14 @@ export class TasksService {
         projectId,
         assigneeIds
       );
+      // dto.title if this same PATCH also renamed it, same reasoning as
+      // notifyStatusChange above.
       await this.notifyNewAssignees(
         projectId,
         existingTask.assignees.map((assignee) => assignee.id),
         assigneeIds,
         userId,
-        existingTask.title
+        dto.title ?? existingTask.title
       );
     }
 

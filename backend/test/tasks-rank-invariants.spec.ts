@@ -857,6 +857,45 @@ test("update() adding an assignee notifies only the newly added one", async () =
   assert.equal(notifications.created[0].userId, "user-c");
 });
 
+test("update() renaming and changing status in the same PATCH notifies with the new title", async () => {
+  const store = new FakeTaskStore();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { notifications });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+  taskA.assignees = [{ id: "user-b", username: "B", avatarUrl: null }];
+
+  await service.update(
+    taskA.id,
+    { status: TaskStatus.IN_PROGRESS, title: "A renamed" } as never,
+    projectId,
+    userId
+  );
+
+  assert.equal(notifications.created.length, 1);
+  assert.match(notifications.created[0].message, /"A renamed"/);
+});
+
+test("update() renaming and adding an assignee in the same PATCH notifies with the new title", async () => {
+  const store = new FakeTaskStore();
+  const notifications = createNotificationsSpy();
+  const service = createService(store, { notifications });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+
+  await service.update(
+    taskA.id,
+    { title: "A renamed", assigneeIds: ["user-c"] } as never,
+    projectId,
+    userId
+  );
+
+  assert.equal(notifications.created.length, 1);
+  assert.match(notifications.created[0].message, /"A renamed"/);
+});
+
 test("update() self-assigning sends no notification", async () => {
   const store = new FakeTaskStore();
   const notifications = createNotificationsSpy();
