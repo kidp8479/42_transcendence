@@ -46,6 +46,7 @@ export function MembersSection({
   const [isRemoving, setIsRemoving] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const { showToast } = useToast();
   const safeInvalidateRouter = useSafeRouterInvalidate();
 
@@ -195,6 +196,10 @@ export function MembersSection({
   // POST /api/projects/:projectId/members - adds a member by username.
   async function handleAddMember(event: FormEvent) {
     event.preventDefault();
+    if (isSubmittingMember) {
+      return;
+    }
+    setIsSubmittingMember(true);
     try {
       await addMember(projectId, {
         username,
@@ -211,6 +216,8 @@ export function MembersSection({
           error instanceof Error ? error.message : "Failed to add member",
         type: "error",
       });
+    } finally {
+      setIsSubmittingMember(false);
     }
   }
 
@@ -292,10 +299,10 @@ export function MembersSection({
                   type="submit"
                   color="none"
                   className="!h-9 !rounded-lg !bg-brand-500 !text-black hover:!bg-brand-600 inline-flex items-center gap-2"
-                  disabled={!username.trim()}
+                  disabled={!username.trim() || isSubmittingMember}
                 >
                   <FaUserPlus className="h-4 w-4" />
-                  Add
+                  {isSubmittingMember ? "Adding..." : "Add"}
                 </Button>
               </div>
             </form>
