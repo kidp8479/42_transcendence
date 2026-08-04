@@ -7,7 +7,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma, TaskStatus } from "@prisma/client";
-import { PrismaService } from "../prisma/prisma.service";
+import {
+  ApplicationDatabaseTransaction,
+  PrismaService,
+} from "../prisma/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -81,20 +84,13 @@ export class TasksService {
         // outside 0..columnLength would leave a hole in the 0..n-1 sequence.
         // CreateTaskDto's @Min(0) already rejects negatives over HTTP, but the
         // invariant shouldn't depend on a validation decorator staying put -
-        // moveTask() clamps the same way.
-        const columnLength = await database.task.count({
-          where: { projectId: projectId, status: dto.status },
-        });
-        const rank = Math.min(Math.max(dto.rank, 0), columnLength);
-
-        await database.task.updateMany({
-          where: {
-            projectId: projectId,
-            status: dto.status,
-            rank: { gte: rank },
-          },
-          data: { rank: { increment: 1 } },
-        });
+        // openRankSlot clamps the same way for moveTask().
+        const rank = await this.openRankSlot(
+          database,
+          projectId,
+          dto.status,
+          dto.rank
+        );
 
         return database.task.create({
           data: {
@@ -130,7 +126,9 @@ export class TasksService {
       );
     }
 
-    const created = await this.findById(task.id, projectId, userId);
+    // Membership already asserted at the top of create() - no need for
+    // findById()'s own second check.
+    const created = await this.getTaskOrThrow(task.id, projectId);
     this.realtimeService.emitToProject(projectId, "task:created", created);
     return created;
   }
@@ -152,6 +150,14 @@ export class TasksService {
   // that this task belongs to this project, 404s otherwise
   async findById(id: string, projectId: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
+    return this.getTaskOrThrow(id, projectId);
+  }
+
+  // The read half of findById, without the membership check - for the
+  // callers below that already asserted membership earlier in the same
+  // request (via findById's own access-guard call) and would otherwise
+  // re-run it a second time just to build their response.
+  private async getTaskOrThrow(id: string, projectId: string) {
     const task = await this.prisma.task.findFirst({
       where: { id: id, projectId: projectId },
       include: taskInclude,
@@ -240,7 +246,9 @@ export class TasksService {
       );
     }
 
-    const updated = await this.findById(id, projectId, userId);
+    // Membership already asserted by findById() at the top of update() -
+    // no need for a second check just to build the response.
+    const updated = await this.getTaskOrThrow(id, projectId);
     // A moving update already broadcast task:moved above - this covers the
     // rest (title/notes/priority/category/assignees with no status/rank
     // change). `changes` carries the whole task, same as the frontend's own
@@ -291,6 +299,44 @@ export class TasksService {
     return mapTask(task);
   }
 
+  // Shared by create() and moveTask(): clamps a wanted rank against the
+  // column's current length and shifts every row at or after it down to
+  // open a slot there - the same dense-0..n-1-preserving insertion either
+  // caller needs, just with or without an existing row to exclude.
+  // `excludeId` is the task being moved - still physically sitting in this
+  // column at its old rank while this runs, so it must not count toward the
+  // column length or get shifted by its own insertion. create() has no such
+  // row yet, so it's omitted there. `wantedRank` undefined means "append to
+  // the end", same convention moveTask's own doc comment describes.
+  private async openRankSlot(
+    database: ApplicationDatabaseTransaction,
+    projectId: string,
+    status: TaskStatus,
+    wantedRank: number | undefined,
+    excludeId?: string
+  ): Promise<number> {
+    const exclude = excludeId !== undefined ? { id: { not: excludeId } } : {};
+    const columnLength = await database.task.count({
+      where: { projectId: projectId, status: status, ...exclude },
+    });
+    const rank =
+      wantedRank === undefined
+        ? columnLength
+        : Math.min(Math.max(wantedRank, 0), columnLength);
+
+    await database.task.updateMany({
+      where: {
+        projectId: projectId,
+        status: status,
+        rank: { gte: rank },
+        ...exclude,
+      },
+      data: { rank: { increment: 1 } },
+    });
+
+    return rank;
+  }
+
   // Moves a task within or across status columns, keeping BOTH columns dense
   // 0..n-1 - the invariant the board's reducer (lib/tasksReducer.ts) assumes.
   //
@@ -339,31 +385,17 @@ export class TasksService {
           data: { rank: { decrement: 1 } },
         });
 
-        // 2. clamp inside the target column as it stands WITHOUT this task, so
-        //    dropping past the last card appends instead of leaving a hole.
-        const columnLength = await database.task.count({
-          where: {
-            projectId: projectId,
-            status: toStatus,
-            id: { not: id },
-          },
-        });
-        const nextRank =
-          wantedRank === undefined
-            ? columnLength
-            : Math.min(Math.max(wantedRank, 0), columnLength);
-
-        // 3. open a slot at that position. Excluding this task matters for a
+        // 2-3. clamp inside the target column as it stands WITHOUT this task
+        //    (dropping past the last card appends instead of leaving a hole)
+        //    and open a slot there - excluding this task matters for a
         //    same-column move, where it is still sitting in this column.
-        await database.task.updateMany({
-          where: {
-            projectId: projectId,
-            status: toStatus,
-            rank: { gte: nextRank },
-            id: { not: id },
-          },
-          data: { rank: { increment: 1 } },
-        });
+        const nextRank = await this.openRankSlot(
+          database,
+          projectId,
+          toStatus,
+          wantedRank,
+          id
+        );
 
         // 4. drop the task into the slot, with the rest of the PATCH's fields
         await database.task.update({
