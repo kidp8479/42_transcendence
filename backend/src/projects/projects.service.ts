@@ -235,13 +235,17 @@ export class ProjectsService {
   }
 
   // NOTE ON ROLES: deleting the project is a team-affecting, hard-to-undo action -
-  // decided with the team (see TR-66) that this needs an OWNER/ADMIN check, unlike most
+  // decided with the team (see TR-66) that this needs a role check, unlike most
   // other modules where any member can act freely (tasks, discovery blocks, etc.).
+  // OWNER-only, not OWNER/ADMIN: the frontend only ever offers "Delete project" to
+  // the OWNER (ProjectCard.tsx, DangerZoneSection.tsx) - an ADMIN gets "Leave
+  // project" instead - so the backend now matches that instead of allowing an
+  // ADMIN to delete via a direct API call with no corresponding UI affordance.
   async remove(id: string, userId: string) {
     const member = await this.assertMembership(id, userId);
-    if (member.role !== "OWNER" && member.role !== "ADMIN") {
+    if (member.role !== "OWNER") {
       throw new ForbiddenException(
-        "Only the project owner or admin can delete this project"
+        "Only the project owner can delete this project"
       );
     }
 

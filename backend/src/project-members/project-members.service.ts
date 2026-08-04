@@ -215,77 +215,85 @@ export class ProjectMembersService {
     });
   }
 
+  // wrapped in withProjectLock, same as removeMember - without it, two
+  // concurrent role-change requests (ex: an OWNER demoting this requester
+  // while this requester's own promote of someone else is still in flight)
+  // could both pass their permission check before either write commits.
   async updateMemberRole(
     projectId: string,
     userId: string,
     newRole: "ADMIN" | "MEMBER",
     requestingUserId: string
   ) {
-    // verify requester belongs to project
-    const requester = await this.projectsService.assertMembership(
-      projectId,
-      requestingUserId
-    );
-    // only OWNER and ADMIN can change roles
-    if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
-      throw new ForbiddenException(
-        "Only the project owner and admin can change member roles"
+    return this.realtimeService.withProjectLock(projectId, async () => {
+      // verify requester belongs to project
+      const requester = await this.projectsService.assertMembership(
+        projectId,
+        requestingUserId
       );
-    }
-    // verify target exists in project
-    const memberToUpdate = await this.projectsService.assertMembership(
-      projectId,
-      userId
-    );
-    // cannot change OWNER role
-    if (memberToUpdate.role === "OWNER") {
-      throw new ForbiddenException("Cannot change the project owner's role");
-    }
+      // only OWNER and ADMIN can change roles
+      if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
+        throw new ForbiddenException(
+          "Only the project owner and admin can change member roles"
+        );
+      }
+      // verify target exists in project
+      const memberToUpdate = await this.projectsService.assertMembership(
+        projectId,
+        userId
+      );
+      // cannot change OWNER role
+      if (memberToUpdate.role === "OWNER") {
+        throw new ForbiddenException("Cannot change the project owner's role");
+      }
 
-    // only OWNER can demote an ADMIN
-    if (
-      memberToUpdate.role === "ADMIN" &&
-      newRole === "MEMBER" &&
-      requester.role !== "OWNER"
-    ) {
-      throw new ForbiddenException("Only the project owner can demote admins");
-    }
+      // only OWNER can demote an ADMIN
+      if (
+        memberToUpdate.role === "ADMIN" &&
+        newRole === "MEMBER" &&
+        requester.role !== "OWNER"
+      ) {
+        throw new ForbiddenException(
+          "Only the project owner can demote admins"
+        );
+      }
 
-    if (memberToUpdate.role === newRole) {
-      throw new BadRequestException("Member already has this role");
-    }
+      if (memberToUpdate.role === newRole) {
+        throw new BadRequestException("Member already has this role");
+      }
 
-    // update role
-    const updateMember = await this.prisma.projectMember.update({
-      where: {
-        userId_projectId: {
-          userId,
-          projectId,
-        },
-      },
-      data: {
-        role: newRole,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-            campus: true,
+      // update role
+      const updateMember = await this.prisma.projectMember.update({
+        where: {
+          userId_projectId: {
+            userId,
+            projectId,
           },
         },
-      },
-    });
-    this.realtimeService.emitToProject(
-      projectId,
-      "project:member-role-changed",
-      {
-        userId,
+        data: {
+          role: newRole,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+              campus: true,
+            },
+          },
+        },
+      });
+      this.realtimeService.emitToProject(
         projectId,
-        role: newRole,
-      }
-    );
-    return updateMember;
+        "project:member-role-changed",
+        {
+          userId,
+          projectId,
+          role: newRole,
+        }
+      );
+      return updateMember;
+    });
   }
 }

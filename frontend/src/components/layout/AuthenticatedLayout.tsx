@@ -35,12 +35,14 @@ export function AuthenticatedLayout() {
     socket.on("project:updated", invalidate);
     socket.on("project:member-added", invalidate);
     socket.on("project:member-removed", invalidate);
+    socket.on("project:member-role-changed", invalidate);
     socket.on("project:deleted", invalidate);
 
     return () => {
       socket.off("project:updated", invalidate);
       socket.off("project:member-added", invalidate);
       socket.off("project:member-removed", invalidate);
+      socket.off("project:member-role-changed", invalidate);
       socket.off("project:deleted", invalidate);
     };
   }, [router]);
