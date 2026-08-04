@@ -86,10 +86,13 @@ export class ChatService {
 
     const deletedMessage = await this.prisma.chatMessage.delete({
       where: { id },
+      include: { user: { select: AUTHOR_SELECT } },
     });
-    this.realtimeService.emitToProject(projectId, "chat:deleted", {
-      id: deletedMessage.id,
-    });
+    // full message, not just {id}: the frontend's generic live-sync hook
+    // (useLiveItemSync) validates every event's payload against the same
+    // parser as create/findAll and reads projectId off it to scope updates
+    // to the conversation currently open - a bare {id} wouldn't parse.
+    this.realtimeService.emitToProject(projectId, "chat:deleted", deletedMessage);
     return deletedMessage;
   }
 }
