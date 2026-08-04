@@ -636,7 +636,7 @@ test("create() broadcasts task:created with the full mapped task", async () => {
   ]);
 });
 
-test("update() reordering within a column broadcasts task:moved and sends no notification", async () => {
+test("update() reordering within a column broadcasts task:moved and task:updated, sends no notification", async () => {
   const store = new FakeTaskStore();
   const realtime = createRealtimeSpy();
   const notifications = createNotificationsSpy();
@@ -655,7 +655,12 @@ test("update() reordering within a column broadcasts task:moved and sends no not
   realtime.emitted.length = 0; // drop the 2 task:created events from setup
   const taskA = store.rows.find((row) => row.title === "A")!;
 
-  await service.update(taskA.id, { rank: 1 } as never, projectId, userId);
+  const updated = await service.update(
+    taskA.id,
+    { rank: 1 } as never,
+    projectId,
+    userId
+  );
 
   assert.deepEqual(realtime.emitted, [
     {
@@ -663,11 +668,16 @@ test("update() reordering within a column broadcasts task:moved and sends no not
       event: "task:moved",
       payload: { taskId: taskA.id, toStatus: TaskStatus.TODO, toIndex: 1 },
     },
+    {
+      projectId,
+      event: "task:updated",
+      payload: { taskId: taskA.id, changes: updated },
+    },
   ]);
   assert.equal(notifications.created.length, 0);
 });
 
-test("update() moving a task to another column broadcasts task:moved and notifies the other assignees, excluding the mover", async () => {
+test("update() moving a task to another column broadcasts task:moved and task:updated, notifies the other assignees excluding the mover", async () => {
   const store = new FakeTaskStore();
   const realtime = createRealtimeSpy();
   const notifications = createNotificationsSpy();
@@ -681,7 +691,7 @@ test("update() moving a task to another column broadcasts task:moved and notifie
   ];
   realtime.emitted.length = 0;
 
-  await service.update(
+  const updated = await service.update(
     taskA.id,
     { status: TaskStatus.IN_PROGRESS } as never,
     projectId,
@@ -697,6 +707,11 @@ test("update() moving a task to another column broadcasts task:moved and notifie
         toStatus: TaskStatus.IN_PROGRESS,
         toIndex: 0,
       },
+    },
+    {
+      projectId,
+      event: "task:updated",
+      payload: { taskId: taskA.id, changes: updated },
     },
   ]);
   assert.equal(notifications.created.length, 1);
@@ -750,6 +765,43 @@ test("update() editing a field with no status/rank change broadcasts task:update
     },
   ]);
   assert.equal(notifications.created.length, 0);
+});
+
+test("update() moving a task AND editing a field in the same PATCH broadcasts both task:moved and task:updated", async () => {
+  const store = new FakeTaskStore();
+  const realtime = createRealtimeSpy();
+  const service = createService(store, { realtime });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+  realtime.emitted.length = 0;
+
+  const updated = await service.update(
+    taskA.id,
+    { status: TaskStatus.IN_PROGRESS, title: "A renamed" } as never,
+    projectId,
+    userId
+  );
+
+  // Without task:updated here, a client that only applies task:moved would
+  // move the card correctly but never see the renamed title.
+  assert.equal(updated.title, "A renamed");
+  assert.deepEqual(realtime.emitted, [
+    {
+      projectId,
+      event: "task:moved",
+      payload: {
+        taskId: taskA.id,
+        toStatus: TaskStatus.IN_PROGRESS,
+        toIndex: 0,
+      },
+    },
+    {
+      projectId,
+      event: "task:updated",
+      payload: { taskId: taskA.id, changes: updated },
+    },
+  ]);
 });
 
 test("remove() broadcasts task:deleted", async () => {

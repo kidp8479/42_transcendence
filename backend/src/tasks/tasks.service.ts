@@ -253,15 +253,16 @@ export class TasksService {
     // Membership already asserted by findById() at the top of update() -
     // no need for a second check just to build the response.
     const updated = await this.getTaskOrThrow(id, projectId);
-    // A moving update already broadcast task:moved above - this covers the
-    // rest (fields-only edits). changes carries the whole task, matching
-    // what the frontend's own local dispatch already sends after a save.
-    if (!isMoving) {
-      this.realtimeService.emitToProject(projectId, "task:updated", {
-        taskId: id,
-        changes: updated,
-      });
-    }
+    // Always emitted, moving or not: a single PATCH can change status/rank
+    // AND other fields (the drawer sends both together), and task:moved's
+    // payload only carries the position - without this, other clients would
+    // apply the move but miss the field changes. changes carries the whole
+    // task, matching what the frontend's own local dispatch already sends
+    // after a save.
+    this.realtimeService.emitToProject(projectId, "task:updated", {
+      taskId: id,
+      changes: updated,
+    });
     return updated;
   }
 
