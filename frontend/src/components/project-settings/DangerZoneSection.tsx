@@ -140,6 +140,7 @@ export function DangerZoneSection({
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder={projectName}
+              aria-label="Type project name to confirm deletion"
               color="none"
               theme={{
                 field: {

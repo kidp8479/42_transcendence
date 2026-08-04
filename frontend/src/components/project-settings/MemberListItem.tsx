@@ -75,6 +75,7 @@ export function MemberListItem({
           // components/projects/ProjectCard.tsx for why border-solid and
           // !border-surface-border both need to be spelled out locally.
           className="border-solid !border-surface-border dark:border-solid dark:!border-surface-border"
+          aria-label={`Manage ${username}`}
           label={
             <RiMoreLine className="h-4 w-4 text-text-secondary hover:text-text-primary" />
           }

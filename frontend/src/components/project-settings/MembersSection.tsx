@@ -295,6 +295,7 @@ export function MembersSection({
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Add member by username"
+                  aria-label="Username to add"
                   className="h-9 flex-1 rounded-md bg-surface-overlay px-3 text-sm text-text-primary placeholder:text-text-secondary"
                 />
 
