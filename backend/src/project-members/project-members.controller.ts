@@ -81,7 +81,8 @@ export class ProjectMembersController {
 
   // PATCH	/api/projects/:projectId/members/:userId
   //    => change a member role
-  //    => only OWNER can promote/demote members
+  //    => OWNER/ADMIN can promote/demote members
+  //    => only OWNER can demote an ADMIN
   //    => OWNER role cannot be assigned through this endpoint
   @Patch(":userId")
   updateMemberRole(
