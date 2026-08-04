@@ -43,6 +43,7 @@ export function MembersSection({
   const [memberToRemove, setMemberToRemove] = useState<ProjectMember | null>(
     null
   );
+  const [isRemoving, setIsRemoving] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const { showToast } = useToast();
@@ -93,7 +94,11 @@ export function MembersSection({
     });
 
     socket.on("project:member-added", (member: ProjectMember) => {
-      setMembers((currentMembers) => [...currentMembers, member]);
+      setMembers((currentMembers) =>
+        currentMembers.some((existing) => existing.id === member.id)
+          ? currentMembers
+          : [...currentMembers, member]
+      );
     });
 
     return () => {
@@ -134,10 +139,11 @@ export function MembersSection({
 
   // DELETE /api/projects/:projectId/members/:userId - removes memberToRemove.
   const handleConfirmRemove = async () => {
-    if (!memberToRemove) {
+    if (!memberToRemove || isRemoving) {
       return;
     }
 
+    setIsRemoving(true);
     try {
       await removeMember(projectId, memberToRemove.userId);
       showToast({
@@ -150,6 +156,8 @@ export function MembersSection({
         message: "Failed to remove member",
         type: "error",
       });
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -179,6 +187,10 @@ export function MembersSection({
   // except OWNER.
   async function handleLeaveProject() {
     if (!currentUserId) {
+      showToast({
+        type: "error",
+        message: "Still loading your session, please try again",
+      });
       return;
     }
     setIsLeaving(true);
@@ -280,6 +292,7 @@ export function MembersSection({
       </SettingsSection>
       <RemoveMemberModal
         member={memberToRemove}
+        isRemoving={isRemoving}
         onClose={handleCloseRemoveModal}
         onConfirm={handleConfirmRemove}
       />

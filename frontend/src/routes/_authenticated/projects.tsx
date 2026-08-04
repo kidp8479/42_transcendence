@@ -80,6 +80,10 @@ function ProjectsPage() {
 
   async function handleLeaveProject(project: Project) {
     if (!currentUserId) {
+      showToast({
+        type: "error",
+        message: "Still loading your session, please try again",
+      });
       return false;
     }
     try {

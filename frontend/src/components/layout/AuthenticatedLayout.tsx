@@ -11,20 +11,29 @@ export function AuthenticatedLayout() {
   useEffect(() => {
     const socket = getRealtimeSocket();
 
+    // sync: true on every listener below - router.invalidate() defaults to a
+    // BACKGROUND reload: the returned promise resolves immediately without
+    // waiting for the refetch to actually land in the store, and any
+    // non-redirect error from that background reload is silently swallowed
+    // (see TanStack Router's loadRouteMatch). That's fine for the acting
+    // user's own optimistic UI, but these listeners exist specifically so
+    // OTHER connected users see the change live - without sync: true, the
+    // sidebar/project list can go on showing stale data indefinitely with no
+    // error anywhere to explain why.
     socket.on("project:updated", () => {
-      router.invalidate();
+      router.invalidate({ sync: true });
     });
 
     socket.on("project:member-added", () => {
-      router.invalidate();
+      router.invalidate({ sync: true });
     });
 
     socket.on("project:member-removed", () => {
-      router.invalidate();
+      router.invalidate({ sync: true });
     });
 
     socket.on("project:deleted", () => {
-      router.invalidate();
+      router.invalidate({ sync: true });
     });
 
     return () => {

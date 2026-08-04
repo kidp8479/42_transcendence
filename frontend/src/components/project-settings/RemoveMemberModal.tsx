@@ -3,12 +3,14 @@ import type { ProjectMember } from "@/lib/projectMembersApi";
 
 interface RemoveMemberModalProps {
   member: ProjectMember | null;
+  isRemoving: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }
 
 export function RemoveMemberModal({
   member,
+  isRemoving,
   onClose,
   onConfirm,
 }: RemoveMemberModalProps) {
@@ -41,6 +43,7 @@ export function RemoveMemberModal({
           <Button
             color="none"
             onClick={onClose}
+            disabled={isRemoving}
             className="
 		      !h-8
 			  !px-3
@@ -64,6 +67,7 @@ export function RemoveMemberModal({
           <Button
             color="none"
             onClick={onConfirm}
+            disabled={isRemoving}
             className="
 			  !h-8
 			  !px-3
@@ -88,7 +92,7 @@ export function RemoveMemberModal({
 			  gap-2
 			"
           >
-            Remove
+            {isRemoving ? "Removing..." : "Remove"}
           </Button>
         </div>
       </div>

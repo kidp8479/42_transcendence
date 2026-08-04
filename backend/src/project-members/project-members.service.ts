@@ -161,11 +161,11 @@ export class ProjectMembersService {
           "Only the project owner or admin can remove members"
         );
       }
-      // verify target exists in project
-      const memberToRemove = await this.projectsService.assertMembership(
-        projectId,
-        userId
-      );
+      // verify target exists in project - self-removal already resolved this
+      // row as `requester` above, no need to fetch it again
+      const memberToRemove = isSelfRemoval
+        ? requester
+        : await this.projectsService.assertMembership(projectId, userId);
       // prevent removing the OWNER - every project has exactly one, enforced in
       // DB (TR-69). Also blocks an owner from "leaving" through this endpoint.
       if (memberToRemove.role === "OWNER") {
