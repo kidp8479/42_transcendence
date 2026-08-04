@@ -48,7 +48,9 @@ function ProjectsPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    getSession().then((session) => setCurrentUserId(session?.user.id ?? null));
+    getSession()
+      .then((session) => setCurrentUserId(session?.user.id ?? null))
+      .catch(() => setCurrentUserId(null));
   }, []);
 
   async function handleCreateProject(values: NewProjectFormValues) {
