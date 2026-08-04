@@ -1,6 +1,6 @@
 // ProjectStatusSection.tsx
 import { useState } from "react";
-import { Button } from "flowbite-react";
+import { Button, Tooltip } from "flowbite-react";
 import { SettingsActionRow } from "./SettingsActionRow";
 import { SettingsSection } from "./SettingsSection";
 import { HiOutlineArchive, HiOutlineShieldCheck } from "react-icons/hi";
@@ -108,7 +108,7 @@ export function ProjectStatusSection({
               : undefined
           }
         >
-          {canManageLifecycle && (
+          {canManageLifecycle ? (
             <Button
               onClick={handleToggleFinished}
               disabled={isUpdatingStatus}
@@ -132,6 +132,19 @@ export function ProjectStatusSection({
                   ? "Mark as unfinished"
                   : "Mark as finished"}
             </Button>
+          ) : (
+            // MEMBER can't act here - without this, the icon/title/description
+            // show up with nothing next to them, reading as broken instead of
+            // "not your role." Same slot as the real button, disabled, with a
+            // tooltip explaining why.
+            <Tooltip content="Only the project owner or admin can change this">
+              <Button
+                disabled
+                className="!border !border-surface-border !bg-surface-overlay !text-text-primary"
+              >
+                {isFinished ? "Mark as unfinished" : "Mark as finished"}
+              </Button>
+            </Tooltip>
           )}
         </SettingsActionRow>
 
@@ -145,7 +158,7 @@ export function ProjectStatusSection({
               : undefined
           }
         >
-          {canManageLifecycle && (
+          {canManageLifecycle ? (
             <Button
               onClick={handleToggleArchive}
               disabled={isUpdatingArchive}
@@ -173,6 +186,17 @@ export function ProjectStatusSection({
                   ? "Restore"
                   : "Archive"}
             </Button>
+          ) : (
+            // Same reasoning as the finished-toggle branch above.
+            <Tooltip content="Only the project owner or admin can change this">
+              <Button
+                disabled
+                className="!border !border-surface-border !bg-surface-overlay !text-text-primary inline-flex items-center gap-2"
+              >
+                <HiOutlineArchive className="h-4 w-4" />
+                {isArchived ? "Restore" : "Archive"}
+              </Button>
+            </Tooltip>
           )}
         </SettingsActionRow>
       </div>
