@@ -37,7 +37,7 @@ export class ProjectMembersController {
   // ENDPOINTS:
   // POST   /api/projects/:projectId/members
   //	=> add a user to a project
-  //    => expects a request body matching AddMemberDto (userId)
+  //    => expects a request body matching AddMemberDto (username)
   //    => projectId comes from the URL, not the body
   @Post()
   addMember(
