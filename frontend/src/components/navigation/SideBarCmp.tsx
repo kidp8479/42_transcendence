@@ -154,7 +154,7 @@ export function SideBarCmp() {
         className={`
           ${sidebarContainerClasses}
           ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
-          md:sticky md:top-[65px] md:min-h-[calc(100vh-133px)] md:self-stretch md:shrink-0 md:translate-x-0 md:transition-[width]
+          md:sticky md:top-[65px] md:h-[calc(100vh-133px)] md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
           ${isCollapsed ? "md:w-0" : "md:w-64"}
         `}
       >

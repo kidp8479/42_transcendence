@@ -15,13 +15,11 @@ export function AuthenticatedLayout() {
       the right, which without clipping stretched the page's scrollable area
       and caused an unwanted horizontal scrollbar.
       This row and <main> have no explicit height of their own - on desktop
-      the sidebar's md:min-h-[calc(100vh-133px)] + md:self-stretch give this
-      flex row a floor of one viewport (matching the header/footer it sits
-      between), but let it grow taller to match whatever <main>'s real content
-      needs (e.g. a long Kanban board), so the sidebar's own panel always
-      spans the row's full height instead of stopping short and leaving a
-      gap once the page scrolls past one viewport. Below md nothing bounds
-      it and the page scrolls the normal way regardless. */}
+      the sidebar's own h-[calc(100vh-133px)] + sticky + self-start is what
+      keeps it pinned while the page scrolls (self-stretch was tried to also
+      close its cosmetic bottom gap, but that made it exactly as tall as its
+      container, leaving sticky no room to float - reverted, pinning matters
+      more). Below md nothing bounds this row, page scrolls normally. */}
       <main className="scrollbar-thin-surface relative min-w-0 flex-1 min-h-0 overflow-x-hidden">
         <Outlet />
       </main>
