@@ -114,8 +114,8 @@ export function KanbanColumn({
                     ? (categoriesById.get(task.categoryId) ?? null)
                     : null
                 }
-                onOpen={() => onOpenTask(task.id)}
-                onDelete={() => onDeleteTask(task.id)}
+                onOpen={onOpenTask}
+                onDelete={onDeleteTask}
               />
             ))
           )}

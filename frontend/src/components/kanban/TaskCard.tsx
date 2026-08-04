@@ -20,7 +20,7 @@
 // DragOverlay (isOverlay): that copy must not register itself as a sortable
 // (it would collide with the real card, which keeps its place in the column
 // at reduced opacity while the overlay follows the pointer).
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import {
   Button,
   Dropdown,
@@ -47,10 +47,14 @@ interface TaskCardProps {
   task: Task;
   // resolved by the parent from task.categoryId (the route owns data joining)
   category: TaskCategory | null;
-  onOpen: () => void;
+  // Takes the id, not pre-bound: KanbanColumn passes these straight through
+  // from the route without wrapping a new closure per card, so this
+  // component's own React.memo below actually holds when unrelated cards
+  // change (a realtime edit on one card no longer re-renders every other).
+  onOpen: (taskId: string) => void;
   // resolves to true once the task is really gone - the card only leaves its
   // confirmation state then, so a failed delete keeps the confirm open
-  onDelete: () => Promise<boolean>;
+  onDelete: (taskId: string) => Promise<boolean>;
   isOverlay?: boolean;
 }
 
@@ -61,7 +65,10 @@ const roundedDropdownItemTheme = {
   base: "rounded-md",
 };
 
-export function TaskCard({
+// Memoized: KanbanColumn now passes stable onOpen/onDelete straight through
+// from the route (see their own comments), so a card only re-renders when
+// its own props actually change - not on every unrelated realtime update.
+export const TaskCard = memo(function TaskCard({
   task,
   category,
   onOpen,
@@ -118,7 +125,7 @@ export function TaskCard({
   async function handleConfirmDelete() {
     setIsDeleting(true);
     try {
-      if (await onDelete()) {
+      if (await onDelete(task.id)) {
         setIsConfirmingDelete(false);
       }
     } finally {
@@ -188,7 +195,7 @@ export function TaskCard({
       style={sortable_style}
       {...(isOverlay ? {} : attributes)}
       {...(isOverlay ? {} : listeners)}
-      onClick={onOpen}
+      onClick={() => onOpen(task.id)}
       // Neutral at rest; hovering reveals the CATEGORY's colour on the border,
       // which is the card's only tie to its category besides the badge. Nothing
       // here depends on the task's status - the column already states it.
@@ -229,7 +236,7 @@ export function TaskCard({
                 <DropdownItem
                   icon={HiOutlinePencil}
                   theme={roundedDropdownItemTheme}
-                  onClick={onOpen}
+                  onClick={() => onOpen(task.id)}
                 >
                   Edit
                 </DropdownItem>
@@ -263,4 +270,4 @@ export function TaskCard({
       <TaskAssignees assignees={task.assignees} />
     </div>
   );
-}
+});

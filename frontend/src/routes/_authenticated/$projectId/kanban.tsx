@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { KanbanCardDrawer } from "@/components/drawers/kanban/KanbanCardDrawer";
@@ -130,17 +130,27 @@ function KanbanPage() {
   // like drawer.target.mode inside a callback, only a plain const.
   const drawer_target = drawer.target;
 
-  function openDrawer(target: DrawerTarget) {
+  // Kept fresh every render, read from inside the stable callbacks below
+  // instead of closing over `tasks`/`drawer_target` directly - otherwise
+  // those callbacks (and anything memoized against their identity, like
+  // TaskCard) would get a new reference on every board update, which now
+  // includes every realtime broadcast, not just this client's own edits.
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const drawerTargetRef = useRef(drawer_target);
+  drawerTargetRef.current = drawer_target;
+
+  const openDrawer = useCallback((target: DrawerTarget) => {
     setDrawer((current) => ({
       target,
       isOpen: true,
       session: current.session + 1,
     }));
-  }
+  }, []);
 
-  function closeDrawer() {
+  const closeDrawer = useCallback(() => {
     setDrawer((current) => ({ ...current, isOpen: false }));
-  }
+  }, []);
 
   // Live board sync: remote broadcasts from tasks.service.ts's
   // emitToProject calls dispatch into the same reducer as local edits, same
@@ -148,23 +158,32 @@ function KanbanPage() {
   // exclusion server-side, so this client's own actions echo back too -
   // every action tasksReducer.ts handles is idempotent against that.
   //
-  // Empty dep array like discovery.tsx's: the handlers below only call
-  // dispatch/setDrawer (both stable setters) via a functional updater, so
-  // they never need a fresh closure over `tasks`/`drawer` to read the
-  // latest state.
+  // projectId in deps (unlike discovery.tsx's empty array): the handlers
+  // below now filter events by it, and a stale closure would silently drop
+  // every future event if this route ever re-rendered with a new project id
+  // without remounting. dispatch/setDrawer are still stable setters, so
+  // that's the only value actually needed here.
   useEffect(() => {
     const socket = getRealtimeSocket();
 
+    // A socket joins every project room a user is a MEMBER of, not just the
+    // one this page is showing - without the projectId check in each
+    // handler below, an event from an unrelated project (open in another
+    // tab, or just one you belong to) would corrupt this board.
     function handleTaskCreated(payload: unknown) {
       const task = parseTask(payload);
-      if (task === null) {
+      if (task === null || task.projectId !== projectId) {
         return;
       }
       dispatch({ type: "task_created", task });
     }
 
     function handleTaskUpdated(payload: unknown) {
-      if (!isRecord(payload) || typeof payload.taskId !== "string") {
+      if (
+        !isRecord(payload) ||
+        typeof payload.taskId !== "string" ||
+        payload.projectId !== projectId
+      ) {
         return;
       }
       const changes = parseTask(payload.changes);
@@ -178,6 +197,7 @@ function KanbanPage() {
       if (
         !isRecord(payload) ||
         typeof payload.taskId !== "string" ||
+        payload.projectId !== projectId ||
         typeof payload.toStatus !== "string" ||
         !STATUS_ORDER.includes(payload.toStatus as TaskStatus) ||
         typeof payload.toIndex !== "number"
@@ -193,7 +213,11 @@ function KanbanPage() {
     }
 
     function handleTaskDeleted(payload: unknown) {
-      if (!isRecord(payload) || typeof payload.taskId !== "string") {
+      if (
+        !isRecord(payload) ||
+        typeof payload.taskId !== "string" ||
+        payload.projectId !== projectId
+      ) {
         return;
       }
       const taskId = payload.taskId;
@@ -219,7 +243,7 @@ function KanbanPage() {
       socket.off("task:moved", handleTaskMoved);
       socket.off("task:deleted", handleTaskDeleted);
     };
-  }, []);
+  }, [projectId]);
 
   // Local-only reposition, fired by the board on every column the card crosses
   // mid-drag. Nothing is persisted here: the drop does that, once.
@@ -277,47 +301,65 @@ function KanbanPage() {
 
   // Optimistic too: the card is already behind an inline confirmation, so
   // making it linger after the user confirmed would read as a broken button.
-  async function handleDeleteTask(taskId: string): Promise<boolean> {
-    // The card itself, not a snapshot of the whole board - see the rollback below.
-    const previous_task = tasks.find((current) => current.id === taskId);
-    if (previous_task === undefined) {
-      return false;
-    }
+  // Reads tasksRef/drawerTargetRef, not tasks/drawer_target directly, so
+  // this callback's own identity stays stable - see the refs' own comment.
+  const handleDeleteTask = useCallback(
+    async (taskId: string): Promise<boolean> => {
+      // The card itself, not a snapshot of the whole board - see the rollback below.
+      const previous_task = tasksRef.current.find(
+        (current) => current.id === taskId
+      );
+      if (previous_task === undefined) {
+        return false;
+      }
 
-    dispatch({ type: "task_deleted", taskId });
-    // The drawer no longer unmounts when it closes, so it can't be left
-    // pointing at a task that just disappeared - it would render an empty form.
-    if (drawer_target.mode === "edit" && drawer_target.taskId === taskId) {
-      closeDrawer();
-    }
+      dispatch({ type: "task_deleted", taskId });
+      // The drawer no longer unmounts when it closes, so it can't be left
+      // pointing at a task that just disappeared - it would render an empty form.
+      const current_drawer_target = drawerTargetRef.current;
+      if (
+        current_drawer_target.mode === "edit" &&
+        current_drawer_target.taskId === taskId
+      ) {
+        closeDrawer();
+      }
 
-    try {
-      await deleteTask(projectId, taskId);
-    } catch (error) {
-      showToast({
-        type: "error",
-        message: errorMessage(error, "Failed to delete task"),
-      });
-      // Put THIS card back, rather than reloading the board from a pre-delete
-      // snapshot: that snapshot also predates anything that succeeded while the
-      // delete was in flight, so restoring it would silently revert a move the
-      // server had already accepted, with no error shown for it.
-      // Two dispatches, because task_created alone appends the card and re-sorts
-      // by rank - and deleting already pulled its old neighbour up to the freed
-      // rank, so the restored card ties with it and lands one slot too low.
-      // task_moved then splices it back at the exact index.
-      dispatch({ type: "task_created", task: previous_task });
-      dispatch({
-        type: "task_moved",
-        taskId,
-        toStatus: previous_task.status,
-        toIndex: previous_task.rank,
-      });
-      return false;
-    }
-    showToast({ type: "success", message: "Task deleted" });
-    return true;
-  }
+      try {
+        await deleteTask(projectId, taskId);
+      } catch (error) {
+        showToast({
+          type: "error",
+          message: errorMessage(error, "Failed to delete task"),
+        });
+        // Put THIS card back, rather than reloading the board from a pre-delete
+        // snapshot: that snapshot also predates anything that succeeded while the
+        // delete was in flight, so restoring it would silently revert a move the
+        // server had already accepted, with no error shown for it.
+        // Two dispatches, because task_created alone appends the card and re-sorts
+        // by rank - and deleting already pulled its old neighbour up to the freed
+        // rank, so the restored card ties with it and lands one slot too low.
+        // task_moved then splices it back at the exact index.
+        dispatch({ type: "task_created", task: previous_task });
+        dispatch({
+          type: "task_moved",
+          taskId,
+          toStatus: previous_task.status,
+          toIndex: previous_task.rank,
+        });
+        return false;
+      }
+      showToast({ type: "success", message: "Task deleted" });
+      return true;
+    },
+    [projectId, dispatch, showToast, closeDrawer]
+  );
+
+  // Stable for the same reason as handleDeleteTask above - passed straight
+  // through KanbanBoard/KanbanColumn to every TaskCard's onOpen.
+  const handleOpenTask = useCallback(
+    (taskId: string) => openDrawer({ mode: "edit", taskId }),
+    [openDrawer]
+  );
 
   // NOT optimistic, unlike the two above: a create has no id until the server
   // answers, and on failure the drawer has to stay open with the user's input
@@ -426,6 +468,19 @@ function KanbanPage() {
           });
         }
       } catch (error) {
+        // Same reasoning as handleMoveTask's 409 branch: a serialization
+        // conflict means the board moved under this edit, so the open
+        // draft is stale - reload instead of leaving it open showing data
+        // that no longer matches the server.
+        if (error instanceof ApiError && error.status === 409) {
+          showToast({
+            type: "error",
+            message: "Task changed while you were editing, reloading",
+          });
+          await safeInvalidateRouter();
+          closeDrawer();
+          return;
+        }
         showToast({
           type: "error",
           message: errorMessage(error, "Failed to save changes"),
@@ -465,7 +520,7 @@ function KanbanPage() {
         onPreviewMove={handlePreviewMove}
         onMoveTask={handleMoveTask}
         onAddTask={(status) => openDrawer({ mode: "create", status })}
-        onOpenTask={(taskId) => openDrawer({ mode: "edit", taskId })}
+        onOpenTask={handleOpenTask}
         onDeleteTask={handleDeleteTask}
       />
 
