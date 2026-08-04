@@ -40,8 +40,17 @@ export function ProjectLayout() {
           The SCROLLER fills it and owns the overflow, so a long tab (Discovery,
           Evaluation Checklist) scrolls inside the tab area. A tab that wants to
           fill the space instead renders h-full and never overflows this, which
-          is how the Kanban columns end up scrolling on their own. */}
-      <div className="relative isolate min-h-0 flex-1">
+          is how the Kanban columns end up scrolling on their own.
+
+          z-40, not left at auto: `isolate` makes this anchor its own stacking
+          context, so a drawer's own z-40 (claimed INSIDE it) no longer competes
+          with anything outside - the anchor as a whole does now, per its own
+          (previously unstated) z-index, and lost to the mobile sidebar's z-30
+          backdrop (see SideBarCmp.tsx's own comment on this same tradeoff).
+          z-40 matches the drawer's own value and sits below the header/sidebar's
+          z-50, so an open drawer still beats that backdrop without covering
+          the header or an open sidebar. */}
+      <div className="relative isolate z-40 min-h-0 flex-1">
         <div className="scrollbar-thin-surface h-full overflow-y-auto p-6">
           <Outlet />
         </div>
