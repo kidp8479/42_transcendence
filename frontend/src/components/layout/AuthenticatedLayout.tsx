@@ -13,12 +13,15 @@ export function AuthenticatedLayout() {
       Project tabs bring their own bounded scroller (ProjectLayout).
       overflow-x-hidden: a closed drawer still sits translated off-screen to
       the right, which without clipping stretched the page's scrollable area
-      and caused an unwanted horizontal scrollbar. It also makes overflow-y
-      compute to auto, which is what lets this scroll at all - but only once the
-      box has a bounded height, and the shell gives it none (__root.tsx is
-      min-h-screen, a floor rather than a height). On desktop that height comes
-      from the sidebar's md:h-screen forcing this flex row to 100vh; below md
-      nothing bounds it and the page scrolls instead. */}
+      and caused an unwanted horizontal scrollbar.
+      This row and <main> have no explicit height of their own - on desktop
+      the sidebar's md:min-h-[calc(100vh-133px)] + md:self-stretch give this
+      flex row a floor of one viewport (matching the header/footer it sits
+      between), but let it grow taller to match whatever <main>'s real content
+      needs (e.g. a long Kanban board), so the sidebar's own panel always
+      spans the row's full height instead of stopping short and leaving a
+      gap once the page scrolls past one viewport. Below md nothing bounds
+      it and the page scrolls the normal way regardless. */}
       <main className="scrollbar-thin-surface relative min-w-0 flex-1 min-h-0 overflow-x-hidden">
         <Outlet />
       </main>

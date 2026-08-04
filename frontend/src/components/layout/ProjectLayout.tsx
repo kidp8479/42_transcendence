@@ -30,17 +30,14 @@ export function ProjectLayout() {
         <ProjectTabs />
       </div>
       {/* Split in two on purpose.
-          The ANCHOR is bounded and carries no padding: min-h-0 is what stops a
-          flex item from growing to its content's height (its default min-height
-          is auto), which is what used to push a tall tab past the viewport and
-          make the whole page scroll - title and tabs included. `relative` makes
-          it the containing block for the drawers (DrawerShell is absolute), so
-          they span exactly from the tab bar's rule down to the footer without
-          measuring anything, and no longer scroll away with the content.
-          The SCROLLER fills it and owns the overflow, so a long tab (Discovery,
-          Evaluation Checklist) scrolls inside the tab area. A tab that wants to
-          fill the space instead renders h-full and never overflows this, which
-          is how the Kanban columns end up scrolling on their own.
+          The ANCHOR carries no padding: min-h-0 keeps title/tabs from being
+          pushed along by a tall tab. `relative` makes it the containing block
+          for the drawers (DrawerShell is absolute), spanning tab bar to footer.
+          Internal (non-page) scrolling only happens for tabs short enough to
+          fit main's real rendered height - main has no hard cap (see
+          AuthenticatedLayout.tsx), so a taller tab just grows the page and the
+          document scrolls, same as any page without this wrapper. Kanban's own
+          per-column scrolling is separate and unrelated to this anchor.
 
           z-40, not left at auto: `isolate` makes this anchor its own stacking
           context, so a drawer's own z-40 (claimed INSIDE it) no longer competes
