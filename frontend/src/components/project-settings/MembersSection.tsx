@@ -52,10 +52,13 @@ export function MembersSection({
 
   const loadMembers = useCallback(async () => {
     try {
-      const session = await getSession();
+      // independent of each other, so they run in parallel (Promise.all) -
+      // same pattern as discovery.tsx's own independent fetches
+      const [session, data] = await Promise.all([
+        getSession(),
+        getMembers(projectId),
+      ]);
       setCurrentUserId(session?.user.id ?? null);
-
-      const data = await getMembers(projectId);
       setMembers(data);
     } catch {
       showToast({

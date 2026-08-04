@@ -219,6 +219,22 @@ export class ProjectMembersService {
           },
         },
       });
+      // TaskAssignee/CalendarAssignee only cascade-delete on User deletion,
+      // not on a member leaving one project - without this, their rows for
+      // this project's tasks/events would survive pointing at a non-member,
+      // and any later PATCH resending that id would be rejected by
+      // assertAssigneesAreProjectMembers with no way to clean it up from
+      // that side. Scoped through the task/event relation, not a bare
+      // userId match, so this only touches assignments in THIS project -
+      // the user may still be a legitimate assignee elsewhere.
+      await Promise.all([
+        this.prisma.taskAssignee.deleteMany({
+          where: { userId, task: { projectId } },
+        }),
+        this.prisma.calendarAssignee.deleteMany({
+          where: { userId, calendarEvent: { projectId } },
+        }),
+      ]);
       // Tells the rest of the team, plus the kicked user themselves (not on
       // a self-removal - no need to tell someone they left when they're the
       // one who just did it). Runs after the delete, so this query of

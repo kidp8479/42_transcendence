@@ -71,6 +71,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.currentClient().calendarAssignee;
   }
 
+  get taskAssignee(): PrismaClient["taskAssignee"] {
+    return this.currentClient().taskAssignee;
+  }
+
   get notification(): PrismaClient["notification"] {
     return this.currentClient().notification;
   }
