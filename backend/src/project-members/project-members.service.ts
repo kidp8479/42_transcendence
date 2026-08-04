@@ -33,6 +33,22 @@ export class ProjectMembersService {
   // team (see TR-66) that role checks only matter for Project + ProjectMember management,
   // not everyday content (tasks, discovery blocks, etc.)
 
+  // Shared by removeMember and updateMemberRole: an ADMIN can act on a
+  // MEMBER, but only the OWNER can act on a fellow ADMIN (TR-80's
+  // cross-branch review - without this, any two admins could remove or
+  // demote each other). Each call site is responsible for its own
+  // exemptions (ex: removeMember's self-removal, updateMemberRole's no-op
+  // role check) before calling this.
+  private assertOwnerRequiredForAdminTarget(
+    targetRole: "OWNER" | "ADMIN" | "MEMBER",
+    requesterRole: "OWNER" | "ADMIN" | "MEMBER",
+    action: string
+  ): void {
+    if (targetRole === "ADMIN" && requesterRole !== "OWNER") {
+      throw new ForbiddenException(`Only the project owner can ${action}`);
+    }
+  }
+
   // must also throw (ex: ForbiddenException) if requester.role is neither "OWNER" nor "ADMIN"
   // insert a new row in the ProjectMember table (link a user to a project)
   // wrapped in withProjectLock, same as removeMember/updateMemberRole -
@@ -179,17 +195,12 @@ export class ProjectMembersService {
       if (memberToRemove.role === "OWNER") {
         throw new ForbiddenException("Cannot remove the project owner");
       }
-      // an ADMIN can remove a MEMBER, but not a fellow ADMIN - only the OWNER
-      // can remove an ADMIN (flagged in TR-80's cross-branch review: without
-      // this, any two admins could remove each other). Doesn't apply when an
-      // admin is removing themselves.
-      if (
-        !isSelfRemoval &&
-        memberToRemove.role === "ADMIN" &&
-        requester.role !== "OWNER"
-      ) {
-        throw new ForbiddenException(
-          "Only the project owner can remove an admin"
+      // doesn't apply when an admin is removing themselves
+      if (!isSelfRemoval) {
+        this.assertOwnerRequiredForAdminTarget(
+          memberToRemove.role,
+          requester.role,
+          "remove an admin"
         );
       }
       // KNOWN GAP (TR-B): this deletes the membership row and nothing else.
@@ -295,14 +306,11 @@ export class ProjectMembersService {
         throw new ForbiddenException("Cannot change the project owner's role");
       }
 
-      // only OWNER can demote an ADMIN
-      if (
-        memberToUpdate.role === "ADMIN" &&
-        newRole === "MEMBER" &&
-        requester.role !== "OWNER"
-      ) {
-        throw new ForbiddenException(
-          "Only the project owner can demote admins"
+      if (newRole === "MEMBER") {
+        this.assertOwnerRequiredForAdminTarget(
+          memberToUpdate.role,
+          requester.role,
+          "demote admins"
         );
       }
 
