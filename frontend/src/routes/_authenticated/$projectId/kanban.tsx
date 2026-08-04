@@ -368,20 +368,29 @@ function KanbanPage() {
       // mean to change". It matters most for assigneeIds, which REPLACES the whole
       // set: an untouched member list is now simply not sent.
       const updates: UpdateTaskBody = {};
-      if (draft.title !== initial_draft.title) {
-        updates.title = draft.title;
+
+      function setIfChanged<K extends keyof UpdateTaskBody>(
+        key: K,
+        current: UpdateTaskBody[K],
+        previous: UpdateTaskBody[K]
+      ) {
+        if (current !== previous) {
+          updates[key] = current;
+        }
       }
+
+      // categoryId and assigneeIds stay their own explicit checks instead of
+      // going through setIfChanged: categoryId is `string | null` on the
+      // draft but `string | undefined` on UpdateTaskBody (draft.categoryId
+      // is narrowed non-null by the guard above, initial_draft.categoryId
+      // isn't), and assigneeIds needs set-equality (sameAssignees), not
+      // reference/primitive comparison.
+      setIfChanged("title", draft.title, initial_draft.title);
+      setIfChanged("status", draft.status, initial_draft.status);
+      setIfChanged("priority", draft.priority, initial_draft.priority);
+      setIfChanged("notes", draft.notes, initial_draft.notes);
       if (draft.categoryId !== initial_draft.categoryId) {
         updates.categoryId = draft.categoryId;
-      }
-      if (draft.status !== initial_draft.status) {
-        updates.status = draft.status;
-      }
-      if (draft.priority !== initial_draft.priority) {
-        updates.priority = draft.priority;
-      }
-      if (draft.notes !== initial_draft.notes) {
-        updates.notes = draft.notes;
       }
       if (!sameAssignees(draft.assigneeIds, initial_draft.assigneeIds)) {
         updates.assigneeIds = draft.assigneeIds;
@@ -396,9 +405,32 @@ function KanbanPage() {
 
       try {
         const updated = await updateTask(projectId, taskId, updates);
-        // The whole task from the server, not a hand-built patch: it carries
-        // the resolved assignees and any rank the server reshuffled.
-        dispatch({ type: "task_updated", taskId, changes: updated });
+        // Split in two rather than one task_updated carrying the whole
+        // response: status/rank are deliberately left out of this dispatch
+        // and applied separately below via task_moved when they changed -
+        // the exact same action type (and shape) a remote client gets for
+        // this identical change over the socket, so both converge on
+        // task_moved's own reindex logic instead of two independently
+        // written ones that happen to agree today.
+        dispatch({
+          type: "task_updated",
+          taskId,
+          changes: {
+            title: updated.title,
+            categoryId: updated.categoryId,
+            priority: updated.priority,
+            notes: updated.notes,
+            assignees: updated.assignees,
+          },
+        });
+        if (updates.status !== undefined) {
+          dispatch({
+            type: "task_moved",
+            taskId,
+            toStatus: updated.status,
+            toIndex: updated.rank,
+          });
+        }
       } catch (error) {
         console.error("Failed to update task", error);
         showToast({
