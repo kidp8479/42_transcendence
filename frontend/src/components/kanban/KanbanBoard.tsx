@@ -79,6 +79,22 @@ export function KanbanBoard({
     [categories]
   );
 
+  // resolveDropTarget/columnIndexOf call this on every dragover tick (and
+  // the render loop once per column), each a filter+sort over the whole
+  // board - cheap for a handful of tasks, but no reason to redo the work
+  // every pointer-move instead of once per actual task-list change.
+  const columns_by_status = useMemo(() => {
+    const columns = new Map<TaskStatus, Task[]>();
+    for (const status of STATUS_ORDER) {
+      columns.set(status, selectColumnTasks(tasks, status));
+    }
+    return columns;
+  }, [tasks]);
+
+  function columnTasks(status: TaskStatus): Task[] {
+    return columns_by_status.get(status) ?? [];
+  }
+
   // An 8px activation distance keeps plain clicks (open the drawer) from
   // starting a drag; the keyboard sensor makes cards draggable without a
   // pointer (pick up with Space/Enter, move with arrows).
@@ -132,9 +148,8 @@ export function KanbanBoard({
     if (over_status !== undefined) {
       return {
         status: over_status,
-        index: selectColumnTasks(tasks, over_status).filter(
-          (task) => task.id !== active_id
-        ).length,
+        index: columnTasks(over_status).filter((task) => task.id !== active_id)
+          .length,
       };
     }
     const over_task = tasks.find((task) => task.id === over_id);
@@ -154,7 +169,7 @@ export function KanbanBoard({
         index: columnIndexOf(active_id, over_task.status),
       };
     }
-    const column = selectColumnTasks(tasks, over_task.status).filter(
+    const column = columnTasks(over_task.status).filter(
       (task) => task.id !== active_id
     );
     const over_index = column.findIndex((task) => task.id === over_task.id);
@@ -175,9 +190,7 @@ export function KanbanBoard({
   );
 
   function columnIndexOf(taskId: string, status: TaskStatus): number {
-    return selectColumnTasks(tasks, status).findIndex(
-      (task) => task.id === taskId
-    );
+    return columnTasks(status).findIndex((task) => task.id === taskId);
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -330,7 +343,7 @@ export function KanbanBoard({
           <KanbanColumn
             key={status}
             status={status}
-            tasks={selectColumnTasks(tasks, status)}
+            tasks={columnTasks(status)}
             categoriesById={categories_by_id}
             onAddTask={() => onAddTask(status)}
             onOpenTask={onOpenTask}
