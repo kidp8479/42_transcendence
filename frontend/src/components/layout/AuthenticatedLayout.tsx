@@ -20,27 +20,28 @@ export function AuthenticatedLayout() {
     // OTHER connected users see the change live - without sync: true, the
     // sidebar/project list can go on showing stale data indefinitely with no
     // error anywhere to explain why.
-    socket.on("project:updated", () => {
+    const invalidate = () => {
       router.invalidate({ sync: true });
-    });
+    };
 
-    socket.on("project:member-added", () => {
-      router.invalidate({ sync: true });
-    });
-
-    socket.on("project:member-removed", () => {
-      router.invalidate({ sync: true });
-    });
-
-    socket.on("project:deleted", () => {
-      router.invalidate({ sync: true });
-    });
+    // Named handler + socket.off(event, handler) below, not socket.off(event):
+    // getRealtimeSocket() is a shared singleton - other components (e.g.
+    // MembersSection) register their own listeners for these same event names
+    // on the same socket. socket.off(event) with no handler removes EVERY
+    // listener for that event, not just this component's, so it was silently
+    // unregistering these listeners the moment MembersSection unmounted -
+    // this component itself never remounts, so once that happened, cross-user
+    // sync stayed broken for the rest of the session with zero error anywhere.
+    socket.on("project:updated", invalidate);
+    socket.on("project:member-added", invalidate);
+    socket.on("project:member-removed", invalidate);
+    socket.on("project:deleted", invalidate);
 
     return () => {
-      socket.off("project:updated");
-      socket.off("project:member-added");
-      socket.off("project:member-removed");
-      socket.off("project:deleted");
+      socket.off("project:updated", invalidate);
+      socket.off("project:member-added", invalidate);
+      socket.off("project:member-removed", invalidate);
+      socket.off("project:deleted", invalidate);
     };
   }, [router]);
 

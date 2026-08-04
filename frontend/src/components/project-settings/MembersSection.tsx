@@ -71,40 +71,51 @@ export function MembersSection({
   useEffect(() => {
     const socket = getRealtimeSocket();
 
-    socket.on(
-      "project:member-role-changed",
-      (data: { userId: string; role: "OWNER" | "ADMIN" | "MEMBER" }) => {
-        setMembers((currentMembers) =>
-          currentMembers.map((member) =>
-            member.userId === data.userId
-              ? {
-                  ...member,
-                  role: data.role,
-                }
-              : member
-          )
-        );
-      }
-    );
+    const handleMemberRoleChanged = (data: {
+      userId: string;
+      role: "OWNER" | "ADMIN" | "MEMBER";
+    }) => {
+      setMembers((currentMembers) =>
+        currentMembers.map((member) =>
+          member.userId === data.userId
+            ? {
+                ...member,
+                role: data.role,
+              }
+            : member
+        )
+      );
+    };
 
-    socket.on("project:member-removed", (data: { userId: string }) => {
+    const handleMemberRemoved = (data: { userId: string }) => {
       setMembers((currentMembers) =>
         currentMembers.filter((member) => member.userId !== data.userId)
       );
-    });
+    };
 
-    socket.on("project:member-added", (member: ProjectMember) => {
+    const handleMemberAdded = (member: ProjectMember) => {
       setMembers((currentMembers) =>
         currentMembers.some((existing) => existing.id === member.id)
           ? currentMembers
           : [...currentMembers, member]
       );
-    });
+    };
+
+    // Named handlers + socket.off(event, handler) below, not socket.off(event):
+    // getRealtimeSocket() is a shared singleton - AuthenticatedLayout also
+    // listens for "project:member-added"/"project:member-removed" on this
+    // same socket for cross-user sidebar sync. socket.off(event) with no
+    // handler removes EVERY listener for that event, not just this
+    // component's, which was silently breaking AuthenticatedLayout's sync
+    // the moment this component unmounted.
+    socket.on("project:member-role-changed", handleMemberRoleChanged);
+    socket.on("project:member-removed", handleMemberRemoved);
+    socket.on("project:member-added", handleMemberAdded);
 
     return () => {
-      socket.off("project:member-role-changed");
-      socket.off("project:member-removed");
-      socket.off("project:member-added");
+      socket.off("project:member-role-changed", handleMemberRoleChanged);
+      socket.off("project:member-removed", handleMemberRemoved);
+      socket.off("project:member-added", handleMemberAdded);
     };
   }, [projectId]);
 
