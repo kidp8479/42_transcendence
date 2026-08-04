@@ -202,6 +202,7 @@ export class ProjectMembersService {
       });
       this.realtimeService.emitToProject(projectId, "project:member-removed", {
         userId,
+        projectId,
       });
       this.realtimeService.leaveProjectRoom(userId, projectId);
       for (const released of this.realtimeService.releaseFieldLocksForUserInProject(

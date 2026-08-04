@@ -87,13 +87,29 @@ export function MembersSection({
       );
     };
 
-    const handleMemberRemoved = (data: { userId: string }) => {
+    const handleMemberRemoved = (data: {
+      userId: string;
+      projectId: string;
+    }) => {
+      if (data.projectId !== projectId) {
+        return;
+      }
       setMembers((currentMembers) =>
         currentMembers.filter((member) => member.userId !== data.userId)
       );
     };
 
+    // Every socket joins ALL of a user's project:<id> rooms at connect time
+    // (see realtimeService.joinProjectRoom), not just the one currently open
+    // in this tab - an add/remove in a DIFFERENT project this user also
+    // belongs to still reaches this listener. Without the projectId check,
+    // that event would corrupt this project's member list with another
+    // project's member, or drop one of this project's members by a
+    // coincidentally-matching userId.
     const handleMemberAdded = (member: ProjectMember) => {
+      if (member.projectId !== projectId) {
+        return;
+      }
       setMembers((currentMembers) =>
         currentMembers.some((existing) => existing.id === member.id)
           ? currentMembers
