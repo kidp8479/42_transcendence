@@ -150,65 +150,75 @@ export function SideBarCmp() {
         />
       )}
 
-      <div
-        className={`
-          ${sidebarContainerClasses}
-          ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
-          md:sticky md:top-[65px] md:h-[calc(100vh-133px)] md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
-          ${isCollapsed ? "md:w-0" : "md:w-64"}
-        `}
-      >
-        <div className={sidebarInnerClasses}>
+      {/* Desktop-only, unstyled below md - just holds the bg layer below. */}
+      <div className="md:relative md:self-stretch md:min-h-[calc(100vh-133px)] md:shrink-0">
+        {/* Decorative fill so the panel color reaches the page bottom on a
+            tall page. No z-index: never competes with the header. */}
+        <div
+          aria-hidden="true"
+          className="hidden md:absolute md:inset-0 md:block md:rounded md:!bg-surface-raised dark:md:!bg-surface-raised"
+        />
+
+        <div
+          className={`
+            ${sidebarContainerClasses}
+            ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
+            md:sticky md:top-[65px] md:h-[calc(100vh-133px)] md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
+            ${isCollapsed ? "md:w-0" : "md:w-64"}
+          `}
+        >
+          <div className={sidebarInnerClasses}>
+            <button
+              type="button"
+              onClick={closeSidebar}
+              aria-label="Close sidebar"
+              className="absolute top-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-md text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden"
+            >
+              <HiX size={18} />
+            </button>
+
+            <Sidebar
+              aria-label="Sidebar"
+              className="h-full w-full"
+              theme={sidebarTheme}
+            >
+              <SidebarItems>
+                <SidebarItemGroup className={sidebarGroupClasses}>
+                  {sidebarPrimaryNavigation.map((item) => (
+                    <SidebarNavLink key={item.to} {...item} />
+                  ))}
+                </SidebarItemGroup>
+                <SidebarItemGroup>
+                  <SidebarSectionTitle>Current projects</SidebarSectionTitle>
+
+                  {visibleProjects.length === 0 ? (
+                    <li className="px-3 py-2 text-sm text-text-muted">
+                      No projects yet
+                    </li>
+                  ) : (
+                    visibleProjects.map((project) => (
+                      <ProjectRow key={project.id} project={project} />
+                    ))
+                  )}
+                </SidebarItemGroup>
+              </SidebarItems>
+            </Sidebar>
+          </div>
+
+          {/* Desktop collapse/expand toggle: squeezes the panel width, hidden on mobile */}
           <button
             type="button"
-            onClick={closeSidebar}
-            aria-label="Close sidebar"
-            className="absolute top-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-md text-text-muted hover:bg-surface-overlay hover:text-text-primary md:hidden"
+            onClick={toggleSidebar}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={sidebarToggleBaseClasses}
           >
-            <HiX size={18} />
+            {isCollapsed ? (
+              <HiChevronRight size={14} />
+            ) : (
+              <HiChevronLeft size={14} />
+            )}
           </button>
-
-          <Sidebar
-            aria-label="Sidebar"
-            className="h-full w-full"
-            theme={sidebarTheme}
-          >
-            <SidebarItems>
-              <SidebarItemGroup className={sidebarGroupClasses}>
-                {sidebarPrimaryNavigation.map((item) => (
-                  <SidebarNavLink key={item.to} {...item} />
-                ))}
-              </SidebarItemGroup>
-              <SidebarItemGroup>
-                <SidebarSectionTitle>Current projects</SidebarSectionTitle>
-
-                {visibleProjects.length === 0 ? (
-                  <li className="px-3 py-2 text-sm text-text-muted">
-                    No projects yet
-                  </li>
-                ) : (
-                  visibleProjects.map((project) => (
-                    <ProjectRow key={project.id} project={project} />
-                  ))
-                )}
-              </SidebarItemGroup>
-            </SidebarItems>
-          </Sidebar>
         </div>
-
-        {/* Desktop collapse/expand toggle: squeezes the panel width, hidden on mobile */}
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={sidebarToggleBaseClasses}
-        >
-          {isCollapsed ? (
-            <HiChevronRight size={14} />
-          ) : (
-            <HiChevronLeft size={14} />
-          )}
-        </button>
       </div>
     </>
   );
