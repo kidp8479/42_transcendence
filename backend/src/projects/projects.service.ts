@@ -272,14 +272,34 @@ export class ProjectsService {
     // Broadcast project changes to all connected project members so their UI
     // (ex: sidebar project list) can refresh without requiring a page reload.
     // Used for status changes (COMPLETED), archiving, and other project updates.
+    //
+    // Includes the same fields findById() fetches separately, and reuses
+    // `member` from the assertMembership call above instead of calling
+    // findById() (which would re-run assertMembership and re-fetch the
+    // project from scratch) - one query instead of three for every PATCH.
     const updatedProject = await this.prisma.project.update({
       where: { id },
       data: dto,
+      include: {
+        evaluationChecklistItems: {
+          select: { section: true, isChecked: true },
+        },
+        _count: {
+          select: { members: true },
+        },
+      },
     });
+    const { evaluationChecklistItems, _count, ...rest } = updatedProject;
+    const result = {
+      ...rest,
+      role: member.role,
+      progress: computeProjectProgress(evaluationChecklistItems),
+      memberCount: _count.members,
+    };
 
-    this.realtimeService.emitToProject(id, "project:updated", updatedProject);
+    this.realtimeService.emitToProject(id, "project:updated", result);
 
-    return this.findById(id, userId);
+    return result;
   }
 
   private async findProjectForUser(
