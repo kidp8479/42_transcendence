@@ -23,7 +23,6 @@ import { Route as PublicAboutRouteImport } from './routes/_public/about'
 import { Route as AuthenticatedUserSettingsRouteImport } from './routes/_authenticated/user-settings'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
-import { Route as AuthenticatedProjectSettingsRouteImport } from './routes/_authenticated/project-settings'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedProjectIdRouteRouteImport } from './routes/_authenticated/$projectId/route'
 import { Route as AuthenticatedUsersUsernameRouteImport } from './routes/_authenticated/users/$username'
@@ -105,12 +104,6 @@ const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedProjectSettingsRoute =
-  AuthenticatedProjectSettingsRouteImport.update({
-    id: '/project-settings',
-    path: '/project-settings',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -182,7 +175,6 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/project-settings': typeof AuthenticatedProjectSettingsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/search': typeof AuthenticatedSearchRoute
   '/user-settings': typeof AuthenticatedUserSettingsRoute
@@ -208,7 +200,6 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/project-settings': typeof AuthenticatedProjectSettingsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/search': typeof AuthenticatedSearchRoute
   '/user-settings': typeof AuthenticatedUserSettingsRoute
@@ -236,7 +227,6 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/_authenticated/$projectId': typeof AuthenticatedProjectIdRouteRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/project-settings': typeof AuthenticatedProjectSettingsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/_authenticated/user-settings': typeof AuthenticatedUserSettingsRoute
@@ -265,7 +255,6 @@ export interface FileRouteTypes {
     | '/$'
     | '/$projectId'
     | '/dashboard'
-    | '/project-settings'
     | '/projects'
     | '/search'
     | '/user-settings'
@@ -291,7 +280,6 @@ export interface FileRouteTypes {
     | '/$'
     | '/$projectId'
     | '/dashboard'
-    | '/project-settings'
     | '/projects'
     | '/search'
     | '/user-settings'
@@ -318,7 +306,6 @@ export interface FileRouteTypes {
     | '/$'
     | '/_authenticated/$projectId'
     | '/_authenticated/dashboard'
-    | '/_authenticated/project-settings'
     | '/_authenticated/projects'
     | '/_authenticated/search'
     | '/_authenticated/user-settings'
@@ -447,13 +434,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/project-settings': {
-      id: '/_authenticated/project-settings'
-      path: '/project-settings'
-      fullPath: '/project-settings'
-      preLoaderRoute: typeof AuthenticatedProjectSettingsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -568,7 +548,6 @@ const AuthenticatedProjectIdRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectIdRouteRoute: typeof AuthenticatedProjectIdRouteRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedProjectSettingsRoute: typeof AuthenticatedProjectSettingsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
   AuthenticatedUserSettingsRoute: typeof AuthenticatedUserSettingsRoute
@@ -579,7 +558,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProjectIdRouteRoute:
     AuthenticatedProjectIdRouteRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedProjectSettingsRoute: AuthenticatedProjectSettingsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
   AuthenticatedUserSettingsRoute: AuthenticatedUserSettingsRoute,
