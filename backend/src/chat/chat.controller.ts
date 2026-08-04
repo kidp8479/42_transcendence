@@ -38,7 +38,7 @@ export class ChatController {
     return this.chatService.findAll(projectId, request.user.id, query);
   }
 
-  // POST - persists a new message and broadcasts it on "chat:message" to
+  // POST - persists a new message and broadcasts it on "chat:created" to
   // project:<projectId>. Real-time delivery of new messages is this route,
   // not the websocket - the websocket only carries what this call already
   // wrote to the database.

@@ -66,7 +66,7 @@ export class ChatService {
       include: { user: { select: AUTHOR_SELECT } },
     });
 
-    this.realtimeService.emitToProject(projectId, "chat:message", message);
+    this.realtimeService.emitToProject(projectId, "chat:created", message);
     return message;
   }
 
@@ -87,7 +87,7 @@ export class ChatService {
     const deletedMessage = await this.prisma.chatMessage.delete({
       where: { id },
     });
-    this.realtimeService.emitToProject(projectId, "chat:message:deleted", {
+    this.realtimeService.emitToProject(projectId, "chat:deleted", {
       id: deletedMessage.id,
     });
     return deletedMessage;
