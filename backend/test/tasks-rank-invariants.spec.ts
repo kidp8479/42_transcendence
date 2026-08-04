@@ -229,6 +229,25 @@ function createFakePrisma(store: FakeTaskStore) {
 const projectAssignedStub = { assertMembership: async () => undefined };
 const noopTaskAssignees = { replaceAssignees: async () => undefined };
 
+interface TaskAssigneeSpy {
+  calls: { taskId: string; projectId: string; userIds: string[] }[];
+  replaceAssignees: (
+    taskId: string,
+    projectId: string,
+    userIds: string[]
+  ) => Promise<void>;
+}
+
+function createTaskAssigneeSpy(): TaskAssigneeSpy {
+  const calls: TaskAssigneeSpy["calls"] = [];
+  return {
+    calls,
+    replaceAssignees: async (taskId, projectId, userIds) => {
+      calls.push({ taskId, projectId, userIds });
+    },
+  };
+}
+
 interface RealtimeSpy {
   emitted: { projectId: string; event: string; payload: unknown }[];
   emitToProject: (projectId: string, event: string, payload: unknown) => void;
@@ -265,11 +284,15 @@ function createNotificationsSpy(): NotificationsSpy {
 // pass their own spy in and inspect it afterward.
 function createService(
   store: FakeTaskStore,
-  overrides: { realtime?: RealtimeSpy; notifications?: NotificationsSpy } = {}
+  overrides: {
+    realtime?: RealtimeSpy;
+    notifications?: NotificationsSpy;
+    taskAssignees?: TaskAssigneeSpy;
+  } = {}
 ) {
   return new TasksService(
     createFakePrisma(store) as never,
-    noopTaskAssignees as never,
+    (overrides.taskAssignees ?? noopTaskAssignees) as never,
     projectAssignedStub as never,
     (overrides.realtime ?? createRealtimeSpy()) as never,
     (overrides.notifications ?? createNotificationsSpy()) as never
@@ -894,6 +917,31 @@ test("update() renaming and adding an assignee in the same PATCH notifies with t
 
   assert.equal(notifications.created.length, 1);
   assert.match(notifications.created[0].message, /"A renamed"/);
+});
+
+// Guards against a Copilot false positive on PR#38: `if (assigneeIds)` reads
+// as "not provided" at a glance, but an empty array is truthy in JS - `[]`
+// still enters the block, so this already works. Asserts on the
+// TaskAssigneeService call itself (not just the DB), since that's the exact
+// mechanism in question.
+test("update() with assigneeIds: [] clears all assignees, doesn't treat it as absent", async () => {
+  const store = new FakeTaskStore();
+  const taskAssignees = createTaskAssigneeSpy();
+  const service = createService(store, { taskAssignees });
+
+  await service.create(projectId, baseCreateDto({ title: "A" }), userId);
+  const taskA = store.rows[0];
+  taskA.assignees = [{ id: "user-b", username: "B", avatarUrl: null }];
+
+  await service.update(
+    taskA.id,
+    { assigneeIds: [] } as never,
+    projectId,
+    userId
+  );
+
+  assert.equal(taskAssignees.calls.length, 1);
+  assert.deepEqual(taskAssignees.calls[0].userIds, []);
 });
 
 test("update() self-assigning sends no notification", async () => {
