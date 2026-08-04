@@ -35,80 +35,88 @@ export class ProjectMembersService {
 
   // must also throw (ex: ForbiddenException) if requester.role is neither "OWNER" nor "ADMIN"
   // insert a new row in the ProjectMember table (link a user to a project)
+  // wrapped in withProjectLock, same as removeMember/updateMemberRole -
+  // without it, a requester whose role is being changed/removed by a
+  // concurrent, lock-protected call could still pass this permission check
+  // on their stale pre-change role, since nothing would serialize the two.
   async addMember(
     projectId: string,
     dto: AddMemberDto,
     requestingUserId: string
   ) {
-    // verify requester belongs to the project
-    const requester = await this.projectsService.assertMembership(
-      projectId,
-      requestingUserId
-    );
-    // verify they're owner or admin
-    if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
-      throw new ForbiddenException(
-        "Only project owner or admins can add members"
-      );
-    }
-    // find user by username
-    const user = await this.prisma.user.findUnique({
-      where: {
-        username: dto.username,
-      },
-    });
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-    // prevent adding the same user twice
-    const existingMember = await this.prisma.projectMember.findUnique({
-      where: {
-        userId_projectId: {
-          userId: user.id,
-          projectId,
-        },
-      },
-    });
-    if (existingMember) {
-      throw new BadRequestException("User is already a member of this project");
-    }
-    // create a ProjectMember row
-    const member = await this.prisma.projectMember.create({
-      data: {
+    return this.realtimeService.withProjectLock(projectId, async () => {
+      // verify requester belongs to the project
+      const requester = await this.projectsService.assertMembership(
         projectId,
-        userId: user.id,
-        role: "MEMBER",
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-            campus: true,
+        requestingUserId
+      );
+      // verify they're owner or admin
+      if (requester.role !== "OWNER" && requester.role !== "ADMIN") {
+        throw new ForbiddenException(
+          "Only project owner or admins can add members"
+        );
+      }
+      // find user by username
+      const user = await this.prisma.user.findUnique({
+        where: {
+          username: dto.username,
+        },
+      });
+      if (!user) {
+        throw new NotFoundException("User not found");
+      }
+      // prevent adding the same user twice
+      const existingMember = await this.prisma.projectMember.findUnique({
+        where: {
+          userId_projectId: {
+            userId: user.id,
+            projectId,
           },
         },
-      },
+      });
+      if (existingMember) {
+        throw new BadRequestException(
+          "User is already a member of this project"
+        );
+      }
+      // create a ProjectMember row
+      const member = await this.prisma.projectMember.create({
+        data: {
+          projectId,
+          userId: user.id,
+          role: "MEMBER",
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+              campus: true,
+            },
+          },
+        },
+      });
+
+      const project = await this.prisma.project.findUniqueOrThrow({
+        where: { id: projectId },
+        select: { name: true },
+      });
+      await this.notificationsService.create(
+        user.id,
+        `You were added to "${project.name}"`,
+        `/${projectId}/project-settings`
+      );
+      this.realtimeService.joinProjectRoom(user.id, projectId);
+
+      this.realtimeService.emitToProject(
+        projectId,
+        "project:member-added",
+        member
+      );
+
+      return member;
     });
-
-    const project = await this.prisma.project.findUniqueOrThrow({
-      where: { id: projectId },
-      select: { name: true },
-    });
-    await this.notificationsService.create(
-      user.id,
-      `You were added to "${project.name}"`,
-      `/${projectId}/project-settings`
-    );
-    this.realtimeService.joinProjectRoom(user.id, projectId);
-
-    this.realtimeService.emitToProject(
-      projectId,
-      "project:member-added",
-      member
-    );
-
-    return member;
   }
 
   // no role check, any member can see the member list
