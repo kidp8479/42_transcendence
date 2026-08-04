@@ -1,7 +1,7 @@
 // Pure state transitions for the project's task list. No React in here on
-// purpose: the route drives it through useReducer, and the future WebSocket
-// handler will dispatch these same actions, so board interactions and remote
-// events stay one code path.
+// purpose: the route drives it through useReducer, and the WebSocket handler
+// (kanban.tsx) dispatches these same actions, so board interactions and
+// remote events stay one code path.
 //
 // State is the flat Task[] returned by GET /tasks; columns are derived per
 // status with selectColumnTasks. Every transition touching a column reindexes

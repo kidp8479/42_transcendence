@@ -10,23 +10,19 @@ export class TaskAssigneeService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Wipes the task's current assignees and inserts the new list, in one
-  // transaction: between the delete and the insert the task has no assignees at
-  // all, so without it a failure halfway through would silently drop every
-  // member instead of leaving the old set in place.
+  // transaction - otherwise a failure between delete and insert would
+  // silently drop every assignee instead of leaving the old set in place.
   //
-  // Replace rather than diff on purpose: the frontend sends the full desired
-  // set (its member picker is a row of toggles), not "add X, remove Y", and
-  // these rows carry no data of their own worth preserving. It also sidesteps
-  // the @@unique([userId, taskId]) constraint, which a naive insert-only
-  // approach would trip on any already-assigned user.
+  // Replace, not diff: the frontend sends the full desired set (a row of
+  // toggles), and this sidesteps the @@unique([userId, taskId]) constraint
+  // a naive insert-only approach would trip on an already-assigned user.
   //
-  // TasksService.assertAssigneesAreProjectMembers already checked this before
-  // calling in - kept there for a fast, clear 400 in the common case without
-  // paying for a transaction first. That check runs outside any transaction
-  // though, so a membership change (removeMember) landing between it and this
-  // call would go undetected - the same TOCTOU family as the rank race
-  // already fixed in moveTask(). Re-checking here, fresh, inside the same
-  // transaction that performs the write, is what actually closes it.
+  // TasksService.assertAssigneesAreProjectMembers already checked this
+  // before calling in, for a fast 400 without paying for a transaction
+  // first - but that check runs outside any transaction, so a membership
+  // change landing in the gap would go undetected (same TOCTOU family as
+  // the rank race in moveTask()). Re-checking fresh, inside this same
+  // transaction, is what actually closes it.
   async replaceAssignees(
     taskId: string,
     projectId: string,

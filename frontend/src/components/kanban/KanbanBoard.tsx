@@ -126,19 +126,16 @@ export function KanbanBoard({
     return active_center > over_center;
   }
 
-  // A drop target is either a card (over.id = task id -> that card's column,
-  // landing just before or after it depending on insert_after) or a column's
-  // droppable area (over.id = status -> append at the end, which is how
-  // empty columns accept drops).
+  // A drop target is either a card (over.id = task id, landing before/after
+  // it per insert_after) or a column's droppable (over.id = status, appends
+  // at the end - how empty columns accept drops).
   //
-  // Both branches exclude the dragged card from the column before counting:
-  // the backend's moveTask() computes `nextRank` the same way (`id: { not: id
-  // }` on every rank query, see tasks.service.ts), since a same-column move
-  // still has the card sitting in its old slot when the target column is
-  // read. Counting it here too shifted every target after the card's own
-  // position one slot too far - dropping card 1 of [1,2,3,4] onto 3 landed it
-  // after 3 instead of before, because index 2 (3's position with card 1
-  // still in the list) is where 3 sits once card 1 is actually removed.
+  // Both branches exclude the dragged card before counting, matching the
+  // backend's moveTask() (`id: { not: id }` on every rank query) - a
+  // same-column move still has the card in its old slot when the target
+  // column is read. Without this, dropping card 1 of [1,2,3,4] onto 3 landed
+  // it after 3 instead of before: index 2 (3's position with card 1 still in
+  // the list) isn't where 3 sits once card 1 is actually removed.
   function resolveDropTarget(
     active_id: string,
     over_id: string,
@@ -295,14 +292,10 @@ export function KanbanBoard({
 
   // closestCorners alone measures every droppable board-wide by corner
   // distance, with no notion of "which container is the pointer actually
-  // over." An empty column's droppable is the whole (generously sized) card
-  // list area, but a card sitting in the NEXT column over can still have a
-  // numerically closer corner - especially near the boundary between
-  // columns - so the empty column was sometimes unreachable, landing the
-  // drop in a neighbour instead. pointerWithin checks literal containment
-  // (is the pointer actually inside this rect?) first, which has no such
-  // cross-column ambiguity; closestCorners is the fallback because
-  // pointerWithin returns nothing for keyboard-driven drags (no pointer
+  // over" - a card in the next column could have a numerically closer corner
+  // near a boundary, making an empty column's (generously sized) droppable
+  // unreachable. pointerWithin checks literal containment first, avoiding
+  // that; closestCorners is only the fallback for keyboard drags (no pointer
   // coordinates to test).
   const collisionDetection: CollisionDetection = (args) => {
     const pointer_collisions = pointerWithin(args);
@@ -319,14 +312,11 @@ export function KanbanBoard({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
-      // Auto-scroll is confined to the board. By default dnd-kit scrolls the
-      // nearest scrollable ancestor, and AuthenticatedLayout's <main> qualifies:
-      // `overflow-x-hidden` still scrolls programmatically. Dragging to the
-      // right edge slid the whole page sideways onto the closed drawer, which is
-      // parked off-screen in `translate-x-full` and only hidden by that very
-      // overflow - hence the empty area. contains() covers the row itself, so
-      // the board still scrolls sideways when the columns overflow, and each
-      // column's card list still scrolls vertically.
+      // Auto-scroll confined to the board: dnd-kit's default (nearest
+      // scrollable ancestor) picks up AuthenticatedLayout's <main>, whose
+      // overflow-x-hidden still scrolls programmatically - dragging to the
+      // right edge slid the page onto the closed drawer (translate-x-full,
+      // only hidden by that overflow). contains() keeps it to the row.
       autoScroll={{
         canScroll: (element) => board_ref.current?.contains(element) ?? false,
       }}
@@ -352,17 +342,13 @@ export function KanbanBoard({
         ))}
       </div>
 
-      {/* Floating copy of the dragged card. The card is opaque on its own, so
-          the wrapper only adds the shadow that lifts it off the board.
-          DragOverlay renders into its own position:fixed wrapper, so the row's
-          overflow doesn't clip it.
-
-          zIndex is load-bearing: dnd-kit defaults to 999, and the overlay sits
-          in the same stacking context as the drawer (ProjectLayout's `isolate`
-          anchor), so it painted over a drawer that only claims z-40. The click
-          that opens a drawer also counts as a drag once it passes the 8px
-          threshold, so the overlay's drop animation played on top of the panel.
-          30 keeps it above the columns, which claim no z-index at all. */}
+      {/* Floating copy of the dragged card - only adds the lift shadow, the
+          card is opaque on its own. DragOverlay renders into its own
+          position:fixed wrapper so the row's overflow doesn't clip it.
+          zIndex 30 is load-bearing: dnd-kit's default 999 sat above the
+          drawer's z-40 (same isolate stacking context via ProjectLayout), so
+          a drawer-opening click that crosses the 8px drag threshold played
+          the drop animation on top of the panel. */}
       <DragOverlay zIndex={30}>
         {active_task !== null && (
           <div className="rounded-lg shadow-2xl">

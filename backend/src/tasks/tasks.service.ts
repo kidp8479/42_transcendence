@@ -80,11 +80,9 @@ export class TasksService {
     // the same length and land on the same rank.
     const task = await this.prisma.transaction(
       async (database) => {
-        // Clamp both ends: dto.rank is a client-supplied position, and anything
-        // outside 0..columnLength would leave a hole in the 0..n-1 sequence.
-        // CreateTaskDto's @Min(0) already rejects negatives over HTTP, but the
-        // invariant shouldn't depend on a validation decorator staying put -
-        // openRankSlot clamps the same way for moveTask().
+        // dto.rank is client-supplied; openRankSlot clamps it to
+        // 0..columnLength so the invariant doesn't rely on CreateTaskDto's
+        // @Min(0) alone.
         const rank = await this.openRankSlot(
           database,
           projectId,
@@ -157,10 +155,8 @@ export class TasksService {
     return this.getTaskOrThrow(id, projectId);
   }
 
-  // The read half of findById, without the membership check - for the
-  // callers below that already asserted membership earlier in the same
-  // request (via findById's own access-guard call) and would otherwise
-  // re-run it a second time just to build their response.
+  // findById's read half, without the membership check - for callers that
+  // already asserted membership earlier in the same request.
   private async getTaskOrThrow(id: string, projectId: string) {
     const task = await this.prisma.task.findFirst({
       where: { id: id, projectId: projectId },
@@ -258,10 +254,8 @@ export class TasksService {
     // no need for a second check just to build the response.
     const updated = await this.getTaskOrThrow(id, projectId);
     // A moving update already broadcast task:moved above - this covers the
-    // rest (title/notes/priority/category/assignees with no status/rank
-    // change). `changes` carries the whole task, same as the frontend's own
-    // local dispatch after a drawer save already does. Silent state-sync
-    // only, no notification - see notifyStatusChange above for that.
+    // rest (fields-only edits). changes carries the whole task, matching
+    // what the frontend's own local dispatch already sends after a save.
     if (!isMoving) {
       this.realtimeService.emitToProject(projectId, "task:updated", {
         taskId: id,
@@ -283,11 +277,9 @@ export class TasksService {
           where: { id: id },
           include: taskInclude,
         });
-        // Close the gap the deleted task leaves behind, so the column stays
-        // dense 0..n-1. The position comes from the row delete() just returned,
-        // not from the findById() above: that one ran before the transaction
-        // opened, so a concurrent move could have made it stale and this would
-        // shift the wrong rows.
+        // Closes the gap left behind, keeping the column dense 0..n-1. Uses
+        // delete()'s own returned rank, not findById() above - that ran
+        // before the transaction opened and could be stale by now.
         await database.task.updateMany({
           where: {
             projectId: projectId,
@@ -307,15 +299,11 @@ export class TasksService {
     return mapTask(task);
   }
 
-  // Shared by create() and moveTask(): clamps a wanted rank against the
-  // column's current length and shifts every row at or after it down to
-  // open a slot there - the same dense-0..n-1-preserving insertion either
-  // caller needs, just with or without an existing row to exclude.
-  // `excludeId` is the task being moved - still physically sitting in this
-  // column at its old rank while this runs, so it must not count toward the
-  // column length or get shifted by its own insertion. create() has no such
-  // row yet, so it's omitted there. `wantedRank` undefined means "append to
-  // the end", same convention moveTask's own doc comment describes.
+  // Shared by create() and moveTask(): clamps wantedRank to the column's
+  // current length and shifts every row at or after it down one, keeping
+  // ranks dense 0..n-1. excludeId omits the task being moved from its own
+  // count/shift (still physically in this column at its old rank) - create()
+  // has no such row, so it's left out there. wantedRank undefined = append.
   private async openRankSlot(
     database: ApplicationDatabaseTransaction,
     projectId: string,
@@ -345,19 +333,13 @@ export class TasksService {
     return rank;
   }
 
-  // Moves a task within or across status columns, keeping BOTH columns dense
-  // 0..n-1 - the invariant the board's reducer (lib/tasksReducer.ts) assumes.
-  //
-  // The whole thing runs Serializable because it reads the target column's
-  // length and then writes based on it: two people dragging into the same
-  // column at once would otherwise both compute the same slot. A conflict
-  // surfaces as P2034, which the global Prisma filter maps to 409 - the client
-  // reloads rather than retrying blindly.
-  //
-  // `wantedRank` is undefined when the caller only changed the status: the task
-  // then lands at the END of its new column. Reusing its rank from the OLD
-  // column would drop it in the middle of the new one, at a position that means
-  // nothing there.
+  // Moves a task within/across columns, keeping both columns dense 0..n-1
+  // (the invariant tasksReducer.ts assumes). Runs Serializable: it reads the
+  // target column's length then writes based on it, so two concurrent drags
+  // into the same column would otherwise collide - surfaces as a 409 via the
+  // global Prisma filter, client reloads instead of retrying blindly.
+  // wantedRank undefined means "append to the new column" - reusing the rank
+  // from the old one would drop it somewhere meaningless in the new one.
   private async moveTask(
     id: string,
     projectId: string,
@@ -365,17 +347,13 @@ export class TasksService {
     wantedRank: number | undefined,
     taskFields: Prisma.TaskUpdateInput
   ): Promise<void> {
-    // nextRank is computed inside the transaction (it depends on the live
-    // column length) but is exactly the "toIndex" the frontend's task_moved
-    // reducer action needs - returned here so the broadcast below can use it
-    // straight, no second lookup.
+    // nextRank depends on the live column length, computed inside the
+    // transaction, then reused as-is below for task_moved's toIndex.
     const nextRank = await this.prisma.transaction(
       async (database) => {
-        // Where the task sits RIGHT NOW, read inside the transaction. Taking it
-        // from a findById() done before the transaction opened was a real race:
-        // Serializable only guards what it reads itself, so a concurrent move
-        // landing in between left this shifting the wrong rows - duplicate
-        // ranks or holes, and no error to show for it.
+        // Read inside the transaction, not from a findById() before it
+        // opened - Serializable only guards what it reads itself, so a
+        // concurrent move landing in between used to shift the wrong rows.
         const current = await database.task.findUniqueOrThrow({
           where: { id: id },
           select: { status: true, rank: true },
@@ -416,11 +394,9 @@ export class TasksService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
 
-    // Covers both a drag-and-drop move and a drawer status change - this is
-    // the single call site for moveTask(), so one broadcast here reaches
-    // both. No sender exclusion: task_moved is idempotent (see its own
-    // comment in tasksReducer.ts), so the acting client harmlessly
-    // re-applies its own already-optimistic move.
+    // Covers both drag-and-drop and a drawer status change - moveTask's only
+    // call site. No sender exclusion: task_moved is idempotent (see
+    // tasksReducer.ts), so the acting client just re-applies its own move.
     this.realtimeService.emitToProject(projectId, "task:moved", {
       taskId: id,
       toStatus,

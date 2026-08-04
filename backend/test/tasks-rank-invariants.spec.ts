@@ -1,22 +1,16 @@
 // Integration-style tests for TasksService's rank-maintenance invariant:
-// every status column stays a dense 0..n-1 sequence, no matter what sequence
-// of create/move/delete operations hits it. Requested by Andrei on PR#34
-// (review finding, 2026-08-02): "la logique de maintien des rangs est
-// centrale et complexe... tests d'intégration ciblant la création, les
-// déplacements intra/inter-colonnes, la suppression et les conflits de
-// sérialisation."
+// every status column stays a dense 0..n-1 sequence through any sequence of
+// create/move/delete operations.
 //
 // No real database: this project's test runner is plain node:test (see
-// field-lock-manager.spec.ts/websocket-admission.spec.ts for the same
-// pattern), not Jest with a Nest TestModule. FakeTaskStore below is a
-// minimal in-memory stand-in for the one slice of Prisma.task the service
-// actually calls - count/updateMany/create/findUniqueOrThrow/update/delete/
-// findFirst, with just the where-clause shapes tasks.service.ts uses
-// (projectId/status/rank comparisons, id: { not }). It intentionally does
-// NOT model real transactional isolation: tests run single-threaded and
-// sequential, which is enough to verify the invariant these operations
-// maintain, not the concurrency behaviour Postgres's Serializable isolation
-// itself provides (that needs a real database, out of scope for a unit test).
+// field-lock-manager.spec.ts/websocket-admission.spec.ts), not Jest with a
+// Nest TestModule. FakeTaskStore below is a minimal in-memory stand-in for
+// the one slice of Prisma.task the service actually calls - count/
+// updateMany/create/findUniqueOrThrow/update/delete/findFirst, matching just
+// the where-clause shapes tasks.service.ts uses. It doesn't model real
+// transactional isolation: tests run single-threaded, enough to verify the
+// invariant itself, not Postgres's own Serializable concurrency behaviour
+// (needs a real database, out of scope here).
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TaskStatus } from "@prisma/client";

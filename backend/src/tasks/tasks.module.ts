@@ -9,7 +9,7 @@ import { TasksController } from "./tasks.controller";
 import { TaskAssigneeService } from "./task-assignees.service";
 
 @Module({
-  imports: [ProjectsModule, RealtimeModule, NotificationsModule], // ProjectsModule: assertMembership. RealtimeModule: broadcast task changes live. NotificationsModule: notify assignees on a column change
+  imports: [ProjectsModule, RealtimeModule, NotificationsModule], // membership check, live broadcast, assignee notifications
   controllers: [TasksController], // handles HTTP requests
   // TaskAssigneeService has no controller/module of its own - it's a plain internal
   // helper injected into TasksService to manage the TaskAssignee join-table rows

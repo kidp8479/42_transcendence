@@ -1,12 +1,10 @@
-// Tests TaskAssigneeService.replaceAssignees's membership re-check, added to
-// close the same TOCTOU family already fixed for rank in
-// tasks.service.ts's moveTask() (Cricriiii #3 on PR#34's review): the
-// caller-side assertAssigneesAreProjectMembers in TasksService runs BEFORE
-// any transaction opens, so a membership change (removeMember) landing
-// between that check and this call would go undetected without a fresh
-// re-check at write time. No real database - same node:test + hand-rolled
-// fake pattern as tasks-rank-invariants.spec.ts, minimal here since this
-// only needs projectMember/taskAssignee, not the whole task store.
+// Tests TaskAssigneeService.replaceAssignees's membership re-check - closes
+// the same TOCTOU family already fixed for rank in tasks.service.ts's
+// moveTask(): the caller-side assertAssigneesAreProjectMembers runs before
+// any transaction opens, so a membership change landing in the gap would go
+// undetected without a fresh re-check at write time. No real database - same
+// node:test + hand-rolled fake pattern as tasks-rank-invariants.spec.ts,
+// minimal here since this only needs projectMember/taskAssignee.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TaskAssigneeService } from "../src/tasks/task-assignees.service";
