@@ -190,13 +190,12 @@ function buildInitialDraft(
     status: task.status,
     priority: task.priority,
     // Assignees who are no longer members of the project are dropped here.
-    // Removing a member deletes the ProjectMember row and nothing else - the
-    // TaskAssignee row survives, since its only cascade is on User deletion - so
-    // the server keeps returning that user in task.assignees. The picker below
-    // renders one button per CURRENT member, so a stale id has no control to
-    // remove it, and the server rejects any assigneeId that isn't a current
-    // member: the task became impossible to save at all, for any field. TR-B
-    // closes this at the source and makes the filter redundant.
+    // Removing a member deletes the ProjectMember row only - TaskAssignee's
+    // only cascade is on User deletion, so the server keeps returning that
+    // user in task.assignees. The picker below renders one button per CURRENT
+    // member, so a stale id has no control to remove it, and the server
+    // rejects any assigneeId that isn't a current member - without this
+    // filter the task would become unsavable entirely, for any field.
     assigneeIds: task.assignees
       .filter((assignee) => members.some((member) => member.id === assignee.id))
       .map((assignee) => assignee.id),
@@ -576,7 +575,7 @@ function KanbanCardForm({
           type="button"
           onClick={onClose}
           disabled={is_submitting}
-          className="mr-auto border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:ring-2 focus:ring-brand-500/40 focus:outline-none! focus-visible:outline-none"
+          className="mr-auto border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:ring-2 focus:ring-brand-500/40 dark:focus:ring-brand-500/40 focus:outline-none! focus-visible:outline-none"
         >
           Discard
         </Button>

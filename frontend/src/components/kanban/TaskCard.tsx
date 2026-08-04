@@ -173,7 +173,7 @@ export function TaskCard({
             size="xs"
             onClick={() => setIsConfirmingDelete(false)}
             disabled={is_deleting}
-            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:ring-2 focus:ring-brand-500/40 focus:outline-none! focus-visible:outline-none"
+            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:ring-2 focus:ring-brand-500/40 dark:focus:ring-brand-500/40 focus:outline-none! focus-visible:outline-none"
           >
             Cancel
           </Button>
