@@ -73,8 +73,12 @@ export function MembersSection({
 
     const handleMemberRoleChanged = (data: {
       userId: string;
+      projectId: string;
       role: "OWNER" | "ADMIN" | "MEMBER";
     }) => {
+      if (data.projectId !== projectId) {
+        return;
+      }
       setMembers((currentMembers) =>
         currentMembers.map((member) =>
           member.userId === data.userId

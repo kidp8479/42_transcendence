@@ -5,6 +5,7 @@ import { SettingsSection } from "./SettingsSection";
 import { SettingsActionRow } from "./SettingsActionRow";
 import { LiaTrashAltSolid } from "react-icons/lia";
 import { deleteProject } from "@/lib/projectsApi";
+import { useToast } from "@/hooks/useToast";
 
 // Displays destructive project actions inside the Project Settings page.
 // Isolated from the other settings sections because these actions are
@@ -30,6 +31,7 @@ export function DangerZoneSection({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const { showToast } = useToast();
 
   const canConfirmDelete = confirmText.trim() === projectName;
 
@@ -57,6 +59,12 @@ export function DangerZoneSection({
       await deleteProject(projectId);
       handleCloseDeleteModal();
       onDeleteProjectSuccess();
+    } catch (error) {
+      showToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to delete project",
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -177,7 +185,7 @@ export function DangerZoneSection({
               <Button
                 type="button"
                 disabled={!canConfirmDelete || isDeleting}
-                onClick={handleDeleteProject}
+                onClick={() => void handleDeleteProject()}
                 className="
 				  !h-8
 				  !px-3

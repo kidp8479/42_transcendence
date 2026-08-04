@@ -282,6 +282,7 @@ export class ProjectMembersService {
       "project:member-role-changed",
       {
         userId,
+        projectId,
         role: newRole,
       }
     );

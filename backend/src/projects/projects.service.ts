@@ -249,8 +249,12 @@ export class ProjectsService {
     // CalendarEvent, CalendarCategory, DiscoveryBlock, and EvaluationChecklistItem
     // row for this project is deleted too. Permanent, no soft-delete/undo.
     // No return value: the controller responds 204 No Content (see delete() there).
-    this.realtimeService.emitToProject(id, "project:deleted", { id });
+    // Emit AFTER the delete succeeds, not before - broadcasting first would
+    // tell every connected client the project is gone even if the delete
+    // then throws (DB error, constraint failure), leaving clients desynced
+    // from a project that's still actually there.
     await this.prisma.project.delete({ where: { id } });
+    this.realtimeService.emitToProject(id, "project:deleted", { id });
   }
 
   async update(id: string, dto: UpdateProjectDto, userId: string) {
