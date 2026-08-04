@@ -65,6 +65,21 @@ export function deleteChatMessage(projectId: string, id: string) {
   });
 }
 
+// GET /chat/unread - project ids (among the caller's own project
+// memberships) that have at least one message they haven't seen yet.
+// Backs the red-dot unread badge - see chatUnreadState.ts.
+export function fetchUnreadChatProjectIds(): Promise<string[]> {
+  return apiClient<unknown>("/chat/unread").then((value) => {
+    if (
+      !Array.isArray(value) ||
+      value.some((entry) => typeof entry !== "string")
+    ) {
+      throw new Error("Unread chat response is invalid");
+    }
+    return value as string[];
+  });
+}
+
 function parseChatMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) {
     throw new Error("Chat messages response is invalid");

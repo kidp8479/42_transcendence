@@ -20,7 +20,9 @@ import {
 } from "@/lib/chatApi";
 import { getMembers, type ProjectMember } from "@/lib/projectMembersApi";
 import { authSessionResource } from "@/lib/authState";
+import { chatUnreadResource } from "@/lib/chatUnreadState";
 import { useLiveItemSync } from "@/hooks/useLiveItemSync";
+import { useChatUnread } from "@/hooks/useChatUnread";
 import { useToast } from "@/hooks/useToast";
 import { darkSurfaceFieldClassName } from "@/lib/flowbite";
 
@@ -56,6 +58,7 @@ function ChatPage() {
     authState?.status === "authenticated" ? authState.session.user.id : null;
 
   const { showToast } = useToast();
+  const unreadProjectIds = useChatUnread();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     conversations[0]?.id ?? null
@@ -78,6 +81,17 @@ function ChatPage() {
     getValue: (message) => message.projectId,
   });
 
+  // Tells the unread store which conversation is on screen, so a message
+  // landing here while the user is looking at it never lights up its dot -
+  // cleared on unmount (leaving the Chat page) so a later message can flag
+  // it again once nobody's actively viewing it.
+  useEffect(() => {
+    chatUnreadResource.setActiveProjectId(selectedProjectId);
+    return () => {
+      chatUnreadResource.setActiveProjectId(null);
+    };
+  }, [selectedProjectId]);
+
   useEffect(() => {
     if (!selectedProjectId) {
       setMessages([]);
@@ -95,6 +109,10 @@ function ChatPage() {
         setMessages(fetchedMessages);
         setHasMoreHistory(fetchedMessages.length === MESSAGES_PAGE_SIZE);
         setMembers(fetchedMembers);
+        // this GET is what marks the conversation read backend-side (see
+        // ChatService.findAll) - clear its dot immediately instead of
+        // waiting on the unread store's next background refetch
+        chatUnreadResource.markRead(selectedProjectId);
       })
       .catch(() => {
         if (cancelled) return;
@@ -203,6 +221,7 @@ function ChatPage() {
                 name={project.name}
                 memberCount={project.memberCount}
                 active={project.id === selectedProjectId}
+                hasUnread={unreadProjectIds.has(project.id)}
                 onClick={() => setSelectedProjectId(project.id)}
               />
             ))
@@ -312,11 +331,13 @@ function ConversationRow({
   name,
   memberCount,
   active,
+  hasUnread,
   onClick,
 }: {
   name: string;
   memberCount: number;
   active: boolean;
+  hasUnread: boolean;
   onClick: () => void;
 }) {
   return (
@@ -328,8 +349,16 @@ function ConversationRow({
       }`}
     >
       <div className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-text-primary">
-          {name}
+        <span className="flex items-center gap-2">
+          <span className="truncate text-sm font-semibold text-text-primary">
+            {name}
+          </span>
+          {hasUnread && (
+            <span
+              aria-label="Unread messages"
+              className="h-2 w-2 shrink-0 rounded-full bg-control-error"
+            />
+          )}
         </span>
         <span className="block text-xs text-text-secondary">
           {memberCount} members

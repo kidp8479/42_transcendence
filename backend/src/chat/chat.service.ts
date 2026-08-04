@@ -33,6 +33,8 @@ export class ChatService {
   // GET (page of history) - cursor pagination, newest page by default, or
   // the page strictly older than query.before (infinite scroll upward).
   // Returned oldest-first, the order a chat thread renders top-to-bottom.
+  // Opening a conversation (loading its history) is what counts as "read"
+  // for the unread badge - see markRead below.
   async findAll(projectId: string, userId: string, query: FindChatMessagesDto) {
     await this.projectsService.assertMembership(projectId, userId);
 
@@ -47,7 +49,63 @@ export class ChatService {
       include: { user: { select: AUTHOR_SELECT } },
     });
 
+    // only the first page (no cursor) reflects "caught up to the latest
+    // message" - paging further back into history shouldn't move the read
+    // marker forward past messages the caller hasn't actually seen yet.
+    if (query.before === undefined) {
+      await this.markRead(projectId, userId);
+    }
+
     return messages.reverse();
+  }
+
+  // GET /chat/unread - project ids (among this user's own memberships) that
+  // have at least one message, from someone else, newer than this user's
+  // own ChatReadState.lastReadAt (or no ChatReadState row at all yet, i.e.
+  // never opened). Drives the red-dot badge on the Chat nav item and on
+  // each conversation row - no unread count, just a boolean per project.
+  async findUnreadProjectIds(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.projectMember.findMany({
+      where: { userId },
+      select: { projectId: true },
+    });
+    const projectIds = memberships.map((membership) => membership.projectId);
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    const [readStates, latestMessagesFromOthers] = await Promise.all([
+      this.prisma.chatReadState.findMany({
+        where: { userId, projectId: { in: projectIds } },
+        select: { projectId: true, lastReadAt: true },
+      }),
+      this.prisma.chatMessage.groupBy({
+        by: ["projectId"],
+        where: { projectId: { in: projectIds }, userId: { not: userId } },
+        _max: { createdAt: true },
+      }),
+    ]);
+    const lastReadAtByProject = new Map(
+      readStates.map((state) => [state.projectId, state.lastReadAt])
+    );
+
+    return latestMessagesFromOthers
+      .filter(({ projectId, _max }) => {
+        if (_max.createdAt === null) {
+          return false;
+        }
+        const lastReadAt = lastReadAtByProject.get(projectId);
+        return lastReadAt === undefined || _max.createdAt > lastReadAt;
+      })
+      .map(({ projectId }) => projectId);
+  }
+
+  private async markRead(projectId: string, userId: string): Promise<void> {
+    await this.prisma.chatReadState.upsert({
+      where: { userId_projectId: { userId, projectId } },
+      create: { userId, projectId },
+      update: { lastReadAt: new Date() },
+    });
   }
 
   // POST - persists the message, then broadcasts it so every other member

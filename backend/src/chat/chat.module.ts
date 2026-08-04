@@ -2,14 +2,14 @@
 // NestJS will not know they exist until they are declared here
 
 import { Module } from "@nestjs/common";
-import { ChatController } from "./chat.controller";
+import { ChatController, ChatUnreadController } from "./chat.controller";
 import { ChatService } from "./chat.service";
 import { ProjectsModule } from "../projects/projects.module";
 import { RealtimeModule } from "../realtime/realtime.module";
 
 @Module({
   imports: [ProjectsModule, RealtimeModule], // ProjectsModule: ProjectsService (assertMembership). RealtimeModule: broadcast new/deleted messages live
-  controllers: [ChatController],
+  controllers: [ChatController, ChatUnreadController],
   providers: [ChatService],
   exports: [],
 })

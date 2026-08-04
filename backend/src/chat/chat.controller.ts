@@ -63,3 +63,17 @@ export class ChatController {
     return this.chatService.remove(projectId, id, request.user.id);
   }
 }
+
+// Separate controller (unscoped by :projectId, unlike ChatController above)
+// for the one chat route that spans every project the caller belongs to at
+// once - drives the red-dot unread badge on the Chat nav item and on each
+// conversation row.
+@Controller("chat")
+export class ChatUnreadController {
+  constructor(private readonly chatService: ChatService) {}
+
+  @Get("unread")
+  findUnread(@Req() request: AuthenticatedRequest) {
+    return this.chatService.findUnreadProjectIds(request.user.id);
+  }
+}
