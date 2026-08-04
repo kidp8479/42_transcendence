@@ -34,6 +34,9 @@
   --color-text-primary: #f4f4f5;
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #52525b;
+  /* text-muted fails contrast on surface-base (#0f0f0f, 2.48:1) - this is the
+     surface-base-safe variant, 4.66:1. */
+  --color-text-muted-on-base: #7c7c89;
 
   /* Task status, used for dashboards, kanban, list etc - matches the Figma prototype's COLUMN_ACCENTS */
   --color-status-todo: #7a8aa8;

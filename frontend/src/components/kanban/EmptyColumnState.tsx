@@ -6,7 +6,7 @@
 // to drop a dragged card into.
 export function EmptyColumnState() {
   return (
-    <div className="rounded-lg border border-dashed border-surface-border p-4 text-center text-xs text-text-muted">
+    <div className="rounded-lg border border-dashed border-surface-border p-4 text-center text-xs text-text-muted-on-base">
       No tasks
     </div>
   );
