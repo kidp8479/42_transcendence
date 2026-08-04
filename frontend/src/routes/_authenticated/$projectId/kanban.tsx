@@ -45,15 +45,13 @@ export const Route = createFileRoute("/_authenticated/$projectId/kanban")({
 });
 
 // What the drawer is pointed at. Edit stores the task ID (not the task), so a
-// task deleted from under an open drawer resolves to null instead of a dangling
-// object. Note this does NOT make the open FORM fresh: it seeds its draft once at
-// mount and never resyncs, so a change arriving from elsewhere lands in `tasks`
-// and on the card but not in the fields (the socket handlers below dispatch into
-// `tasks`, same as a local edit, but nothing re-keys an already-open form). Save
-// works around it by sending only the fields the user actually changed - see
-// handleSubmitDrawer. A live-resyncing draft (like a real per-field lock, the
-// way Discovery/the checklist do it) is still open - see Cricriiii #6 in
-// pr34-tr49-open-findings.
+// task deleted from under an open drawer resolves to null instead of a
+// dangling object. This does NOT make the open FORM fresh: it seeds its draft
+// once at mount and never resyncs, so a remote change lands in `tasks` and on
+// the card but not in the open form's fields. Save works around it by only
+// sending fields the user actually changed - see handleSubmitDrawer. A
+// live-resyncing draft (a real per-field lock, like Discovery/the checklist
+// have) would close this properly but is a bigger change, not done here.
 type DrawerTarget =
   | { mode: "create"; status: TaskStatus }
   | { mode: "edit"; taskId: string };
@@ -102,14 +100,13 @@ function KanbanPage() {
   // local board interactions AND the WS handler below dispatch these same
   // actions, so remote events and this client's own edits stay one code path.
   //
-  // Deliberately NOT calling safeInvalidateRouter() after a successful mutation,
-  // unlike discovery.tsx. Every mutation here already dispatches the task the
-  // server returned, so the refetch added nothing - it just rebuilt all four
-  // columns from scratch, which visibly jolted cards the user never touched. It
-  // would also actively fight the realtime layer below: the loader hands back a
-  // full SNAPSHOT asynchronously, so a late response could overwrite a remote
-  // change that arrived over the socket in the meantime. The only survivor is
-  // the 409 path below, where the local state really is worthless.
+  // Deliberately NOT calling safeInvalidateRouter() after a mutation, unlike
+  // discovery.tsx: every mutation here already dispatches the task the server
+  // returned, so a refetch just rebuilt all four columns and jolted cards the
+  // user never touched. It would also fight the realtime layer below - a late
+  // loader snapshot could overwrite a remote change that arrived over the
+  // socket meanwhile. The only survivor is the 409 path, where local state
+  // really is worthless.
   const [tasks, dispatch] = useReducer(tasksReducer, loaderData.tasks);
 
   // Mirrors the loader into the reducer, the same way discovery.tsx mirrors it
@@ -250,7 +247,6 @@ function KanbanPage() {
       // columns to keep them dense, matching what the reducer just did locally.
       await updateTask(projectId, taskId, { status: toStatus, rank: toIndex });
     } catch (error) {
-      console.error("Failed to move task", error);
       // 409 = the server hit a serialization conflict (someone else was
       // reordering the same column). Our local guess is meaningless then, so
       // reload instead of rolling back to a state that never existed.
@@ -298,7 +294,6 @@ function KanbanPage() {
     try {
       await deleteTask(projectId, taskId);
     } catch (error) {
-      console.error("Failed to delete task", error);
       showToast({
         type: "error",
         message: errorMessage(error, "Failed to delete task"),
@@ -350,7 +345,6 @@ function KanbanPage() {
         });
         dispatch({ type: "task_created", task: created });
       } catch (error) {
-        console.error("Failed to create task", error);
         showToast({
           type: "error",
           message: errorMessage(error, "Failed to create task"),
@@ -432,7 +426,6 @@ function KanbanPage() {
           });
         }
       } catch (error) {
-        console.error("Failed to update task", error);
         showToast({
           type: "error",
           message: errorMessage(error, "Failed to save changes"),
@@ -452,14 +445,15 @@ function KanbanPage() {
       : null;
 
   return (
-    // md:h-full of ProjectLayout's scroller: the board exactly fills it, so that
-    // scroller never overflows and the COLUMNS scroll instead of the page.
-    // Below md it is left to size itself, so the columns' min height (see
-    // KanbanColumn) can push past the viewport and the TAB scrolls - bounding it
-    // there would make the columns row scroll on its own axis instead, stacking
-    // two vertical scrollbars.
-    // Deliberately NOT `relative` - DrawerShell is absolute and has to span the
-    // whole tab area, so its containing block must stay ProjectLayout's anchor.
+    // md:h-full of ProjectLayout's scroller: the board fills it exactly, so
+    // each column scrolls on its own instead of the page, as long as that
+    // scroller has room (see ProjectLayout.tsx) - enough cards still grow the
+    // whole page, same as any tab. Below md it sizes itself instead, so the
+    // columns' min height (KanbanColumn) can push past the viewport and the
+    // tab scrolls - bounding it there would stack two vertical scrollbars.
+    // Deliberately NOT `relative` - DrawerShell is absolute and has to span
+    // the whole tab area, so its containing block must stay ProjectLayout's
+    // anchor.
     <div className="flex flex-col md:h-full">
       <p className="mb-4 shrink-0 text-sm text-text-secondary">
         Drag tasks between columns to track progress.
