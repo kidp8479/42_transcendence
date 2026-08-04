@@ -208,6 +208,46 @@ export class ProjectMembersService {
           },
         },
       });
+      // Tells the rest of the team, plus the kicked user themselves (not on
+      // a self-removal - no need to tell someone they left when they're the
+      // one who just did it). Runs after the delete, so this query of
+      // remaining ProjectMember rows already excludes the removed user for
+      // free - requestingUserId is excluded too, since the actor doesn't
+      // need to be told about their own action.
+      const [project, removedUser, remainingMembers] = await Promise.all([
+        this.prisma.project.findUniqueOrThrow({
+          where: { id: projectId },
+          select: { name: true },
+        }),
+        this.prisma.user.findUniqueOrThrow({
+          where: { id: userId },
+          select: { username: true },
+        }),
+        this.prisma.projectMember.findMany({
+          where: { projectId, userId: { not: requestingUserId } },
+          select: { userId: true },
+        }),
+      ]);
+      const removalMessage = isSelfRemoval
+        ? `${removedUser.username} left "${project.name}"`
+        : `${removedUser.username} was removed from "${project.name}"`;
+      await Promise.all(
+        remainingMembers.map((member) =>
+          this.notificationsService.create(
+            member.userId,
+            removalMessage,
+            `/${projectId}/project-settings`
+          )
+        )
+      );
+      if (!isSelfRemoval) {
+        // No link, unlike the notification above - the kicked user no
+        // longer has access to /:projectId/project-settings.
+        await this.notificationsService.create(
+          userId,
+          `You were removed from "${project.name}"`
+        );
+      }
       this.realtimeService.emitToProject(projectId, "project:member-removed", {
         userId,
         projectId,
@@ -292,6 +332,35 @@ export class ProjectMembersService {
           },
         },
       });
+      // Tells the rest of the team, plus the promoted/demoted member
+      // themselves - not the requester, who already knows what they just
+      // did.
+      const [project, otherMembers] = await Promise.all([
+        this.prisma.project.findUniqueOrThrow({
+          where: { id: projectId },
+          select: { name: true },
+        }),
+        this.prisma.projectMember.findMany({
+          where: { projectId, userId: { notIn: [userId, requestingUserId] } },
+          select: { userId: true },
+        }),
+      ]);
+      const roleChangeAction =
+        newRole === "ADMIN" ? "promoted to ADMIN" : "demoted to MEMBER";
+      await Promise.all([
+        ...otherMembers.map((member) =>
+          this.notificationsService.create(
+            member.userId,
+            `${updateMember.user.username} was ${roleChangeAction} in "${project.name}"`,
+            `/${projectId}/project-settings`
+          )
+        ),
+        this.notificationsService.create(
+          userId,
+          `You were ${roleChangeAction} in "${project.name}"`,
+          `/${projectId}/project-settings`
+        ),
+      ]);
       this.realtimeService.emitToProject(
         projectId,
         "project:member-role-changed",
