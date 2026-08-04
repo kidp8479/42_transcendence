@@ -1,7 +1,11 @@
 // ChatService: handles all database operations for ChatMessages
 // called by the controller, never called directly by the frontend
 
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { ProjectsService } from "../projects/projects.service";

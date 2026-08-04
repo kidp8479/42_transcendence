@@ -113,5 +113,5 @@ export class UsersController {
   @Patch("me")
   update(@Body() dto: UpdateUserDto, @Req() request: AuthenticatedRequest) {
     return this.usersService.update(request.user.id, dto);
-  }  
+  }
 }
