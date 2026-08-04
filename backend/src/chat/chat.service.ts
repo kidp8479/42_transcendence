@@ -92,7 +92,11 @@ export class ChatService {
     // (useLiveItemSync) validates every event's payload against the same
     // parser as create/findAll and reads projectId off it to scope updates
     // to the conversation currently open - a bare {id} wouldn't parse.
-    this.realtimeService.emitToProject(projectId, "chat:deleted", deletedMessage);
+    this.realtimeService.emitToProject(
+      projectId,
+      "chat:deleted",
+      deletedMessage
+    );
     return deletedMessage;
   }
 }
