@@ -206,7 +206,11 @@ export function SideBarCmp() {
               <SidebarItems>
                 <SidebarItemGroup className={sidebarGroupClasses}>
                   {sidebarPrimaryNavigation.map((item) => (
-                    <SidebarNavLink key={item.to} {...item} />
+                    <SidebarNavLink
+                      key={item.to}
+                      {...item}
+                      hasBadge={item.to === "/chat" && hasUnreadChat}
+                    />
                   ))}
                 </SidebarItemGroup>
                 <SidebarItemGroup>
@@ -239,37 +243,6 @@ export function SideBarCmp() {
               <HiChevronLeft size={14} />
             )}
           </button>
-
-          <Sidebar
-            aria-label="Sidebar"
-            className="h-full w-full"
-            theme={sidebarTheme}
-          >
-            <SidebarItems>
-              <SidebarItemGroup className={sidebarGroupClasses}>
-                {sidebarPrimaryNavigation.map((item) => (
-                  <SidebarNavLink
-                    key={item.to}
-                    {...item}
-                    hasBadge={item.to === "/chat" && hasUnreadChat}
-                  />
-                ))}
-              </SidebarItemGroup>
-              <SidebarItemGroup>
-                <SidebarSectionTitle>Current projects</SidebarSectionTitle>
-
-                {visibleProjects.length === 0 ? (
-                  <li className="px-3 py-2 text-sm text-text-muted">
-                    No projects yet
-                  </li>
-                ) : (
-                  visibleProjects.map((project) => (
-                    <ProjectRow key={project.id} project={project} />
-                  ))
-                )}
-              </SidebarItemGroup>
-            </SidebarItems>
-          </Sidebar>
         </div>
       </div>
     </>
