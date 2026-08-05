@@ -53,7 +53,8 @@ export class ChatService {
     // message" - paging further back into history shouldn't move the read
     // marker forward past messages the caller hasn't actually seen yet.
     if (query.before === undefined) {
-      await this.markRead(projectId, userId);
+      const upToCreatedAt = messages[0]?.createdAt ?? new Date();
+      await this.markRead(projectId, userId, upToCreatedAt);
     }
 
     return messages.reverse();
@@ -100,11 +101,11 @@ export class ChatService {
       .map(({ projectId }) => projectId);
   }
 
-  private async markRead(projectId: string, userId: string): Promise<void> {
+  private async markRead(projectId: string, userId: string, upToCreatedAt: Date): Promise<void> {
     await this.prisma.chatReadState.upsert({
       where: { userId_projectId: { userId, projectId } },
       create: { userId, projectId },
-      update: { lastReadAt: new Date() },
+      update: { lastReadAt: upToCreatedAt },
     });
   }
 

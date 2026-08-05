@@ -202,7 +202,15 @@ function ChatPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    // h-[calc(100vh-133px)], not h-full: <main> (AuthenticatedLayout) has no
+    // hard-capped height of its own (page scrolls normally by design there),
+    // so h-full would resolve against nothing and the whole document would
+    // scroll instead of just the message list below. Same viewport-relative
+    // constant SideBarCmp already pins itself to (header+footer chrome).
+    // overflow-hidden keeps this root from ever growing past that bound, so
+    // only the flex-1 message list (overflow-y-auto further down) scrolls -
+    // header and input bar stay put.
+    <div className="flex h-[calc(100vh-133px)] min-h-0 flex-col overflow-hidden">
       <div className="mb-2 border-b border-surface-border p-6">
         <h1 className="font-mono text-xl font-bold text-text-primary">Chat</h1>
         <p className="text-xs text-text-secondary">
