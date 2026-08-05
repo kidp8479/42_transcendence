@@ -109,7 +109,7 @@ export class UsersController {
     return this.usersService.removeAvatar(request.user.id);
   }
 
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Patch("me")
   update(@Body() dto: UpdateUserDto, @Req() request: AuthenticatedRequest) {
     return this.usersService.update(request.user.id, dto);

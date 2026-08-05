@@ -42,7 +42,7 @@ export class ChatController {
   // project:<projectId>. Real-time delivery of new messages is this route,
   // not the websocket - the websocket only carries what this call already
   // wrote to the database.
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -53,7 +53,7 @@ export class ChatController {
   }
 
   // DELETE - only the message's own author can delete it.
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete(":id")
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,
