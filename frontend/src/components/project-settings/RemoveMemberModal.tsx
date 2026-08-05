@@ -1,18 +1,10 @@
-import { Button, Modal } from "flowbite-react";
+import { Button, Modal, ModalBody, ModalHeader } from "flowbite-react";
+import { HiOutlineExclamationTriangle } from "react-icons/hi2";
 import type { ProjectMember } from "@/lib/projectMembersApi";
-
-// KNOWN DUPLICATION: this modal's structure and styling (no icon,
-// left-aligned text, muted-red confirm button, one-off inline Modal
-// className overrides) is hand-duplicated in LeaveProjectModal.tsx and
-// DangerZoneSection.tsx's delete modal, and also diverges from the
-// unrelated delete-account modal in user-settings.tsx (which uses a
-// centered layout, a warning icon, Flowbite's solid color="red" button, and
-// a shared theme object). A future style or logic fix applied to just this
-// file is easy to leave silently unfixed in the other two - check
-// LeaveProjectModal.tsx and DangerZoneSection.tsx before assuming a change
-// here is complete. Not unified yet on purpose: doing so means touching
-// shared modal theming across several components, scoped as its own
-// follow-up branch rather than bundled into feature work.
+import {
+  darkSurfaceModalCancelButtonClass,
+  darkSurfaceModalTheme,
+} from "@/lib/flowbite";
 
 interface RemoveMemberModalProps {
   member: ProjectMember | null;
@@ -21,6 +13,9 @@ interface RemoveMemberModalProps {
   onConfirm: () => Promise<void>;
 }
 
+// Centered, icon-led layout matching the other destructive confirmations
+// on this page - LeaveProjectModal.tsx and DangerZoneSection's delete
+// modal, both sharing this same darkSurfaceModalTheme/color="red" style.
 export function RemoveMemberModal({
   member,
   isRemoving,
@@ -30,85 +25,47 @@ export function RemoveMemberModal({
   return (
     <Modal
       show={member !== null}
+      dismissible
       size="md"
+      theme={darkSurfaceModalTheme}
       onClose={onClose}
       popup
-      className="
-		[&>div>div]:!bg-surface-raised
-		[&>div>div]:!border
-		[&>div>div]:!border-control-bg
-	  "
     >
-      <div className="p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-text-primary">
-          Remove member
-        </h3>
+      <ModalHeader />
+      <ModalBody>
+        <div className="flex flex-col items-center gap-4 pb-2 text-center">
+          <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
 
-        <p className="text-xs text-text-secondary">
-          Are you sure you want to remove{" "}
-          <span className="font-semibold text-text-primary">
-            {member?.user.username}
-          </span>{" "}
-          from this project?
-        </p>
+          <h3 className="text-lg font-semibold text-text-primary">
+            Are you sure you want to remove{" "}
+            <span className="font-semibold">{member?.user.username}</span> from
+            this project?
+          </h3>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button
-            color="none"
-            onClick={onClose}
-            disabled={isRemoving}
-            className="
-		      !h-8
-			  !px-3
-              !py-1
-			  !text-xs
-			  !rounded-md
-			  !border
-			  !border-control-border
-			  !bg-surface-overlay
-		      !text-text-secondary
-			  hover:!bg-surface-raised
-			  hover:!border-brand-700
-			  hover:!text-brand-700
-			  focus:!ring-0
-			  transition-colors
-			"
-          >
-            Cancel
-          </Button>
-
-          <Button
-            color="none"
-            onClick={() => void onConfirm()}
-            disabled={isRemoving}
-            className="
-			  !h-8
-			  !px-3
-			  !py-1
-			  !text-xs
-			  !rounded-md
-			  border
-			  border-red-500/30
-		      bg-red-500/10
-			  text-red-400
-			  hover:bg-red-500/20
-			  dark:border-red-500/30
-			  dark:bg-red-500/10
-			  dark:text-red-500
-			  dark:hover:bg-red-500/20
-			  focus-visible:!outline-none
-			  focus-visible:!ring-2
-			  focus-visible:!ring-red-500
-			  dark:focus:!ring-red-500
-			  inline-flex
-			  items-center
-			  gap-2
-			"
-          >
-            {isRemoving ? "Removing..." : "Remove"}
-          </Button>
+          <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
+            <Button
+              className={darkSurfaceModalCancelButtonClass}
+              disabled={isRemoving}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                onClose();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              disabled={isRemoving}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                void onConfirm();
+              }}
+            >
+              {isRemoving ? "Removing..." : "Remove"}
+            </Button>
+          </div>
         </div>
-      </div>
+      </ModalBody>
     </Modal>
   );
 }

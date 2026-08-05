@@ -14,7 +14,11 @@ import {
 } from "flowbite-react";
 import { useState } from "react";
 import { HiOutlineExclamationTriangle } from "react-icons/hi2";
-import { darkSurfaceTextInputTheme } from "@/lib/flowbite";
+import {
+  darkSurfaceModalCancelButtonClass,
+  darkSurfaceModalTheme,
+  darkSurfaceTextInputTheme,
+} from "@/lib/flowbite";
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
@@ -38,25 +42,6 @@ const MAX_AVATAR_BYTES = 1 * 1024 * 1024;
 // for a destructive, unrecoverable action.
 const DELETE_CONFIRMATION_PHRASE =
   "I acknowledge that my account will be lost forever and I want to delete it anyway";
-
-// theme override shared by the delete-account modal - matches the
-// surface/border tokens ModalLayer.tsx uses for the auth modal, instead of
-// Flowbite's default light popup card.
-const darkSurfaceModalTheme = {
-  content: {
-    inner:
-      "relative flex max-h-[90dvh] flex-col rounded-2xl border border-surface-border bg-surface-raised shadow-2xl",
-  },
-  header: {
-    base: "relative flex items-center justify-center rounded-t-2xl p-4",
-    popup: "border-b-0 p-4",
-    title: "text-sm font-semibold text-text-primary text-center",
-    close: {
-      base: "absolute right-4 top-1/2 -translate-y-1/2 inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-text-secondary hover:bg-surface-overlay hover:text-text-primary focus:outline-none",
-      icon: "h-5 w-5",
-    },
-  },
-};
 
 export const Route = createFileRoute("/_authenticated/user-settings")({
   loader: () => getMe(),
@@ -352,7 +337,7 @@ function UserSettingsPage() {
                 </p>
                 <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
                   <Button
-                    className={rowUploadButtonClass}
+                    className={darkSurfaceModalCancelButtonClass}
                     onClick={(e) => {
                       e.currentTarget.blur();
                       closeDeleteAccountModal();
@@ -405,7 +390,7 @@ function UserSettingsPage() {
                 />
                 <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
                   <Button
-                    className={rowUploadButtonClass}
+                    className={darkSurfaceModalCancelButtonClass}
                     disabled={deleting}
                     onClick={(e) => {
                       e.currentTarget.blur();

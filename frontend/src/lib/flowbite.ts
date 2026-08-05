@@ -178,3 +178,43 @@ export const darkDropdownTheme = {
     },
   },
 };
+
+// Shared by centered, icon-led confirmation modals (delete account in
+// user-settings.tsx, leave project in LeaveProjectModal.tsx) - matches the
+// surface/border tokens ModalLayer.tsx uses for the auth modal, instead of
+// Flowbite's default light popup card.
+export const darkSurfaceModalTheme = {
+  content: {
+    inner:
+      "relative flex max-h-[90dvh] flex-col rounded-2xl border border-surface-border bg-surface-raised shadow-2xl",
+  },
+  header: {
+    base: "relative flex items-center justify-center rounded-t-2xl p-4",
+    popup: "border-b-0 p-4",
+    title: "text-sm font-semibold text-text-primary text-center",
+    close: {
+      base: "absolute right-4 top-1/2 -translate-y-1/2 inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-text-secondary hover:bg-surface-overlay hover:text-text-primary focus:outline-none",
+      icon: "h-5 w-5",
+    },
+  },
+};
+
+// Cancel button for darkSurfaceModalTheme confirmation modals - a muted
+// ring-based style distinct from the bordered Cancel buttons used elsewhere
+// (ProjectCard.tsx, DangerZoneSection.tsx).
+export const darkSurfaceModalCancelButtonClass = `
+  bg-surface-overlay
+  dark:bg-surface-overlay!
+  text-text-primary
+  dark:text-text-primary
+  text-xs
+  dark:text-xs
+  hover:ring-1
+  hover:ring-surface-border
+  focus:ring-1
+  focus:ring-brand-500
+  dark:hover:ring-1
+  dark:hover:ring-surface-border
+  dark:focus:ring-1
+  dark:focus:ring-brand-500
+`;

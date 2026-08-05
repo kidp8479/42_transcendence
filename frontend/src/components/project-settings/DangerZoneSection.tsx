@@ -20,9 +20,6 @@ import { useToast } from "@/hooks/useToast";
 // This delete modal's Delete/Cancel buttons (order, flex-1 sizing,
 // solid-red styling) match the delete/leave confirmation on the Projects
 // grid (ProjectCard.tsx) - that's the reference for THIS confirmation.
-// RemoveMemberModal.tsx still has its own older left-aligned/muted-red
-// layout, not unified yet on purpose (its own one-off inline className
-// overrides, scoped as a follow-up rather than bundled into feature work).
 
 interface DangerZoneSectionProps {
   projectId: string;
