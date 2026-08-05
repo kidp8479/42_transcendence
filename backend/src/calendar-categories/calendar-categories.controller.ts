@@ -27,7 +27,7 @@ export class CalendarCategoriesController {
   ) {}
 
   // create a label for this project
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -65,7 +65,7 @@ export class CalendarCategoriesController {
   }
 
   // rename or recolor a label
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -82,7 +82,7 @@ export class CalendarCategoriesController {
   }
 
   // delete a label (returns the deleted row, so 200 not 204)
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete(":id")
   delete(
     @Param("projectId", ParseUUIDPipe) projectId: string,

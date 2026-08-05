@@ -45,7 +45,27 @@ async function bootstrap() {
       .setTitle("42 Project Planner API")
       .setDescription("API documentation for the 42 Project Planner app")
       .setVersion("1.0")
-      .addBearerAuth()
+      .addBearerAuth(
+        {
+          description: "Default JWT Authorization",
+          type: "http",
+          in: "header",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+        "access-token"
+      )
+      .addApiKey(
+        {
+          type: "apiKey",
+          in: "header",
+          name: "X-API-Key",
+          description:
+            "Project API token. Created tokens are revealed exactly once; never send one in a URL.",
+        },
+        "project-api-key"
+      )
+      .addSecurityRequirements("access-token")
       .build();
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup("api/docs", app, document);

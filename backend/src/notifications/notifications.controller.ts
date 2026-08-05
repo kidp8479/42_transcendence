@@ -36,14 +36,14 @@ export class NotificationsController {
 
   // PATCH (mark every unread notification as read - no request body, no id:
   // it always applies to the whole authenticated user's set)
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Patch("read-all")
   markAllAsRead(@Req() request: AuthenticatedRequest) {
     return this.notificationsService.markAllAsRead(request.user.id);
   }
 
   // PATCH (mark as read - no request body, the URL says it all)
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Patch(":id/read")
   markAsRead(
     @Param("id", ParseUUIDPipe) id: string,
@@ -54,14 +54,14 @@ export class NotificationsController {
 
   // DELETE (every notification belonging to the authenticated user, read
   // or unread - no id, same "no body, URL says it all" shape as read-all)
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete()
   removeAll(@Req() request: AuthenticatedRequest) {
     return this.notificationsService.removeAll(request.user.id);
   }
 
   // DELETE (one)
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete(":id")
   remove(
     @Param("id", ParseUUIDPipe) id: string,

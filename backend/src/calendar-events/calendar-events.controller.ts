@@ -26,7 +26,7 @@ export class CalendarEventsController {
   constructor(private readonly calendarEventsService: CalendarEventsService) {}
 
   // create a new event
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -56,7 +56,7 @@ export class CalendarEventsController {
   }
 
   // update an existing event
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -73,7 +73,7 @@ export class CalendarEventsController {
   }
 
   // delete an event (returns the deleted row, so 200 not 204)
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete(":id")
   delete(
     @Param("projectId", ParseUUIDPipe) projectId: string,

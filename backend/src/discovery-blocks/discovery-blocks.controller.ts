@@ -50,7 +50,7 @@ export class DiscoveryBlocksController {
   }
 
   // POST
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -61,7 +61,7 @@ export class DiscoveryBlocksController {
   }
 
   // PATCH
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -81,7 +81,7 @@ export class DiscoveryBlocksController {
   }
 
   // DELETE
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete(":id")
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,

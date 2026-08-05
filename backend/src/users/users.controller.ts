@@ -31,11 +31,12 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get("me")
+  @ApiBearerAuth("access-token")
   async findMe(@Req() request: AuthenticatedRequest) {
     return this.usersService.findById(request.user.id);
   }
 
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Patch("me")
   async updateMe(
     @Body() dto: UpdateUserDto,
@@ -44,7 +45,7 @@ export class UsersController {
     return this.usersService.update(request.user.id, dto);
   }
 
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete("me")
   async removeMe(@Req() request: AuthenticatedRequest) {
     return this.usersService.remove(request.user.id);
@@ -70,7 +71,7 @@ export class UsersController {
   // Multipart upload, so it can't go through UpdateUserDto/class-validator
   // like the rest of the profile - the file is checked by hand below, and
   // the resulting object key/URL is computed in the service.
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Post("me/avatar")
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: MAX_AVATAR_BYTES } })
@@ -102,7 +103,7 @@ export class UsersController {
   // capability token, just the storage object name, and it leaks straight
   // out through any user's avatarUrl. Accepting one from the client let any
   // authenticated caller delete another user's avatar object.
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete("me/avatar")
   async removeAvatar(@Req() request: AuthenticatedRequest) {
     return this.usersService.removeAvatar(request.user.id);
