@@ -30,3 +30,10 @@ export interface ProjectApiTokenRequest {
   method: string;
   apiToken: ProjectApiTokenPrincipal;
 }
+
+// Machine writes are deliberately distinct from browser users. In particular,
+// a project token must never be represented by a made-up User UUID.
+export interface MachineTaskMutationActor {
+  kind: "MACHINE";
+  tokenId: string;
+}

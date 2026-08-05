@@ -350,6 +350,21 @@ model ProjectApiTokenEvent {
   @@index([tokenId, createdAt])
 }
 
+// Append-only, deliberately redacted evidence of machine task mutations.
+// It has no foreign keys so token/project/task deletion cannot erase it.
+model MachineTaskActionAudit {
+  id        String   @id
+  tokenId   String
+  projectId String
+  taskId    String
+  action    String
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([tokenId, createdAt])
+  @@index([taskId, createdAt])
+}
+
 // TASK
 //    This configures the Task related tables: Task, TaskCategory, TaskAssignee
 //

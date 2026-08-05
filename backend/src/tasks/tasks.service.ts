@@ -6,11 +6,13 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { Prisma, TaskStatus } from "@prisma/client";
 import {
   ApplicationDatabaseTransaction,
   PrismaService,
 } from "../prisma/prisma.service";
+import type { MachineTaskMutationActor } from "../auth/authenticated-request";
 import { ProjectsService } from "../projects/projects.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -47,6 +49,9 @@ const taskInclude = {
 type TaskWithRelations = Prisma.TaskGetPayload<{
   include: typeof taskInclude;
 }>;
+type TaskMutationActor =
+  { kind: "USER"; userId: string } | MachineTaskMutationActor;
+type MachineTaskAction = "CREATE" | "UPDATE" | "DELETE";
 
 // Prisma returns the TaskAssignee join rows, not the users directly - flatten
 // each row down to its nested user before sending the response.
@@ -68,10 +73,28 @@ export class TasksService {
   ) {}
 
   async create(projectId: string, dto: CreateTaskDto, userId: string) {
+    return this.createAs(projectId, dto, { kind: "USER", userId });
+  }
+
+  async createForMachine(
+    projectId: string,
+    dto: CreateTaskDto,
+    actor: MachineTaskMutationActor
+  ) {
+    return this.createAs(projectId, dto, actor);
+  }
+
+  private async createAs(
+    projectId: string,
+    dto: CreateTaskDto,
+    actor: TaskMutationActor
+  ) {
     // Membership first, on its own: an authorization gate, not just another
     // independent check - a non-member shouldn't trigger category/assignee
     // validation at all, in parallel or otherwise.
-    await this.projectsService.assertMembership(projectId, userId);
+    if (actor.kind === "USER") {
+      await this.projectsService.assertMembership(projectId, actor.userId);
+    }
     this.assertValidDateRange(dto.startAt, dto.endAt);
     // Independent of each other once membership holds - no reason to await
     // them one at a time.
@@ -97,7 +120,7 @@ export class TasksService {
           dto.rank
         );
 
-        return database.task.create({
+        const created = await database.task.create({
           data: {
             title: dto.title,
             categoryId: dto.categoryId,
@@ -112,29 +135,45 @@ export class TasksService {
             projectId: projectId, // from the url, not the dto
           },
         });
+        if (actor.kind === "MACHINE" && dto.assigneeIds) {
+          await this.taskAssigneeService.replaceAssigneesInTransaction(
+            database,
+            created.id,
+            projectId,
+            dto.assigneeIds
+          );
+        }
+        await this.recordMachineAction(
+          database,
+          actor,
+          projectId,
+          created.id,
+          "CREATE"
+        );
+        return created;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
 
-    // Outside the transaction above, like CalendarEventsService does: the join
-    // rows aren't part of the ordering invariant, so a failure here leaves a
-    // correctly-ranked task with no assignees rather than a corrupt column.
     if (dto.assigneeIds) {
-      await this.taskAssigneeService.replaceAssignees(
-        task.id,
-        projectId,
-        dto.assigneeIds
-      );
+      if (actor.kind === "USER") {
+        // User-created task ranks are already committed before assignee
+        // replacement, preserving the existing user mutation behavior.
+        await this.taskAssigneeService.replaceAssignees(
+          task.id,
+          projectId,
+          dto.assigneeIds
+        );
+      }
       // Everything is "new" on create - no previous assignees to diff against.
       await this.notifyNewAssignees(
         projectId,
         [],
         dto.assigneeIds,
-        userId,
+        actor.kind === "USER" ? actor.userId : undefined,
         dto.title
       );
     }
-
     // Membership already asserted at the top of create() - no need for
     // findById()'s own second check.
     const created = await this.findByIdForProject(task.id, projectId);
@@ -194,7 +233,28 @@ export class TasksService {
     projectId: string,
     userId: string
   ) {
-    const existingTask = await this.findById(id, projectId, userId); // access guard
+    return this.updateAs(id, dto, projectId, { kind: "USER", userId });
+  }
+
+  async updateForMachine(
+    id: string,
+    dto: UpdateTaskDto,
+    projectId: string,
+    actor: MachineTaskMutationActor
+  ) {
+    return this.updateAs(id, dto, projectId, actor);
+  }
+
+  private async updateAs(
+    id: string,
+    dto: UpdateTaskDto,
+    projectId: string,
+    actor: TaskMutationActor
+  ) {
+    const existingTask =
+      actor.kind === "USER"
+        ? await this.findById(id, projectId, actor.userId)
+        : await this.findByIdForProject(id, projectId);
     // a PATCH can send only one of startAt/endAt - validate the pair as it will
     // actually end up in the database, not just the field(s) sent. Pure and
     // synchronous, so it runs before the remaining DB round-trips below.
@@ -240,7 +300,15 @@ export class TasksService {
       // nextStatus: moveTask needs to know whether a status change was
       // actually REQUESTED (vs. just defaulted from a stale pre-transaction
       // read) to resolve the race described in its own comment.
-      await this.moveTask(id, projectId, dto.status, dto.rank, taskFields);
+      await this.moveTask(
+        id,
+        projectId,
+        dto.status,
+        dto.rank,
+        taskFields,
+        actor,
+        assigneeIds
+      );
 
       // Only a real column change is notification-worthy - a same-column
       // drag (isMoving from a rank change alone) isn't news to anyone.
@@ -252,31 +320,60 @@ export class TasksService {
         await this.notifyStatusChange(
           projectId,
           existingTask.assignees,
-          userId,
+          actor.kind === "USER" ? actor.userId : undefined,
           dto.title ?? existingTask.title,
           nextStatus
         );
       }
     } else {
-      await this.prisma.task.update({
-        where: { id: id },
-        data: taskFields,
-      });
+      if (actor.kind === "MACHINE") {
+        await this.prisma.transaction(
+          async (database) => {
+            await database.task.update({
+              where: { id: id },
+              data: taskFields,
+            });
+            if (assigneeIds) {
+              await this.taskAssigneeService.replaceAssigneesInTransaction(
+                database,
+                id,
+                projectId,
+                assigneeIds
+              );
+            }
+            await this.recordMachineAction(
+              database,
+              actor,
+              projectId,
+              id,
+              "UPDATE"
+            );
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+        );
+      } else {
+        await this.prisma.task.update({
+          where: { id: id },
+          data: taskFields,
+        });
+      }
     }
 
     if (assigneeIds) {
-      await this.taskAssigneeService.replaceAssignees(
-        id,
-        projectId,
-        assigneeIds
-      );
+      if (actor.kind === "USER") {
+        await this.taskAssigneeService.replaceAssignees(
+          id,
+          projectId,
+          assigneeIds
+        );
+      }
       // dto.title if this same PATCH also renamed it, same reasoning as
       // notifyStatusChange above.
       await this.notifyNewAssignees(
         projectId,
         existingTask.assignees.map((assignee) => assignee.id),
         assigneeIds,
-        userId,
+        actor.kind === "USER" ? actor.userId : undefined,
         dto.title ?? existingTask.title
       );
     }
@@ -299,8 +396,28 @@ export class TasksService {
   }
 
   async remove(id: string, projectId: string, userId: string) {
+    return this.removeAs(id, projectId, { kind: "USER", userId });
+  }
+
+  async removeForMachine(
+    id: string,
+    projectId: string,
+    actor: MachineTaskMutationActor
+  ) {
+    return this.removeAs(id, projectId, actor);
+  }
+
+  private async removeAs(
+    id: string,
+    projectId: string,
+    actor: TaskMutationActor
+  ) {
     // Access guard only - the position used below comes from the delete itself.
-    await this.findById(id, projectId, userId);
+    if (actor.kind === "USER") {
+      await this.findById(id, projectId, actor.userId);
+    } else {
+      await this.findByIdForProject(id, projectId);
+    }
 
     const task = await this.prisma.transaction(
       async (database) => {
@@ -317,6 +434,13 @@ export class TasksService {
           projectId,
           deleted.status,
           deleted.rank
+        );
+        await this.recordMachineAction(
+          database,
+          actor,
+          projectId,
+          id,
+          "DELETE"
         );
         return deleted;
       },
@@ -395,7 +519,9 @@ export class TasksService {
     projectId: string,
     requestedStatus: TaskStatus | undefined,
     wantedRank: number | undefined,
-    taskFields: Prisma.TaskUpdateInput
+    taskFields: Prisma.TaskUpdateInput,
+    actor: TaskMutationActor,
+    assigneeIds: string[] | undefined
   ): Promise<void> {
     // Both depend on the live state read inside the transaction (rank on
     // column length, status on the race above) - reused as-is below for
@@ -444,6 +570,21 @@ export class TasksService {
           where: { id: id },
           data: { ...taskFields, status: targetStatus, rank: nextRank },
         });
+        if (actor.kind === "MACHINE" && assigneeIds) {
+          await this.taskAssigneeService.replaceAssigneesInTransaction(
+            database,
+            id,
+            projectId,
+            assigneeIds
+          );
+        }
+        await this.recordMachineAction(
+          database,
+          actor,
+          projectId,
+          id,
+          "UPDATE"
+        );
 
         return { nextRank, targetStatus };
       },
@@ -468,7 +609,7 @@ export class TasksService {
   private async notifyStatusChange(
     projectId: string,
     assignees: { id: string }[],
-    actingUserId: string,
+    actingUserId: string | undefined,
     taskTitle: string,
     nextStatus: TaskStatus
   ): Promise<void> {
@@ -505,7 +646,7 @@ export class TasksService {
     projectId: string,
     previousAssigneeIds: string[],
     newAssigneeIds: string[],
-    actingUserId: string,
+    actingUserId: string | undefined,
     taskTitle: string
   ): Promise<void> {
     const addedUserIds = newAssigneeIds.filter(
@@ -580,5 +721,20 @@ export class TasksService {
         "assigneeIds must all be members of this project"
       );
     }
+  }
+
+  private async recordMachineAction(
+    database: ApplicationDatabaseTransaction,
+    actor: TaskMutationActor,
+    projectId: string,
+    taskId: string,
+    action: MachineTaskAction
+  ): Promise<void> {
+    if (actor.kind !== "MACHINE") {
+      return;
+    }
+    await database.$executeRaw(
+      Prisma.sql`INSERT INTO "MachineTaskActionAudit" ("id", "tokenId", "projectId", "taskId", "action") VALUES (${randomUUID()}, ${actor.tokenId}, ${projectId}, ${taskId}, ${action})`
+    );
   }
 }

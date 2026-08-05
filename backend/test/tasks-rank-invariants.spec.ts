@@ -207,6 +207,8 @@ class FakeTaskStore {
 // Prisma transaction still shares the row data with the outer client
 // (SERIALIZABLE, not a separate in-memory copy).
 function createFakePrisma(store: FakeTaskStore) {
+  const auditQueries: { query: unknown; withinTransaction: boolean }[] = [];
+  let withinTransaction = false;
   const db = {
     task: store,
     taskCategory: { findFirst: async () => ({ id: "cat-a" }) },
@@ -218,32 +220,81 @@ function createFakePrisma(store: FakeTaskStore) {
       count: async ({ where }: { where: { userId: { in: string[] } } }) =>
         where.userId.in.length,
     },
+    $executeRaw: async (query: unknown) => {
+      auditQueries.push({ query, withinTransaction });
+      return 1;
+    },
   };
   return {
     ...db,
-    transaction: async (operation: (database: typeof db) => Promise<unknown>) =>
-      operation(db),
+    auditQueries,
+    get withinTransaction() {
+      return withinTransaction;
+    },
+    transaction: async (
+      operation: (database: typeof db) => Promise<unknown>
+    ) => {
+      const wasWithinTransaction = withinTransaction;
+      withinTransaction = true;
+      try {
+        return await operation(db);
+      } finally {
+        withinTransaction = wasWithinTransaction;
+      }
+    },
   };
 }
 
 const projectAssignedStub = { assertMembership: async () => undefined };
-const noopTaskAssignees = { replaceAssignees: async () => undefined };
+const noopTaskAssignees = {
+  replaceAssignees: async () => undefined,
+  replaceAssigneesInTransaction: async () => undefined,
+};
 
 interface TaskAssigneeSpy {
   calls: { taskId: string; projectId: string; userIds: string[] }[];
+  transactionCalls: {
+    taskId: string;
+    projectId: string;
+    userIds: string[];
+    withinTransaction: boolean;
+  }[];
   replaceAssignees: (
+    taskId: string,
+    projectId: string,
+    userIds: string[]
+  ) => Promise<void>;
+  replaceAssigneesInTransaction: (
+    database: unknown,
     taskId: string,
     projectId: string,
     userIds: string[]
   ) => Promise<void>;
 }
 
-function createTaskAssigneeSpy(): TaskAssigneeSpy {
+function createTaskAssigneeSpy(
+  isWithinTransaction: () => boolean = () => false
+): TaskAssigneeSpy {
   const calls: TaskAssigneeSpy["calls"] = [];
+  const transactionCalls: TaskAssigneeSpy["transactionCalls"] = [];
   return {
     calls,
+    transactionCalls,
     replaceAssignees: async (taskId, projectId, userIds) => {
       calls.push({ taskId, projectId, userIds });
+    },
+    replaceAssigneesInTransaction: async (
+      _database,
+      taskId,
+      projectId,
+      userIds
+    ) => {
+      transactionCalls.push({
+        taskId,
+        projectId,
+        userIds,
+        withinTransaction: isWithinTransaction(),
+      });
     },
   };
 }
@@ -366,6 +417,77 @@ test("create() clamps an out-of-range rank instead of leaving a hole", async () 
   await service.create(projectId, baseCreateDto({ rank: 99 }), userId);
 
   assert.deepEqual(store.ranksIn(projectId, TaskStatus.TODO), [0]);
+});
+
+test("machine create atomically records a redacted action and replaces assignees", async () => {
+  const store = new FakeTaskStore();
+  const fakePrisma = createFakePrisma(store);
+  const notifications = createNotificationsSpy();
+  const taskAssignees = createTaskAssigneeSpy(
+    () => fakePrisma.withinTransaction
+  );
+  const service = new TasksService(
+    fakePrisma as never,
+    taskAssignees as never,
+    projectAssignedStub as never,
+    createRealtimeSpy() as never,
+    notifications as never
+  );
+
+  await service.createForMachine(
+    projectId,
+    baseCreateDto({ assigneeIds: [userId] }),
+    { kind: "MACHINE", tokenId: "internal-token-id" }
+  );
+
+  assert.equal(fakePrisma.auditQueries.length, 1);
+  assert.equal(fakePrisma.auditQueries[0].withinTransaction, true);
+  assert.deepEqual(taskAssignees.calls, []);
+  assert.deepEqual(taskAssignees.transactionCalls, [
+    {
+      taskId: store.rows[0].id,
+      projectId,
+      userIds: [userId],
+      withinTransaction: true,
+    },
+  ]);
+  assert.equal(notifications.created.length, 1);
+  assert.equal(notifications.created[0].userId, userId);
+});
+
+test("machine update atomically records an action and replaces assignees", async () => {
+  const store = new FakeTaskStore();
+  const fakePrisma = createFakePrisma(store);
+  const taskAssignees = createTaskAssigneeSpy(
+    () => fakePrisma.withinTransaction
+  );
+  const service = new TasksService(
+    fakePrisma as never,
+    taskAssignees as never,
+    projectAssignedStub as never,
+    createRealtimeSpy() as never,
+    createNotificationsSpy() as never
+  );
+  await service.create(projectId, baseCreateDto(), userId);
+
+  await service.updateForMachine(
+    store.rows[0].id,
+    { title: "Renamed", assigneeIds: [userId] } as never,
+    projectId,
+    { kind: "MACHINE", tokenId: "internal-token-id" }
+  );
+
+  assert.equal(fakePrisma.auditQueries.length, 1);
+  assert.equal(fakePrisma.auditQueries[0].withinTransaction, true);
+  assert.deepEqual(taskAssignees.calls, []);
+  assert.deepEqual(taskAssignees.transactionCalls, [
+    {
+      taskId: store.rows[0].id,
+      projectId,
+      userIds: [userId],
+      withinTransaction: true,
+    },
+  ]);
 });
 
 // -- Intra-column moves -------------------------------------------------------

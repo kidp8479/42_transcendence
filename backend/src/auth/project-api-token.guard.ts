@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -63,12 +64,16 @@ export class ProjectApiTokenGuard implements CanActivate {
     }
 
     const principal = await this.introspect(apiKey);
-    if (
-      request.params.projectId !== principal.projectId ||
-      (requiredPermission === "READ_WRITE" &&
-        principal.permission !== "READ_WRITE")
-    ) {
+    if (request.params.projectId !== principal.projectId) {
       throw new NotFoundException("Project not found");
+    }
+    if (
+      requiredPermission === "READ_WRITE" &&
+      principal.permission !== "READ_WRITE"
+    ) {
+      throw new ForbiddenException(
+        "Project API token does not permit write operations"
+      );
     }
 
     const project = await this.prisma.project.findFirst({

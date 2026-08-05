@@ -2,7 +2,7 @@
 // every module that needs to run must be registered here in "imports"
 
 import { Module } from "@nestjs/common";
-import { APP_FILTER, APP_GUARD } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { ConfigModule } from "@nestjs/config";
 import { envValidationSchema } from "./config/env.validation";
@@ -30,6 +30,7 @@ import { StorageModule } from "./storage/storage.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { ProjectApiTokensModule } from "./project-api-tokens/project-api-tokens.module";
 import { PublicApiModule } from "./public-api/public-api.module";
+import { NoStoreApiResponsesInterceptor } from "./common/interceptors/no-store-api-responses.interceptor";
 
 @Module({
   imports: [
@@ -89,6 +90,10 @@ import { PublicApiModule } from "./public-api/public-api.module";
     {
       provide: APP_GUARD,
       useClass: ProjectApiTokenGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: NoStoreApiResponsesInterceptor,
     },
 
     // translates raw Prisma errors (ex: unique constraint violation, record not

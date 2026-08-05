@@ -19,6 +19,7 @@ export type ApplicationDatabaseTransaction = Pick<
   | "task"
   | "taskCategory"
   | "taskAssignee"
+  | "$executeRaw"
 >;
 
 type TransactionOptions = {
@@ -85,6 +86,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get taskAssignee(): PrismaClient["taskAssignee"] {
     return this.currentClient().taskAssignee;
+  }
+
+  async executeRaw(query: Prisma.Sql): Promise<number> {
+    return this.currentClient().$executeRaw(query);
   }
 
   async transaction<T>(

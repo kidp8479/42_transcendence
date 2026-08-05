@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -29,7 +28,6 @@ export class ProjectApiTokensController {
   }
 
   @Post()
-  @Header("Cache-Control", "no-store")
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Body() dto: CreateProjectApiTokenDto,
@@ -39,6 +37,7 @@ export class ProjectApiTokensController {
   }
 
   @Post(":tokenId/revoke")
+  @HttpCode(200)
   revoke(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("tokenId", ParseUUIDPipe) tokenId: string,

@@ -88,5 +88,10 @@ REVOKE ALL ON TABLE
 	"AuthToken",
 	"AuthEvent",
 	"ProjectApiToken",
-	"ProjectApiTokenEvent"
+	"ProjectApiTokenEvent",
+	"MachineTaskActionAudit"
 FROM backend_runtime;
+-- Machine task-action evidence is append-only and is written without a
+-- RETURNING clause, so the application needs INSERT but never read/update/
+-- delete access to it.
+GRANT INSERT ON TABLE "MachineTaskActionAudit" TO backend_runtime;
