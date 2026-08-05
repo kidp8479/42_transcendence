@@ -168,6 +168,36 @@ The frontend must still serialize refresh calls. The grace window is a resilienc
 
 Bearer-authenticated application APIs use explicit `Authorization` and do not rely on cookies, so they do not require CSRF protection. Login/register remain Origin-checked and rate-limited.
 
+### Project API tokens
+
+TR-85 introduces an independent machine-credential lifecycle described by
+[ADR-006](ADR-006-project-bound-opaque-api-tokens.md). A project API token is
+an opaque `trp_v1_...` value transported only in `X-API-Key` over TLS. It is
+not a JWT, cookie, refresh token, OAuth grant, user session, or impersonated
+user.
+
+Go auth generates the token with `crypto/rand`, stores only a public selector
+and Vault-peppered HMAC digest, and returns the raw value exactly once when it
+is created. The auth service owns expiry, revoke/delete lifecycle, and
+introspection. NestJS authenticates the requesting human browser session for
+management actions, then owns current project-role checks and every
+project/object containment decision for token requests.
+
+Tokens are bound permanently to one project and carry `READ` or `READ_WRITE`;
+write implies read. An `OWNER` or `ADMIN` can manage tokens. A token stays
+valid when its creator loses membership or is disabled because its authority
+belongs to the project, not the person. Revoke is permanent; delete removes
+the credential record while an independent, redacted audit event remains.
+
+`/api/public/v1` accepts only the distinct project-token principal. Existing
+browser `/api` controllers remain JWT-only. Tokens cannot access token
+management, project lifecycle, memberships/roles, user/session/auth
+endpoints, WebSockets, uploads, global endpoints, or OWNER-only actions
+unless a new allowlist entry is explicitly reviewed. Invalid, malformed,
+unknown, expired, revoked, and deleted tokens all return `401`; auth/Vault/DB
+unavailability returns `503`; a project-path mismatch returns non-disclosing
+`404`.
+
 ### XSS policy
 
 The production frontend CSP begins restrictive:
