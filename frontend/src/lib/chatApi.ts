@@ -1,5 +1,5 @@
 // chatApi.ts
-// Typed API client for the per-project group chat (TR-93).
+// Typed API client for the per-project group chat.
 // One chat per Project (see ChatMessage in schema.prisma) - there is no
 // separate "Conversation" model, the project id in the URL is the room id.
 
