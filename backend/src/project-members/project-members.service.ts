@@ -203,14 +203,6 @@ export class ProjectMembersService {
           "remove an admin"
         );
       }
-      // KNOWN GAP (TR-B): this deletes the membership row and nothing else.
-      // TaskAssignee/CalendarAssignee only cascade on User deletion, not on a
-      // member leaving a project, so their rows survive and keep pointing at a
-      // non-member. TasksService.assertAssigneesAreProjectMembers then rejects
-      // any PATCH that resends that id, which made the affected task impossible
-      // to save from the Kanban drawer at all - worked around client-side in
-      // TR-49 (KanbanCardDrawer filters stale ids out of its draft), still to be
-      // fixed here, inside this same transaction.
       const removed = await this.prisma.projectMember.delete({
         where: {
           userId_projectId: {
