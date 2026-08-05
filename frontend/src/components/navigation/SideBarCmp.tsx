@@ -39,9 +39,8 @@ interface NavigationItem {
 const sidebarContainerClasses =
   "fixed inset-y-0 left-0 z-50 w-full transition-transform duration-300";
 const sidebarInnerClasses = "font-mono relative h-full w-full overflow-hidden";
-// Fixed: dark: variant must come right before the utility, `!` goes after the variant.
 const sidebarSurfaceClasses =
-  "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 !bg-surface-raised dark:!bg-surface-raised";
+  "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 bg-surface-raised! dark:bg-surface-raised!";
 const sidebarIconClasses =
   "h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary";
 const sidebarNavLinkClasses =
