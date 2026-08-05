@@ -197,6 +197,19 @@ export function MembersSection({
   };
 
   // POST /api/projects/:projectId/members - adds a member by username.
+  // TODO: (v1) two gaps in add-member worth addressing together:
+  // 1. Requires knowing and typing the exact username - no search/
+  //    autocomplete, so a typo isn't caught until after clicking Add
+  //    (backend correctly returns "User not found", but only then). Worth
+  //    a typeahead search endpoint (GET /users/search?q=...) with a
+  //    picker UI, or at minimum a debounced inline lookup that confirms a
+  //    match before submit.
+  // 2. Bigger gap: addMember grants access immediately and unilaterally -
+  //    the target user has no chance to accept or decline before they're
+  //    already a member. Should become a real invite flow (a pending
+  //    request the target must accept) instead of an unconditional add,
+  //    which also gives search/autocomplete (1) a natural home: inviting
+  //    someone found via search, rather than blindly adding them.
   async function handleAddMember(event: FormEvent) {
     event.preventDefault();
     if (isSubmittingMember) {
