@@ -73,6 +73,7 @@ class ChatUnreadResource {
     // reconnect (dropped wifi, backend restart) needs a full refetch to
     // catch up - same reasoning as NotificationBell's own "connect" refetch.
     socket.on("connect", refresh);
+    socket.on("chat:deleted", refresh);
     socket.on("chat:created", (payload: unknown) => {
       const message = parseChatMessage(payload);
       if (message === null) return;
