@@ -15,8 +15,7 @@ interface AvatarStackProps {
   maxVisible?: number;
 }
 
-// lib/categoryColorPalette.ts). The ring makes overlapped avatars readable
-// against each other.
+// lib/categoryColorPalette.ts).
 // `relative` is load-bearing, not decoration: the sr-only labels inside are
 // position:absolute, and an absolute box is only clipped by a POSITIONED
 // ancestor. The column's card list is deliberately unpositioned (see
