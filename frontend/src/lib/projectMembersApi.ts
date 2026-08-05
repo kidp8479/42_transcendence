@@ -86,10 +86,10 @@ function isProjectMemberRole(value: unknown): value is ProjectMember["role"] {
 
 // POST   /api/projects/:projectId/members
 //  => add a user to a project
-//  => body: { userId }
-//  => only ADMIN members can add users
-//  => backend enforces the permission check (frontend must not be trusted)
-export function addMember(projectId: string, input: { userId: string }) {
+//  => body: { username }
+//  => only OWNER or ADMIN members can add users
+//  => backend resolves username to a user id and enforces all permission checks.
+export function addMember(projectId: string, input: { username: string }) {
   return apiClient<unknown>(`/projects/${projectId}/members`, {
     method: "POST",
     body: input,
@@ -104,6 +104,17 @@ export function removeMember(projectId: string, userId: string) {
   return apiClient<void>(`/projects/${projectId}/members/${userId}`, {
     method: "DELETE",
   });
+}
+
+export function updateMemberRole(
+  projectId: string,
+  userId: string,
+  role: "ADMIN" | "MEMBER"
+) {
+  return apiClient<ProjectMember>(`/projects/${projectId}/members/${userId}`, {
+    method: "PATCH",
+    body: { role },
+  }).then(parseProjectMember);
 }
 
 // IMPORTANT:

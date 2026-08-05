@@ -4,6 +4,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { ProjectLayout } from "@/components/layout/ProjectLayout";
 import { getProject } from "@/lib/projectsApi";
+import { ApiError } from "@/lib/apiClient";
 
 export const Route = createFileRoute("/_authenticated/$projectId")({
   beforeLoad: ({ location, params }) => {
@@ -11,6 +12,15 @@ export const Route = createFileRoute("/_authenticated/$projectId")({
       throw redirect({ to: "/$projectId/summary", params });
     }
   },
-  loader: ({ params }) => getProject(params.projectId),
+  loader: async ({ params }) => {
+    try {
+      return await getProject(params.projectId);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        throw redirect({ to: "/projects" });
+      }
+      throw error;
+    }
+  },
   component: ProjectLayout,
 });

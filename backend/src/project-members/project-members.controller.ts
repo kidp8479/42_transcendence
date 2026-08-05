@@ -20,11 +20,13 @@ import {
   Post,
   Body,
   Delete,
+  Patch,
 } from "@nestjs/common";
 
 import { ProjectMembersService } from "./project-members.service";
 import { AuthenticatedRequest } from "../auth/authenticated-request";
 import { AddMemberDto } from "./dto/add-member.dto";
+import { UpdateMemberRoleDto } from "./dto/update-member-role.dto";
 
 @Controller("projects/:projectId/members")
 export class ProjectMembersController {
@@ -35,7 +37,7 @@ export class ProjectMembersController {
   // ENDPOINTS:
   // POST   /api/projects/:projectId/members
   //	=> add a user to a project
-  //    => expects a request body matching AddMemberDto (userId)
+  //    => expects a request body matching AddMemberDto (username)
   //    => projectId comes from the URL, not the body
   @Post()
   addMember(
@@ -73,6 +75,26 @@ export class ProjectMembersController {
     return this.projectMembersService.removeMember(
       projectId,
       userId,
+      request.user.id
+    );
+  }
+
+  // PATCH	/api/projects/:projectId/members/:userId
+  //    => change a member role
+  //    => OWNER/ADMIN can promote/demote members
+  //    => only OWNER can demote an ADMIN
+  //    => OWNER role cannot be assigned through this endpoint
+  @Patch(":userId")
+  updateMemberRole(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() dto: UpdateMemberRoleDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectMembersService.updateMemberRole(
+      projectId,
+      userId,
+      dto.role,
       request.user.id
     );
   }

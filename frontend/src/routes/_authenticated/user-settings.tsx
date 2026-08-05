@@ -194,9 +194,14 @@ function UserSettingsPage() {
         return;
       }
 
+      // TODO: (v1) implement ownership transfer so an OWNER who wants to
+      // delete their account isn't forced to delete the entire project just to
+      // do so. Right now there's no way to hand off ownership or leave as an
+      // OWNER, so this block is a permanent dead end for any user who owns a
+      // project they don't want to destroy.
       const message =
         error instanceof ApiError && error.status === 409
-          ? "You must delete or transfer the ownership of the projects you own before deleting your account."
+          ? "You must delete the projects you own before deleting your account."
           : "Account deletion failed. Please retry.";
 
       showToast({ type: "error", message });

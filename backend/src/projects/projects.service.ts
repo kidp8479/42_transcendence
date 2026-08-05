@@ -235,13 +235,17 @@ export class ProjectsService {
   }
 
   // NOTE ON ROLES: deleting the project is a team-affecting, hard-to-undo action -
-  // decided with the team (see TR-66) that this needs an OWNER/ADMIN check, unlike most
+  // decided with the team (see TR-66) that this needs a role check, unlike most
   // other modules where any member can act freely (tasks, discovery blocks, etc.).
+  // OWNER-only, not OWNER/ADMIN: the frontend only ever offers "Delete project" to
+  // the OWNER (ProjectCard.tsx, DangerZoneSection.tsx) - an ADMIN gets "Leave
+  // project" instead - so the backend now matches that instead of allowing an
+  // ADMIN to delete via a direct API call with no corresponding UI affordance.
   async remove(id: string, userId: string) {
     const member = await this.assertMembership(id, userId);
-    if (member.role !== "OWNER" && member.role !== "ADMIN") {
+    if (member.role !== "OWNER") {
       throw new ForbiddenException(
-        "Only the project owner or admin can delete this project"
+        "Only the project owner can delete this project"
       );
     }
 
@@ -249,7 +253,12 @@ export class ProjectsService {
     // CalendarEvent, CalendarCategory, DiscoveryBlock, and EvaluationChecklistItem
     // row for this project is deleted too. Permanent, no soft-delete/undo.
     // No return value: the controller responds 204 No Content (see delete() there).
+    // Emit AFTER the delete succeeds, not before - broadcasting first would
+    // tell every connected client the project is gone even if the delete
+    // then throws (DB error, constraint failure), leaving clients desynced
+    // from a project that's still actually there.
     await this.prisma.project.delete({ where: { id } });
+    this.realtimeService.emitToProject(id, "project:deleted", { id });
   }
 
   async update(id: string, dto: UpdateProjectDto, userId: string) {
@@ -260,8 +269,37 @@ export class ProjectsService {
       );
     }
 
-    await this.prisma.project.update({ where: { id }, data: dto });
-    return this.findById(id, userId);
+    // Broadcast project changes to all connected project members so their UI
+    // (ex: sidebar project list) can refresh without requiring a page reload.
+    // Used for status changes (COMPLETED), archiving, and other project updates.
+    //
+    // Includes the same fields findById() fetches separately, and reuses
+    // `member` from the assertMembership call above instead of calling
+    // findById() (which would re-run assertMembership and re-fetch the
+    // project from scratch) - one query instead of three for every PATCH.
+    const updatedProject = await this.prisma.project.update({
+      where: { id },
+      data: dto,
+      include: {
+        evaluationChecklistItems: {
+          select: { section: true, isChecked: true },
+        },
+        _count: {
+          select: { members: true },
+        },
+      },
+    });
+    const { evaluationChecklistItems, _count, ...rest } = updatedProject;
+    const result = {
+      ...rest,
+      role: member.role,
+      progress: computeProjectProgress(evaluationChecklistItems),
+      memberCount: _count.members,
+    };
+
+    this.realtimeService.emitToProject(id, "project:updated", result);
+
+    return result;
   }
 
   private async findProjectForUser(
