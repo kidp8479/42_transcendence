@@ -38,10 +38,7 @@ export function assigneeColorIndex(username: string): number {
   return char_code_sum % CATEGORY_COLOR_PALETTE.length;
 }
 
-export function AvatarStack({
-  assignees,
-  maxVisible = 3,
-}: AvatarStackProps) {
+export function AvatarStack({ assignees, maxVisible = 3 }: AvatarStackProps) {
   if (assignees.length === 0) {
     return null;
   }

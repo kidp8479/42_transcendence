@@ -25,6 +25,7 @@ import { useLiveItemSync } from "@/hooks/useLiveItemSync";
 import { useChatUnread } from "@/hooks/useChatUnread";
 import { useToast } from "@/hooks/useToast";
 import { darkSurfaceFieldClassName } from "@/lib/flowbite";
+import { AvatarStack } from "@/components/common/AvatarStack";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
@@ -71,6 +72,8 @@ function ChatPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const AVATAR_STACK_MAX_DISPLAYED = 12;
 
   // Real-time: another member's new/deleted message updates this page
   // without a reload. Scoped to the open conversation only - value "" (no
@@ -245,16 +248,10 @@ function ChatPage() {
                   </p>
                 </div>
                 <div className="flex -space-x-2">
-                  {members.map((member) => (
-                    <Avatar
-                      key={member.id}
-                      img={member.user.avatarUrl ?? undefined}
-                      placeholderInitials={initialsOf(member.user.username)}
-                      rounded
-                      size="sm"
-                      className="ring-2 ring-surface-raised"
-                    />
-                  ))}
+                  <AvatarStack
+                    assignees={members.map((member) => member.user)}
+                    maxVisible={AVATAR_STACK_MAX_DISPLAYED}
+                  />
                 </div>
               </header>
 
