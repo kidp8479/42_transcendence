@@ -214,12 +214,42 @@ func TestHandleCreateProjectAPITokenReturnsDefaultResolvedExpiry(t *testing.T) {
 	if response.Code != http.StatusCreated {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
+
 	if authStore.projectRequest.ExpiresAt.Before(time.Now().UTC().Add(projectAPITokenDefaultTTL-time.Second)) ||
 		authStore.projectRequest.ExpiresAt.After(time.Now().UTC().Add(projectAPITokenDefaultTTL+time.Second)) {
 		t.Fatalf("store expiry = %s, want resolved 90-day default", authStore.projectRequest.ExpiresAt)
 	}
 	if !strings.Contains(response.Body.String(), authStore.projectRequest.ExpiresAt.Format(time.RFC3339Nano)) {
 		t.Fatalf("response does not return resolved expiry: %s", response.Body.String())
+	}
+}
+
+func TestHandleCreateProjectAPITokenMapsStaleProjectAndExpiryFailures(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		storeError error
+		wantStatus int
+	}{
+		{"deleted project", store.ErrNotFound, http.StatusNotFound},
+		{"expiry elapsed during issuance", store.ErrInvalid, http.StatusBadRequest},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := &Server{
+				internalToken: "internal-token",
+				store:         &testAuthStore{err: test.storeError},
+			}
+			request := httptest.NewRequest(http.MethodPost, "/auth/internal/project-api-tokens", strings.NewReader(
+				`{"projectId":"6ba7b810-9dad-11d1-80b4-00c04fd430c8","createdByUserId":"6ba7b811-9dad-11d1-80b4-00c04fd430c8","label":"automation","permission":"READ"}`,
+			))
+			request.Header.Set("Authorization", "Bearer internal-token")
+			response := httptest.NewRecorder()
+
+			server.handleCreateProjectAPIToken(response, request)
+
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body = %s", response.Code, test.wantStatus, response.Body.String())
+			}
+		})
 	}
 }
 

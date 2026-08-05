@@ -114,6 +114,9 @@ func (s *Store) CreateProjectAPIToken(
 	); err != nil {
 		return CreatedProjectAPIToken{}, fmt.Errorf("lock project API token issuance: %w", err)
 	}
+	if !created.ExpiresAt.After(time.Now().UTC()) {
+		return CreatedProjectAPIToken{}, ErrInvalid
+	}
 	var activeCount int
 	if err := tx.QueryRow(
 		ctx,

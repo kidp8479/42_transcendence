@@ -536,6 +536,14 @@ func (s *Server) handleCreateProjectAPIToken(w http.ResponseWriter, r *http.Requ
 		)
 		return
 	}
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Not Found", "project not found")
+		return
+	}
+	if errors.Is(err, store.ErrInvalid) {
+		writeError(w, http.StatusBadRequest, "Bad Request", "expiresAt must be in the future")
+		return
+	}
 	if err != nil {
 		log.Printf("create project API token: %v", err)
 		writeErrorCode(

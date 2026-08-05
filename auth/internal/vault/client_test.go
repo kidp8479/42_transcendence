@@ -260,14 +260,64 @@ func TestRuntimeCoalescesAndNegativeCachesUnknownKeyRefresh(t *testing.T) {
 	if _, found, err := runtime.PublicKey(context.Background(), "v2"); err != nil || found {
 		t.Fatalf("negative-cached PublicKey(v2) = found %v, error %v", found, err)
 	}
-	if _, found, err := runtime.PublicKey(context.Background(), "v3"); err != nil || found {
-		t.Fatalf("rate-limited PublicKey(v3) = found %v, error %v", found, err)
-	}
 	if _, found, err := runtime.PublicKey(context.Background(), "v999"); err != nil || found {
 		t.Fatalf("implausible PublicKey(v999) = found %v, error %v", found, err)
 	}
 	if requests.Load() != 1 {
 		t.Fatalf("negative or implausible key IDs caused %d Vault requests, want 1", requests.Load())
+	}
+}
+
+func TestRuntimeRefreshesDistinctUnknownTransitKeyAfterNegativeCache(t *testing.T) {
+	t.Parallel()
+
+	v1 := make(ed25519.PublicKey, ed25519.PublicKeySize)
+	v3 := append(ed25519.PublicKey(nil), v1...)
+	v3[0] = 3
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requireVaultToken(t, r)
+		switch requests.Add(1) {
+		case 1:
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{
+				"latest_version": 1,
+				"keys": map[string]any{
+					"1": map[string]string{"public_key": base64.StdEncoding.EncodeToString(v1)},
+				},
+			}})
+		case 2:
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{
+				"latest_version": 3,
+				"keys": map[string]any{
+					"1": map[string]string{"public_key": base64.StdEncoding.EncodeToString(v1)},
+					"3": map[string]string{"public_key": base64.StdEncoding.EncodeToString(v3)},
+				},
+			}})
+		default:
+			t.Errorf("unexpected Transit key refresh")
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	client.setToken("runtime-token")
+	runtime := &Runtime{client: client}
+	runtime.installKeyInfo(TransitKeyInfo{LatestVersion: 1, PublicKeys: TransitPublicKeys{"v1": v1}})
+	runtime.ready.Store(true)
+
+	if _, found, err := runtime.PublicKey(context.Background(), "v2"); err != nil || found {
+		t.Fatalf("PublicKey(v2) = found %v, error %v; want unknown", found, err)
+	}
+	key, found, err := runtime.PublicKey(context.Background(), "v3")
+	if err != nil || !found || !bytes.Equal(key, v3) {
+		t.Fatalf("PublicKey(v3) = %x, %v, %v; want refreshed key", key, found, err)
+	}
+	if requests.Load() != 2 {
+		t.Fatalf("distinct unknown key lookups caused %d Vault requests, want 2", requests.Load())
 	}
 }
 
