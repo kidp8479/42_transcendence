@@ -89,7 +89,11 @@ export function DefenseReadiness({
         ].map((threshold) => (
           <span
             key={threshold}
-            className="absolute -translate-x-1/2 text-text-muted/70"
+            // text-muted-on-surface, not text-muted/70: the 70% opacity on
+            // an already-dim color was 1.76:1 on this surface-raised
+            // background, needs 4.5:1 - same fix already applied to the
+            // checklist page's own copy of this same threshold-label pattern.
+            className="absolute -translate-x-1/2 text-text-muted-on-surface"
             style={{
               left: `${(threshold / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
             }}
