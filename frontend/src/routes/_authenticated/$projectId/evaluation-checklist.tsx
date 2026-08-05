@@ -10,7 +10,7 @@ import {
   ThemeProvider,
 } from "flowbite-react";
 import { FaRegStar } from "react-icons/fa";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HiOutlineShieldCheck, HiOutlineGift, HiPlus } from "react-icons/hi";
 import type { IconType } from "react-icons";
 import {
@@ -249,6 +249,18 @@ function EvaluationChecklistPage() {
   const accordionItemData = categorizeChecklistItems(items);
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
+
+  // useState's initial value only seeds the first mount - if this route's
+  // component survives a visit without remounting (ex: arriving here from
+  // another tab whose own navigation didn't fully tear this route down),
+  // items would otherwise stay stuck on whatever loaderData looked like at
+  // that first mount, missing any change (like another member's delete)
+  // that happened while this tab wasn't showing the checklist and therefore
+  // had no live-sync listener mounted to catch it. Same pattern
+  // discovery_.$discoveryBlockId.edit.tsx already uses for its own items.
+  useEffect(() => {
+    setItems(checklistItems);
+  }, [checklistItems]);
 
   // live sync: another member checking/unchecking, adding, or removing an
   // item updates this page without a reload - no scope filter, the whole
