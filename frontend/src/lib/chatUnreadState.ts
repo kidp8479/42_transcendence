@@ -96,6 +96,7 @@ class ChatUnreadResource {
         this.recomputeSnapshot();
       }
     });
+    socket.on("project:deleted", refresh);
   }
 
   private recomputeSnapshot(): void {
