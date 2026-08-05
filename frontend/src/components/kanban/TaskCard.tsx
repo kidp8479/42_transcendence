@@ -39,7 +39,7 @@ import { getCategoryColor } from "@/lib/categoryColorPalette";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import type { Task } from "@/lib/tasks";
 import type { TaskCategory } from "@/lib/taskCategories";
-import { TaskAssignees } from "./TaskAssignees";
+import { AvatarStack } from "../common/AvatarStack";
 import { TaskCategoryBadge } from "./TaskCategoryBadge";
 import { TaskPriorityDot } from "./TaskPriorityDot";
 
@@ -267,7 +267,7 @@ export const TaskCard = memo(function TaskCard({
         {task.title}
       </p>
 
-      <TaskAssignees assignees={task.assignees} />
+      <AvatarStack assignees={task.assignees} />
     </div>
   );
 });

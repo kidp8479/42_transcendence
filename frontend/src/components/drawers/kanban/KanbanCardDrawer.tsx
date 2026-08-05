@@ -43,7 +43,7 @@ import type { TaskCategory } from "@/lib/taskCategories";
 import { DrawerShell } from "@/components/drawers/DrawerShell";
 import { TaskCategoryBadge } from "@/components/kanban/TaskCategoryBadge";
 import { TaskPriorityDot } from "@/components/kanban/TaskPriorityDot";
-import { assigneeColorIndex } from "@/components/kanban/TaskAssignees";
+import { assigneeColorIndex } from "@/components/common/AvatarStack";
 
 // The fields this form edits - a subset of Task, with assignees as plain ids.
 export interface TaskDraft {

@@ -9,7 +9,7 @@
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import type { TaskAssigneeUser } from "@/lib/tasks";
 
-interface TaskAssigneesProps {
+interface AvatarStackProps {
   assignees: TaskAssigneeUser[];
   // avatars shown before collapsing the rest into a "+N" chip
   maxVisible?: number;
@@ -38,10 +38,10 @@ export function assigneeColorIndex(username: string): number {
   return char_code_sum % CATEGORY_COLOR_PALETTE.length;
 }
 
-export function TaskAssignees({
+export function AvatarStack({
   assignees,
   maxVisible = 3,
-}: TaskAssigneesProps) {
+}: AvatarStackProps) {
   if (assignees.length === 0) {
     return null;
   }
