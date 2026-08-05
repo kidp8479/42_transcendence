@@ -3,7 +3,6 @@ import {
   HiOutlineChartBar,
   HiOutlineLightBulb,
   HiOutlineViewBoards,
-  HiOutlineViewList,
   HiOutlineCalendar,
   HiOutlineClipboardCheck,
   HiOutlineCog,
@@ -28,7 +27,9 @@ export function ProjectTabs() {
       to: "/$projectId/kanban",
       icon: HiOutlineViewBoards,
     },
-    { tabs_name: "List", to: "/$projectId/list", icon: HiOutlineViewList },
+    // "List" tab intentionally hidden, not deleted - out of scope for v0 but
+    // the route/component (routes/.../list.tsx) stay in place in case v1
+    // brings it back, no reason to rip out working code for that.
     {
       tabs_name: "Calendar",
       to: "/$projectId/calendar",
