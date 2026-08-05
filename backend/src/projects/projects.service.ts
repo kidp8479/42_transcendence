@@ -307,16 +307,22 @@ export class ProjectsService {
     return result;
   }
 
-  // Open to any project member, unlike update() above (OWNER/ADMIN-only for
-  // status/archive) - split into its own method/route rather than loosening
-  // update()'s check, since every permission check in this backend is
-  // method-level, never conditional on which fields are in the body.
+  // Same OWNER/ADMIN gate as update() above - kept as its own method anyway
+  // (not merged into update()/UpdateProjectDto) so the optimistic-
+  // concurrency check below stays scoped to this endpoint only, instead of
+  // forcing every existing update() caller (ex: ProjectStatusSection's
+  // finish/archive toggles) to start sending updatedAt too.
   async updateDetails(
     id: string,
     dto: UpdateProjectDetailsDto,
     userId: string
   ) {
     const member = await this.assertMembership(id, userId);
+    if (member.role !== "OWNER" && member.role !== "ADMIN") {
+      throw new ForbiddenException(
+        "Only the project owner or admin can update this project"
+      );
+    }
 
     let updatedProject;
     try {
