@@ -82,7 +82,10 @@ export class ChatService {
       }),
       this.prisma.chatMessage.groupBy({
         by: ["projectId"],
-        where: { projectId: { in: projectIds }, userId: { not: userId } },
+        where: {
+          projectId: { in: projectIds },
+          OR: [{ userId: { not: userId } }, { userId: null }],
+        },
         _max: { createdAt: true },
       }),
     ]);
@@ -101,7 +104,11 @@ export class ChatService {
       .map(({ projectId }) => projectId);
   }
 
-  private async markRead(projectId: string, userId: string, upToCreatedAt: Date): Promise<void> {
+  private async markRead(
+    projectId: string,
+    userId: string,
+    upToCreatedAt: Date
+  ): Promise<void> {
     await this.prisma.chatReadState.upsert({
       where: { userId_projectId: { userId, projectId } },
       create: { userId, projectId },

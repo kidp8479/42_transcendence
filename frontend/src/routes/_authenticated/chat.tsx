@@ -158,17 +158,15 @@ function ChatPage() {
 
   async function handleSend() {
     const content = draft.trim();
-    if (!content || !selectedProjectId || sending) return;
-
+    const projectId = selectedProjectId;
+    if (!content || !projectId || sending) return;
     setSending(true);
     setDraft("");
     try {
-      const created = await createChatMessage(selectedProjectId, content);
-      // the chat:created broadcast (see useLiveItemSync above) can land on
-      // this same client before this request's own response does - dedup
-      // on both sides so whichever arrives first wins
+      const created = await createChatMessage(projectId, content);
+      if (projectId !== selectedProjectId) return; // meanwhile conversation changed
       setMessages((previous) =>
-        previous.some((message) => message.id === created.id)
+        previous.some((m) => m.id === created.id)
           ? previous
           : [...previous, created]
       );
@@ -202,15 +200,20 @@ function ChatPage() {
   );
 
   return (
-    // h-[calc(100vh-133px)], not h-full: <main> (AuthenticatedLayout) has no
+    // h-[calc(100vh-134px)], not h-full: <main> (AuthenticatedLayout) has no
     // hard-capped height of its own (page scrolls normally by design there),
     // so h-full would resolve against nothing and the whole document would
     // scroll instead of just the message list below. Same viewport-relative
-    // constant SideBarCmp already pins itself to (header+footer chrome).
-    // overflow-hidden keeps this root from ever growing past that bound, so
-    // only the flex-1 message list (overflow-y-auto further down) scrolls -
-    // header and input bar stay put.
-    <div className="flex h-[calc(100vh-133px)] min-h-0 flex-col overflow-hidden">
+    // constant SideBarCmp pins itself to (header+footer chrome, ~133px) -
+    // +1px here because that constant backs a `sticky` element there, which
+    // silently tolerates being a pixel short/tall (just a hairline gap).
+    // This div instead hard-clips (overflow-hidden) the real document height,
+    // so the same 133px undershooting by a pixel left the page exactly one
+    // pixel taller than the viewport - just enough to trigger the browser's
+    // vertical scrollbar. overflow-hidden keeps this root from ever growing
+    // past its bound, so only the flex-1 message list (overflow-y-auto
+    // further down) scrolls - header and input bar stay put.
+    <div className="flex h-[calc(100vh-134px)] min-h-0 flex-col overflow-hidden">
       <div className="mb-2 border-b border-surface-border p-6">
         <h1 className="font-mono text-xl font-bold text-text-primary">Chat</h1>
         <p className="text-xs text-text-secondary">
