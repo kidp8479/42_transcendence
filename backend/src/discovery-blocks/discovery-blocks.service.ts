@@ -56,7 +56,10 @@ export class DiscoveryBlocksService {
     // shared guard (see ProjectsService.assertMembership) - throws NotFoundException
     // if the project doesn't exist or userId isn't a member of it
     await this.projectsService.assertMembership(projectId, userId);
+    return this.findAllForProject(projectId);
+  }
 
+  async findAllForProject(projectId: string, limit?: number) {
     // retrieve the discovery blocks after the ownership test passed.
     // orderBy is not optional here: without it, Postgres makes no ordering
     // guarantee at all for a plain SELECT, and an UPDATE (ex: editing a
@@ -69,6 +72,7 @@ export class DiscoveryBlocksService {
       orderBy: {
         createdAt: "asc",
       },
+      ...(limit === undefined ? {} : { take: limit }),
     });
     return blocks;
   }
@@ -125,7 +129,10 @@ export class DiscoveryBlocksService {
   // and throws the right NotFoundException in each case
   async findById(projectId: string, id: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
+    return this.findByIdForProject(projectId, id);
+  }
 
+  async findByIdForProject(projectId: string, id: string) {
     const block = await this.prisma.discoveryBlock.findFirst({
       where: { id: id, projectId: projectId },
     });

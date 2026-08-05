@@ -137,7 +137,7 @@ export class TasksService {
 
     // Membership already asserted at the top of create() - no need for
     // findById()'s own second check.
-    const created = await this.getTaskOrThrow(task.id, projectId);
+    const created = await this.findByIdForProject(task.id, projectId);
     // created carries its own projectId (a real Task field) - the frontend
     // checks it before dispatching. A socket joins every project room a
     // user is a MEMBER of, not just the one they're currently viewing, so
@@ -149,6 +149,12 @@ export class TasksService {
 
   async findAll(projectId: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
+    return this.findAllForProject(projectId);
+  }
+
+  // Shared project-scoped read primitive. Its caller must authenticate and
+  // authorize a human or project-token principal before reaching it.
+  async findAllForProject(projectId: string, limit?: number) {
     const tasks = await this.prisma.task.findMany({
       where: { projectId: projectId },
       include: taskInclude,
@@ -156,6 +162,7 @@ export class TasksService {
       // groups each board column together, and the enum sorts in declaration
       // order (TODO, IN_PROGRESS, REVIEW, COMPLETED) - the board's own order.
       orderBy: [{ status: "asc" }, { rank: "asc" }],
+      ...(limit === undefined ? {} : { take: limit }),
     });
     return tasks.map(mapTask);
   }
@@ -164,12 +171,13 @@ export class TasksService {
   // that this task belongs to this project, 404s otherwise
   async findById(id: string, projectId: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
-    return this.getTaskOrThrow(id, projectId);
+    return this.findByIdForProject(id, projectId);
   }
 
-  // findById's read half, without the membership check - for callers that
-  // already asserted membership earlier in the same request.
-  private async getTaskOrThrow(id: string, projectId: string) {
+  // Shared project-scoped single-resource read primitive. Keeping projectId
+  // in the query prevents a valid token for one project from reading another
+  // project's UUID-addressable task.
+  async findByIdForProject(id: string, projectId: string) {
     const task = await this.prisma.task.findFirst({
       where: { id: id, projectId: projectId },
       include: taskInclude,
@@ -275,7 +283,7 @@ export class TasksService {
 
     // Membership already asserted by findById() at the top of update() -
     // no need for a second check just to build the response.
-    const updated = await this.getTaskOrThrow(id, projectId);
+    const updated = await this.findByIdForProject(id, projectId);
     // Always emitted, moving or not: a single PATCH can change status/rank
     // AND other fields (the drawer sends both together), and task:moved's
     // payload only carries the position - without this, other clients would

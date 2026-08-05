@@ -134,10 +134,15 @@ export class CalendarEventsService {
 
   async findAll(projectId: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
+    return this.findAllForProject(projectId);
+  }
+
+  async findAllForProject(projectId: string, limit?: number) {
     const events = await this.prisma.calendarEvent.findMany({
       where: { projectId: projectId },
       include: calendarEventInclude,
       orderBy: { startAt: "asc" },
+      ...(limit === undefined ? {} : { take: limit }),
     });
     return events.map(mapCalendarEvent);
   }
@@ -146,6 +151,10 @@ export class CalendarEventsService {
   // that this event belongs to this project, 404s otherwise
   async findById(id: string, projectId: string, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
+    return this.findByIdForProject(id, projectId);
+  }
+
+  async findByIdForProject(id: string, projectId: string) {
     const event = await this.prisma.calendarEvent.findFirst({
       where: { id: id, projectId: projectId },
       include: calendarEventInclude,

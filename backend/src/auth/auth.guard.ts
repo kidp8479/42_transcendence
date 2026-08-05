@@ -14,6 +14,7 @@ import type {
   AuthenticatedUser,
 } from "./authenticated-request";
 import { IS_PUBLIC_KEY } from "./public.decorator";
+import { PROJECT_API_TOKEN_PERMISSION_KEY } from "./project-api-token.decorator";
 
 interface IntrospectionResponse {
   active: true;
@@ -48,6 +49,14 @@ export class AuthGuard implements CanActivate {
       context.getClass(),
     ]);
     if (isPublic) {
+      return true;
+    }
+    const isProjectApiTokenRoute =
+      this.reflector.getAllAndOverride<boolean>(
+        PROJECT_API_TOKEN_PERMISSION_KEY,
+        [context.getHandler(), context.getClass()]
+      ) !== undefined;
+    if (isProjectApiTokenRoute) {
       return true;
     }
 
