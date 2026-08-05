@@ -229,8 +229,18 @@ function UserSettingsPage() {
       }
       safeInvalidateRouter();
       showToast({ type: "success", message: "Changes saved." });
-    } catch {
-      showToast({ type: "error", message: "Saving failed. Please retry." });
+    } catch (error) {
+      // a taken username hits the DB's unique constraint -> 409, with a raw
+      // Prisma message ("Unique constraint failed on the fields: (`username`)")
+      // that isn't something to show a user
+      if (error instanceof ApiError && error.status === 409) {
+        showToast({
+          type: "error",
+          message: "This username is already taken.",
+        });
+      } else {
+        showToast({ type: "error", message: "Saving failed. Please retry." });
+      }
     } finally {
       setSavingChanges(false);
     }
