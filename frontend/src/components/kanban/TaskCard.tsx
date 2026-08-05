@@ -39,7 +39,7 @@ import { getCategoryColor } from "@/lib/categoryColorPalette";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import type { Task } from "@/lib/tasks";
 import type { TaskCategory } from "@/lib/taskCategories";
-import { AvatarStack } from "../common/AvatarStack";
+import { AvatarStack } from "@/components/common/AvatarStack";
 import { TaskCategoryBadge } from "./TaskCategoryBadge";
 import { TaskPriorityDot } from "./TaskPriorityDot";
 

@@ -25,6 +25,7 @@ import {
   darkSurfaceTextInputTheme,
 } from "@/lib/flowbite";
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
+import { assigneeColorIndex } from "@/components/common/AvatarStack";
 import type { CalendarCategory } from "@/lib/calendarCategoriesApi";
 import {
   CALENDAR_EVENT_NOTES_MAX_LENGTH,
@@ -316,13 +317,29 @@ export function EventForm({
                 onClick={() => toggleAssignee(member.userId)}
                 title={member.user.username}
                 className={
-                  "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white " +
-                  (isSelected
-                    ? "bg-brand-500 ring-2 ring-brand-500 ring-offset-2 ring-offset-surface-raised"
-                    : "bg-control-bg opacity-60 hover:opacity-100")
+                  isSelected
+                    ? "rounded-full ring-2 ring-brand-500 focus:ring-2 focus:ring-brand-500/40 focus:outline-none"
+                    : "rounded-full opacity-50 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-brand-500/40 focus:outline-none"
                 }
               >
-                {member.user.username.slice(0, 2).toUpperCase()}
+                {member.user.avatarUrl !== null ? (
+                  <img
+                    src={member.user.avatarUrl}
+                    alt={member.user.username}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full object-cover"
+                  />
+                ) : (
+                  <span
+                    // same deterministic per-username color as Kanban
+                    // (assigneeColorIndex) - a member keeps the same avatar
+                    // color on both boards instead of everyone here looking
+                    // identical.
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${CATEGORY_COLOR_PALETTE[assigneeColorIndex(member.user.username)].bg}`}
+                  >
+                    {member.user.username.slice(0, 2).toUpperCase()}
+                    <span className="sr-only">{member.user.username}</span>
+                  </span>
+                )}
               </button>
             );
           })}

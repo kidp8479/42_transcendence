@@ -13,7 +13,7 @@ import {
   TeamWorkload,
   type TeamMemberWorkload,
 } from "@/components/summary/TeamWorkload";
-import { assigneeColorIndex } from "@/components/kanban/TaskAssignees";
+import { assigneeColorIndex } from "@/components/common/AvatarStack";
 import { listCalendarEvents } from "@/lib/calendarEventsApi";
 import { fetchEvaluationChecklistItems } from "@/lib/evaluationChecklist";
 import { computeEvaluationChecklistProgress } from "@/lib/evaluationChecklistProgress";
@@ -83,7 +83,7 @@ function buildTeamWorkload(
         task.status !== "COMPLETED" &&
         task.assignees.some((assignee) => assignee.username === username)
     );
-    // Same initials recipe as TaskAssignees' kanban-card avatars, so a
+    // Same initials recipe as AvatarStack's kanban-card avatars, so a
     // member's initials/color don't visually diverge between the two pages.
     const categoryNames = [
       ...new Set(

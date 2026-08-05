@@ -1,11 +1,9 @@
-// See DefenseReadiness.tsx (components/summary) for an explanation of the
-// pattern every component here follows.
-//
-// Overlapping row of assignee avatars, read-only, shown on a kanban card. The
-// drawer needs the same avatars as toggle buttons, so it builds its own from
-// assigneeColorIndex below rather than reusing this. Same initials recipe as
-// Team Workload; a user with an avatarUrl gets the image instead (User.avatarUrl
-// in schema.prisma: "if null, the frontend generates an avatar from initials").
+// Overlapping row of assignee avatars, read-only - used by the Kanban card
+// and Summary's Team Workload. Drawers/pickers (KanbanCardDrawer, calendar
+// EventForm) need the same avatars as toggle buttons, so they build their
+// own from assigneeColorIndex below rather than reusing this. A user with
+// an avatarUrl gets the image instead (User.avatarUrl in schema.prisma:
+// "if null, the frontend generates an avatar from initials").
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import type { TaskAssigneeUser } from "@/lib/tasks";
 
