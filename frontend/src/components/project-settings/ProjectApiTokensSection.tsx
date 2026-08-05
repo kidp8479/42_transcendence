@@ -24,17 +24,21 @@ import { SettingsSection } from "./SettingsSection";
 interface ProjectApiTokensSectionProps {
   projectId: string;
   role: "OWNER" | "ADMIN" | "MEMBER";
+  isArchived: boolean;
 }
 
 export function ProjectApiTokensSection({
   projectId,
   role,
+  isArchived,
 }: ProjectApiTokensSectionProps) {
   const [tokens, setTokens] = useState<ProjectApiToken[]>([]);
   const [label, setLabel] = useState("");
+  const [labelError, setLabelError] = useState<string | null>(null);
   const [expiryDays, setExpiryDays] = useState("90");
   const [writeAccess, setWriteAccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [pendingRevoke, setPendingRevoke] = useState<ProjectApiToken | null>(
     null
@@ -50,19 +54,20 @@ export function ProjectApiTokensSection({
   const [copied, setCopied] = useState(false);
   const revealButtonRef = useRef<HTMLButtonElement>(null);
   const actionTriggerRef = useRef<HTMLButtonElement>(null);
+  const tokenTableRef = useRef<HTMLTableElement>(null);
   const { showToast } = useToast();
   const canManage = role === "OWNER" || role === "ADMIN";
+  const isMutating = isRevoking || isDeleting;
 
   const load = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       setTokens(await listProjectApiTokens(projectId));
     } catch (error) {
-      showToast({
-        type: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to load API tokens",
-      });
+      setLoadError(
+        error instanceof Error ? error.message : "Failed to load API tokens"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -86,13 +91,18 @@ export function ProjectApiTokensSection({
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
-    if (!canManage || isCreating) {
+    const trimmedLabel = label.trim();
+    if (!canManage || isArchived || isCreating) {
+      return;
+    }
+    if (!trimmedLabel) {
+      setLabelError("Enter a label for this token.");
       return;
     }
     setIsCreating(true);
     try {
       const token = await createProjectApiToken(projectId, {
-        label,
+        label: trimmedLabel,
         permission: writeAccess ? "READ_WRITE" : "READ",
         expiresAt: expiryFromDays(expiryDays),
       });
@@ -102,6 +112,7 @@ export function ProjectApiTokensSection({
       setAcknowledged(false);
       setCopied(false);
       setLabel("");
+      setLabelError(null);
       setWriteAccess(false);
       setExpiryDays("90");
     } catch (error) {
@@ -127,6 +138,7 @@ export function ProjectApiTokensSection({
       );
       setPendingRevoke(null);
       showToast({ type: "success", message: "API token revoked" });
+      requestAnimationFrame(() => tokenTableRef.current?.focus());
     } catch (error) {
       showToast({
         type: "error",
@@ -150,6 +162,7 @@ export function ProjectApiTokensSection({
       );
       setPendingDelete(null);
       showToast({ type: "success", message: "API token deleted" });
+      requestAnimationFrame(() => tokenTableRef.current?.focus());
     } catch (error) {
       showToast({
         type: "error",
@@ -197,19 +210,27 @@ export function ProjectApiTokensSection({
       description="Tokens are project-bound credentials for integrations and automation. They are not browser sessions."
     >
       <div className="space-y-6">
-        {canManage ? (
+        {canManage && !isArchived ? (
           <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreate}>
             <div>
               <Label htmlFor="api-token-label">Token label</Label>
               <TextInput
                 id="api-token-label"
                 value={label}
-                onChange={(event) => setLabel(event.target.value)}
+                onChange={(event) => {
+                  setLabel(event.target.value);
+                  if (labelError) {
+                    setLabelError(null);
+                  }
+                }}
                 maxLength={100}
                 required
                 placeholder="CI integration"
                 theme={darkSurfaceTextInputTheme}
               />
+              {labelError && (
+                <p className="mt-1 text-xs text-control-error">{labelError}</p>
+              )}
             </div>
             <div>
               <Label htmlFor="api-token-expiry">Expires in</Label>
@@ -239,7 +260,7 @@ export function ProjectApiTokensSection({
                   theme={projectApiTokenCheckboxTheme}
                   className="cursor-not-allowed !opacity-50"
                 />
-                Read access
+                Read access (always included)
               </Label>
               <Label className="flex items-center gap-2">
                 <Checkbox
@@ -249,6 +270,10 @@ export function ProjectApiTokensSection({
                 />
                 Allow write access
               </Label>
+              <span className="text-xs text-text-secondary">
+                Write access can create, update, reorder, assign, and delete
+                project tasks through the public API.
+              </span>
               <Button
                 type="submit"
                 color="none"
@@ -259,6 +284,11 @@ export function ProjectApiTokensSection({
               </Button>
             </div>
           </form>
+        ) : isArchived ? (
+          <p className="text-xs text-text-secondary">
+            This project is archived. Existing token history remains visible,
+            but new tokens cannot be created.
+          </p>
         ) : (
           <p className="text-xs text-text-secondary">
             Project owners and admins manage project API tokens. You can view
@@ -266,110 +296,143 @@ export function ProjectApiTokensSection({
           </p>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-text-secondary">
-            <thead className="border-b border-surface-border text-text-primary">
-              <tr>
-                <th className="py-2 pr-3">Label</th>
-                <th className="py-2 pr-3">Permission</th>
-                <th className="py-2 pr-3">Expires</th>
-                <th className="py-2 pr-3">Last used</th>
-                <th className="py-2 pr-3">Status</th>
-                {canManage && <th className="py-2">Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {tokens.map((token) => {
-                const inactive = token.revokedAt !== null || isExpired(token);
-                return (
-                  <tr key={token.id} className="border-b border-surface-border">
-                    <td className="py-3 pr-3 text-text-primary">
-                      {token.label}
-                    </td>
-                    <td className="py-3 pr-3">
-                      {token.permission === "READ_WRITE"
-                        ? "Read & write"
-                        : "Read"}
-                    </td>
-                    <td className="py-3 pr-3">{formatDate(token.expiresAt)}</td>
-                    <td className="py-3 pr-3">
-                      {token.lastUsedAt
-                        ? formatDate(token.lastUsedAt)
-                        : "Never"}
-                    </td>
-                    <td className="py-3 pr-3">
-                      {token.revokedAt
-                        ? "Revoked"
-                        : isExpired(token)
-                          ? "Expired"
-                          : "Active"}
-                    </td>
-                    {canManage && (
-                      <td className="py-3">
-                        <div className="flex gap-2">
-                          {!inactive && (
-                            <Button
-                              size="xs"
-                              color="none"
-                              onClick={(event) => {
-                                actionTriggerRef.current = event.currentTarget;
-                                setPendingRevoke(token);
-                              }}
-                              className={destructiveButtonClassName}
-                            >
-                              Revoke
-                            </Button>
-                          )}
-                          {inactive && (
-                            <Button
-                              size="xs"
-                              color="none"
-                              onClick={(event) => {
-                                actionTriggerRef.current = event.currentTarget;
-                                setPendingDelete(token);
-                              }}
-                              className={destructiveButtonClassName}
-                            >
-                              Delete
-                            </Button>
-                          )}
-                        </div>
+        {loadError ? (
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-4 rounded-lg border border-control-error/40 bg-alert-bg px-3 py-2 text-xs text-control-error"
+          >
+            <span>Unable to load API tokens: {loadError}</span>
+            <Button
+              size="xs"
+              color="none"
+              onClick={() => void load()}
+              className={secondaryButtonClassName}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table
+              ref={tokenTableRef}
+              tabIndex={-1}
+              aria-label="Project API tokens"
+              className="w-full text-left text-xs text-text-secondary"
+            >
+              <thead className="border-b border-surface-border text-text-primary">
+                <tr>
+                  <th className="py-2 pr-3">Label</th>
+                  <th className="py-2 pr-3">Permission</th>
+                  <th className="py-2 pr-3">Expires</th>
+                  <th className="py-2 pr-3">Last used</th>
+                  <th className="py-2 pr-3">Status</th>
+                  {canManage && <th className="py-2">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {tokens.map((token) => {
+                  const inactive = token.revokedAt !== null || isExpired(token);
+                  return (
+                    <tr
+                      key={token.id}
+                      className="border-b border-surface-border"
+                    >
+                      <td className="py-3 pr-3 text-text-primary">
+                        {token.label}
                       </td>
-                    )}
+                      <td className="py-3 pr-3">
+                        {token.permission === "READ_WRITE"
+                          ? "Read & write"
+                          : "Read"}
+                      </td>
+                      <td className="py-3 pr-3">
+                        {formatDate(token.expiresAt)}
+                      </td>
+                      <td className="py-3 pr-3">
+                        {token.lastUsedAt
+                          ? formatDate(token.lastUsedAt)
+                          : "Never"}
+                      </td>
+                      <td className="py-3 pr-3">
+                        {token.revokedAt
+                          ? "Revoked"
+                          : isExpired(token)
+                            ? "Expired"
+                            : "Active"}
+                      </td>
+                      {canManage && (
+                        <td className="py-3">
+                          <div className="flex gap-2">
+                            {!inactive && (
+                              <Button
+                                size="xs"
+                                color="none"
+                                onClick={(event) => {
+                                  actionTriggerRef.current =
+                                    event.currentTarget;
+                                  setPendingRevoke(token);
+                                }}
+                                disabled={isMutating}
+                                className={destructiveButtonClassName}
+                              >
+                                Revoke
+                              </Button>
+                            )}
+                            {inactive && (
+                              <Button
+                                size="xs"
+                                color="none"
+                                onClick={(event) => {
+                                  actionTriggerRef.current =
+                                    event.currentTarget;
+                                  setPendingDelete(token);
+                                }}
+                                disabled={isMutating}
+                                className={destructiveButtonClassName}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+                {isLoading && (
+                  <tr>
+                    <td
+                      className="py-3 text-text-secondary"
+                      colSpan={canManage ? 6 : 5}
+                    >
+                      Loading API tokens...
+                    </td>
                   </tr>
-                );
-              })}
-              {isLoading && (
-                <tr>
-                  <td
-                    className="py-3 text-text-secondary"
-                    colSpan={canManage ? 6 : 5}
-                  >
-                    Loading API tokens...
-                  </td>
-                </tr>
-              )}
-              {!isLoading && tokens.length === 0 && (
-                <tr>
-                  <td
-                    className="py-3 text-text-secondary"
-                    colSpan={canManage ? 6 : 5}
-                  >
-                    No project API tokens have been created.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+                {!isLoading && tokens.length === 0 && (
+                  <tr>
+                    <td
+                      className="py-3 text-text-secondary"
+                      colSpan={canManage ? 6 : 5}
+                    >
+                      No project API tokens have been created.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <Modal
         show={created !== null}
         size="md"
-        onClose={() => undefined}
+        onClose={closeSecretModal}
         popup
         className={darkModalClassName}
+        aria-labelledby="project-api-token-reveal-title"
+        aria-describedby="project-api-token-reveal-description"
       >
         <div className="space-y-4 p-6">
           <h3
@@ -421,7 +484,14 @@ export function ProjectApiTokensSection({
             />
             I have stored this token securely.
           </Label>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              color="none"
+              onClick={closeSecretModal}
+              className={secondaryButtonClassName}
+            >
+              Discard token
+            </Button>
             <Button
               color="none"
               onClick={closeSecretModal}
@@ -440,12 +510,20 @@ export function ProjectApiTokensSection({
         onClose={() => closeActionModal(setPendingRevoke, isRevoking)}
         popup
         className={darkModalClassName}
+        aria-labelledby="project-api-token-revoke-title"
+        aria-describedby="project-api-token-revoke-description"
       >
         <div className="space-y-4 p-6">
-          <h3 className="text-sm font-semibold text-text-primary">
+          <h3
+            id="project-api-token-revoke-title"
+            className="text-sm font-semibold text-text-primary"
+          >
             Revoke token?
           </h3>
-          <p className="text-xs text-text-secondary">
+          <p
+            id="project-api-token-revoke-description"
+            className="text-xs text-text-secondary"
+          >
             <strong>{pendingRevoke?.label}</strong> stops working immediately.
             This cannot be undone.
           </p>
@@ -476,12 +554,20 @@ export function ProjectApiTokensSection({
         onClose={() => closeActionModal(setPendingDelete, isDeleting)}
         popup
         className={darkModalClassName}
+        aria-labelledby="project-api-token-delete-title"
+        aria-describedby="project-api-token-delete-description"
       >
         <div className="space-y-4 p-6">
-          <h3 className="text-sm font-semibold text-text-primary">
+          <h3
+            id="project-api-token-delete-title"
+            className="text-sm font-semibold text-text-primary"
+          >
             Delete token record?
           </h3>
-          <p className="text-xs text-text-secondary">
+          <p
+            id="project-api-token-delete-description"
+            className="text-xs text-text-secondary"
+          >
             This removes <strong>{pendingDelete?.label}</strong> from the active
             token history. Its audit record remains.
           </p>
@@ -539,9 +625,11 @@ const projectApiTokenCheckboxTheme = {
 };
 
 function expiryFromDays(value: string): string {
-  return new Date(
-    Date.now() + Number(value) * 24 * 60 * 60 * 1000
-  ).toISOString();
+  const days = Number(value);
+  const validDays = expiryOptions.some((option) => option.days === days)
+    ? days
+    : 90;
+  return new Date(Date.now() + validDays * 24 * 60 * 60 * 1000).toISOString();
 }
 
 function isExpired(token: ProjectApiToken): boolean {

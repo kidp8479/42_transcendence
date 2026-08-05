@@ -41,7 +41,11 @@ function ProjectSettingsPage() {
         onLeaveProjectSuccess={() => navigate({ to: "/projects" })}
       />
 
-      <ProjectApiTokensSection projectId={projectId} role={project.role} />
+      <ProjectApiTokensSection
+        projectId={projectId}
+        role={project.role}
+        isArchived={project.isArchived}
+      />
 
       {/* <BehaviorSection /> - deactivated, see import comment above */}
 
