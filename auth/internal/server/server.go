@@ -24,14 +24,16 @@ import (
 )
 
 const (
-	maxRequestBody           = 16 * 1024
-	rateLimitWindow          = time.Minute
-	maxRateLimitEntries      = 10_000
-	registerRequestsPerIP    = 20
-	loginRequestsPerIP       = 10
-	loginRequestsPerAccount  = 5
-	ticketRequestsPerAccount = 30
-	passwordConcurrency      = 2
+	maxRequestBody            = 16 * 1024
+	rateLimitWindow           = time.Minute
+	maxRateLimitEntries       = 10_000
+	registerRequestsPerIP     = 20
+	loginRequestsPerIP        = 10
+	loginRequestsPerAccount   = 5
+	ticketRequestsPerAccount  = 30
+	passwordConcurrency       = 2
+	projectAPITokenDefaultTTL = 90 * 24 * time.Hour
+	projectAPITokenMaxTTL     = 365 * 24 * time.Hour
 )
 
 var (
@@ -505,8 +507,13 @@ func (s *Server) handleCreateProjectAPIToken(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
 		return
 	}
-	expiresAt := parseProjectAPITokenExpiry(request.ExpiresAt)
-	if err := validateProjectAPITokenCreate(request, expiresAt); err != nil {
+	now := time.Now().UTC()
+	expiresAt, err := resolveProjectAPITokenExpiry(request.ExpiresAt, now)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
+		return
+	}
+	if err := validateProjectAPITokenCreate(request, expiresAt, now); err != nil {
 		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
 		return
 	}
@@ -657,7 +664,11 @@ func (s *Server) handleIntrospectProjectAPIToken(w http.ResponseWriter, r *http.
 	})
 }
 
-func validateProjectAPITokenCreate(request createProjectAPITokenRequest, expiresAt time.Time) error {
+func validateProjectAPITokenCreate(
+	request createProjectAPITokenRequest,
+	expiresAt time.Time,
+	now time.Time,
+) error {
 	if !validUUID(request.ProjectID) || !validUUID(request.CreatedByUserID) {
 		return errors.New("projectId and createdByUserId must be UUIDs")
 	}
@@ -668,19 +679,21 @@ func validateProjectAPITokenCreate(request createProjectAPITokenRequest, expires
 		request.Permission != string(store.ProjectAPITokenReadWrite) {
 		return errors.New("permission must be READ or READ_WRITE")
 	}
-	if expiresAt.IsZero() || !expiresAt.After(time.Now().UTC()) ||
-		expiresAt.After(time.Now().UTC().AddDate(1, 0, 0)) {
+	if !expiresAt.After(now) || expiresAt.After(now.Add(projectAPITokenMaxTTL)) {
 		return errors.New("expiresAt must be in the next 365 days")
 	}
 	return nil
 }
 
-func parseProjectAPITokenExpiry(value string) time.Time {
+func resolveProjectAPITokenExpiry(value string, now time.Time) (time.Time, error) {
+	if value == "" {
+		return now.Add(projectAPITokenDefaultTTL), nil
+	}
 	expiresAt, err := time.Parse(time.RFC3339, value)
 	if err != nil {
-		return time.Time{}
+		return time.Time{}, errors.New("expiresAt must be an RFC3339 timestamp")
 	}
-	return expiresAt.UTC()
+	return expiresAt.UTC(), nil
 }
 
 func projectAPITokenMetadata(token store.ProjectAPIToken) projectAPITokenResponse {

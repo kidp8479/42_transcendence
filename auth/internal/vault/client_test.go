@@ -381,8 +381,9 @@ func TestRuntimeStartRequiresTransitPublicKeys(t *testing.T) {
 		case "/v1/kv/data/auth/project-api-token-pepper":
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
-				"pepper":  "a-dedicated-project-api-token-pepper-long-enough",
-				"version": "1",
+				"active_version": "2",
+				"pepper_v1":      "a-retained-project-api-token-pepper-long-enough",
+				"pepper_v2":      "a-dedicated-project-api-token-pepper-long-enough",
 			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)
@@ -457,8 +458,9 @@ func TestClientUsesAppRoleTokenForRuntimeOperations(t *testing.T) {
 		case "/v1/kv/data/auth/project-api-token-pepper":
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
-				"pepper":  "a-dedicated-project-api-token-pepper-long-enough",
-				"version": "1",
+				"active_version": "2",
+				"pepper_v1":      "a-retained-project-api-token-pepper-long-enough",
+				"pepper_v2":      "a-dedicated-project-api-token-pepper-long-enough",
 			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)
@@ -501,6 +503,12 @@ func TestClientUsesAppRoleTokenForRuntimeOperations(t *testing.T) {
 	}
 	if secrets.RefreshSuccessorCipherKey != "a-dedicated-refresh-successor-key-long-enough" {
 		t.Errorf("ReadSecrets() refresh successor key = %q", secrets.RefreshSuccessorCipherKey)
+	}
+	if secrets.ProjectAPITokenActiveVersion != 2 ||
+		secrets.ProjectAPITokenPeppers[1] != "a-retained-project-api-token-pepper-long-enough" ||
+		secrets.ProjectAPITokenPeppers[2] != "a-dedicated-project-api-token-pepper-long-enough" {
+		t.Errorf("ReadSecrets() project token pepper keyring = %#v, active=%d",
+			secrets.ProjectAPITokenPeppers, secrets.ProjectAPITokenActiveVersion)
 	}
 	credentials, err := client.IssueDatabaseCredentials(context.Background(), "auth-runtime")
 	if err != nil {
@@ -701,8 +709,9 @@ func TestRuntimeReauthenticatesAndReplacesDatabaseLease(t *testing.T) {
 		case "/v1/kv/data/auth/project-api-token-pepper":
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
-				"pepper":  "a-dedicated-project-api-token-pepper-long-enough",
-				"version": "1",
+				"active_version": "2",
+				"pepper_v1":      "a-retained-project-api-token-pepper-long-enough",
+				"pepper_v2":      "a-dedicated-project-api-token-pepper-long-enough",
 			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)

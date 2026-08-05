@@ -41,9 +41,9 @@ const (
 )
 
 type Store struct {
-	pool                  atomic.Pointer[pgxpool.Pool]
-	refreshCipher         *refreshTokenCipher
-	projectAPITokenPepper atomic.Pointer[projectAPITokenPepper]
+	pool                   atomic.Pointer[pgxpool.Pool]
+	refreshCipher          *refreshTokenCipher
+	projectAPITokenPeppers atomic.Pointer[projectAPITokenPepperKeyring]
 }
 
 type User struct {

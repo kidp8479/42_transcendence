@@ -33,6 +33,8 @@ type testAuthStore struct {
 	revalidateCalls   int
 	ticket            string
 	admission         store.WebSocketAdmission
+	projectToken      store.CreatedProjectAPIToken
+	projectRequest    store.CreateProjectAPITokenRequest
 }
 
 func (s *testAuthStore) CreateLocalAccount(context.Context, string, string, string) (store.User, error) {
@@ -90,10 +92,17 @@ func (s *testAuthStore) RecordEvent(context.Context, *string, string, *string, *
 }
 
 func (s *testAuthStore) CreateProjectAPIToken(
-	context.Context,
-	store.CreateProjectAPITokenRequest,
+	_ context.Context,
+	request store.CreateProjectAPITokenRequest,
 ) (store.CreatedProjectAPIToken, error) {
-	return store.CreatedProjectAPIToken{}, s.err
+	s.projectRequest = request
+	if s.projectToken.ExpiresAt.IsZero() {
+		s.projectToken.ProjectAPIToken = store.ProjectAPIToken{
+			ID: "6ba7b812-9dad-11d1-80b4-00c04fd430c8", ProjectID: request.ProjectID,
+			Label: request.Label, Permission: request.Permission, ExpiresAt: request.ExpiresAt,
+		}
+	}
+	return s.projectToken, s.err
 }
 
 func (s *testAuthStore) ListProjectAPITokens(context.Context, string) ([]store.ProjectAPIToken, error) {
@@ -159,6 +168,58 @@ func newLoginTestServer(authStore authStore, tokens tokenService) *Server {
 		loginIPLimiter:      middleware.NewFixedWindowLimiter(loginRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		loginAccountLimiter: middleware.NewFixedWindowLimiter(loginRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
 		passwordSlots:       make(chan struct{}, passwordConcurrency),
+	}
+}
+
+func TestResolveProjectAPITokenExpiryDefaultsAndEnforcesBounds(t *testing.T) {
+	now := time.Date(2026, time.August, 5, 16, 0, 0, 0, time.UTC)
+	resolved, err := resolveProjectAPITokenExpiry("", now)
+	if err != nil || !resolved.Equal(now.Add(projectAPITokenDefaultTTL)) {
+		t.Fatalf("default expiry = %s, %v", resolved, err)
+	}
+	request := createProjectAPITokenRequest{
+		ProjectID: "6ba7b810-9dad-11d1-80b4-00c04fd430c8", CreatedByUserID: "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
+		Label: "automation", Permission: "READ",
+	}
+	for _, test := range []struct {
+		name string
+		when time.Time
+		ok   bool
+	}{
+		{"one second in future", now.Add(time.Second), true},
+		{"exactly 365 days", now.Add(projectAPITokenMaxTTL), true},
+		{"past", now.Add(-time.Second), false},
+		{"beyond 365 days", now.Add(projectAPITokenMaxTTL + time.Second), false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := validateProjectAPITokenCreate(request, test.when, now); (err == nil) != test.ok {
+				t.Fatalf("validateProjectAPITokenCreate() error = %v, want valid=%v", err, test.ok)
+			}
+		})
+	}
+	if _, err := resolveProjectAPITokenExpiry("not-a-timestamp", now); err == nil {
+		t.Fatal("resolveProjectAPITokenExpiry() accepted an invalid timestamp")
+	}
+}
+
+func TestHandleCreateProjectAPITokenReturnsDefaultResolvedExpiry(t *testing.T) {
+	authStore := &testAuthStore{}
+	server := &Server{internalToken: "internal-token", store: authStore}
+	request := httptest.NewRequest(http.MethodPost, "/auth/internal/project-api-tokens", strings.NewReader(
+		`{"projectId":"6ba7b810-9dad-11d1-80b4-00c04fd430c8","createdByUserId":"6ba7b811-9dad-11d1-80b4-00c04fd430c8","label":"automation","permission":"READ"}`,
+	))
+	request.Header.Set("Authorization", "Bearer internal-token")
+	response := httptest.NewRecorder()
+	server.handleCreateProjectAPIToken(response, request)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if authStore.projectRequest.ExpiresAt.Before(time.Now().UTC().Add(projectAPITokenDefaultTTL-time.Second)) ||
+		authStore.projectRequest.ExpiresAt.After(time.Now().UTC().Add(projectAPITokenDefaultTTL+time.Second)) {
+		t.Fatalf("store expiry = %s, want resolved 90-day default", authStore.projectRequest.ExpiresAt)
+	}
+	if !strings.Contains(response.Body.String(), authStore.projectRequest.ExpiresAt.Format(time.RFC3339Nano)) {
+		t.Fatalf("response does not return resolved expiry: %s", response.Body.String())
 	}
 }
 
