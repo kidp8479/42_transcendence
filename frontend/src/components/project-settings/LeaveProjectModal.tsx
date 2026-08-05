@@ -1,5 +1,18 @@
 import { Button, Modal } from "flowbite-react";
 
+// KNOWN DUPLICATION: this modal's structure and styling (no icon,
+// left-aligned text, muted-red confirm button, one-off inline Modal
+// className overrides) is hand-duplicated in RemoveMemberModal.tsx and
+// DangerZoneSection.tsx's delete modal, and also diverges from the
+// unrelated delete-account modal in user-settings.tsx (which uses a
+// centered layout, a warning icon, Flowbite's solid color="red" button, and
+// a shared theme object). A future style or logic fix applied to just this
+// file is easy to leave silently unfixed in the other two - check
+// RemoveMemberModal.tsx and DangerZoneSection.tsx before assuming a change
+// here is complete. Not unified yet on purpose: doing so means touching
+// shared modal theming across several components, scoped as its own
+// follow-up branch rather than bundled into feature work.
+
 interface LeaveProjectModalProps {
   show: boolean;
   isLeaving: boolean;

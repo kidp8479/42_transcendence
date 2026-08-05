@@ -16,6 +16,19 @@ import { useToast } from "@/hooks/useToast";
 // ADMIN gets "Leave project" instead, from the cogwheel menu on the Projects
 // grid (ProjectCard.tsx), which has its own separate delete/leave
 // confirmation flow mirroring this one.
+//
+// KNOWN DUPLICATION: this delete modal's structure and styling (no icon,
+// left-aligned text, muted-red confirm button, one-off inline Modal
+// className overrides) is hand-duplicated in LeaveProjectModal.tsx and
+// RemoveMemberModal.tsx, and also diverges from the unrelated delete-account
+// modal in user-settings.tsx (which uses a centered layout, a warning icon,
+// Flowbite's solid color="red" button, and a shared theme object). A future
+// style or logic fix applied to just this file is easy to leave silently
+// unfixed in the other two - check LeaveProjectModal.tsx and
+// RemoveMemberModal.tsx before assuming a change here is complete. Not
+// unified yet on purpose: doing so means touching shared modal theming
+// across several components, scoped as its own follow-up branch rather than
+// bundled into feature work.
 
 interface DangerZoneSectionProps {
   projectId: string;
