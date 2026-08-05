@@ -89,6 +89,37 @@ func (s *testAuthStore) RecordEvent(context.Context, *string, string, *string, *
 	return nil
 }
 
+func (s *testAuthStore) CreateProjectAPIToken(
+	context.Context,
+	store.CreateProjectAPITokenRequest,
+) (store.CreatedProjectAPIToken, error) {
+	return store.CreatedProjectAPIToken{}, s.err
+}
+
+func (s *testAuthStore) ListProjectAPITokens(context.Context, string) ([]store.ProjectAPIToken, error) {
+	return nil, s.err
+}
+
+func (s *testAuthStore) RevokeProjectAPIToken(
+	context.Context,
+	string,
+	string,
+	string,
+) (store.ProjectAPIToken, error) {
+	return store.ProjectAPIToken{}, s.err
+}
+
+func (s *testAuthStore) DeleteProjectAPIToken(context.Context, string, string, string) error {
+	return s.err
+}
+
+func (s *testAuthStore) IntrospectProjectAPIToken(
+	context.Context,
+	string,
+) (store.ProjectAPITokenPrincipal, error) {
+	return store.ProjectAPITokenPrincipal{}, s.err
+}
+
 type testTokenService struct {
 	compact string
 	claims  token.Claims

@@ -20,6 +20,7 @@ import (
 	"github.com/42london/42_transcendence/auth/internal/password"
 	"github.com/42london/42_transcendence/auth/internal/store"
 	"github.com/42london/42_transcendence/auth/internal/token"
+	"github.com/google/uuid"
 )
 
 const (
@@ -67,6 +68,11 @@ type authStore interface {
 	RevokeRefreshFamily(context.Context, string, string, string) (store.RefreshFamily, error)
 	IntrospectAccess(context.Context, string, string) (store.AccessState, error)
 	RecordEvent(context.Context, *string, string, *string, *string, *string) error
+	CreateProjectAPIToken(context.Context, store.CreateProjectAPITokenRequest) (store.CreatedProjectAPIToken, error)
+	ListProjectAPITokens(context.Context, string) ([]store.ProjectAPIToken, error)
+	RevokeProjectAPIToken(context.Context, string, string, string) (store.ProjectAPIToken, error)
+	DeleteProjectAPIToken(context.Context, string, string, string) error
+	IntrospectProjectAPIToken(context.Context, string) (store.ProjectAPITokenPrincipal, error)
 }
 
 type webSocketStore interface {
@@ -102,6 +108,27 @@ type webSocketTicketRequest struct {
 type webSocketSessionRequest struct {
 	Subject   string `json:"sub"`
 	SessionID string `json:"sid"`
+}
+
+type createProjectAPITokenRequest struct {
+	ProjectID       string `json:"projectId"`
+	Label           string `json:"label"`
+	Permission      string `json:"permission"`
+	ExpiresAt       string `json:"expiresAt"`
+	CreatedByUserID string `json:"createdByUserId"`
+}
+
+type revokeProjectAPITokenRequest struct {
+	ProjectID   string `json:"projectId"`
+	ActorUserID string `json:"actorUserId"`
+}
+
+type deleteProjectAPITokenRequest struct {
+	ActorUserID string `json:"actorUserId"`
+}
+
+type introspectProjectAPITokenRequest struct {
+	APIKey string `json:"apiKey"`
 }
 
 type tokenResponse struct {
@@ -140,6 +167,30 @@ type webSocketAdmissionResponse struct {
 	SessionID string  `json:"sid"`
 	Username  string  `json:"username"`
 	AvatarURL *string `json:"avatarUrl"`
+}
+
+type projectAPITokenResponse struct {
+	ID         string     `json:"id"`
+	ProjectID  string     `json:"projectId"`
+	Label      string     `json:"label"`
+	Permission string     `json:"permission"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	ExpiresAt  time.Time  `json:"expiresAt"`
+	LastUsedAt *time.Time `json:"lastUsedAt"`
+	RevokedAt  *time.Time `json:"revokedAt"`
+}
+
+type createdProjectAPITokenResponse struct {
+	Token  projectAPITokenResponse `json:"token"`
+	APIKey string                  `json:"apiKey"`
+}
+
+type projectAPITokenIntrospectionResponse struct {
+	Active        bool   `json:"active"`
+	PrincipalType string `json:"principalType"`
+	TokenID       string `json:"tokenId"`
+	ProjectID     string `json:"projectId"`
+	Permission    string `json:"permission"`
 }
 
 type errorResponse struct {
@@ -205,6 +256,11 @@ func NewWithReadiness(
 	mux.HandleFunc("POST /auth/logout", server.handleLogout)
 	mux.HandleFunc("POST /auth/ws-ticket", server.handleIssueWebSocketTicket)
 	mux.HandleFunc("POST /auth/internal/introspect", server.handleIntrospect)
+	mux.HandleFunc("POST /auth/internal/project-api-tokens", server.handleCreateProjectAPIToken)
+	mux.HandleFunc("GET /auth/internal/projects/{projectId}/api-tokens", server.handleListProjectAPITokens)
+	mux.HandleFunc("POST /auth/internal/project-api-tokens/{tokenId}/revoke", server.handleRevokeProjectAPIToken)
+	mux.HandleFunc("DELETE /auth/internal/projects/{projectId}/api-tokens/{tokenId}", server.handleDeleteProjectAPIToken)
+	mux.HandleFunc("POST /auth/internal/project-api-tokens/introspect", server.handleIntrospectProjectAPIToken)
 	mux.HandleFunc("POST /auth/internal/ws-ticket/consume", server.handleConsumeWebSocketTicket)
 	mux.HandleFunc("POST /auth/internal/ws-session/revalidate", server.handleRevalidateWebSocketSession)
 
@@ -438,6 +494,205 @@ func (s *Server) handleIntrospect(w http.ResponseWriter, r *http.Request) {
 		IdleExpiresAt:        state.IdleExpiresAt,
 		AbsoluteExpiresAt:    state.AbsoluteExpiresAt,
 	})
+}
+
+func (s *Server) handleCreateProjectAPIToken(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInternal(w, r) {
+		return
+	}
+	var request createProjectAPITokenRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
+		return
+	}
+	expiresAt := parseProjectAPITokenExpiry(request.ExpiresAt)
+	if err := validateProjectAPITokenCreate(request, expiresAt); err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
+		return
+	}
+	created, err := s.store.CreateProjectAPIToken(
+		r.Context(),
+		store.CreateProjectAPITokenRequest{
+			ProjectID:       request.ProjectID,
+			Label:           strings.TrimSpace(request.Label),
+			Permission:      store.ProjectAPITokenPermission(request.Permission),
+			ExpiresAt:       expiresAt,
+			CreatedByUserID: request.CreatedByUserID,
+		},
+	)
+	if errors.Is(err, store.ErrConflict) {
+		writeError(
+			w,
+			http.StatusConflict,
+			"Conflict",
+			fmt.Sprintf("a project can have at most %d active API tokens", store.MaxProjectAPITokens),
+		)
+		return
+	}
+	if err != nil {
+		log.Printf("create project API token: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"project API token could not be created", "PROJECT_API_TOKEN_UNAVAILABLE",
+		)
+		return
+	}
+	writeJSON(w, http.StatusCreated, createdProjectAPITokenResponse{
+		Token:  projectAPITokenMetadata(created.ProjectAPIToken),
+		APIKey: created.Token,
+	})
+}
+
+func (s *Server) handleListProjectAPITokens(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInternal(w, r) {
+		return
+	}
+	projectID := r.PathValue("projectId")
+	if !validUUID(projectID) {
+		writeError(w, http.StatusBadRequest, "Bad Request", "projectId must be a UUID")
+		return
+	}
+	tokens, err := s.store.ListProjectAPITokens(r.Context(), projectID)
+	if err != nil {
+		log.Printf("list project API tokens: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"project API tokens could not be listed", "PROJECT_API_TOKEN_UNAVAILABLE",
+		)
+		return
+	}
+	response := make([]projectAPITokenResponse, 0, len(tokens))
+	for _, projectToken := range tokens {
+		response = append(response, projectAPITokenMetadata(projectToken))
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) handleRevokeProjectAPIToken(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInternal(w, r) {
+		return
+	}
+	tokenID := r.PathValue("tokenId")
+	var request revokeProjectAPITokenRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
+		return
+	}
+	if !validUUID(tokenID) || !validUUID(request.ProjectID) || !validUUID(request.ActorUserID) {
+		writeError(w, http.StatusBadRequest, "Bad Request", "projectId, tokenId, and actorUserId must be UUIDs")
+		return
+	}
+	token, err := s.store.RevokeProjectAPIToken(
+		r.Context(), request.ProjectID, tokenID, request.ActorUserID,
+	)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Not Found", "project API token not found")
+		return
+	}
+	if err != nil {
+		log.Printf("revoke project API token: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"project API token could not be revoked", "PROJECT_API_TOKEN_UNAVAILABLE",
+		)
+		return
+	}
+	writeJSON(w, http.StatusOK, projectAPITokenMetadata(token))
+}
+
+func (s *Server) handleDeleteProjectAPIToken(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInternal(w, r) {
+		return
+	}
+	projectID := r.PathValue("projectId")
+	tokenID := r.PathValue("tokenId")
+	var request deleteProjectAPITokenRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
+		return
+	}
+	if !validUUID(projectID) || !validUUID(tokenID) || !validUUID(request.ActorUserID) {
+		writeError(w, http.StatusBadRequest, "Bad Request", "projectId, tokenId, and actorUserId must be UUIDs")
+		return
+	}
+	if err := s.store.DeleteProjectAPIToken(r.Context(), projectID, tokenID, request.ActorUserID); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "Not Found", "project API token not found")
+		return
+	} else if err != nil {
+		log.Printf("delete project API token: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"project API token could not be deleted", "PROJECT_API_TOKEN_UNAVAILABLE",
+		)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleIntrospectProjectAPIToken(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInternal(w, r) {
+		return
+	}
+	var request introspectProjectAPITokenRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", err.Error())
+		return
+	}
+	principal, err := s.store.IntrospectProjectAPIToken(r.Context(), request.APIKey)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErrorCode(w, http.StatusUnauthorized, "Unauthorized", "project API token is invalid", "PROJECT_API_TOKEN_INVALID")
+		return
+	}
+	if err != nil {
+		log.Printf("introspect project API token: %v", err)
+		writeErrorCode(
+			w, http.StatusServiceUnavailable, "Service Unavailable",
+			"project API token could not be introspected", "PROJECT_API_TOKEN_UNAVAILABLE",
+		)
+		return
+	}
+	writeJSON(w, http.StatusOK, projectAPITokenIntrospectionResponse{
+		Active: true, PrincipalType: "PROJECT_API_TOKEN", TokenID: principal.TokenID,
+		ProjectID: principal.ProjectID, Permission: string(principal.Permission),
+	})
+}
+
+func validateProjectAPITokenCreate(request createProjectAPITokenRequest, expiresAt time.Time) error {
+	if !validUUID(request.ProjectID) || !validUUID(request.CreatedByUserID) {
+		return errors.New("projectId and createdByUserId must be UUIDs")
+	}
+	if label := strings.TrimSpace(request.Label); len(label) == 0 || len(label) > 100 {
+		return errors.New("label must be 1-100 characters")
+	}
+	if request.Permission != string(store.ProjectAPITokenRead) &&
+		request.Permission != string(store.ProjectAPITokenReadWrite) {
+		return errors.New("permission must be READ or READ_WRITE")
+	}
+	if expiresAt.IsZero() || !expiresAt.After(time.Now().UTC()) ||
+		expiresAt.After(time.Now().UTC().AddDate(1, 0, 0)) {
+		return errors.New("expiresAt must be in the next 365 days")
+	}
+	return nil
+}
+
+func parseProjectAPITokenExpiry(value string) time.Time {
+	expiresAt, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}
+	}
+	return expiresAt.UTC()
+}
+
+func projectAPITokenMetadata(token store.ProjectAPIToken) projectAPITokenResponse {
+	return projectAPITokenResponse{
+		ID: token.ID, ProjectID: token.ProjectID, Label: token.Label,
+		Permission: string(token.Permission), CreatedAt: token.CreatedAt,
+		ExpiresAt: token.ExpiresAt, LastUsedAt: token.LastUsedAt, RevokedAt: token.RevokedAt,
+	}
+}
+
+func validUUID(value string) bool {
+	return uuid.Validate(value) == nil
 }
 
 func (s *Server) handleIssueWebSocketTicket(w http.ResponseWriter, r *http.Request) {
