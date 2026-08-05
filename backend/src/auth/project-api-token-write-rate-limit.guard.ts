@@ -19,6 +19,8 @@ interface TokenWindow {
 // This intentionally runs after ProjectApiTokenGuard, so the limiter key is
 // the authenticated internal token ID rather than an attacker-controlled
 // header or a shared source IP.
+// Deliberately process-local for the project's single-backend deployment.
+// Revisit with a shared store before introducing multiple backend replicas.
 @Injectable()
 export class ProjectApiTokenWriteRateLimitGuard implements CanActivate {
   private readonly tokenWindows = new Map<string, TokenWindow>();

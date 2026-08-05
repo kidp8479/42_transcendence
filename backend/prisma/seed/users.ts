@@ -19,12 +19,6 @@ export async function seedUsers(prisma: PrismaClient): Promise<{
     { username: "emptyuser", campus: "42 Void" },
   ];
 
-  const specialUsersData = [
-    { username: "_systemUser1", campus: "42 London" },
-    { username: "_systemUser2", campus: "42 London" },
-    { username: "_systemUser3", campus: "42 London" },
-  ];
-
   const createdUsers: Record<string, User> = {};
 
   for (const u of usersData) {

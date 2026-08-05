@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   Injectable,
@@ -9,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
+import { isUUID } from "class-validator";
 import { firstHeaderValue } from "../common/first-header-value";
 import { PrismaService } from "../prisma/prisma.service";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
@@ -54,6 +56,10 @@ export class ProjectApiTokenGuard implements CanActivate {
       .getRequest<
         ProjectApiTokenRequest & { params: { projectId?: string } }
       >();
+    const projectId = request.params.projectId;
+    if (!projectId || !isUUID(projectId)) {
+      throw new BadRequestException("projectId must be a UUID");
+    }
     const rawAPIKey = request.headers["x-api-key"];
     if (Array.isArray(rawAPIKey)) {
       throw new UnauthorizedException("Project API token is invalid");
@@ -64,7 +70,14 @@ export class ProjectApiTokenGuard implements CanActivate {
     }
 
     const principal = await this.introspect(apiKey);
-    if (request.params.projectId !== principal.projectId) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: principal.projectId, isArchived: false },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException("Project not found");
+    }
+    if (projectId.toLowerCase() !== principal.projectId.toLowerCase()) {
       throw new NotFoundException("Project not found");
     }
     if (
@@ -74,14 +87,6 @@ export class ProjectApiTokenGuard implements CanActivate {
       throw new ForbiddenException(
         "Project API token does not permit write operations"
       );
-    }
-
-    const project = await this.prisma.project.findFirst({
-      where: { id: principal.projectId, isArchived: false },
-      select: { id: true },
-    });
-    if (!project) {
-      throw new NotFoundException("Project not found");
     }
 
     request.apiToken = principal;

@@ -5,6 +5,7 @@ import { AppModule } from "./app.module";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import helmet from "helmet";
 import { VaultRuntimeService } from "./vault/vault-runtime.service";
+import { setNoStoreForSensitiveApi } from "./common/no-store-sensitive-api";
 
 // Entry point of the NestJS application.
 // Flow: bootstrap() => NestFactory.create(AppModule) => setGlobalPrefix => Swagger => listen
@@ -14,6 +15,7 @@ async function bootstrap() {
   // Adds security-related HTTP response headers (ex: blocks MIME-sniffing,
   // disables framing to prevent clickjacking) - cheap, no config needed for defaults
   app.use(helmet());
+  app.use(setNoStoreForSensitiveApi);
 
   // Listens for shutdown signals (ex: SIGTERM sent by Docker on container stop/restart)
   // and calls onModuleDestroy() on every service that implements it - without this,
