@@ -75,10 +75,21 @@ export function MemberListItem({
           // components/projects/ProjectCard.tsx for why border-solid and
           // !border-surface-border both need to be spelled out locally.
           className="border-solid !border-surface-border dark:border-solid dark:!border-surface-border"
-          aria-label={`Manage ${username}`}
-          label={
-            <RiMoreLine className="h-4 w-4 text-text-secondary hover:text-text-primary" />
-          }
+          // renderTrigger, not label+aria-label: Flowbite's inline Dropdown
+          // trigger drops any aria-label passed as a top-level prop (only
+          // ...a11yProps make it onto the real <button>, not the rest of
+          // buttonProps) - axe-core caught this as a nameless button.
+          // renderTrigger hands back a real element Flowbite clones props
+          // onto directly, same fix already used in NotificationBell.tsx.
+          renderTrigger={(dropdownTheme) => (
+            <button
+              type="button"
+              aria-label={`Manage ${username}`}
+              className={dropdownTheme?.inlineWrapper}
+            >
+              <RiMoreLine className="h-4 w-4 text-text-secondary hover:text-text-primary" />
+            </button>
+          )}
         >
           {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") &&
             role === "MEMBER" && (
@@ -106,10 +117,10 @@ export function MemberListItem({
           <DropdownDivider />
           <DropdownItem
             theme={roundedDropdownItemTheme}
-            className="!text-red-700"
+            className="!text-red-400"
             onClick={() => onRemove(userId)}
           >
-            <div className="flex items-center gap-2 text-red-700">
+            <div className="flex items-center gap-2 text-red-400">
               <LiaTrashAltSolid className="h-4 w-4" />
               <span className="text-xs">Remove from project</span>
             </div>

@@ -472,7 +472,7 @@ export function ProjectCard({
                 <DropdownItem
                   icon={LiaTrashAltSolid}
                   theme={roundedDropdownItemTheme}
-                  className="text-red-700! dark:text-red-700!"
+                  className="text-red-400! dark:text-red-400!"
                   onClick={() => setMode("confirming-delete")}
                 >
                   Delete project
@@ -481,7 +481,7 @@ export function ProjectCard({
                 <DropdownItem
                   icon={HiOutlineArrowRightOnRectangle}
                   theme={roundedDropdownItemTheme}
-                  className="text-red-700! dark:text-red-700!"
+                  className="text-red-400! dark:text-red-400!"
                   onClick={() => setMode("confirming-leave")}
                 >
                   Leave project
