@@ -92,6 +92,40 @@ export class CalendarEventsService {
     );
   }
 
+  // Mirror of notifyNewAssignees for the other direction - notifies whoever
+  // was dropped from an event's assignee list on this PATCH. Only ever
+  // called from update(): create() has no previous assignees to remove.
+  private async notifyRemovedAssignees(
+    projectId: string,
+    previousAssigneeIds: string[],
+    newAssigneeIds: string[],
+    actingUserId: string,
+    messageFor: (projectName: string) => string
+  ): Promise<void> {
+    const removedUserIds = previousAssigneeIds.filter(
+      (userId) => !newAssigneeIds.includes(userId) && userId !== actingUserId
+    );
+    if (removedUserIds.length === 0) {
+      return;
+    }
+
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { name: true },
+    });
+    const message = messageFor(project.name);
+
+    await Promise.all(
+      removedUserIds.map((userId) =>
+        this.notificationsService.create(
+          userId,
+          message,
+          `/${projectId}/calendar`
+        )
+      )
+    );
+  }
+
   async create(projectId: string, dto: CreateCalendarEventDto, userId: string) {
     await this.projectsService.assertMembership(projectId, userId);
     this.assertValidDateRange(dto.startAt, dto.endAt);
@@ -217,12 +251,23 @@ export class CalendarEventsService {
       // old rows - its own assignees list is the "previous" set to diff against
       await this.calendarAssigneeService.replaceAssignees(id, assigneeIds);
       const eventTitle = dto.title ?? existingEvent.title;
+      const previousAssigneeIds = existingEvent.assignees.map(
+        (assignee) => assignee.id
+      );
       await this.notifyNewAssignees(
         projectId,
-        existingEvent.assignees.map((assignee) => assignee.id),
+        previousAssigneeIds,
         assigneeIds,
         userId,
         (projectName) => `You were added to "${eventTitle}" on "${projectName}"`
+      );
+      await this.notifyRemovedAssignees(
+        projectId,
+        previousAssigneeIds,
+        assigneeIds,
+        userId,
+        (projectName) =>
+          `You were removed from "${eventTitle}" on "${projectName}"`
       );
     }
 

@@ -369,9 +369,19 @@ export class TasksService {
       }
       // dto.title if this same PATCH also renamed it, same reasoning as
       // notifyStatusChange above.
+      const previousAssigneeIds = existingTask.assignees.map(
+        (assignee) => assignee.id
+      );
       await this.notifyNewAssignees(
         projectId,
-        existingTask.assignees.map((assignee) => assignee.id),
+        previousAssigneeIds,
+        assigneeIds,
+        userId,
+        dto.title ?? existingTask.title
+      );
+      await this.notifyRemovedAssignees(
+        projectId,
+        previousAssigneeIds,
         assigneeIds,
         actor.kind === "USER" ? actor.userId : undefined,
         dto.title ?? existingTask.title
@@ -667,6 +677,42 @@ export class TasksService {
       addedUserIds.map((addedUserId) =>
         this.notificationsService.create(
           addedUserId,
+          message,
+          `/${projectId}/kanban`
+        )
+      )
+    );
+  }
+
+  // Mirror of notifyNewAssignees for the other direction - notifies whoever
+  // was dropped from a task's assignee list on this PATCH. Only ever called
+  // from update(): create()'s previousAssigneeIds is always [], so nothing
+  // to remove.
+  private async notifyRemovedAssignees(
+    projectId: string,
+    previousAssigneeIds: string[],
+    newAssigneeIds: string[],
+    actingUserId: string,
+    taskTitle: string
+  ): Promise<void> {
+    const removedUserIds = previousAssigneeIds.filter(
+      (assigneeId) =>
+        !newAssigneeIds.includes(assigneeId) && assigneeId !== actingUserId
+    );
+    if (removedUserIds.length === 0) {
+      return;
+    }
+
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { name: true },
+    });
+    const message = `You were removed from "${taskTitle}" in "${project.name}"`;
+
+    await Promise.all(
+      removedUserIds.map((removedUserId) =>
+        this.notificationsService.create(
+          removedUserId,
           message,
           `/${projectId}/kanban`
         )
