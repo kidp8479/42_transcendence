@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useLoaderData } from "@tanstack/react-router";
 import { Avatar, Button, Textarea } from "flowbite-react";
 import { HiOutlineTrash } from "react-icons/hi2";
-import { IoSend } from "react-icons/io5";
+import { IoArrowBack, IoSend } from "react-icons/io5";
 import {
   fetchChatMessages,
   createChatMessage,
@@ -65,6 +65,11 @@ function ChatPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     conversations[0]?.id ?? null
   );
+  // Below md, the conversation list and the open chat can't fit
+  // side-by-side, so only one shows at a time - this tracks which, with a
+  // back button in the chat header to return to the list. Ignored at md+,
+  // where both panes are always visible regardless of its value.
+  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(false);
@@ -223,7 +228,11 @@ function ChatPage() {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-72 shrink-0 overflow-y-auto border-r border-surface-border">
+        <aside
+          className={`w-full shrink-0 overflow-y-auto border-r border-surface-border md:block md:w-72 ${
+            mobileView === "chat" ? "hidden" : "block"
+          }`}
+        >
           {conversations.length === 0 ? (
             <p className="p-4 text-xs text-text-secondary">
               No group chats yet - join or create a project with at least one
@@ -237,29 +246,46 @@ function ChatPage() {
                 memberCount={project.memberCount}
                 active={project.id === selectedProjectId}
                 hasUnread={unreadProjectIds.has(project.id)}
-                onClick={() => setSelectedProjectId(project.id)}
+                onClick={() => {
+                  setSelectedProjectId(project.id);
+                  setMobileView("chat");
+                }}
               />
             ))
           )}
         </aside>
 
-        <section className="flex min-h-0 flex-1 flex-col">
+        <section
+          className={`min-h-0 flex-1 flex-col md:flex ${
+            mobileView === "list" ? "hidden" : "flex"
+          }`}
+        >
           {!activeConversation ? (
             <div className="flex flex-1 items-center justify-center text-sm text-text-secondary">
               Select a conversation to start chatting.
             </div>
           ) : (
             <>
-              <header className="flex items-center justify-between border-b border-surface-border px-6 py-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-text-primary">
-                    {activeConversation.name}
-                  </h2>
-                  <p className="text-xs text-text-secondary">
-                    {activeConversation.memberCount} members
-                  </p>
+              <header className="flex items-center justify-between border-b border-surface-border px-4 py-4 sm:px-6">
+                <div className="flex min-w-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMobileView("list")}
+                    aria-label="Back to conversations"
+                    className="-ml-1 shrink-0 p-1 text-text-secondary hover:text-text-primary md:hidden"
+                  >
+                    <IoArrowBack className="h-5 w-5" />
+                  </button>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-sm font-semibold text-text-primary">
+                      {activeConversation.name}
+                    </h2>
+                    <p className="text-xs text-text-secondary">
+                      {activeConversation.memberCount} members
+                    </p>
+                  </div>
                 </div>
-                <div className="flex -space-x-2">
+                <div className="flex shrink-0 -space-x-2">
                   <AvatarStack
                     assignees={members.map((member) => member.user)}
                     maxVisible={AVATAR_STACK_MAX_DISPLAYED}
@@ -267,7 +293,7 @@ function ChatPage() {
                 </div>
               </header>
 
-              <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4">
+              <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
                 {loading ? (
                   <p className="text-center text-xs text-text-secondary">
                     Loading messages...
@@ -305,7 +331,7 @@ function ChatPage() {
                 )}
               </div>
 
-              <div className="flex items-end border-t border-surface-border px-4 py-4">
+              <div className="flex items-end gap-2 border-t border-surface-border px-3 py-3 sm:px-4 sm:py-4">
                 <Textarea
                   rows={1}
                   placeholder="Write a message..."
@@ -398,7 +424,7 @@ function ChatBubble({
         size="sm"
       />
       <div
-        className={`flex max-w-[70%] flex-col gap-1 ${isSelf ? "items-end" : "items-start"}`}
+        className={`flex max-w-[85%] flex-col gap-1 sm:max-w-[70%] ${isSelf ? "items-end" : "items-start"}`}
       >
         <div className="flex items-center gap-2 text-xs text-text-secondary">
           <span className="font-semibold text-text-primary">{username}</span>
@@ -410,7 +436,7 @@ function ChatBubble({
               type="button"
               onClick={onDelete}
               aria-label="Delete message"
-              className="hidden text-text-muted transition-colors hover:text-control-error group-hover:block"
+              className="block text-text-muted transition-colors hover:text-control-error sm:hidden sm:group-hover:block"
             >
               <HiOutlineTrash className="h-4 w-4" />
             </button>
