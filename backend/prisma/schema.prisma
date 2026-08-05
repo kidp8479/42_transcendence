@@ -320,7 +320,6 @@ model ProjectApiToken {
   label         String
   selector      String                    @unique
   secretHmac    String
-  pepperVersion Int
   permission    ProjectApiTokenPermission
   createdByUserId String?
   createdAt     DateTime                  @default(now())

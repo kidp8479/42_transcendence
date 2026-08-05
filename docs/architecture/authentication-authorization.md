@@ -177,11 +177,13 @@ not a JWT, cookie, refresh token, OAuth grant, user session, or impersonated
 user.
 
 Go auth generates the token with `crypto/rand`, stores only a public selector
-and Vault-peppered HMAC digest, and returns the raw value exactly once when it
-is created. The auth service owns expiry, revoke/delete lifecycle, and
-introspection. NestJS authenticates the requesting human browser session for
-management actions, then owns current project-role checks and every
-project/object containment decision for token requests.
+and an HMAC digest keyed by the one auth-only Vault `pepper` value, and returns
+the raw value exactly once when it is created. The auth service owns expiry,
+revoke/delete lifecycle, and introspection. NestJS authenticates the
+requesting human browser session for management actions, then owns current
+project-role checks and every project/object containment decision for token
+requests. There is no pepper keyring, versioning, rotation, or seamless secret
+migration, so changing the Vault pepper invalidates existing token HMACs.
 
 Tokens are bound permanently to one project and carry `READ` or `READ_WRITE`;
 write implies read. An `OWNER` or `ADMIN` can manage tokens. Go auth applies a

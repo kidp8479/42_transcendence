@@ -8,7 +8,6 @@ CREATE TABLE "ProjectApiToken" (
     "label" TEXT NOT NULL,
     "selector" TEXT NOT NULL,
     "secretHmac" TEXT NOT NULL,
-    "pepperVersion" INTEGER NOT NULL,
     "permission" "ProjectApiTokenPermission" NOT NULL,
     "createdByUserId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -21,7 +20,6 @@ CREATE TABLE "ProjectApiToken" (
     CONSTRAINT "ProjectApiToken_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "ProjectApiToken_selector_key" UNIQUE ("selector"),
     CONSTRAINT "ProjectApiToken_secret_hmac_chk" CHECK (char_length("secretHmac") = 64),
-    CONSTRAINT "ProjectApiToken_pepper_version_chk" CHECK ("pepperVersion" > 0),
     CONSTRAINT "ProjectApiToken_expiry_chk" CHECK ("expiresAt" > "createdAt")
 );
 

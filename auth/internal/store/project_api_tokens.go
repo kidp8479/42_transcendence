@@ -60,57 +60,19 @@ type ProjectAPITokenPrincipal struct {
 	Permission ProjectAPITokenPermission
 }
 
-type projectAPITokenPepper struct {
-	value   []byte
-	version int
-}
-
-type projectAPITokenPepperKeyring struct {
-	activeVersion int
-	byVersion     map[int]*projectAPITokenPepper
-}
-
-// SetProjectAPITokenPeppers installs an immutable versioned keyring. Tokens
-// are created with activeVersion while existing tokens are verified using the
-// version persisted alongside their digest.
-func (s *Store) SetProjectAPITokenPeppers(peppers map[int]string, activeVersion int) error {
-	if activeVersion <= 0 {
-		return fmt.Errorf("project API token active pepper version must be positive")
+func (s *Store) SetProjectAPITokenPepper(value string) error {
+	if len(value) < 32 {
+		return fmt.Errorf("project API token pepper must be at least 32 characters")
 	}
-	keyring := &projectAPITokenPepperKeyring{
-		activeVersion: activeVersion,
-		byVersion:     make(map[int]*projectAPITokenPepper, len(peppers)),
-	}
-	for version, value := range peppers {
-		if version <= 0 {
-			return fmt.Errorf("project API token pepper version must be positive")
-		}
-		if len(value) < 32 {
-			return fmt.Errorf("project API token pepper must be at least 32 characters")
-		}
-		keyring.byVersion[version] = &projectAPITokenPepper{
-			value:   []byte(value),
-			version: version,
-		}
-	}
-	if keyring.byVersion[activeVersion] == nil {
-		return fmt.Errorf("project API token active pepper version is unavailable")
-	}
-	s.projectAPITokenPeppers.Store(keyring)
+	s.projectAPITokenPepper = []byte(value)
 	return nil
-}
-
-// SetProjectAPITokenPepper preserves the single-version configuration API for
-// callers that have not yet moved to the Vault keyring representation.
-func (s *Store) SetProjectAPITokenPepper(value string, version int) error {
-	return s.SetProjectAPITokenPeppers(map[int]string{version: value}, version)
 }
 
 func (s *Store) CreateProjectAPIToken(
 	ctx context.Context,
 	request CreateProjectAPITokenRequest,
 ) (CreatedProjectAPIToken, error) {
-	pepper, err := s.activeProjectAPITokenPepper()
+	pepper, err := s.currentProjectAPITokenPepper()
 	if err != nil {
 		return CreatedProjectAPIToken{}, err
 	}
@@ -171,15 +133,14 @@ func (s *Store) CreateProjectAPIToken(
 	_, err = tx.Exec(
 		ctx,
 		`INSERT INTO "ProjectApiToken"
-			("id", "projectId", "label", "selector", "secretHmac", "pepperVersion",
+			("id", "projectId", "label", "selector", "secretHmac",
 			 "permission", "createdByUserId", "createdAt", "expiresAt")
-		 VALUES ($1, $2, $3, $4, $5, $6, CAST($7 AS "ProjectApiTokenPermission"), $8, $9, $10)`,
+		 VALUES ($1, $2, $3, $4, $5, CAST($6 AS "ProjectApiTokenPermission"), $7, $8, $9)`,
 		created.ID,
 		created.ProjectID,
 		created.Label,
 		selector,
-		projectAPITokenHMAC(pepper.value, selector, secret),
-		pepper.version,
+		projectAPITokenHMAC(pepper, selector, secret),
 		string(created.Permission),
 		created.CreatedByUserID,
 		created.CreatedAt,
@@ -286,7 +247,7 @@ func (s *Store) IntrospectProjectAPIToken(
 	if !ok {
 		return ProjectAPITokenPrincipal{}, ErrNotFound
 	}
-	keyring, err := s.currentProjectAPITokenPepperKeyring()
+	pepper, err := s.currentProjectAPITokenPepper()
 	if err != nil {
 		return ProjectAPITokenPrincipal{}, err
 	}
@@ -298,30 +259,27 @@ func (s *Store) IntrospectProjectAPIToken(
 
 	var principal ProjectAPITokenPrincipal
 	var digest string
-	var pepperVersion int
 	// Lock the credential row through verification, last-use update, and
 	// commit. Revoke and delete acquire the same row lock via UPDATE/DELETE,
 	// so an introspection that starts after either mutation commits cannot
 	// observe or return a still-active credential.
 	err = tx.QueryRow(
 		ctx,
-		`SELECT "id", "projectId", "permission"::text, "secretHmac", "pepperVersion"
+		`SELECT "id", "projectId", "permission"::text, "secretHmac"
 		 FROM "ProjectApiToken"
 		 WHERE "selector" = $1
 		   AND "revokedAt" IS NULL
 		   AND "expiresAt" > CURRENT_TIMESTAMP
 		 FOR UPDATE`,
 		selector,
-	).Scan(&principal.TokenID, &principal.ProjectID, &principal.Permission, &digest, &pepperVersion)
+	).Scan(&principal.TokenID, &principal.ProjectID, &principal.Permission, &digest)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ProjectAPITokenPrincipal{}, ErrNotFound
 	}
 	if err != nil {
 		return ProjectAPITokenPrincipal{}, fmt.Errorf("introspect project API token: %w", err)
 	}
-	pepper := keyring.byVersion[pepperVersion]
-	if pepper == nil ||
-		!hmac.Equal([]byte(projectAPITokenHMAC(pepper.value, selector, secret)), []byte(digest)) {
+	if !hmac.Equal([]byte(projectAPITokenHMAC(pepper, selector, secret)), []byte(digest)) {
 		return ProjectAPITokenPrincipal{}, ErrNotFound
 	}
 	if _, err := tx.Exec(
@@ -429,20 +387,11 @@ func recordProjectAPITokenEvent(
 	return nil
 }
 
-func (s *Store) currentProjectAPITokenPepperKeyring() (*projectAPITokenPepperKeyring, error) {
-	keyring := s.projectAPITokenPeppers.Load()
-	if keyring == nil {
-		return nil, fmt.Errorf("project API token pepper keyring is unavailable")
+func (s *Store) currentProjectAPITokenPepper() ([]byte, error) {
+	if len(s.projectAPITokenPepper) == 0 {
+		return nil, fmt.Errorf("project API token pepper is unavailable")
 	}
-	return keyring, nil
-}
-
-func (s *Store) activeProjectAPITokenPepper() (*projectAPITokenPepper, error) {
-	keyring, err := s.currentProjectAPITokenPepperKeyring()
-	if err != nil {
-		return nil, err
-	}
-	return keyring.byVersion[keyring.activeVersion], nil
+	return s.projectAPITokenPepper, nil
 }
 
 func formatProjectAPIToken(selector string, secret string) string {

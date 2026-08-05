@@ -19,8 +19,8 @@ project-path containment, and the explicit public-v1 route allowlist.
 
 Tokens have the versioned form `trp_v1_<selector>.<secret>`. Both components
 are generated with `crypto/rand`; the secret is at least 256 bits. Go stores
-the selector, an HMAC-SHA-256 digest, the Vault pepper version, and lifecycle
-metadata. It displays the raw credential in the create response exactly once.
+the selector, an HMAC-SHA-256 digest, and lifecycle metadata. It displays the
+raw credential in the create response exactly once.
 No list, audit, log, trace, metric label, URL, browser storage, or error
 response may contain the credential, selector, or digest.
 
@@ -64,8 +64,8 @@ WebSockets, uploads, global endpoints, or OWNER-only actions.
 
 This creates a separate credential lifecycle and an auth-service dependency
 for machine requests, but preserves immediate revocation and avoids stale
-project roles in JWT claims. The Vault pepper is readable only by Go auth;
-the NestJS database role is explicitly denied token-table access. Vault
-stores an active pepper version plus retained historical versions; new tokens
-use the active version and verification accepts a retained version until its
-tokens have expired, been revoked, or been replaced.
+project roles in JWT claims. Vault stores one auth-only `pepper` value,
+readable only by Go auth; the NestJS database role is explicitly denied
+token-table access. There is no pepper keyring, versioning, or secret
+migration: changing the Vault pepper invalidates existing token HMACs, so
+replacement tokens must be issued.

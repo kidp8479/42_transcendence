@@ -58,11 +58,10 @@ type OAuthCredentials struct {
 }
 
 type Secrets struct {
-	OAuth                        OAuthCredentials
-	InternalToken                string
-	RefreshSuccessorCipherKey    string
-	ProjectAPITokenPeppers       map[int]string
-	ProjectAPITokenActiveVersion int
+	OAuth                     OAuthCredentials
+	InternalToken             string
+	RefreshSuccessorCipherKey string
+	ProjectAPITokenPepper     string
 }
 
 // TransitPublicKeys contains only verification material. Vault never exposes
@@ -138,23 +137,8 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 	if err != nil {
 		return Secrets{}, fmt.Errorf("read project API token pepper: %w", err)
 	}
-	activePepperVersion, err := strconv.Atoi(projectAPITokenPepper["active_version"])
-	if err != nil || activePepperVersion <= 0 {
-		return Secrets{}, fmt.Errorf("Vault project API token active pepper version must be a positive integer")
-	}
-	peppers := make(map[int]string)
-	for key, value := range projectAPITokenPepper {
-		if !strings.HasPrefix(key, "pepper_v") {
-			continue
-		}
-		version, err := strconv.Atoi(strings.TrimPrefix(key, "pepper_v"))
-		if err != nil || version <= 0 || key != "pepper_v"+strconv.Itoa(version) || len(value) < 32 {
-			return Secrets{}, fmt.Errorf("Vault project API token pepper keyring is invalid")
-		}
-		peppers[version] = value
-	}
-	if peppers[activePepperVersion] == "" {
-		return Secrets{}, fmt.Errorf("Vault project API token active pepper is unavailable")
+	if len(projectAPITokenPepper["pepper"]) < 32 {
+		return Secrets{}, fmt.Errorf("Vault project API token pepper must be at least 32 characters")
 	}
 	secrets := Secrets{
 		OAuth: OAuthCredentials{
@@ -163,10 +147,9 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 			GoogleClientID:       oauth["oauth_google_client_id"],
 			GoogleClientSecret:   oauth["oauth_google_client_secret"],
 		},
-		InternalToken:                internal["internal_token"],
-		RefreshSuccessorCipherKey:    refreshSuccessor["cipher_key"],
-		ProjectAPITokenPeppers:       peppers,
-		ProjectAPITokenActiveVersion: activePepperVersion,
+		InternalToken:             internal["internal_token"],
+		RefreshSuccessorCipherKey: refreshSuccessor["cipher_key"],
+		ProjectAPITokenPepper:     projectAPITokenPepper["pepper"],
 	}
 	if len(secrets.InternalToken) < 32 {
 		return Secrets{}, fmt.Errorf("Vault internal credential must be at least 32 characters")

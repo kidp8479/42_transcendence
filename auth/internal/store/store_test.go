@@ -1,8 +1,6 @@
 package store
 
 import (
-	"fmt"
-	"sync"
 	"testing"
 	"time"
 )
@@ -84,50 +82,21 @@ func TestProjectAPITokenFormatAndHMAC(t *testing.T) {
 	}
 }
 
-func TestProjectAPITokenPepperKeyringRetainsPreviousVersions(t *testing.T) {
+func TestProjectAPITokenPepperConfiguration(t *testing.T) {
 	store := New(nil)
-	previous := "previous-project-api-token-pepper-long-enough"
-	active := "active-project-api-token-pepper-long-enough"
-	if err := store.SetProjectAPITokenPeppers(map[int]string{1: previous, 2: active}, 2); err != nil {
-		t.Fatalf("SetProjectAPITokenPeppers() error = %v", err)
+	const value = "project-api-token-pepper-long-enough"
+	if err := store.SetProjectAPITokenPepper(value); err != nil {
+		t.Fatalf("SetProjectAPITokenPepper() error = %v", err)
 	}
-	current, err := store.activeProjectAPITokenPepper()
-	if err != nil || current.version != 2 || string(current.value) != active {
-		t.Fatalf("activeProjectAPITokenPepper() = %#v, %v", current, err)
-	}
-	keyring, err := store.currentProjectAPITokenPepperKeyring()
-	if err != nil || keyring.byVersion[1] == nil || string(keyring.byVersion[1].value) != previous {
-		t.Fatalf("previous pepper was not retained: %#v, %v", keyring, err)
+	current, err := store.currentProjectAPITokenPepper()
+	if err != nil || string(current) != value {
+		t.Fatalf("currentProjectAPITokenPepper() = %#v, %v", current, err)
 	}
 }
 
-func TestProjectAPITokenPepperKeyringRejectsInvalidActiveVersion(t *testing.T) {
+func TestProjectAPITokenPepperConfigurationRejectsShortValue(t *testing.T) {
 	store := New(nil)
-	if err := store.SetProjectAPITokenPeppers(map[int]string{1: "project-api-token-pepper-long-enough"}, 2); err == nil {
-		t.Fatal("SetProjectAPITokenPeppers() accepted an unavailable active version")
+	if err := store.SetProjectAPITokenPepper("too-short"); err == nil {
+		t.Fatal("SetProjectAPITokenPepper() accepted a short value")
 	}
-}
-
-func TestProjectAPITokenPepperKeyringConcurrentReplacement(t *testing.T) {
-	store := New(nil)
-	const workers = 16
-	var wait sync.WaitGroup
-	wait.Add(workers)
-	for worker := 0; worker < workers; worker++ {
-		go func(worker int) {
-			defer wait.Done()
-			for version := 1; version <= 100; version++ {
-				pepper := fmt.Sprintf("project-api-token-pepper-%d-%d-long-enough", worker, version)
-				if err := store.SetProjectAPITokenPeppers(map[int]string{version: pepper}, version); err != nil {
-					t.Errorf("SetProjectAPITokenPeppers() error = %v", err)
-					return
-				}
-				if _, err := store.activeProjectAPITokenPepper(); err != nil {
-					t.Errorf("activeProjectAPITokenPepper() error = %v", err)
-					return
-				}
-			}
-		}(worker)
-	}
-	wait.Wait()
 }

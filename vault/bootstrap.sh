@@ -80,20 +80,10 @@ if [ -z "${OAUTH_42_CLIENT_ID:-}" ] || [ -z "${OAUTH_GOOGLE_CLIENT_ID:-}" ]; the
 fi
 quiet vault kv put kv/internal/backend-auth internal_token="$AUTH_INTERNAL_TOKEN"
 quiet vault kv put kv/auth/refresh-successor cipher_key="$AUTH_REFRESH_SUCCESSOR_KEY"
-# A pepper rotation is an explicit Vault operation: retain old pepper_vN
-# values until all tokens issued under them have expired. Bootstrap only seeds
-# a missing keyring, so a re-run can never roll a rotated keyring back to v1.
-# Earlier TR-85 foundations stored the v1 pepper under `pepper`; upgrade that
-# legacy shape once without replacing its secret material.
+# Seed the auth-only pepper exactly once. A bootstrap rerun must never replace
+# an existing secret, including an older incompatible secret shape.
 if ! vault kv get -format=json kv/auth/project-api-token-pepper >/dev/null 2>&1; then
-	quiet vault kv put kv/auth/project-api-token-pepper \
-		active_version="1" \
-		pepper_v1="$AUTH_PROJECT_API_TOKEN_PEPPER"
-elif ! vault kv get -field=active_version kv/auth/project-api-token-pepper >/dev/null 2>&1; then
-	legacy_pepper=$(vault kv get -field=pepper kv/auth/project-api-token-pepper)
-	quiet vault kv patch kv/auth/project-api-token-pepper \
-		active_version="1" \
-		pepper_v1="$legacy_pepper"
+	quiet vault kv put kv/auth/project-api-token-pepper pepper="$AUTH_PROJECT_API_TOKEN_PEPPER"
 fi
 
 step "configuring PostgreSQL database secrets engine"
