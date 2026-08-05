@@ -294,6 +294,153 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /internal/project-api-tokens:
+    post:
+      operationId: createProjectApiToken
+      description: >
+        Internal endpoint. Creates a project-bound opaque credential and returns
+        its plaintext apiKey exactly once. When expiresAt is omitted, auth
+        applies a 90-day expiry; the maximum expiry is 365 days.
+      security:
+        - internalBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectApiTokenRequest"
+      responses:
+        "201":
+          description: Project API token created; do not persist apiKey in logs or telemetry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedProjectApiToken"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: The project already has ten active API tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /internal/projects/{projectId}/api-tokens:
+    get:
+      operationId: listProjectApiTokens
+      description: Internal endpoint returning token metadata only, never credential material.
+      security:
+        - internalBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project token metadata.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectApiToken"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /internal/project-api-tokens/{tokenId}/revoke:
+    post:
+      operationId: revokeProjectApiToken
+      description: Internal endpoint. Revocation is permanent and idempotent.
+      security:
+        - internalBearer: []
+      parameters:
+        - $ref: "#/components/parameters/TokenId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectApiTokenActorRequest"
+      responses:
+        "200":
+          description: Revoked token metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectApiToken"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Token does not belong to the supplied project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /internal/projects/{projectId}/api-tokens/{tokenId}:
+    delete:
+      operationId: deleteProjectApiToken
+      description: Internal endpoint. Deletes the credential record after authorization.
+      security:
+        - internalBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/TokenId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteProjectApiTokenRequest"
+      responses:
+        "204":
+          description: Token deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Token does not belong to the supplied project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /internal/project-api-tokens/introspect:
+    post:
+      operationId: introspectProjectApiToken
+      description: >
+        Internal endpoint. Invalid, expired, revoked, and deleted credentials
+        intentionally share the same 401 response.
+      security:
+        - internalBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectApiTokenIntrospectionRequest"
+      responses:
+        "200":
+          description: Active project-token principal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectApiTokenIntrospectionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /internal/ws-ticket/consume:
     post:
       operationId: consumeWebSocketTicket
@@ -359,6 +506,20 @@ components:
       required: true
       schema:
         type: string
+    ProjectId:
+      in: path
+      name: projectId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TokenId:
+      in: path
+      name: tokenId
+      required: true
+      schema:
+        type: string
+        format: uuid
   schemas:
     RegisterRequest:
       type: object
@@ -439,6 +600,104 @@ components:
       properties:
         accessToken:
           type: string
+    CreateProjectApiTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId, label, permission, createdByUserId]
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        permission:
+          enum: [READ, READ_WRITE]
+        expiresAt:
+          type: string
+          format: date-time
+          description: Defaults to 90 days from creation when omitted; cannot exceed 365 days.
+        createdByUserId:
+          type: string
+          format: uuid
+    ProjectApiTokenActorRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId, actorUserId]
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        actorUserId:
+          type: string
+          format: uuid
+    DeleteProjectApiTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [actorUserId]
+      properties:
+        actorUserId:
+          type: string
+          format: uuid
+    ProjectApiToken:
+      type: object
+      required: [id, projectId, label, permission, createdAt, expiresAt, lastUsedAt, revokedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        label:
+          type: string
+        permission:
+          enum: [READ, READ_WRITE]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: [string, "null"]
+          format: date-time
+        revokedAt:
+          type: [string, "null"]
+          format: date-time
+    CreatedProjectApiToken:
+      type: object
+      required: [token, apiKey]
+      properties:
+        token:
+          $ref: "#/components/schemas/ProjectApiToken"
+        apiKey:
+          type: string
+          description: Returned only at creation; store it outside the application.
+    ProjectApiTokenIntrospectionRequest:
+      type: object
+      additionalProperties: false
+      required: [apiKey]
+      properties:
+        apiKey:
+          type: string
+    ProjectApiTokenIntrospectionResponse:
+      type: object
+      required: [active, principalType, tokenId, projectId, permission]
+      properties:
+        active:
+          const: true
+        principalType:
+          const: PROJECT_API_TOKEN
+        tokenId:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        permission:
+          enum: [READ, READ_WRITE]
     WebSocketTicketResponse:
       type: object
       additionalProperties: false

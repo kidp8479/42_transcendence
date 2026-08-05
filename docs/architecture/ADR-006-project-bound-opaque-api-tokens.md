@@ -26,9 +26,14 @@ response may contain the credential, selector, or digest.
 
 ## Lifecycle and audit
 
-- Default expiry is 90 days; the maximum is 365 days.
-- Revocation is immediate, permanent, and idempotent. Re-enabling is not
-  supported; rotation means issuing a replacement then revoking the old token.
+- Go auth applies a 90-day default when no expiry is supplied; the maximum is
+  365 days.
+- Revocation is permanent and idempotent. Introspection locks the token row
+  while it verifies and records use, so every introspection beginning after a
+  revoke or delete commits rejects the credential. A request already
+  authorized before that linearization point may finish.
+- Re-enabling is not supported; rotation means issuing a replacement then
+  revoking the old token.
 - Deletion removes the credential record and therefore invalidates it
   immediately. A separate append-only event record retains audit evidence.
 - Demoting, removing, disabling, or deleting the issuing user does not affect
@@ -41,21 +46,26 @@ response may contain the credential, selector, or digest.
 
 Tokens travel only in `X-API-Key` over TLS. Browser JWT routes remain bearer
 JWT-only; public routes live under `/api/public/v1` and accept only project
-token principals. Invalid, malformed, unknown, expired, revoked, and deleted
-tokens all return indistinguishable `401` responses. Auth/Vault/database
-availability failures return `503`. A token routed to another project returns
-non-disclosing `404`.
+token principals. Invalid, malformed, unknown, expired, revoked, and deleted tokens all return
+indistinguishable `401` responses. Auth/Vault/database availability failures
+return `503`. A token routed to another project returns non-disclosing `404`.
+All public-v1 and browser token-management responses are `Cache-Control:
+no-store`.
 
-The first public-v1 slice is read-only. No token may access token management,
+`READ` and `READ_WRITE` tokens can use the explicit project-scoped read
+allowlist. `READ_WRITE` additionally permits task creation, updates (including
+rank/status moves and assignee changes), and deletion through
+`/api/public/v1/projects/:projectId/tasks`. A valid `READ` token attempting
+one of those writes receives `403`. No token may access token management,
 project lifecycle, membership/role operations, user/session/auth endpoints,
-WebSockets, uploads, global endpoints, or OWNER-only actions. Write routes
-require an explicit later allowlist review.
+WebSockets, uploads, global endpoints, or OWNER-only actions.
 
 ## Consequences
 
 This creates a separate credential lifecycle and an auth-service dependency
 for machine requests, but preserves immediate revocation and avoids stale
 project roles in JWT claims. The Vault pepper is readable only by Go auth;
-the NestJS database role is explicitly denied token-table access. A future
-pepper rotation keeps per-token versions and accepts the old version until
-affected credentials are replaced or expire.
+the NestJS database role is explicitly denied token-table access. Vault
+stores an active pepper version plus retained historical versions; new tokens
+use the active version and verification accepts a retained version until its
+tokens have expired, been revoked, or been replaced.

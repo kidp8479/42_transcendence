@@ -184,19 +184,24 @@ management actions, then owns current project-role checks and every
 project/object containment decision for token requests.
 
 Tokens are bound permanently to one project and carry `READ` or `READ_WRITE`;
-write implies read. An `OWNER` or `ADMIN` can manage tokens. A token stays
-valid when its creator loses membership or is disabled because its authority
-belongs to the project, not the person. Revoke is permanent; delete removes
-the credential record while an independent, redacted audit event remains.
+write implies read. An `OWNER` or `ADMIN` can manage tokens. Go auth applies a
+90-day default expiry when none is supplied, up to a 365-day maximum. A token
+stays valid when its creator loses membership or is disabled because its
+authority belongs to the project, not the person. Revoke is permanent; delete
+removes the credential record while an independent, redacted audit event
+remains.
 
 `/api/public/v1` accepts only the distinct project-token principal. Existing
-browser `/api` controllers remain JWT-only. Tokens cannot access token
-management, project lifecycle, memberships/roles, user/session/auth
-endpoints, WebSockets, uploads, global endpoints, or OWNER-only actions
-unless a new allowlist entry is explicitly reviewed. Invalid, malformed,
-unknown, expired, revoked, and deleted tokens all return `401`; auth/Vault/DB
-unavailability returns `503`; a project-path mismatch returns non-disclosing
-`404`.
+browser `/api` controllers remain JWT-only. `READ_WRITE` explicitly permits
+project-scoped task create, update (including rank/status and assignee
+changes), and deletion under `/api/public/v1`; `READ` write attempts return
+`403`. Tokens cannot access token management, project lifecycle,
+memberships/roles, user/session/auth endpoints, WebSockets, uploads, global
+endpoints, or OWNER-only actions unless a new allowlist entry is explicitly
+reviewed. Invalid, malformed, unknown, expired, revoked, and deleted tokens
+all return `401`; auth/Vault/DB unavailability returns `503`; a project-path
+mismatch returns non-disclosing `404`. Token routes emit `Cache-Control:
+no-store` and never expose credentials in caches, logs, URLs, or telemetry.
 
 ### XSS policy
 
