@@ -6,6 +6,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import {
@@ -16,11 +17,14 @@ import {
 import { maxProjectsPerUser } from "./projects.constants";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
+import { UpdateProjectDetailsDto } from "./dto/update-project-details.dto";
 import { DEFAULT_CALENDAR_CATEGORIES } from "../calendar-categories/default-calendar-categories";
 import { DEFAULT_TASK_CATEGORIES } from "../task-categories/default-task-categories";
 import { DEFAULT_DISCOVERY_BLOCKS } from "../discovery-blocks/default-discovery-blocks";
 import { computeDiscoveryBlockStatus } from "../discovery-blocks/discovery-block-status.util";
 import { RealtimeService } from "../realtime/realtime.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 
 // Mirrors the weighted, gated score computed client-side in
 // evaluation-checklist.tsx (totalProgress.percent / READINESS_THRESHOLD /
@@ -62,7 +66,8 @@ function computeProjectProgress(
 export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly realtimeService: RealtimeService
+    private readonly realtimeService: RealtimeService,
+    private readonly notificationsService: NotificationsService
   ) {}
 
   // shared access guard, meant to be called by any module that needs to verify
@@ -296,6 +301,86 @@ export class ProjectsService {
       progress: computeProjectProgress(evaluationChecklistItems),
       memberCount: _count.members,
     };
+
+    this.realtimeService.emitToProject(id, "project:updated", result);
+
+    return result;
+  }
+
+  // Open to any project member, unlike update() above (OWNER/ADMIN-only for
+  // status/archive) - split into its own method/route rather than loosening
+  // update()'s check, since every permission check in this backend is
+  // method-level, never conditional on which fields are in the body.
+  async updateDetails(
+    id: string,
+    dto: UpdateProjectDetailsDto,
+    userId: string
+  ) {
+    const member = await this.assertMembership(id, userId);
+
+    let updatedProject;
+    try {
+      updatedProject = await this.prisma.project.update({
+        // Matching on updatedAt too, not just id, is the optimistic-
+        // concurrency check: dto.updatedAt is the version this edit was
+        // based on. If someone else's edit already landed, the row's real
+        // updatedAt has moved on and no row matches this where clause -
+        // Prisma throws instead of writing, so this save can never
+        // silently overwrite a concurrent edit.
+        where: { id, updatedAt: new Date(dto.updatedAt) },
+        data: {
+          name: dto.name,
+          description: dto.description,
+        },
+        include: {
+          evaluationChecklistItems: {
+            select: { section: true, isChecked: true },
+          },
+          _count: {
+            select: { members: true },
+          },
+        },
+      });
+    } catch (error) {
+      if (isRecordNotFoundError(error)) {
+        throw new ConflictException(
+          "This project was updated by someone else. Reload and try again."
+        );
+      }
+      throw error;
+    }
+
+    const { evaluationChecklistItems, _count, ...rest } = updatedProject;
+    const result = {
+      ...rest,
+      role: member.role,
+      progress: computeProjectProgress(evaluationChecklistItems),
+      memberCount: _count.members,
+    };
+
+    // Tells every other project member their teammate changed the
+    // project's details - same "notify everyone else, not the actor"
+    // pattern already used for member removal/role changes in
+    // project-members.service.ts.
+    const [actor, otherMembers] = await Promise.all([
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { username: true },
+      }),
+      this.prisma.projectMember.findMany({
+        where: { projectId: id, userId: { not: userId } },
+        select: { userId: true },
+      }),
+    ]);
+    await Promise.all(
+      otherMembers.map((otherMember) =>
+        this.notificationsService.create(
+          otherMember.userId,
+          `${actor.username} updated "${result.name}"'s details`,
+          `/${id}/project-settings`
+        )
+      )
+    );
 
     this.realtimeService.emitToProject(id, "project:updated", result);
 
