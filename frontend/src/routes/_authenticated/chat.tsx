@@ -9,7 +9,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useLoaderData } from "@tanstack/react-router";
 import { Avatar, Button, Textarea } from "flowbite-react";
-import { HiOutlinePaperAirplane, HiOutlineTrash } from "react-icons/hi2";
+import { HiOutlineTrash } from "react-icons/hi2";
+import { IoSend } from "react-icons/io5";
 import {
   fetchChatMessages,
   createChatMessage,
@@ -304,7 +305,7 @@ function ChatPage() {
                 )}
               </div>
 
-              <div className="flex items-end gap-3 border-t border-surface-border px-6 py-4">
+              <div className="flex items-end border-t border-surface-border px-4 py-4">
                 <Textarea
                   rows={1}
                   placeholder="Write a message..."
@@ -324,7 +325,7 @@ function ChatPage() {
                   disabled={draft.trim().length === 0 || sending}
                   onClick={() => void handleSend()}
                 >
-                  <HiOutlinePaperAirplane className="h-5 w-5 rotate-90" />
+                  <IoSend className="h-5 w-5" />
                 </Button>
               </div>
             </>
