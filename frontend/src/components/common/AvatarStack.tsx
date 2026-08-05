@@ -24,7 +24,7 @@ interface AvatarStackProps {
 // ProjectLayout's anchor, each one parked at its card's un-scrolled offset -
 // enough of them and the whole tab area became scrollable onto empty space.
 const AVATAR_CLASS =
-  "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-surface-raised";
+  "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white";
 
 // Deterministic palette index from the username, so a member keeps the same
 // avatar color everywhere on the board. Mock-only shortcut: User has no color
