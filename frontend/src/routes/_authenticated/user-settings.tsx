@@ -94,6 +94,7 @@ function UserSettingsPage() {
   const { showToast } = useToast();
   const [openModalUploadAvatar, setOpenModalUploadAvatar] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
   const [deleteAccountStep, setDeleteAccountStep] =
     useState<DeleteAccountStep | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
@@ -264,7 +265,29 @@ function UserSettingsPage() {
         <div className="flex w-full items-center justify-center px-6 pb-6">
           <Label
             htmlFor="dropzone-file"
-            className="flex h-64 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 focus-within:ring-2 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600"
+            // the wrapping <label> never receives an HTML5 drop natively -
+            // only the <input> itself does - so drag-and-drop has to be
+            // wired here explicitly rather than relying on the input alone
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setIsDraggingAvatar(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              setIsDraggingAvatar(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingAvatar(false);
+              setOpenModalUploadAvatar(false);
+              handleUpload(e.dataTransfer.files[0] ?? null);
+            }}
+            className={`flex h-64 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed bg-gray-50 hover:bg-gray-100 focus-within:ring-2 focus-within:ring-brand-500 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600 ${
+              isDraggingAvatar
+                ? "border-brand-500 bg-gray-100 dark:border-brand-500 dark:bg-gray-600"
+                : "border-gray-300 dark:border-gray-600"
+            }`}
           >
             <div className="flex flex-col items-center justify-center pb-6 pt-5">
               <svg
