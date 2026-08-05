@@ -378,6 +378,12 @@ func TestRuntimeStartRequiresTransitPublicKeys(t *testing.T) {
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
 				"cipher_key": "a-dedicated-refresh-successor-key-long-enough",
 			}}})
+		case "/v1/kv/data/auth/project-api-token-pepper":
+			requireVaultToken(t, r)
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"pepper":  "a-dedicated-project-api-token-pepper-long-enough",
+				"version": "1",
+			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{
@@ -447,6 +453,12 @@ func TestClientUsesAppRoleTokenForRuntimeOperations(t *testing.T) {
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
 				"cipher_key": "a-dedicated-refresh-successor-key-long-enough",
+			}}})
+		case "/v1/kv/data/auth/project-api-token-pepper":
+			requireVaultToken(t, r)
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"pepper":  "a-dedicated-project-api-token-pepper-long-enough",
+				"version": "1",
 			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)
@@ -685,6 +697,12 @@ func TestRuntimeReauthenticatesAndReplacesDatabaseLease(t *testing.T) {
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
 				"cipher_key": "a-dedicated-refresh-successor-key-long-enough",
+			}}})
+		case "/v1/kv/data/auth/project-api-token-pepper":
+			requireVaultToken(t, r)
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"pepper":  "a-dedicated-project-api-token-pepper-long-enough",
+				"version": "1",
 			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)

@@ -58,9 +58,11 @@ type OAuthCredentials struct {
 }
 
 type Secrets struct {
-	OAuth                     OAuthCredentials
-	InternalToken             string
-	RefreshSuccessorCipherKey string
+	OAuth                        OAuthCredentials
+	InternalToken                string
+	RefreshSuccessorCipherKey    string
+	ProjectAPITokenPepper        string
+	ProjectAPITokenPepperVersion int
 }
 
 // TransitPublicKeys contains only verification material. Vault never exposes
@@ -132,6 +134,14 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 	if err != nil {
 		return Secrets{}, fmt.Errorf("read refresh successor credential: %w", err)
 	}
+	projectAPITokenPepper, err := c.readKV(ctx, "kv/data/auth/project-api-token-pepper")
+	if err != nil {
+		return Secrets{}, fmt.Errorf("read project API token pepper: %w", err)
+	}
+	pepperVersion, err := strconv.Atoi(projectAPITokenPepper["version"])
+	if err != nil || pepperVersion <= 0 {
+		return Secrets{}, fmt.Errorf("Vault project API token pepper version must be a positive integer")
+	}
 	secrets := Secrets{
 		OAuth: OAuthCredentials{
 			FortyTwoClientID:     oauth["oauth_42_client_id"],
@@ -139,14 +149,19 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 			GoogleClientID:       oauth["oauth_google_client_id"],
 			GoogleClientSecret:   oauth["oauth_google_client_secret"],
 		},
-		InternalToken:             internal["internal_token"],
-		RefreshSuccessorCipherKey: refreshSuccessor["cipher_key"],
+		InternalToken:                internal["internal_token"],
+		RefreshSuccessorCipherKey:    refreshSuccessor["cipher_key"],
+		ProjectAPITokenPepper:        projectAPITokenPepper["pepper"],
+		ProjectAPITokenPepperVersion: pepperVersion,
 	}
 	if len(secrets.InternalToken) < 32 {
 		return Secrets{}, fmt.Errorf("Vault internal credential must be at least 32 characters")
 	}
 	if len(secrets.RefreshSuccessorCipherKey) < 32 {
 		return Secrets{}, fmt.Errorf("Vault refresh successor credential must be at least 32 characters")
+	}
+	if len(secrets.ProjectAPITokenPepper) < 32 {
+		return Secrets{}, fmt.Errorf("Vault project API token pepper must be at least 32 characters")
 	}
 	return secrets, nil
 }
