@@ -286,6 +286,11 @@ enum ProjectStatus {
   COMPLETED
 }
 
+enum ProjectApiTokenPermission {
+  READ
+  READ_WRITE
+}
+
 // One Project can have many members, tasks, events, blocks, and checklist items
 model Project {
   id                       String                    @id @default(uuid())
@@ -303,6 +308,46 @@ model Project {
   calendarCategories       CalendarCategory[] // one Project => many CalendarCategory rows
   discoveryBlocks          DiscoveryBlock[] // one Project => many DiscoveryBlock rows
   evaluationChecklistItems EvaluationChecklistItem[] // one Project => many EvaluationChecklistItem rows
+  apiTokens                ProjectApiToken[]
+}
+
+// Machine credential metadata. The raw credential is never persisted: selector
+// finds this row and secretHmac verifies the presented secret with the
+// auth-service-only Vault pepper.
+model ProjectApiToken {
+  id            String                    @id @default(uuid())
+  projectId     String
+  label         String
+  selector      String                    @unique
+  secretHmac    String
+  pepperVersion Int
+  permission    ProjectApiTokenPermission
+  createdByUserId String?
+  createdAt     DateTime                  @default(now())
+  expiresAt     DateTime
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+  revokedByUserId String?
+  revokeReason  String?
+  project       Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, revokedAt, expiresAt])
+  @@index([expiresAt])
+}
+
+// This independent append-only audit record intentionally has no foreign keys:
+// revoking/deleting a token or hard-deleting its project must not erase evidence.
+model ProjectApiTokenEvent {
+  id          String   @id @default(uuid())
+  tokenId     String?
+  projectId   String
+  actorUserId String?
+  eventType   String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([tokenId, createdAt])
 }
 
 // TASK
