@@ -15,6 +15,7 @@ import type { TaskPriority, TaskStatus } from "@/lib/tasks";
 // minimum to stay quiet below two characters instead of firing a request the
 // DTO would reject with a 400, which is a normal UI state, not an error.
 export const SEARCH_QUERY_MIN_LENGTH = 2;
+export const SEARCH_QUERY_MAX_LENGTH = 100;
 export const SEARCH_DEFAULT_LIMIT = 20;
 
 // Mirror the unions SearchQueryDto validates with @IsIn.
@@ -260,7 +261,11 @@ function parseSearchUser(value: unknown): SearchUserResult {
   };
 }
 
-function isSearchType(value: unknown): value is SearchType {
+// These four are exported, unlike the parsers around them: searchPageParams.ts
+// validates the same unions coming from the URL rather than from the server,
+// and a second hand-written copy of "all" | "projects" | "tasks" | "users" is
+// exactly the kind of pair that drifts.
+export function isSearchType(value: unknown): value is SearchType {
   return (
     value === "all" ||
     value === "projects" ||
@@ -269,12 +274,20 @@ function isSearchType(value: unknown): value is SearchType {
   );
 }
 
-function isSearchSort(value: unknown): value is SearchSort {
+export function isSearchSort(value: unknown): value is SearchSort {
   return value === "name" || value === "recent";
 }
 
-function isSearchOrder(value: unknown): value is SearchOrder {
+export function isSearchOrder(value: unknown): value is SearchOrder {
   return value === "asc" || value === "desc";
+}
+
+// The status filter spans both enums; which one actually applies is decided by
+// the active type, server-side (SearchService ignores a TaskStatus on projects).
+export function isSearchStatusFilter(
+  value: unknown
+): value is SearchStatusFilter {
+  return isProjectStatus(value) || isTaskStatus(value);
 }
 
 function isProjectStatus(value: unknown): value is ProjectStatus {
