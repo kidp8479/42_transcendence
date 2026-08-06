@@ -21,7 +21,14 @@ export function useLiveItemSync<T extends { id: string }>(
   eventPrefix: string,
   parse: (payload: unknown) => T | null,
   setItems: Dispatch<SetStateAction<T[]>>,
-  scope?: ScopeFilter<T>
+  scope?: ScopeFilter<T>,
+  // Fired only for a genuinely new item arriving over the socket (in scope,
+  // not an echo of this client's own create) - never for the initial fetch
+  // or for updates/deletes. Optional: chat.tsx uses it to feed a visually
+  // hidden live region so screen reader users hear about messages that
+  // arrive while the page is open, without the noise of announcing an
+  // entire page load or "load earlier history" batch.
+  onRemoteCreate?: (item: T) => void
 ): void {
   // parse/scope are re-created every render (parse is usually stable, scope
   // isn't - it closes over a route param) - kept in refs so the effect
@@ -31,6 +38,8 @@ export function useLiveItemSync<T extends { id: string }>(
   parseRef.current = parse;
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
+  const onRemoteCreateRef = useRef(onRemoteCreate);
+  onRemoteCreateRef.current = onRemoteCreate;
 
   useEffect(() => {
     const socket = getRealtimeSocket();
@@ -62,11 +71,13 @@ export function useLiveItemSync<T extends { id: string }>(
       }
       // ignore an echo of our own create - the caller's own submit handler
       // already appended it locally with the real backend-assigned id
-      setItems((previous) =>
-        previous.some((item) => item.id === createdItem.id)
-          ? previous
-          : [...previous, createdItem]
-      );
+      setItems((previous) => {
+        if (previous.some((item) => item.id === createdItem.id)) {
+          return previous;
+        }
+        onRemoteCreateRef.current?.(createdItem);
+        return [...previous, createdItem];
+      });
     }
 
     function handleDeleted(payload: unknown) {

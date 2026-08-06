@@ -339,6 +339,7 @@ rere:
 	+$(MAKE) fclean
 	+$(MAKE) ffclean
 	+$(MAKE) wipe-db
+	+$(MAKE) wipe-storage
 	+$(MAKE) up-build
 	+$(MAKE) migrate
 

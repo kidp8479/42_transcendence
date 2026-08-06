@@ -9,14 +9,13 @@
 import { CATEGORY_COLOR_PALETTE } from "@/lib/categoryColorPalette";
 import type { TaskAssigneeUser } from "@/lib/tasks";
 
-interface TaskAssigneesProps {
+interface AvatarStackProps {
   assignees: TaskAssigneeUser[];
   // avatars shown before collapsing the rest into a "+N" chip
   maxVisible?: number;
 }
 
-// lib/categoryColorPalette.ts). The ring makes overlapped avatars readable
-// against each other.
+// lib/categoryColorPalette.ts).
 // `relative` is load-bearing, not decoration: the sr-only labels inside are
 // position:absolute, and an absolute box is only clipped by a POSITIONED
 // ancestor. The column's card list is deliberately unpositioned (see
@@ -24,7 +23,7 @@ interface TaskAssigneesProps {
 // ProjectLayout's anchor, each one parked at its card's un-scrolled offset -
 // enough of them and the whole tab area became scrollable onto empty space.
 const AVATAR_CLASS =
-  "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-surface-raised";
+  "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white";
 
 // Deterministic palette index from the username, so a member keeps the same
 // avatar color everywhere on the board. Mock-only shortcut: User has no color
@@ -38,10 +37,7 @@ export function assigneeColorIndex(username: string): number {
   return char_code_sum % CATEGORY_COLOR_PALETTE.length;
 }
 
-export function TaskAssignees({
-  assignees,
-  maxVisible = 3,
-}: TaskAssigneesProps) {
+export function AvatarStack({ assignees, maxVisible = 3 }: AvatarStackProps) {
   if (assignees.length === 0) {
     return null;
   }

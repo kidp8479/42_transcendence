@@ -72,7 +72,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
 	"CalendarEvent",
 	"DiscoveryBlock",
 	"DiscoveryBlockItem",
-	"EvaluationChecklistItem"
+	"EvaluationChecklistItem",
+	"ChatMessage",
+	"ChatReadState"
 TO backend_runtime;
 
 -- Defense in depth: even if a blanket grant sneaks in later, keep the

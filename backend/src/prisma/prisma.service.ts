@@ -88,6 +88,14 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.currentClient().taskAssignee;
   }
 
+  get chatMessage(): PrismaClient["chatMessage"] {
+    return this.currentClient().chatMessage;
+  }
+
+  get chatReadState(): PrismaClient["chatReadState"] {
+    return this.currentClient().chatReadState;
+  }
+
   async executeRaw(query: Prisma.Sql): Promise<number> {
     return this.currentClient().$executeRaw(query);
   }

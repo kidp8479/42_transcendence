@@ -2,10 +2,17 @@ import type { IconType } from "react-icons";
 import { useEffect } from "react";
 import { Sidebar, SidebarItemGroup, SidebarItems } from "flowbite-react";
 import { Link, useLoaderData } from "@tanstack/react-router";
-import { HiChevronLeft, HiChevronRight, HiX } from "react-icons/hi";
+import {
+  HiChevronLeft,
+  HiChevronRight,
+  HiX,
+  HiOutlineUsers,
+} from "react-icons/hi";
+import { HiOutlineChatBubbleLeftRight } from "react-icons/hi2";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
 import { useSidebar } from "@/hooks/useSidebar";
+import { useChatUnread } from "@/hooks/useChatUnread";
 import type { Project } from "@/lib/projectsApi";
 
 // <SidebarItem as={Link} to="/location" ...> is used to load only the "working space" area, rather than the whole page
@@ -14,6 +21,8 @@ interface NavigationItem {
   to: string;
   label: string;
   icon: IconType;
+  // Only the Chat item sets this today - see useChatUnread.
+  hasBadge?: boolean;
 }
 
 // z-50 at every size, matching HeaderShell. Two reasons, one per breakpoint:
@@ -30,9 +39,8 @@ interface NavigationItem {
 const sidebarContainerClasses =
   "fixed inset-y-0 left-0 z-50 w-full transition-transform duration-300";
 const sidebarInnerClasses = "font-mono relative h-full w-full overflow-hidden";
-// Fixed: dark: variant must come right before the utility, `!` goes after the variant.
 const sidebarSurfaceClasses =
-  "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 !bg-surface-raised dark:!bg-surface-raised";
+  "h-full overflow-y-auto overflow-x-hidden rounded px-2.5 py-4 bg-surface-raised! dark:bg-surface-raised!";
 const sidebarIconClasses =
   "h-6 w-6 shrink-0 text-text-muted transition duration-75 group-hover:text-text-primary";
 const sidebarNavLinkClasses =
@@ -57,9 +65,11 @@ const sidebarTheme = {
 const sidebarPrimaryNavigation: NavigationItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: MdOutlineDashboard },
   { to: "/projects", label: "Projects", icon: GoFileDirectory },
+  { to: "/chat", label: "Chat", icon: HiOutlineChatBubbleLeftRight },
+  { to: "/friends", label: "Friends", icon: HiOutlineUsers },
 ];
 
-function SidebarNavLink({ to, label, icon: Icon }: NavigationItem) {
+function SidebarNavLink({ to, label, icon: Icon, hasBadge }: NavigationItem) {
   const { isDesktop, closeSidebar } = useSidebar();
 
   // On mobile the sidebar is a full-screen overlay, so picking a destination
@@ -76,7 +86,15 @@ function SidebarNavLink({ to, label, icon: Icon }: NavigationItem) {
         activeProps={{ className: activeSidebarLinkClasses }}
         inactiveProps={{ className: sidebarNavLinkClasses }}
       >
-        <Icon className={sidebarIconClasses} />
+        <span className="relative shrink-0">
+          <Icon className={sidebarIconClasses} />
+          {hasBadge && (
+            <span
+              aria-hidden="true"
+              className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-control-error"
+            />
+          )}
+        </span>
         <span>{label}</span>
       </Link>
     </li>
@@ -126,6 +144,8 @@ export function SideBarCmp() {
     (project) => project.status !== "COMPLETED" && !project.isArchived
   );
   const { isCollapsed, toggleSidebar, closeSidebar } = useSidebar();
+  const unreadChatProjectIds = useChatUnread();
+  const hasUnreadChat = unreadChatProjectIds.size > 0;
 
   // Close on Escape for basic keyboard accessibility on mobile.
   useEffect(() => {
@@ -156,14 +176,14 @@ export function SideBarCmp() {
             tall page. No z-index: never competes with the header. */}
         <div
           aria-hidden="true"
-          className="hidden md:absolute md:inset-0 md:block md:rounded md:!bg-surface-raised dark:md:!bg-surface-raised"
+          className="hidden md:absolute md:inset-0 md:block md:rounded md:bg-surface-raised! dark:md:bg-surface-raised!"
         />
 
         <div
           className={`
             ${sidebarContainerClasses}
             ${isCollapsed ? "-translate-x-full" : "translate-x-0"}
-            md:sticky md:top-[65px] md:h-[calc(100vh-133px)] md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
+            md:sticky md:top-16.25 md:h-[calc(100vh-133px)] md:self-start md:shrink-0 md:translate-x-0 md:transition-[width]
             ${isCollapsed ? "md:w-0" : "md:w-64"}
           `}
         >
@@ -185,7 +205,11 @@ export function SideBarCmp() {
               <SidebarItems>
                 <SidebarItemGroup className={sidebarGroupClasses}>
                   {sidebarPrimaryNavigation.map((item) => (
-                    <SidebarNavLink key={item.to} {...item} />
+                    <SidebarNavLink
+                      key={item.to}
+                      {...item}
+                      hasBadge={item.to === "/chat" && hasUnreadChat}
+                    />
                   ))}
                 </SidebarItemGroup>
                 <SidebarItemGroup>

@@ -30,6 +30,7 @@ import { StorageModule } from "./storage/storage.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { ProjectApiTokensModule } from "./project-api-tokens/project-api-tokens.module";
 import { PublicApiModule } from "./public-api/public-api.module";
+import { ChatModule } from "./chat/chat.module";
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { PublicApiModule } from "./public-api/public-api.module";
     CalendarCategoriesModule,
     StorageModule,
     RealtimeModule,
+    ChatModule,
     ProjectApiTokensModule,
     PublicApiModule,
   ],

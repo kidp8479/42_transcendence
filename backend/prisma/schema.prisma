@@ -37,6 +37,8 @@ model User {
   initiatedOAuthTransactions OAuthTransaction[] @relation("OAuthTransactionInitiator")
   authEventsAsActor  AuthEvent[]         @relation("AuthEventActor")
   authEventsAsTarget AuthEvent[]         @relation("AuthEventTarget")
+  chatMessages     ChatMessage[]
+  chatReadStates   ChatReadState[]
 }
 
 enum AuthProvider {
@@ -309,6 +311,8 @@ model Project {
   discoveryBlocks          DiscoveryBlock[] // one Project => many DiscoveryBlock rows
   evaluationChecklistItems EvaluationChecklistItem[] // one Project => many EvaluationChecklistItem rows
   apiTokens                ProjectApiToken[]
+  chatMessages             ChatMessage[]
+  chatReadStates           ChatReadState[]  
 }
 
 // Machine credential metadata. The raw credential is never persisted: selector
@@ -541,4 +545,41 @@ model EvaluationChecklistItem {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+model ChatMessage {
+  id        String    @id @default(uuid())
+  userId    String?
+  projectId String
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // backs findAll's own (projectId, createdAt desc, id desc) cursor
+  // pagination directly - without createdAt/id in the index, Postgres can
+  // only narrow to projectId and has to sort every matching row in memory
+  // for each page.
+  @@index([projectId, createdAt, id])
+  @@index([userId])
+}
+
+model ChatReadState {
+  id                String   @id @default(uuid())
+  userId            String
+  projectId         String
+  lastReadAt        DateTime @default(now())
+  // id of the newest message the client had actually fetched and rendered
+  // when it marked the conversation read - not a relation on purpose (plain
+  // string, no FK): the message it points to can be deleted later, and this
+  // watermark must survive that untouched, same reasoning as chat pagination
+  // not using the message row as a live Prisma `cursor`. Nullable because a
+  // conversation with zero messages has nothing to point to yet - see
+  // ChatService.markRead.
+  lastReadMessageId String?
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
 }
