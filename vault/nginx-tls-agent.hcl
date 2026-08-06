@@ -33,3 +33,11 @@ EOF
   destination = "/run/nginx-tls/paris-42-wildcard.pem"
   perms = "0644"
 }
+
+template {
+  contents = <<EOF
+{{ with pkiCert "pki/issue/public-domains" "common_name=tomato.iops.dev" "alt_names=tomato-dev.iops.dev" "ttl=72h" }}{{ .Key }}{{ .Cert }}{{ .CA }}{{ end }}
+EOF
+  destination = "/run/nginx-tls/public-domains.pem"
+  perms = "0644"
+}

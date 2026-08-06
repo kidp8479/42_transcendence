@@ -26,6 +26,13 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Keep Vite's host-header protection enabled while admitting the browser
+    // origins supported by the ingress policy.
+    allowedHosts: [
+      ".paris.42.school",
+      "tomato.iops.dev",
+      "tomato-dev.iops.dev",
+    ],
     // The browser only ever talks to nginx on 8080 (5173 is Vite's internal
     // dev server port, never published outside the Docker network). Without
     // this, Vite's HMR client defaults to reconnecting on 5173 directly,
