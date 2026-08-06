@@ -61,6 +61,21 @@ export function updateProject(
   }).then(parseProject);
 }
 
+// PATCH /projects/:id/details => name/description only, OWNER/ADMIN-only.
+// Separate from updateProject() above (see projects.controller.ts for why)
+// - includes updatedAt, the version this edit was based on, so a save
+// based on stale data is rejected (409, ApiError.status) instead of
+// silently overwriting a concurrent edit from someone else.
+export function updateProjectDetails(
+  id: string,
+  input: { name: string; description?: string; updatedAt: string }
+) {
+  return apiClient<unknown>(`/projects/${id}/details`, {
+    method: "PATCH",
+    body: input,
+  }).then(parseProject);
+}
+
 function parseProjects(value: unknown): Project[] {
   if (!Array.isArray(value)) {
     throw new Error("Projects API returned an invalid response");
