@@ -21,6 +21,7 @@ import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { ProjectsService } from "./projects.service";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
+import { UpdateProjectDetailsDto } from "./dto/update-project-details.dto";
 
 @Controller("projects")
 export class ProjectsController {
@@ -68,5 +69,18 @@ export class ProjectsController {
     @Req() request: AuthenticatedRequest
   ) {
     return this.projectsService.update(id, dto, request.user.id);
+  }
+
+  // PATCH /api/projects/:id/details => OWNER/ADMIN-only (enforced in
+  // ProjectsService.updateDetails), name/description only. Optimistic-
+  // concurrency checked via dto.updatedAt - see updateDetails for why this
+  // is a separate method/route from update() above.
+  @Patch(":id/details")
+  updateDetails(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProjectDetailsDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.projectsService.updateDetails(id, dto, request.user.id);
   }
 }
