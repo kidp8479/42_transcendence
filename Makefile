@@ -89,6 +89,104 @@ deploy-prod:
 	$(DEPLOY_PROD_COMPOSE) config --quiet
 	$(DEPLOY_PROD_COMPOSE) up --build -d
 
+## validate externally managed development runtime secrets without replacing them
+recreate-env-dev:
+	@test -f "$(DEPLOY_DEV_ENV_FILE)" || (echo "Missing development runtime env: $(DEPLOY_DEV_ENV_FILE)" >&2; exit 1)
+	@test -f "$(DEPLOY_DEV_COMPOSE_FILE)" || (echo "Missing development Compose override: $(DEPLOY_DEV_COMPOSE_FILE)" >&2; exit 1)
+
+## validate externally managed production runtime secrets without replacing them
+recreate-env-prod:
+	@test -f "$(DEPLOY_PROD_ENV_FILE)" || (echo "Missing production runtime env: $(DEPLOY_PROD_ENV_FILE)" >&2; exit 1)
+	@test -f "$(DEPLOY_PROD_COMPOSE_FILE)" || (echo "Missing production Compose override: $(DEPLOY_PROD_COMPOSE_FILE)" >&2; exit 1)
+
+## remove the isolated development deployment, volumes, orphans, and local images
+fclean-dev:
+	$(DEPLOY_DEV_COMPOSE) down --volumes --remove-orphans --rmi local
+
+## remove the isolated production deployment, volumes, orphans, and local images
+fclean-prod:
+	$(DEPLOY_PROD_COMPOSE) down --volumes --remove-orphans --rmi local
+
+## remove development build caches left by bind-mounted development containers
+ffclean-dev:
+	docker run --rm -v $(CURDIR)/frontend:/target -w /target alpine \
+		sh -c "rm -rf node_modules dist build .vite .tanstack .flowbite-react .cache .eslintcache .stylelintcache coverage *.tsbuildinfo vite.config.js vite.config.d.ts"
+	docker run --rm -v $(CURDIR)/backend:/target -w /target alpine \
+		sh -c "rm -rf node_modules dist build .cache .eslintcache coverage *.tsbuildinfo"
+	docker run --rm -v $(CURDIR)/auth:/target -w /target alpine \
+		sh -c "rm -rf tmp .cache coverage.out"
+
+## production containers do not bind mount source files, so no host cache cleanup is needed
+ffclean-prod:
+	@:
+
+## remove the isolated development database volume and dependent containers
+wipe-db-dev:
+	$(DEPLOY_DEV_COMPOSE) stop nginx backend auth db
+	for svc in nginx backend auth db; do \
+	  ids=$$(docker ps -aq --filter label=com.docker.compose.project=$(DEPLOY_DEV_PROJECT) --filter label=com.docker.compose.service=$$svc); \
+	  if [ -n "$$ids" ]; then echo $$ids | xargs -r docker rm -f; fi; \
+	done
+	docker volume ls -q --filter label=com.docker.compose.project=$(DEPLOY_DEV_PROJECT) \
+		--filter label=com.docker.compose.volume=db_data | xargs -r docker volume rm -f
+
+## remove the isolated production database volume and dependent containers
+wipe-db-prod:
+	$(DEPLOY_PROD_COMPOSE) stop nginx backend auth db
+	for svc in nginx backend auth db; do \
+	  ids=$$(docker ps -aq --filter label=com.docker.compose.project=$(DEPLOY_PROD_PROJECT) --filter label=com.docker.compose.service=$$svc); \
+	  if [ -n "$$ids" ]; then echo $$ids | xargs -r docker rm -f; fi; \
+	done
+	docker volume ls -q --filter label=com.docker.compose.project=$(DEPLOY_PROD_PROJECT) \
+		--filter label=com.docker.compose.volume=db_data | xargs -r docker volume rm -f
+
+## remove the isolated development RustFS volume
+wipe-storage-dev:
+	$(DEPLOY_DEV_COMPOSE) stop rustfs
+	ids=$$(docker ps -aq --filter label=com.docker.compose.project=$(DEPLOY_DEV_PROJECT) --filter label=com.docker.compose.service=rustfs); \
+	if [ -n "$$ids" ]; then echo $$ids | xargs -r docker rm -f; fi
+	docker volume ls -q --filter label=com.docker.compose.project=$(DEPLOY_DEV_PROJECT) \
+		--filter label=com.docker.compose.volume=rustfs_data | xargs -r docker volume rm -f
+
+## remove the isolated production RustFS volume
+wipe-storage-prod:
+	$(DEPLOY_PROD_COMPOSE) stop rustfs
+	ids=$$(docker ps -aq --filter label=com.docker.compose.project=$(DEPLOY_PROD_PROJECT) --filter label=com.docker.compose.service=rustfs); \
+	if [ -n "$$ids" ]; then echo $$ids | xargs -r docker rm -f; fi
+	docker volume ls -q --filter label=com.docker.compose.project=$(DEPLOY_PROD_PROJECT) --filter label=com.docker.compose.volume=rustfs_data | xargs -r docker volume rm -f
+
+## run migrations and runtime grants for the isolated development deployment
+migrate-deploy-dev:
+	$(DEPLOY_DEV_COMPOSE) --profile tools run --rm migration
+	@set -a; . "$(DEPLOY_DEV_ENV_FILE)"; set +a; \
+	$(DEPLOY_DEV_COMPOSE) exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < db/runtime-grants.sql
+
+## run migrations and runtime grants for the isolated production deployment
+migrate-deploy-prod:
+	$(DEPLOY_PROD_COMPOSE) --profile tools run --rm migration
+	@set -a; . "$(DEPLOY_PROD_ENV_FILE)"; set +a; \
+	$(DEPLOY_PROD_COMPOSE) exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < db/runtime-grants.sql
+
+## fully recreate the isolated development stack while preserving its runtime secrets
+rere-dev:
+	+$(MAKE) recreate-env-dev
+	+$(MAKE) fclean-dev
+	+$(MAKE) ffclean-dev
+	+$(MAKE) wipe-db-dev
+	+$(MAKE) wipe-storage-dev
+	+$(MAKE) deploy-dev
+	+$(MAKE) migrate-deploy-dev
+
+## fully recreate the isolated production stack while preserving its runtime secrets
+rere-prod:
+	+$(MAKE) recreate-env-prod
+	+$(MAKE) fclean-prod
+	+$(MAKE) ffclean-prod
+	+$(MAKE) wipe-db-prod
+	+$(MAKE) wipe-storage-prod
+	+$(MAKE) deploy-prod
+	+$(MAKE) migrate-deploy-prod
+
 ## reinstall npm dependencies in running containers without rebuilding images
 ## use after pulling changes that add or remove npm dependencies (faster than up-build)
 install:
@@ -454,8 +552,9 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST) | sort -u
 	@printf "\n"
 
-.PHONY: all up up-build deploy-dev deploy-prod down restart build logs ps clean fclean re rere ffclean rebuild \
-        recreate-env wipe-db wipe-storage \
+.PHONY: all up up-build deploy-dev deploy-prod rere-dev rere-prod down restart build logs ps clean fclean fclean-dev fclean-prod re rere ffclean ffclean-dev ffclean-prod rebuild \
+        recreate-env recreate-env-dev recreate-env-prod wipe-db wipe-storage \
+        wipe-db-dev wipe-db-prod wipe-storage-dev wipe-storage-prod migrate-deploy-dev migrate-deploy-prod \
         up-db up-frontend up-backend up-auth vault-status \
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-nginx logs-nginx-tls-agent logs-frontend logs-backend logs-auth logs-db \
