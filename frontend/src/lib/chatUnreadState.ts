@@ -42,10 +42,10 @@ class ChatUnreadResource {
     this.recomputeSnapshot();
   }
 
-  // Optimistic local removal, called by chat.tsx the moment a conversation
-  // is opened - the backend's own read marker is set by that same GET
-  // request (see ChatService.findAll), this just avoids waiting on a
-  // roundtrip before the dot disappears.
+  // Optimistic local removal, called by chat.tsx right after it fires the
+  // explicit mark-read PATCH (see ChatService.markRead / chatApi's
+  // markChatRead) - this just avoids waiting on that request's roundtrip
+  // before the dot disappears.
   markRead(projectId: string): void {
     if (this.projectIds.delete(projectId)) {
       this.recomputeSnapshot();

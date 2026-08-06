@@ -12,6 +12,7 @@ import { ProjectsService } from "../projects/projects.service";
 import { CreateChatMessageDto } from "./dto/create-chat-message.dto";
 import { FindChatMessagesDto } from "./dto/find-chat-messages.dto";
 import { CHAT_MESSAGES_DEFAULT_PAGE_SIZE } from "./chat.constants";
+import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 
 // author is not the User's full row - only what a chat bubble needs to
 // render (see MockMember in frontend's chat.tsx), same shape as
@@ -31,31 +32,39 @@ export class ChatService {
   ) {}
 
   // GET (page of history) - cursor pagination, newest page by default, or
-  // the page strictly older than query.before (infinite scroll upward).
-  // Returned oldest-first, the order a chat thread renders top-to-bottom.
-  // Opening a conversation (loading its history) is what counts as "read"
-  // for the unread badge - see markRead below.
+  // the page strictly older than (query.beforeCreatedAt, query.before)
+  // (infinite scroll upward). Filtered on beforeCreatedAt/before as plain
+  // where-clause values rather than passed to Prisma's `cursor` option, so a
+  // page still loads correctly even if the message the caller is paging up
+  // from has since been deleted - a `cursor` row that no longer exists makes
+  // findMany silently return an empty page instead of erroring, which read
+  // as "no more history" client-side. Returned oldest-first, the order a
+  // chat thread renders top-to-bottom. Marking the conversation read is a
+  // separate explicit action - see markRead below - not a side effect of
+  // this GET.
   async findAll(projectId: string, userId: string, query: FindChatMessagesDto) {
     await this.projectsService.assertMembership(projectId, userId);
 
     const take = query.take ?? CHAT_MESSAGES_DEFAULT_PAGE_SIZE;
     const messages = await this.prisma.chatMessage.findMany({
-      where: { projectId },
-      orderBy: { createdAt: "desc" },
+      where: {
+        projectId,
+        ...(query.beforeCreatedAt !== undefined && query.before !== undefined
+          ? {
+              OR: [
+                { createdAt: { lt: new Date(query.beforeCreatedAt) } },
+                {
+                  createdAt: new Date(query.beforeCreatedAt),
+                  id: { lt: query.before },
+                },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take,
-      ...(query.before !== undefined
-        ? { skip: 1, cursor: { id: query.before } }
-        : {}),
       include: { user: { select: AUTHOR_SELECT } },
     });
-
-    // only the first page (no cursor) reflects "caught up to the latest
-    // message" - paging further back into history shouldn't move the read
-    // marker forward past messages the caller hasn't actually seen yet.
-    if (query.before === undefined) {
-      const upToCreatedAt = messages[0]?.createdAt ?? new Date();
-      await this.markRead(projectId, userId, upToCreatedAt);
-    }
 
     return messages.reverse();
   }
@@ -104,15 +113,19 @@ export class ChatService {
       .map(({ projectId }) => projectId);
   }
 
-  private async markRead(
-    projectId: string,
-    userId: string,
-    upToCreatedAt: Date
-  ): Promise<void> {
+  // PATCH /chat/read - explicit "mark this conversation read" action, called
+  // by the frontend once it has actually applied a freshly-fetched page to
+  // its own state (never as a side effect of the GET itself - see findAll
+  // above). Mirrors notifications' PATCH read-all rather than inventing a
+  // new pattern. Marks up to "now": this only ever runs right after the
+  // caller has loaded the latest page, so anything created after this call
+  // is legitimately unread again.
+  async markRead(projectId: string, userId: string): Promise<void> {
+    await this.projectsService.assertMembership(projectId, userId);
     await this.prisma.chatReadState.upsert({
       where: { userId_projectId: { userId, projectId } },
       create: { userId, projectId },
-      update: { lastReadAt: upToCreatedAt },
+      update: { lastReadAt: new Date() },
     });
   }
 
@@ -123,14 +136,29 @@ export class ChatService {
   async create(projectId: string, userId: string, dto: CreateChatMessageDto) {
     await this.projectsService.assertMembership(projectId, userId);
 
-    const message = await this.prisma.chatMessage.create({
-      data: {
-        content: dto.content,
-        project: { connect: { id: projectId } },
-        user: { connect: { id: userId } },
-      },
-      include: { user: { select: AUTHOR_SELECT } },
-    });
+    let message;
+    try {
+      message = await this.prisma.chatMessage.create({
+        data: {
+          content: dto.content,
+          project: { connect: { id: projectId } },
+          user: { connect: { id: userId } },
+        },
+        include: { user: { select: AUTHOR_SELECT } },
+      });
+    } catch (error) {
+      // assertMembership passing above doesn't guarantee the user still
+      // exists by the time this write runs - a narrow race where the
+      // account is deleted (User row gone, cascading its ProjectMember)
+      // between the two calls makes `user: { connect }` fail with P2025.
+      // An expired-but-not-yet-revoked token hitting that race deserves a
+      // 403, not Prisma's raw "record to connect not found" surfaced as an
+      // unrelated 404.
+      if (isRecordNotFoundError(error)) {
+        throw new ForbiddenException("Your account no longer exists");
+      }
+      throw error;
+    }
 
     this.realtimeService.emitToProject(projectId, "chat:created", message);
     return message;

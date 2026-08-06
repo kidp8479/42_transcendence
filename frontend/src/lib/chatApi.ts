@@ -24,15 +24,21 @@ export interface ChatMessage {
 export const CHAT_MESSAGE_CONTENT_MAX_LENGTH = 4000;
 
 // GET /projects/:projectId/chat - a page of history, oldest-first.
-// Pass `before` (a message id already loaded) to fetch the page strictly
-// older than it, for loading earlier history on demand.
+// Pass `before` + `beforeCreatedAt` (the id and createdAt of a message
+// already loaded, e.g. messages[0]) to fetch the page strictly older than
+// it, for loading earlier history on demand. Sent as plain values rather
+// than a server-side cursor lookup, so paging still works even if that
+// message has since been deleted - see chat.service.ts's findAll.
 export function fetchChatMessages(
   projectId: string,
-  options?: { before?: string; take?: number }
+  options?: { before?: string; beforeCreatedAt?: string; take?: number }
 ) {
   const params = new URLSearchParams();
   if (options?.before !== undefined) {
     params.set("before", options.before);
+  }
+  if (options?.beforeCreatedAt !== undefined) {
+    params.set("beforeCreatedAt", options.beforeCreatedAt);
   }
   if (options?.take !== undefined) {
     params.set("take", String(options.take));
@@ -41,6 +47,17 @@ export function fetchChatMessages(
   return apiClient<unknown>(
     `/projects/${projectId}/chat${query ? `?${query}` : ""}`
   ).then(parseChatMessages);
+}
+
+// PATCH /projects/:projectId/chat/read - explicit "mark this conversation
+// read" action. Call only after the fetched messages have actually been
+// applied to local state (not merely once the GET resolves), so a client
+// that unmounts mid-fetch never marks messages read it didn't end up
+// showing.
+export function markChatRead(projectId: string) {
+  return apiClient<void>(`/projects/${projectId}/chat/read`, {
+    method: "PATCH",
+  });
 }
 
 // POST /projects/:projectId/chat

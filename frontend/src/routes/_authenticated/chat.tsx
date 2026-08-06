@@ -5,21 +5,23 @@
 // Bubble layout follows Flowbite's chat-bubble pattern
 // (https://flowbite.com/docs/components/chat-bubble/), rebuilt here with
 // plain Tailwind since flowbite-react has no ChatBubble component of its
-// own - Avatar/Button/Textarea below are the real flowbite-react imports.
+// own - Button/Textarea below are the real flowbite-react imports.
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useLoaderData } from "@tanstack/react-router";
-import { Avatar, Button, Textarea } from "flowbite-react";
+import { Button, Textarea } from "flowbite-react";
 import { HiOutlineTrash } from "react-icons/hi2";
 import { IoArrowBack, IoSend } from "react-icons/io5";
 import {
   fetchChatMessages,
   createChatMessage,
   deleteChatMessage,
+  markChatRead,
   parseChatMessage,
   CHAT_MESSAGE_CONTENT_MAX_LENGTH,
   type ChatMessage,
 } from "@/lib/chatApi";
 import { getMembers, type ProjectMember } from "@/lib/projectMembersApi";
+import { LockOwnerAvatar } from "@/components/LockOwnerAvatar";
 import { authSessionResource } from "@/lib/authState";
 import { chatUnreadResource } from "@/lib/chatUnreadState";
 import { useLiveItemSync } from "@/hooks/useLiveItemSync";
@@ -36,10 +38,6 @@ export const Route = createFileRoute("/_authenticated/chat")({
 // (CHAT_MESSAGES_DEFAULT_PAGE_SIZE), kept here just for the "Load earlier
 // messages" button's own page-size request.
 const MESSAGES_PAGE_SIZE = 50;
-
-function initialsOf(username: string) {
-  return username.slice(0, 2).toUpperCase();
-}
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], {
@@ -85,10 +83,25 @@ function ChatPage() {
   // without a reload. Scoped to the open conversation only - value "" (no
   // conversation selected yet) can never match a real projectId, so nothing
   // leaks in before a conversation is chosen.
-  useLiveItemSync("chat", parseChatMessage, setMessages, {
-    value: selectedProjectId ?? "",
-    getValue: (message) => message.projectId,
-  });
+  // Announced text for the visually hidden live region below the message
+  // list - only set for messages that actually arrive over the socket while
+  // the page is open, never for the initial page load or "load earlier
+  // history", so screen reader users hear new messages without also getting
+  // an entire history dump read out on every navigation.
+  const [liveAnnouncement, setLiveAnnouncement] = useState("");
+  useLiveItemSync(
+    "chat",
+    parseChatMessage,
+    setMessages,
+    {
+      value: selectedProjectId ?? "",
+      getValue: (message) => message.projectId,
+    },
+    (message) => {
+      const author = message.author?.username ?? "Deleted user";
+      setLiveAnnouncement(`${author}: ${message.content}`);
+    }
+  );
 
   // Tells the unread store which conversation is on screen, so a message
   // landing here while the user is looking at it never lights up its dot -
@@ -118,10 +131,15 @@ function ChatPage() {
         setMessages(fetchedMessages);
         setHasMoreHistory(fetchedMessages.length === MESSAGES_PAGE_SIZE);
         setMembers(fetchedMembers);
-        // this GET is what marks the conversation read backend-side (see
-        // ChatService.findAll) - clear its dot immediately instead of
-        // waiting on the unread store's next background refetch
+        // explicit mark-read action (see ChatService.markRead), only fired
+        // once the fetched page has actually landed in state above - clear
+        // the dot immediately client-side too instead of waiting on the
+        // unread store's next background refetch
         chatUnreadResource.markRead(selectedProjectId);
+        markChatRead(selectedProjectId).catch(() => {
+          // best-effort - a background refetch of /chat/unread will
+          // eventually reconcile if this fails
+        });
       })
       .catch(() => {
         if (cancelled) return;
@@ -151,6 +169,7 @@ function ChatPage() {
     try {
       const older = await fetchChatMessages(selectedProjectId, {
         before: messages[0].id,
+        beforeCreatedAt: messages[0].createdAt,
         take: MESSAGES_PAGE_SIZE,
       });
       setMessages((previous) => [...older, ...previous]);
@@ -177,7 +196,10 @@ function ChatPage() {
           : [...previous, created]
       );
     } catch {
-      setDraft(content);
+      // restore the failed content, but only by prepending it to whatever's
+      // already in the box - if the user kept typing while the request was
+      // in flight, that new text is real work and must not be clobbered
+      setDraft((current) => (current ? `${content} ${current}` : content));
       showToast({ type: "error", message: "Message could not be sent." });
     } finally {
       setSending(false);
@@ -185,18 +207,25 @@ function ChatPage() {
   }
 
   async function handleDelete(message: ChatMessage) {
-    if (!selectedProjectId) return;
+    const projectId = selectedProjectId;
+    if (!projectId) return;
     setMessages((previous) => previous.filter((m) => m.id !== message.id));
     try {
-      await deleteChatMessage(selectedProjectId, message.id);
+      await deleteChatMessage(projectId, message.id);
     } catch {
-      setMessages((previous) =>
-        previous.some((m) => m.id === message.id)
-          ? previous
-          : [...previous, message].sort((a, b) =>
-              a.createdAt.localeCompare(b.createdAt)
-            )
-      );
+      // only splice the message back in if its own conversation is still
+      // the one on screen - if the user has since switched away, `messages`
+      // now holds a different conversation's list and this message doesn't
+      // belong in it
+      if (projectId === selectedProjectId) {
+        setMessages((previous) =>
+          previous.some((m) => m.id === message.id)
+            ? previous
+            : [...previous, message].sort((a, b) =>
+                a.createdAt.localeCompare(b.createdAt)
+              )
+        );
+      }
       showToast({ type: "error", message: "Message could not be deleted." });
     }
   }
@@ -285,13 +314,20 @@ function ChatPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 -space-x-2">
+                <div className="shrink-0">
                   <AvatarStack
                     assignees={members.map((member) => member.user)}
                     maxVisible={AVATAR_STACK_MAX_DISPLAYED}
                   />
                 </div>
               </header>
+
+              {/* visually hidden - announces messages that arrive live over
+                  the socket to screen readers; see the liveAnnouncement
+                  comment above for why it's not the whole message list */}
+              <div aria-live="polite" aria-atomic="true" className="sr-only">
+                {liveAnnouncement}
+              </div>
 
               <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
                 {loading ? (
@@ -334,6 +370,7 @@ function ChatPage() {
               <div className="flex items-end gap-2 border-t border-surface-border px-3 py-3 sm:px-4 sm:py-4">
                 <Textarea
                   rows={1}
+                  aria-label="Write a message"
                   placeholder="Write a message..."
                   className={`flex-1 resize-none ${darkSurfaceFieldClassName}`}
                   maxLength={CHAT_MESSAGE_CONTENT_MAX_LENGTH}
@@ -379,6 +416,7 @@ function ConversationRow({
     <button
       type="button"
       onClick={onClick}
+      aria-current={active ? "true" : undefined}
       className={`flex w-full items-center gap-3 border-b border-surface-border px-4 py-3 text-left transition-colors hover:bg-surface-overlay ${
         active ? "bg-surface-overlay" : ""
       }`}
@@ -390,6 +428,7 @@ function ConversationRow({
           </span>
           {hasUnread && (
             <span
+              role="img"
               aria-label="Unread messages"
               className="h-2 w-2 shrink-0 rounded-full bg-control-error"
             />
@@ -417,10 +456,9 @@ function ChatBubble({
     <div
       className={`group flex items-start gap-3 ${isSelf ? "flex-row-reverse" : ""}`}
     >
-      <Avatar
-        img={message.author?.avatarUrl ?? undefined}
-        placeholderInitials={initialsOf(username)}
-        rounded
+      <LockOwnerAvatar
+        username={username}
+        avatarUrl={message.author?.avatarUrl ?? null}
         size="sm"
       />
       <div
@@ -436,7 +474,11 @@ function ChatBubble({
               type="button"
               onClick={onDelete}
               aria-label="Delete message"
-              className="block text-text-muted transition-colors hover:text-control-error sm:hidden sm:group-hover:block"
+              // Always in the DOM and focusable - only visually dimmed at
+              // sm+ until hovered/focused (opacity, not display:none/hidden)
+              // so a keyboard-only user can still Tab to it and delete their
+              // own messages, not just a mouse user hovering the bubble.
+              className="text-text-muted opacity-100 transition-colors hover:text-control-error focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
             >
               <HiOutlineTrash className="h-4 w-4" />
             </button>

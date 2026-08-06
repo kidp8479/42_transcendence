@@ -11,11 +11,12 @@ interface LockOwnerAvatarProps {
   size?: "xs" | "sm";
 }
 
-// Shared by ChecklistItemRow.tsx and discovery_.$discoveryBlockId.edit.tsx:
-// both show who currently holds a field lock via the same small avatar -
-// img falls back to undefined (Flowbite's own placeholder) when the lock
-// holder has no avatarUrl, initials are the first two letters of their
-// username, same convention as UserMenu.tsx's own account avatar.
+// Shared by ChecklistItemRow.tsx, discovery_.$discoveryBlockId.edit.tsx (both
+// show who currently holds a field lock) and chat.tsx's ChatBubble (a
+// message's author, not a lock holder - see the props comment above) - all
+// via the same small avatar. img falls back to undefined (Flowbite's own
+// placeholder) when there's no avatarUrl, initials are the first two letters
+// of the username, same convention as UserMenu.tsx's own account avatar.
 export function LockOwnerAvatar({
   username,
   avatarUrl,
