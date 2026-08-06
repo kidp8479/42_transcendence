@@ -367,7 +367,7 @@ export class ProjectsService {
       messages.push(
         updated.status === "COMPLETED"
           ? `${actor.username} marked "${updated.name}" as finished`
-          : previous.status === "COMPLETED"
+          : previous.status === "COMPLETED" && updated.status === "IN_PROGRESS"
             ? `${actor.username} marked "${updated.name}" as unfinished`
             : `${actor.username} changed "${updated.name}"'s status to ${projectStatusLabels[updated.status]}`
       );
