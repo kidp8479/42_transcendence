@@ -1,6 +1,7 @@
 // Dashboard (/dashboard). Kept intentionally light for now - just the
-// welcome header plus the one stat card backed by real data (project
-// count + review count, both already loaded by the _authenticated loader).
+// welcome header plus the one stat card backed by real data (count of
+// non-archived, IN_PROGRESS projects, already loaded by the _authenticated
+// loader).
 import { createFileRoute, Link, useLoaderData } from "@tanstack/react-router";
 import {
   HiOutlineChatBubbleLeftRight,
@@ -16,8 +17,8 @@ function DashboardPage() {
   const projects = useLoaderData({ from: "/_authenticated" });
   const { session } = Route.useRouteContext();
 
-  const reviewCount = projects.filter(
-    (project) => project.status === "REVIEW"
+  const activeProjectCount = projects.filter(
+    (project) => project.status === "IN_PROGRESS" && !project.isArchived
   ).length;
 
   return (
@@ -39,10 +40,7 @@ function DashboardPage() {
             <HiOutlineFolder className="size-5 text-brand-500" />
           </div>
           <p className="mt-2 text-3xl font-bold text-text-primary">
-            {projects.length}
-          </p>
-          <p className="mt-1 text-xs text-text-secondary">
-            {reviewCount} in review
+            {activeProjectCount}
           </p>
         </Link>
 
