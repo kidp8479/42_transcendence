@@ -1,6 +1,6 @@
 // One row of search results, whatever the row is about. A project, a task and
 // a member all reduce to the same four slots - something on the left, a title,
-// a line of context under it, a badge on the right - and giving them one
+// a line of context under it, badges on the right - and giving them one
 // component is what makes the three groups read as one list instead of three
 // widgets that happen to share a page.
 //
@@ -10,7 +10,10 @@
 import type { ReactNode } from "react";
 
 interface SearchResultRowProps {
-  // an icon or an avatar - the row doesn't care which
+  // An icon or an avatar, passed ready to render: this row adds no box around
+  // it. An avatar is already a circle, and wrapping one in a rounded square
+  // gave the bubble-inside-a-bubble look the chat and the board avoid. The
+  // icon rows bring their own box (SEARCH_RESULT_ICON_CLASS).
   leading: ReactNode;
   title: string;
   // Nullable rather than optional-only: descriptions and campuses come back as
@@ -27,10 +30,8 @@ export function SearchResultRow({
   trailing,
 }: SearchResultRowProps) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-surface-border bg-surface-raised px-4 py-3 transition-colors hover:border-brand-500/50">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-overlay">
-        {leading}
-      </div>
+    <div className="flex items-center gap-3 rounded-lg border border-surface-border bg-surface-raised px-4 py-3 transition-colors hover:border-brand-500">
+      {leading}
 
       {/* min-w-0 is what lets truncate work at all: without it this flex item
           refuses to shrink below its content's intrinsic width and the row
@@ -40,11 +41,19 @@ export function SearchResultRow({
           {title}
         </p>
         {subtitle && (
-          <p className="line-clamp-1 text-xs text-text-secondary">{subtitle}</p>
+          // Two lines on a phone, one from sm up. A description clipped to a
+          // single line on a narrow screen is usually clipped mid-sentence and
+          // says nothing; on a wide one a second line is mostly empty space.
+          <p className="line-clamp-2 text-xs text-text-secondary sm:line-clamp-1">
+            {subtitle}
+          </p>
         )}
       </div>
 
       {trailing && (
+        // The badges are laid out in fixed-width columns by their callers, so
+        // a "Medium" and a "High" don't shift the status pill next to them and
+        // the right-hand side of the list reads as columns rather than waves.
         <div className="flex shrink-0 items-center gap-2">{trailing}</div>
       )}
     </div>

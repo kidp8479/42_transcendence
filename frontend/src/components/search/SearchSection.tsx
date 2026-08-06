@@ -40,16 +40,19 @@ export function SearchSection({
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-sm font-semibold text-text-primary">
           {title}
-          <span className="ml-2 rounded-full bg-surface-overlay px-1.5 py-0.5 text-[10px] font-semibold text-text-muted">
+          <span className="ml-2 rounded-full bg-surface-overlay px-2 py-0.5 text-xs font-semibold text-text-secondary">
             {total}
           </span>
         </h2>
+        {/* A bordered control rather than a bare green word: on a page whose
+            All tab shows five of thirty-seven rows, this is how you reach the
+            other thirty-two, and it was too quiet to be found. */}
         <Link
           // Same construction as the tabs, and for the same reasons: the sort
           // travels, the status and the page do not.
           to="/search"
           search={nextSearchParams(params, { type, status: undefined })}
-          className="shrink-0 text-xs font-medium text-brand-500 hover:underline"
+          className="shrink-0 rounded-md border border-surface-border bg-surface-overlay px-2.5 py-1 text-xs font-semibold text-brand-500 transition-colors hover:border-brand-500"
         >
           View all ({total})
         </Link>

@@ -40,6 +40,12 @@ import {
   type SearchPageSearch,
 } from "@/lib/searchPageParams";
 
+// A result row is one line of text and two badges; stretched across a 27"
+// screen it reads as a banner, not a list. Capping the column leaves dead
+// space either side on a desktop and changes nothing below 64rem, where the
+// padding is already the whole story.
+const PAGE_WIDTH_CLASS = "mx-auto w-full max-w-5xl";
+
 // Same dashed box as EmptyColumnState.tsx - the house empty state. Repeated
 // here rather than imported because that component hardcodes "No tasks".
 const EMPTY_STATE_CLASS =
@@ -104,19 +110,23 @@ function SearchPage() {
   return (
     <>
       {/* AuthenticatedLayout's <main> is a plain block, not a flex column, so
-          this page returns sibling divs - same header block as projects.tsx. */}
-      <div className="p-6 mb-2 border-b border-surface-border">
-        <h1 className="text-xl font-bold font-mono text-text-primary">
-          Search
-        </h1>
-        <p className="text-xs text-text-secondary">
-          {params.q
-            ? `Results for "${params.q}"`
-            : "Find projects, tasks and members across your workspace."}
-        </p>
+          this page returns sibling divs - same header block as projects.tsx.
+          The rule spans the full width while its text lines up with the
+          results below, hence the inner wrapper. */}
+      <div className="mb-2 border-b border-surface-border">
+        <div className={`${PAGE_WIDTH_CLASS} p-6`}>
+          <h1 className="text-xl font-bold font-mono text-text-primary">
+            Search
+          </h1>
+          <p className="text-xs text-text-secondary">
+            {params.q
+              ? `Results for "${params.q}"`
+              : "Find projects, tasks and members across your workspace."}
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-4 p-6">
+      <div className={`${PAGE_WIDTH_CLASS} flex flex-col gap-4 p-6`}>
         {results === null ? (
           <p className={EMPTY_STATE_CLASS}>
             {params.q.trim().length === 0

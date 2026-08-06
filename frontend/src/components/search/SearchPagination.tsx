@@ -16,8 +16,11 @@ interface SearchPaginationProps {
   onPageChange: (page: number) => void;
 }
 
+// hover:border-brand-500, like every other clickable surface on this page: a
+// button whose only hover feedback is its label changing shade doesn't read as
+// clickable at all.
 const PAGE_BUTTON_CLASS =
-  "rounded-md border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-text-secondary";
+  "rounded-md border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-brand-500 hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-surface-border disabled:hover:text-text-secondary";
 
 export function SearchPagination({
   page,

@@ -30,7 +30,15 @@ const TAB_CLASS =
   "flex shrink-0 items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap";
 const TAB_ACTIVE_CLASS = "border-brand-500 text-brand-500";
 const TAB_INACTIVE_CLASS =
-  "border-transparent text-text-secondary hover:text-text-primary";
+  "border-transparent text-text-secondary hover:border-brand-500/40 hover:text-text-primary";
+
+// The counts are the point of the tab bar - they say where the results are
+// before you click anything - so they are text-xs on a filled pill rather than
+// the 10px muted-grey pastille the Projects page uses for a passing detail.
+// The active tab's count carries the brand tint its label already has.
+const TAB_COUNT_CLASS = "rounded-full px-2 py-0.5 text-xs font-semibold";
+const TAB_COUNT_ACTIVE_CLASS = "bg-brand-500/15 text-brand-500";
+const TAB_COUNT_INACTIVE_CLASS = "bg-surface-overlay text-text-secondary";
 
 export function SearchTabs({ params, counts }: SearchTabsProps) {
   const tabs: {
@@ -95,7 +103,13 @@ export function SearchTabs({ params, counts }: SearchTabsProps) {
           >
             <tab.icon className="h-5 w-5" />
             {tab.label}
-            <span className="rounded-full bg-surface-overlay px-1.5 py-0.5 text-[10px] font-semibold text-text-muted">
+            <span
+              className={
+                TAB_COUNT_CLASS +
+                " " +
+                (isActive ? TAB_COUNT_ACTIVE_CLASS : TAB_COUNT_INACTIVE_CLASS)
+              }
+            >
               {tab.count}
             </span>
           </Link>

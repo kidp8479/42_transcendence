@@ -19,7 +19,7 @@ import {
   SEARCH_QUERY_MIN_LENGTH,
   type SearchResults,
 } from "@/lib/searchApi";
-import { darkTextInputTheme } from "../../lib/flowbite";
+import { darkSurfaceTextInputTheme } from "../../lib/flowbite";
 
 // Long enough that typing a word is one request rather than five, short
 // enough that the panel feels like it is keeping up.
@@ -179,7 +179,11 @@ export function SearchBar() {
         onFocus={() => setIsPanelOpen(true)}
         placeholder="Search projects, tasks, members..."
         sizing="sm"
-        theme={darkTextInputTheme}
+        // surface tokens, not control-*: the latter is the lighter blue-grey
+        // meant for the auth forms, and against the header's dark background
+        // it made the field glow. This is the field palette every other dark
+        // page uses.
+        theme={darkSurfaceTextInputTheme}
         type="search"
         value={query}
       />

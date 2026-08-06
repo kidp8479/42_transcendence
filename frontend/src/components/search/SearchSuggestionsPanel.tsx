@@ -76,12 +76,14 @@ export function SearchSuggestionsPanel({
             ))}
           </SuggestionGroup>
 
-          {/* The way out of a three-row preview. Only `q` is sent, so the page
-              opens on All with its own defaults. */}
+          {/* The way out of a three-row preview, and the only thing in this
+              panel that says how many matches there really are - so it wears a
+              border instead of being a green word in a corner. Only `q` is
+              sent, so the page opens on All with its own defaults. */}
           <Link
             to="/search"
             search={{ q: query }}
-            className="px-2 py-1 text-xs font-medium text-brand-500 hover:underline"
+            className="self-start rounded-md border border-surface-border bg-surface-raised px-2.5 py-1 text-xs font-semibold text-brand-500 transition-colors hover:border-brand-500"
           >
             See all results ({total})
           </Link>
@@ -106,8 +108,11 @@ function SuggestionGroup({
 
   return (
     <section className="flex flex-col gap-1">
-      <h2 className="px-2 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-        {title} ({total})
+      <h2 className="flex items-center gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {title}
+        <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-semibold text-text-primary">
+          {total}
+        </span>
       </h2>
       {children}
     </section>
