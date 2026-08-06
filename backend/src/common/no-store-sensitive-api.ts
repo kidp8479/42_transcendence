@@ -1,8 +1,9 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 
 export function setNoStoreForSensitiveApi(
   request: Request,
-  response: Response
+  response: Response,
+  next: NextFunction
 ) {
   const path = request.path;
   if (
@@ -11,4 +12,5 @@ export function setNoStoreForSensitiveApi(
   ) {
     response.setHeader("Cache-Control", "no-store");
   }
+  next();
 }
