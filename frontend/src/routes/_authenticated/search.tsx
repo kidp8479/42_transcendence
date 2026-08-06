@@ -15,23 +15,21 @@
 // nothing is mutated here), and no toasts (a failed load belongs to
 // RootErrorComponent).
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Avatar } from "flowbite-react";
-import { HiOutlineFolder } from "react-icons/hi2";
 import { SearchFilters } from "@/components/search/SearchFilters";
 import { SearchPagination } from "@/components/search/SearchPagination";
-import { SearchResultRow } from "@/components/search/SearchResultRow";
+import {
+  ProjectResultLink,
+  TaskResultLink,
+  UserResultLink,
+} from "@/components/search/SearchResultLinks";
 import { SearchSection } from "@/components/search/SearchSection";
 import { SearchSortControl } from "@/components/search/SearchSortControl";
 import { SearchTabs } from "@/components/search/SearchTabs";
-import { PROJECT_STATUS_STYLES } from "@/lib/projectStatusStyles";
 import {
   searchWorkspace,
   SEARCH_QUERY_MIN_LENGTH,
-  type SearchProjectResult,
   type SearchResults,
-  type SearchTaskResult,
   type SearchType,
-  type SearchUserResult,
 } from "@/lib/searchApi";
 import {
   nextSearchParams,
@@ -41,16 +39,11 @@ import {
   type SearchPageParams,
   type SearchPageSearch,
 } from "@/lib/searchPageParams";
-import { PRIORITY_STYLES } from "@/lib/taskPriorityStyles";
-import { STATUS_STYLES } from "@/lib/taskStatusStyles";
 
 // Same dashed box as EmptyColumnState.tsx - the house empty state. Repeated
 // here rather than imported because that component hardcodes "No tasks".
 const EMPTY_STATE_CLASS =
   "rounded-lg border border-dashed border-surface-border p-6 text-center text-xs text-text-muted-on-base";
-
-const STATUS_PILL_CLASS =
-  "rounded-full border px-2 py-0.5 text-[10px] font-semibold";
 
 // What each tab calls its rows in a sentence. "users" is the API's word for
 // them; the UI has said "Members" since the header's search bar.
@@ -284,105 +277,5 @@ function SearchResultsView({
         onPageChange={onPageChange}
       />
     </div>
-  );
-}
-
-// The three row wrappers live here, in the route, because they are the only
-// place the destination is known - and a typed <Link to=... params=...> is
-// checked against the generated route tree only where it is written.
-
-function ProjectResultLink({ project }: { project: SearchProjectResult }) {
-  const style = PROJECT_STATUS_STYLES[project.status];
-
-  return (
-    <Link
-      // Same destination the sidebar and the project cards use.
-      to="/$projectId/summary"
-      params={{ projectId: project.id }}
-      className="block"
-    >
-      <SearchResultRow
-        leading={
-          <HiOutlineFolder className={`h-5 w-5 ${style.text}`} aria-hidden />
-        }
-        title={project.name}
-        subtitle={project.description}
-        trailing={
-          <>
-            {project.isArchived && (
-              <span className="rounded-md bg-yellow-400/15 px-1 py-0.5 text-[10px] font-semibold text-yellow-400">
-                Archived
-              </span>
-            )}
-            <span className={`${STATUS_PILL_CLASS} ${style.statusPill}`}>
-              {style.label}
-            </span>
-          </>
-        }
-      />
-    </Link>
-  );
-}
-
-function TaskResultLink({ task }: { task: SearchTaskResult }) {
-  const style = STATUS_STYLES[task.status];
-  const priority = PRIORITY_STYLES[task.priority];
-  const StatusIcon = style.icon;
-
-  return (
-    <Link
-      // The board has no URL for a single task, so this opens the column the
-      // task sits in and leaves the drawer closed.
-      to="/$projectId/kanban"
-      params={{ projectId: task.projectId }}
-      className="block"
-    >
-      <SearchResultRow
-        leading={<StatusIcon className={`h-5 w-5 ${style.headerIcon}`} />}
-        title={task.title}
-        // A task title out of context means nothing - "Fix login" in which
-        // project? The server flattens the project name onto every task row.
-        subtitle={task.projectName}
-        trailing={
-          <>
-            <span className="flex items-center gap-1 text-[10px] font-semibold text-text-secondary">
-              <span
-                className={`h-2 w-2 rounded-full ${priority.dot}`}
-                aria-hidden
-              />
-              {priority.label}
-            </span>
-            <span className={`${STATUS_PILL_CLASS} ${style.statusPill}`}>
-              {style.label}
-            </span>
-          </>
-        }
-      />
-    </Link>
-  );
-}
-
-function UserResultLink({ user }: { user: SearchUserResult }) {
-  return (
-    <Link
-      // First links in the repo to point at this route - it is still a stub
-      // page, but the destination is the right one.
-      to="/users/$username"
-      params={{ username: user.username }}
-      className="block"
-    >
-      <SearchResultRow
-        leading={
-          <Avatar
-            img={user.avatarUrl ?? undefined}
-            placeholderInitials={user.username.slice(0, 2).toUpperCase()}
-            rounded
-            size="xs"
-          />
-        }
-        title={user.username}
-        subtitle={user.campus}
-      />
-    </Link>
   );
 }
