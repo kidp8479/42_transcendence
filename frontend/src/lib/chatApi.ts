@@ -54,9 +54,22 @@ export function fetchChatMessages(
 // applied to local state (not merely once the GET resolves), so a client
 // that unmounts mid-fetch never marks messages read it didn't end up
 // showing.
-export function markChatRead(projectId: string) {
+//
+// lastRead identifies the newest message the caller actually fetched (id +
+// createdAt) - never let the server stamp its own "now" here, since a
+// message from someone else can land in the gap between the caller's
+// history GET and this PATCH, and "now" would be after that insert,
+// wrongly marking a message the caller never rendered as read. Omit
+// entirely when the conversation had zero messages to observe.
+export function markChatRead(
+  projectId: string,
+  lastRead?: { id: string; createdAt: string }
+) {
   return apiClient<void>(`/projects/${projectId}/chat/read`, {
     method: "PATCH",
+    body: lastRead
+      ? { lastReadMessageId: lastRead.id, lastReadAt: lastRead.createdAt }
+      : {},
   });
 }
 

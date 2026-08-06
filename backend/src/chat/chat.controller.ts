@@ -23,6 +23,7 @@ import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { ChatService } from "./chat.service";
 import { CreateChatMessageDto } from "./dto/create-chat-message.dto";
 import { FindChatMessagesDto } from "./dto/find-chat-messages.dto";
+import { MarkChatReadDto } from "./dto/mark-chat-read.dto";
 
 @Controller("projects/:projectId/chat")
 export class ChatController {
@@ -53,17 +54,19 @@ export class ChatController {
     return this.chatService.create(projectId, request.user.id, dto);
   }
 
-  // PATCH (mark this conversation read - no request body, url says it all,
-  // same shape as notifications' PATCH read-all). Called explicitly by the
-  // frontend once it has applied a fetched page to its own state, not
-  // triggered implicitly by the GET above.
+  // PATCH (mark this conversation read up to the newest message the caller
+  // actually fetched - see MarkChatReadDto for why the body carries that
+  // instead of the server just stamping its own "now"). Called explicitly
+  // by the frontend once it has applied a fetched page to its own state,
+  // not triggered implicitly by the GET above.
   @ApiBearerAuth("access-token")
   @Patch("read")
   markRead(
     @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: MarkChatReadDto,
     @Req() request: AuthenticatedRequest
   ) {
-    return this.chatService.markRead(projectId, request.user.id);
+    return this.chatService.markRead(projectId, request.user.id, dto);
   }
 
   // DELETE - only the message's own author can delete it.

@@ -134,9 +134,19 @@ function ChatPage() {
         // explicit mark-read action (see ChatService.markRead), only fired
         // once the fetched page has actually landed in state above - clear
         // the dot immediately client-side too instead of waiting on the
-        // unread store's next background refetch
+        // unread store's next background refetch. The watermark sent is the
+        // newest message actually in this fetched page (fetchedMessages is
+        // oldest-first, so the last entry), not "now" - a message from
+        // someone else could otherwise land between this GET and the PATCH
+        // below and get marked read despite never being rendered.
         chatUnreadResource.markRead(selectedProjectId);
-        markChatRead(selectedProjectId).catch(() => {
+        const newestFetched = fetchedMessages[fetchedMessages.length - 1];
+        markChatRead(
+          selectedProjectId,
+          newestFetched
+            ? { id: newestFetched.id, createdAt: newestFetched.createdAt }
+            : undefined
+        ).catch(() => {
           // best-effort - a background refetch of /chat/unread will
           // eventually reconcile if this fails
         });
@@ -472,13 +482,18 @@ function ChatBubble({
         size="sm"
       />
       <div
-        className={`flex max-w-[85%] flex-col gap-1 sm:max-w-[70%] ${isSelf ? "items-end" : "items-start"}`}
+        // min-w-0: flex items default to min-width:auto (their content's
+        // natural width), which overrides max-w-[85%]/max-w-[70%] below for
+        // one long unbroken run of text - min-w-0 lets this shrink to the
+        // available space instead, which is what actually allows the
+        // message div's own wrapping to kick in.
+        className={`flex min-w-0 max-w-[85%] flex-col gap-1 sm:max-w-[70%] ${isSelf ? "items-end" : "items-start"}`}
       >
         <div className="flex items-center gap-2 text-xs text-text-secondary">
           <span className="font-semibold text-text-primary">{username}</span>
           <span>{formatTime(message.createdAt)}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {isSelf && (
             <button
               type="button"
@@ -494,7 +509,14 @@ function ChatBubble({
             </button>
           )}
           <div
-            className={`rounded-xl px-4 py-2 text-sm leading-relaxed ${
+            // whitespace-pre-wrap keeps the author's newlines instead of
+            // collapsing them to spaces like normal HTML text flow does;
+            // [overflow-wrap:anywhere] (break-words alone isn't enough for
+            // one long unbroken run with no spaces at all, ex: a pasted
+            // hash/URL) is what stops a single long token from forcing the
+            // whole bubble - and the chat pane around it - wider than the
+            // viewport instead of wrapping.
+            className={`min-w-0 max-w-full whitespace-pre-wrap break-words rounded-xl px-4 py-2 text-sm leading-relaxed [overflow-wrap:anywhere] ${
               isSelf
                 ? "rounded-tr-none bg-brand-600 text-white"
                 : "rounded-tl-none bg-surface-overlay text-text-primary"

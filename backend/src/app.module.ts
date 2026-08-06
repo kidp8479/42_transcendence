@@ -28,8 +28,6 @@ import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
 import { CalendarCategoriesModule } from "./calendar-categories/calendar-categories.module";
 import { StorageModule } from "./storage/storage.module";
 import { RealtimeModule } from "./realtime/realtime.module";
-import { ProjectApiTokensModule } from "./project-api-tokens/project-api-tokens.module";
-import { PublicApiModule } from "./public-api/public-api.module";
 import { ChatModule } from "./chat/chat.module";
 
 @Module({
