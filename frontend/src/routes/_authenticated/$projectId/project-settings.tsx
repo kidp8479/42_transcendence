@@ -11,6 +11,7 @@ import {
 
 import { ProjectStatusSection } from "@/components/project-settings/ProjectStatusSection";
 import { MembersSection } from "@/components/project-settings/MembersSection";
+import { ProjectApiTokensSection } from "@/components/project-settings/ProjectApiTokensSection";
 // BehaviorSection is deactivated (not deleted) for now - time constraint,
 // and it can't persist anything until Task-level archive support and the
 // Kanban board exist (see BehaviorSection.tsx). Re-enable this import and
@@ -38,6 +39,12 @@ function ProjectSettingsPage() {
       <MembersSection
         projectId={projectId}
         onLeaveProjectSuccess={() => navigate({ to: "/projects" })}
+      />
+
+      <ProjectApiTokensSection
+        projectId={projectId}
+        role={project.role}
+        isArchived={project.isArchived}
       />
 
       {/* <BehaviorSection /> - deactivated, see import comment above */}

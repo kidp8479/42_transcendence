@@ -4,7 +4,10 @@
 // own standalone endpoint (unlike ProjectMember, which needs one - see project-members module)
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { PrismaService } from "../prisma/prisma.service";
+import {
+  ApplicationDatabaseTransaction,
+  PrismaService,
+} from "../prisma/prisma.service";
 
 @Injectable()
 export class TaskAssigneeService {
@@ -34,31 +37,44 @@ export class TaskAssigneeService {
     userIds: string[]
   ): Promise<void> {
     await this.prisma.transaction(
-      async (transactionPrisma) => {
-        if (userIds.length > 0) {
-          const memberCount = await transactionPrisma.projectMember.count({
-            where: { projectId: projectId, userId: { in: userIds } },
-          });
-          if (memberCount !== userIds.length) {
-            throw new BadRequestException(
-              "assigneeIds must all be members of this project"
-            );
-          }
-        }
-
-        await transactionPrisma.taskAssignee.deleteMany({
-          where: { taskId: taskId },
-        });
-        if (userIds.length > 0) {
-          await transactionPrisma.taskAssignee.createMany({
-            data: userIds.map((userId) => ({
-              userId: userId,
-              taskId: taskId,
-            })),
-          });
-        }
-      },
+      (database) =>
+        this.replaceAssigneesInTransaction(
+          database,
+          taskId,
+          projectId,
+          userIds
+        ),
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
+  }
+
+  async replaceAssigneesInTransaction(
+    database: ApplicationDatabaseTransaction,
+    taskId: string,
+    projectId: string,
+    userIds: string[]
+  ): Promise<void> {
+    if (userIds.length > 0) {
+      const memberCount = await database.projectMember.count({
+        where: { projectId: projectId, userId: { in: userIds } },
+      });
+      if (memberCount !== userIds.length) {
+        throw new BadRequestException(
+          "assigneeIds must all be members of this project"
+        );
+      }
+    }
+
+    await database.taskAssignee.deleteMany({
+      where: { taskId: taskId },
+    });
+    if (userIds.length > 0) {
+      await database.taskAssignee.createMany({
+        data: userIds.map((userId) => ({
+          userId: userId,
+          taskId: taskId,
+        })),
+      });
+    }
   }
 }

@@ -50,7 +50,7 @@ type Runtime struct {
 	latestKeyVersion  int
 	keySetRefreshedAt time.Time
 	negativeKeyIDs    map[string]time.Time
-	unknownKeyChecked time.Time
+	unknownKeyChecks  map[string]time.Time
 	keyRefreshDone    chan struct{}
 	keyRefreshErr     error
 }
@@ -187,7 +187,7 @@ func (r *Runtime) PublicKey(ctx context.Context, keyID string) (ed25519.PublicKe
 		return nil, false, nil
 	}
 	latest := r.latestKeyVersion
-	unknownKeyChecked := r.unknownKeyChecked
+	unknownKeyChecked := r.unknownKeyChecks[keyID]
 	r.keyMu.Unlock()
 
 	// A verifier-only replica may miss several rotations. Permit one coalesced
@@ -237,7 +237,7 @@ func (r *Runtime) refreshPublicKeys(ctx context.Context, force bool, unknownKeyI
 	done := make(chan struct{})
 	r.keyRefreshDone = done
 	if unknownKeyID != "" {
-		r.unknownKeyChecked = time.Now()
+		r.rememberUnknownKeyCheckLocked(unknownKeyID, time.Now())
 	}
 	r.keyMu.Unlock()
 
@@ -312,6 +312,28 @@ func (r *Runtime) rememberUnknownKeyLocked(keyID string, now time.Time) {
 		delete(r.negativeKeyIDs, oldestKeyID)
 	}
 	r.negativeKeyIDs[keyID] = now.Add(negativeKeyTTL)
+}
+
+func (r *Runtime) rememberUnknownKeyCheckLocked(keyID string, now time.Time) {
+	if r.unknownKeyChecks == nil {
+		r.unknownKeyChecks = make(map[string]time.Time)
+	}
+	for cachedKeyID, checkedAt := range r.unknownKeyChecks {
+		if now.Sub(checkedAt) >= negativeKeyTTL {
+			delete(r.unknownKeyChecks, cachedKeyID)
+		}
+	}
+	if len(r.unknownKeyChecks) >= maxNegativeKeyIDs {
+		var oldestKeyID string
+		var oldestCheckedAt time.Time
+		for cachedKeyID, checkedAt := range r.unknownKeyChecks {
+			if oldestKeyID == "" || checkedAt.Before(oldestCheckedAt) {
+				oldestKeyID, oldestCheckedAt = cachedKeyID, checkedAt
+			}
+		}
+		delete(r.unknownKeyChecks, oldestKeyID)
+	}
+	r.unknownKeyChecks[keyID] = now
 }
 
 func (r *Runtime) renew(ctx context.Context) error {

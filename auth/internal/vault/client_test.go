@@ -120,6 +120,7 @@ func TestReadSecretsRequiresDedicatedRefreshSuccessorKey(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
+
 	}))
 	defer server.Close()
 
@@ -130,6 +131,42 @@ func TestReadSecretsRequiresDedicatedRefreshSuccessorKey(t *testing.T) {
 	client.setToken("runtime-token")
 	if _, err := client.ReadSecrets(context.Background()); err == nil {
 		t.Fatal("ReadSecrets() accepted a short refresh successor key")
+	}
+}
+
+func TestReadSecretsRequiresProjectAPITokenPepper(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requireVaultToken(t, r)
+		switch r.URL.Path {
+		case "/v1/kv/data/auth/oauth":
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{}}})
+		case "/v1/kv/data/internal/backend-auth":
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"internal_token": "a-credential-that-is-definitely-long-enough",
+			}}})
+		case "/v1/kv/data/auth/refresh-successor":
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"cipher_key": "a-dedicated-refresh-successor-key-long-enough",
+			}}})
+		case "/v1/kv/data/auth/project-api-token-pepper":
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"pepper": "short",
+			}}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	client.setToken("runtime-token")
+	if _, err := client.ReadSecrets(context.Background()); err == nil {
+		t.Fatal("ReadSecrets() accepted a short project API token pepper")
 	}
 }
 
@@ -223,14 +260,64 @@ func TestRuntimeCoalescesAndNegativeCachesUnknownKeyRefresh(t *testing.T) {
 	if _, found, err := runtime.PublicKey(context.Background(), "v2"); err != nil || found {
 		t.Fatalf("negative-cached PublicKey(v2) = found %v, error %v", found, err)
 	}
-	if _, found, err := runtime.PublicKey(context.Background(), "v3"); err != nil || found {
-		t.Fatalf("rate-limited PublicKey(v3) = found %v, error %v", found, err)
-	}
 	if _, found, err := runtime.PublicKey(context.Background(), "v999"); err != nil || found {
 		t.Fatalf("implausible PublicKey(v999) = found %v, error %v", found, err)
 	}
 	if requests.Load() != 1 {
 		t.Fatalf("negative or implausible key IDs caused %d Vault requests, want 1", requests.Load())
+	}
+}
+
+func TestRuntimeRefreshesDistinctUnknownTransitKeyAfterNegativeCache(t *testing.T) {
+	t.Parallel()
+
+	v1 := make(ed25519.PublicKey, ed25519.PublicKeySize)
+	v3 := append(ed25519.PublicKey(nil), v1...)
+	v3[0] = 3
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requireVaultToken(t, r)
+		switch requests.Add(1) {
+		case 1:
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{
+				"latest_version": 1,
+				"keys": map[string]any{
+					"1": map[string]string{"public_key": base64.StdEncoding.EncodeToString(v1)},
+				},
+			}})
+		case 2:
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{
+				"latest_version": 3,
+				"keys": map[string]any{
+					"1": map[string]string{"public_key": base64.StdEncoding.EncodeToString(v1)},
+					"3": map[string]string{"public_key": base64.StdEncoding.EncodeToString(v3)},
+				},
+			}})
+		default:
+			t.Errorf("unexpected Transit key refresh")
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	client.setToken("runtime-token")
+	runtime := &Runtime{client: client}
+	runtime.installKeyInfo(TransitKeyInfo{LatestVersion: 1, PublicKeys: TransitPublicKeys{"v1": v1}})
+	runtime.ready.Store(true)
+
+	if _, found, err := runtime.PublicKey(context.Background(), "v2"); err != nil || found {
+		t.Fatalf("PublicKey(v2) = found %v, error %v; want unknown", found, err)
+	}
+	key, found, err := runtime.PublicKey(context.Background(), "v3")
+	if err != nil || !found || !bytes.Equal(key, v3) {
+		t.Fatalf("PublicKey(v3) = %x, %v, %v; want refreshed key", key, found, err)
+	}
+	if requests.Load() != 2 {
+		t.Fatalf("distinct unknown key lookups caused %d Vault requests, want 2", requests.Load())
 	}
 }
 
@@ -378,6 +465,11 @@ func TestRuntimeStartRequiresTransitPublicKeys(t *testing.T) {
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
 				"cipher_key": "a-dedicated-refresh-successor-key-long-enough",
 			}}})
+		case "/v1/kv/data/auth/project-api-token-pepper":
+			requireVaultToken(t, r)
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"pepper": "a-dedicated-project-api-token-pepper-long-enough",
+			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{
@@ -448,6 +540,11 @@ func TestClientUsesAppRoleTokenForRuntimeOperations(t *testing.T) {
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
 				"cipher_key": "a-dedicated-refresh-successor-key-long-enough",
 			}}})
+		case "/v1/kv/data/auth/project-api-token-pepper":
+			requireVaultToken(t, r)
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"pepper": "a-dedicated-project-api-token-pepper-long-enough",
+			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{
@@ -489,6 +586,9 @@ func TestClientUsesAppRoleTokenForRuntimeOperations(t *testing.T) {
 	}
 	if secrets.RefreshSuccessorCipherKey != "a-dedicated-refresh-successor-key-long-enough" {
 		t.Errorf("ReadSecrets() refresh successor key = %q", secrets.RefreshSuccessorCipherKey)
+	}
+	if secrets.ProjectAPITokenPepper != "a-dedicated-project-api-token-pepper-long-enough" {
+		t.Errorf("ReadSecrets() project token pepper = %q", secrets.ProjectAPITokenPepper)
 	}
 	credentials, err := client.IssueDatabaseCredentials(context.Background(), "auth-runtime")
 	if err != nil {
@@ -685,6 +785,11 @@ func TestRuntimeReauthenticatesAndReplacesDatabaseLease(t *testing.T) {
 			requireVaultToken(t, r)
 			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
 				"cipher_key": "a-dedicated-refresh-successor-key-long-enough",
+			}}})
+		case "/v1/kv/data/auth/project-api-token-pepper":
+			requireVaultToken(t, r)
+			writeTestJSON(t, w, map[string]any{"data": map[string]any{"data": map[string]string{
+				"pepper": "a-dedicated-project-api-token-pepper-long-enough",
 			}}})
 		case "/v1/database/creds/auth-runtime":
 			requireVaultToken(t, r)

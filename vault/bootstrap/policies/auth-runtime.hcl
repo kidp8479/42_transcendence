@@ -20,6 +20,10 @@ path "kv/data/auth/refresh-successor" {
   capabilities = ["read"]
 }
 
+path "kv/data/auth/project-api-token-pepper" {
+  capabilities = ["read"]
+}
+
 path "kv/data/internal/backend-auth" {
   capabilities = ["read"]
 }

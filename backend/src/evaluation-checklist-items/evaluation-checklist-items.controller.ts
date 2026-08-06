@@ -61,7 +61,7 @@ export class EvaluationChecklistItemsController {
 
   // POST - creates a new item in the given section, rejected once that
   // section already has EVALUATION_CHECKLIST_MAX_ITEMS_PER_SECTION items.
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Post()
   create(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -73,7 +73,7 @@ export class EvaluationChecklistItemsController {
 
   // PATCH - partial update (label, isChecked, or order); section can't be
   // changed here, see UpdateEvaluationChecklistItemDto.
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Patch(":id")
   update(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -93,7 +93,7 @@ export class EvaluationChecklistItemsController {
   }
 
   // DELETE - permanently removes the item.
-  @ApiBearerAuth()
+  @ApiBearerAuth("access-token")
   @Delete(":id")
   remove(
     @Param("projectId", ParseUUIDPipe) projectId: string,

@@ -12,8 +12,10 @@ import { VaultRuntimeService } from "../vault/vault-runtime.service";
 import type {
   AuthenticatedRequest,
   AuthenticatedUser,
+  ProjectApiTokenPermission,
 } from "./authenticated-request";
 import { IS_PUBLIC_KEY } from "./public.decorator";
+import { PROJECT_API_TOKEN_PERMISSION_KEY } from "./project-api-token.constants";
 
 interface IntrospectionResponse {
   active: true;
@@ -48,6 +50,14 @@ export class AuthGuard implements CanActivate {
       context.getClass(),
     ]);
     if (isPublic) {
+      return true;
+    }
+    const isProjectApiTokenRoute =
+      this.reflector.getAllAndOverride<ProjectApiTokenPermission>(
+        PROJECT_API_TOKEN_PERMISSION_KEY,
+        [context.getHandler(), context.getClass()]
+      ) !== undefined;
+    if (isProjectApiTokenRoute) {
       return true;
     }
 

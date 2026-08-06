@@ -26,11 +26,17 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
 	"RefreshTokenFamily",
 	"AuthRefreshToken",
 	"WebSocketTicket",
-	"AuthToken"
+	"AuthToken",
+	"ProjectApiToken"
 TO auth_runtime;
 GRANT SELECT, INSERT, DELETE ON TABLE
-	"AuthEvent"
+	"AuthEvent",
+	"ProjectApiTokenEvent"
 TO auth_runtime;
+-- Auth creates project-bound credentials, but cannot read or mutate project
+-- data. REFERENCES is the minimum privilege PostgreSQL requires to enforce
+-- the ProjectApiToken foreign key during INSERT.
+GRANT REFERENCES ("id") ON TABLE "Project" TO auth_runtime;
 
 -- NestJS: application/project/resource tables plus canonical user data.
 -- Read access to the full row, but write access only to the self-service
@@ -80,5 +86,12 @@ REVOKE ALL ON TABLE
 	"AuthRefreshToken",
 	"WebSocketTicket",
 	"AuthToken",
-	"AuthEvent"
+	"AuthEvent",
+	"ProjectApiToken",
+	"ProjectApiTokenEvent",
+	"MachineTaskActionAudit"
 FROM backend_runtime;
+-- Machine task-action evidence is append-only and is written without a
+-- RETURNING clause, so the application needs INSERT but never read/update/
+-- delete access to it.
+GRANT INSERT ON TABLE "MachineTaskActionAudit" TO backend_runtime;

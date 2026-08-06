@@ -76,6 +76,9 @@ func main() {
 	if err := authStore.SetRefreshCipher(secrets.RefreshSuccessorCipherKey); err != nil {
 		log.Fatalf("configure refresh token recovery: %v", err)
 	}
+	if err := authStore.SetProjectAPITokenPepper(secrets.ProjectAPITokenPepper); err != nil {
+		log.Fatalf("configure project API token pepper: %v", err)
+	}
 
 	passwords := password.NewHasher()
 	tokens, err := token.NewService(token.Config{

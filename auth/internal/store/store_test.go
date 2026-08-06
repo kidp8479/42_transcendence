@@ -55,3 +55,48 @@ func TestRefreshTokenCipherRecoversSuccessorWithoutPersistingPlaintext(t *testin
 		t.Fatalf("decrypt() = %q, want %q", recovered, token)
 	}
 }
+
+func TestProjectAPITokenFormatAndHMAC(t *testing.T) {
+	selector, err := randomToken(projectAPITokenSelectorSize)
+	if err != nil {
+		t.Fatalf("randomToken(selector): %v", err)
+	}
+	secret, err := randomToken(projectAPITokenSecretSize)
+	if err != nil {
+		t.Fatalf("randomToken(secret): %v", err)
+	}
+	raw := formatProjectAPIToken(selector, secret)
+	gotSelector, gotSecret, ok := parseProjectAPIToken(raw)
+	if !ok || gotSelector != selector || gotSecret != secret {
+		t.Fatalf("parseProjectAPIToken(%q) = %q, %q, %v", raw, gotSelector, gotSecret, ok)
+	}
+	if _, _, ok := parseProjectAPIToken(raw + "x"); ok {
+		t.Fatal("parseProjectAPIToken accepted a malformed token")
+	}
+	digest := projectAPITokenHMAC([]byte("test-project-api-token-pepper-long-enough"), selector, secret)
+	if len(digest) != 64 {
+		t.Fatalf("HMAC digest length = %d, want 64", len(digest))
+	}
+	if digest == projectAPITokenHMAC([]byte("test-project-api-token-pepper-long-enough"), selector, secret+"x") {
+		t.Fatal("HMAC digest did not bind the secret")
+	}
+}
+
+func TestProjectAPITokenPepperConfiguration(t *testing.T) {
+	store := New(nil)
+	const value = "project-api-token-pepper-long-enough"
+	if err := store.SetProjectAPITokenPepper(value); err != nil {
+		t.Fatalf("SetProjectAPITokenPepper() error = %v", err)
+	}
+	current, err := store.currentProjectAPITokenPepper()
+	if err != nil || string(current) != value {
+		t.Fatalf("currentProjectAPITokenPepper() = %#v, %v", current, err)
+	}
+}
+
+func TestProjectAPITokenPepperConfigurationRejectsShortValue(t *testing.T) {
+	store := New(nil)
+	if err := store.SetProjectAPITokenPepper("too-short"); err == nil {
+		t.Fatal("SetProjectAPITokenPepper() accepted a short value")
+	}
+}

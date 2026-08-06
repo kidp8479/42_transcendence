@@ -8,6 +8,7 @@ import { ConfigModule } from "@nestjs/config";
 import { envValidationSchema } from "./config/env.validation";
 import { PrismaExceptionFilter } from "./common/filters/prisma-exception.filter";
 import { AuthGuard } from "./auth/auth.guard";
+import { ProjectApiTokenGuard } from "./auth/project-api-token.guard";
 import { VaultReadinessGuard } from "./auth/vault-readiness.guard";
 import { VaultModule } from "./vault/vault.module";
 import { HealthModule } from "./health/health.module";
@@ -27,6 +28,8 @@ import { CalendarEventsModule } from "./calendar-events/calendar-events.module";
 import { CalendarCategoriesModule } from "./calendar-categories/calendar-categories.module";
 import { StorageModule } from "./storage/storage.module";
 import { RealtimeModule } from "./realtime/realtime.module";
+import { ProjectApiTokensModule } from "./project-api-tokens/project-api-tokens.module";
+import { PublicApiModule } from "./public-api/public-api.module";
 
 @Module({
   imports: [
@@ -65,6 +68,8 @@ import { RealtimeModule } from "./realtime/realtime.module";
     CalendarCategoriesModule,
     StorageModule,
     RealtimeModule,
+    ProjectApiTokensModule,
+    PublicApiModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [
@@ -81,7 +86,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
       provide: APP_GUARD,
       useClass: AuthGuard,
     },
-
+    ProjectApiTokenGuard,
     // translates raw Prisma errors (ex: unique constraint violation, record not
     // found) into clean HTTP responses (409, 404, ...) globally, instead of every
     // service catching and mapping the same Prisma error codes by hand

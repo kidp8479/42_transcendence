@@ -21,6 +21,7 @@ import (
 
 var (
 	ErrConflict = errors.New("auth record already exists")
+	ErrInvalid  = errors.New("auth record is invalid")
 	ErrNotFound = errors.New("auth record not found")
 	ErrCSRF     = errors.New("CSRF token is invalid")
 	ErrReplay   = errors.New("refresh token replay detected")
@@ -41,8 +42,9 @@ const (
 )
 
 type Store struct {
-	pool          atomic.Pointer[pgxpool.Pool]
-	refreshCipher *refreshTokenCipher
+	pool                  atomic.Pointer[pgxpool.Pool]
+	refreshCipher         *refreshTokenCipher
+	projectAPITokenPepper []byte
 }
 
 type User struct {
@@ -884,8 +886,15 @@ func (c *refreshTokenCipher) decrypt(value string) (string, error) {
 
 func mapWriteError(operation string, err error) error {
 	var pgError *pgconn.PgError
-	if errors.As(err, &pgError) && pgError.Code == "23505" {
-		return fmt.Errorf("%s: %w", operation, ErrConflict)
+	if errors.As(err, &pgError) {
+		switch pgError.Code {
+		case "23505":
+			return fmt.Errorf("%s: %w", operation, ErrConflict)
+		case "23503":
+			return fmt.Errorf("%s: %w", operation, ErrNotFound)
+		case "23514":
+			return fmt.Errorf("%s: %w", operation, ErrInvalid)
+		}
 	}
 	return fmt.Errorf("%s: %w", operation, err)
 }

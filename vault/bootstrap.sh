@@ -17,6 +17,7 @@ SECRETS_DIR=${SECRETS_DIR:-/run/secrets}
 : "${POSTGRES_DB:?POSTGRES_DB is required}"
 : "${AUTH_INTERNAL_TOKEN:?AUTH_INTERNAL_TOKEN is required}"
 : "${AUTH_REFRESH_SUCCESSOR_KEY:?AUTH_REFRESH_SUCCESSOR_KEY is required}"
+: "${AUTH_PROJECT_API_TOKEN_PEPPER:?AUTH_PROJECT_API_TOKEN_PEPPER is required}"
 
 on_exit() {
 	rc=$?
@@ -79,6 +80,11 @@ if [ -z "${OAUTH_42_CLIENT_ID:-}" ] || [ -z "${OAUTH_GOOGLE_CLIENT_ID:-}" ]; the
 fi
 quiet vault kv put kv/internal/backend-auth internal_token="$AUTH_INTERNAL_TOKEN"
 quiet vault kv put kv/auth/refresh-successor cipher_key="$AUTH_REFRESH_SUCCESSOR_KEY"
+# Seed the auth-only pepper exactly once. A bootstrap rerun must never replace
+# an existing secret, including an older incompatible secret shape.
+if ! vault kv get -format=json kv/auth/project-api-token-pepper >/dev/null 2>&1; then
+	quiet vault kv put kv/auth/project-api-token-pepper pepper="$AUTH_PROJECT_API_TOKEN_PEPPER"
+fi
 
 step "configuring PostgreSQL database secrets engine"
 # vault_db_admin (created by db/init/01-vault-roles.sql) is a dedicated

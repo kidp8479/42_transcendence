@@ -61,6 +61,7 @@ type Secrets struct {
 	OAuth                     OAuthCredentials
 	InternalToken             string
 	RefreshSuccessorCipherKey string
+	ProjectAPITokenPepper     string
 }
 
 // TransitPublicKeys contains only verification material. Vault never exposes
@@ -132,6 +133,13 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 	if err != nil {
 		return Secrets{}, fmt.Errorf("read refresh successor credential: %w", err)
 	}
+	projectAPITokenPepper, err := c.readKV(ctx, "kv/data/auth/project-api-token-pepper")
+	if err != nil {
+		return Secrets{}, fmt.Errorf("read project API token pepper: %w", err)
+	}
+	if len(projectAPITokenPepper["pepper"]) < 32 {
+		return Secrets{}, fmt.Errorf("Vault project API token pepper must be at least 32 characters")
+	}
 	secrets := Secrets{
 		OAuth: OAuthCredentials{
 			FortyTwoClientID:     oauth["oauth_42_client_id"],
@@ -141,6 +149,7 @@ func (c *Client) ReadSecrets(ctx context.Context) (Secrets, error) {
 		},
 		InternalToken:             internal["internal_token"],
 		RefreshSuccessorCipherKey: refreshSuccessor["cipher_key"],
+		ProjectAPITokenPepper:     projectAPITokenPepper["pepper"],
 	}
 	if len(secrets.InternalToken) < 32 {
 		return Secrets{}, fmt.Errorf("Vault internal credential must be at least 32 characters")
