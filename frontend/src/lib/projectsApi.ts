@@ -20,6 +20,10 @@ export interface Project {
   // count of ProjectMember rows for this project.
   memberCount: number;
   isArchived: boolean;
+  // ISO timestamp, Prisma-managed (@updatedAt) - the version an edit was
+  // based on. Sent back on a details save so the backend can detect a
+  // concurrent edit; see updateProjectDetails below.
+  updatedAt: string;
 }
 
 // GET /projects => every project the authenticated user is a member of
@@ -94,7 +98,8 @@ function parseProject(value: unknown): Project {
     !isProjectMemberRole(value.role) ||
     typeof value.progress !== "number" ||
     typeof value.memberCount !== "number" ||
-    typeof value.isArchived !== "boolean"
+    typeof value.isArchived !== "boolean" ||
+    typeof value.updatedAt !== "string"
   ) {
     throw new Error("Projects API returned an invalid project");
   }
@@ -108,6 +113,7 @@ function parseProject(value: unknown): Project {
     progress: value.progress,
     memberCount: value.memberCount,
     isArchived: value.isArchived,
+    updatedAt: value.updatedAt,
   };
 }
 
