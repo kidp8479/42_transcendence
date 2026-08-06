@@ -70,9 +70,14 @@ export function updateProject(
 // - includes updatedAt, the version this edit was based on, so a save
 // based on stale data is rejected (409, ApiError.status) instead of
 // silently overwriting a concurrent edit from someone else.
+//
+// description is `string | null`, not optional: this call site always has
+// an opinion (the edit form's current value or null for "cleared"), and
+// sending null - not omitting the key - is what tells the backend to
+// actually clear an existing description rather than leave it untouched.
 export function updateProjectDetails(
   id: string,
-  input: { name: string; description?: string; updatedAt: string }
+  input: { name: string; description: string | null; updatedAt: string }
 ) {
   return apiClient<unknown>(`/projects/${id}/details`, {
     method: "PATCH",

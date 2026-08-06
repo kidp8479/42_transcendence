@@ -219,7 +219,11 @@ export function ProjectCard({
         throw new Error("Missing base updatedAt for edit");
       }
       await updateProjectDetails(project.id, {
-        ...values,
+        name: values.name,
+        // ProjectFormValues.description is undefined when the field was
+        // left blank - explicit null here (not omitted) is what tells the
+        // backend to clear an existing description instead of leaving it.
+        description: values.description ?? null,
         updatedAt: editingBaseUpdatedAt,
       });
       setMode("view");

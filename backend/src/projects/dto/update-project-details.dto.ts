@@ -1,9 +1,10 @@
 // DTOs only exist for routes that receive data in their body (POST, PATCH).
 // GET and DELETE don't need one, they only use URL params, nothing in the body.
 
-// Separate from UpdateProjectDto (status/isArchived, OWNER/ADMIN-only) on
-// purpose: this route is open to any project member, so it can only ever
-// touch name/description, never the fields the stricter route guards.
+// Separate from UpdateProjectDto (status/isArchived) on purpose: both routes
+// are OWNER/ADMIN-only, but keeping this as its own DTO/method scopes the
+// optimistic-concurrency check (updatedAt below) to name/description edits
+// only, instead of forcing every update() caller to start sending it too.
 
 // updatedAt is not project data - it's the version this edit was based on.
 // The service compares it against the current row before writing, so a
@@ -30,7 +31,14 @@ export class UpdateProjectDetailsDto {
   @IsOptional()
   @IsString()
   @MaxLength(maxProjectDescriptionLength)
-  description?: string;
+  // string | null | undefined: null means "clear it" (sent explicitly by
+  // the edit form when the field is left blank) and is passed straight
+  // through to Prisma, which writes NULL. undefined means "not included in
+  // this request" and leaves the column untouched - IsOptional() treats
+  // both the same way (skips validation), so this needs no extra
+  // decorator, unlike UpdateTaskDto's ValidateIf workaround for its
+  // non-nullable columns.
+  description?: string | null;
 
   @IsDateString()
   updatedAt: string;
