@@ -87,7 +87,7 @@ export function ProjectStatusSection({
     }
     showToast({
       type: "success",
-      message: isArchived ? "Project restored" : "Project archived",
+      message: isArchived ? "Project unarchived" : "Project archived",
     });
     await safeInvalidateRouter();
     setIsUpdatingArchive(false);
@@ -150,7 +150,7 @@ export function ProjectStatusSection({
 
         <SettingsActionRow
           title="Archive project"
-          description="Hide from active views without deleting data. Can be restored anytime."
+          description="Hide from active views without deleting data. Can be unarchived anytime."
           icon={<HiOutlineArchive className="h-5 w-5" />}
           iconClassName={
             isArchived
@@ -183,7 +183,7 @@ export function ProjectStatusSection({
               {isUpdatingArchive
                 ? "Saving..."
                 : isArchived
-                  ? "Restore"
+                  ? "Unarchive"
                   : "Archive"}
             </Button>
           ) : (
@@ -194,7 +194,7 @@ export function ProjectStatusSection({
                 className="!border !border-surface-border !bg-surface-overlay !text-text-primary inline-flex items-center gap-2"
               >
                 <HiOutlineArchive className="h-4 w-4" />
-                {isArchived ? "Restore" : "Archive"}
+                {isArchived ? "Unarchive" : "Archive"}
               </Button>
             </Tooltip>
           )}

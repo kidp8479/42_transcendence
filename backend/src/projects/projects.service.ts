@@ -12,6 +12,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import {
   Prisma,
   ProjectMember,
+  ProjectStatus,
   EvaluationChecklistItemSection,
 } from "@prisma/client";
 import { maxProjectsPerUser } from "./projects.constants";
@@ -34,6 +35,17 @@ import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 // once Bonus is too - so the raw score tops out at 150. Capped to 100 here
 // because ProjectCard's progress bar (aria-valuemax=100, uncapped width%)
 // isn't built to display past 100%, unlike the checklist page's own bar.
+
+// Only used by notifyLifecycleChange()'s fallback branch below - REVIEW has
+// no UI path to set it via update() today (ProjectStatusSection only
+// toggles COMPLETED/IN_PROGRESS), but a direct API/token call could still
+// send it, so this keeps that case worded sensibly instead of undefined.
+const projectStatusLabels: Record<ProjectStatus, string> = {
+  IN_PROGRESS: "In Progress",
+  REVIEW: "Review",
+  COMPLETED: "Completed",
+};
+
 function computeProjectProgress(
   items: { section: EvaluationChecklistItemSection; isChecked: boolean }[]
 ): number {
@@ -274,6 +286,14 @@ export class ProjectsService {
       );
     }
 
+    // Read before the write so notifyLifecycleChange below can tell what
+    // actually transitioned - dto is a partial PATCH, so a field being
+    // present doesn't mean its value is actually different.
+    const previousProject = await this.prisma.project.findUniqueOrThrow({
+      where: { id },
+      select: { status: true, isArchived: true },
+    });
+
     // Broadcast project changes to all connected project members so their UI
     // (ex: sidebar project list) can refresh without requiring a page reload.
     // Used for status changes (COMPLETED), archiving, and other project updates.
@@ -304,7 +324,73 @@ export class ProjectsService {
 
     this.realtimeService.emitToProject(id, "project:updated", result);
 
+    await this.notifyLifecycleChange(id, userId, previousProject, result);
+
     return result;
+  }
+
+  // Tells every other project member when the project's lifecycle state
+  // changes - finished/unfinished (status <-> COMPLETED) or
+  // archived/unarchived (isArchived). Same "notify everyone else, not the
+  // actor" pattern as updateDetails() below. Both can change in the same
+  // PATCH (e.g. archiving a finished project), so each is checked and
+  // notified independently rather than assuming only one fires per call.
+  private async notifyLifecycleChange(
+    id: string,
+    userId: string,
+    previous: { status: ProjectStatus; isArchived: boolean },
+    updated: { status: ProjectStatus; isArchived: boolean; name: string }
+  ): Promise<void> {
+    if (
+      updated.status === previous.status &&
+      updated.isArchived === previous.isArchived
+    ) {
+      return;
+    }
+
+    const [actor, otherMembers] = await Promise.all([
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { username: true },
+      }),
+      this.prisma.projectMember.findMany({
+        where: { projectId: id, userId: { not: userId } },
+        select: { userId: true },
+      }),
+    ]);
+    if (otherMembers.length === 0) {
+      return;
+    }
+
+    const messages: string[] = [];
+    if (updated.status !== previous.status) {
+      messages.push(
+        updated.status === "COMPLETED"
+          ? `${actor.username} marked "${updated.name}" as finished`
+          : previous.status === "COMPLETED"
+            ? `${actor.username} marked "${updated.name}" as unfinished`
+            : `${actor.username} changed "${updated.name}"'s status to ${projectStatusLabels[updated.status]}`
+      );
+    }
+    if (updated.isArchived !== previous.isArchived) {
+      messages.push(
+        updated.isArchived
+          ? `${actor.username} archived "${updated.name}"`
+          : `${actor.username} unarchived "${updated.name}"`
+      );
+    }
+
+    await Promise.all(
+      otherMembers.flatMap((otherMember) =>
+        messages.map((message) =>
+          this.notificationsService.create(
+            otherMember.userId,
+            message,
+            `/${id}/project-settings`
+          )
+        )
+      )
+    );
   }
 
   // Same OWNER/ADMIN gate as update() above - kept as its own method anyway
