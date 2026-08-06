@@ -49,6 +49,8 @@ import {
   ProjectDetailsForm,
   type ProjectFormValues,
 } from "./ProjectDetailsForm";
+import { PROJECT_STATUS_STYLES } from "@/lib/projectStatusStyles";
+import type { ProjectStatus } from "@/lib/projectsApi";
 
 // Scoped to this card's "..." menu only - rounds the item hover highlight
 // (rectangular by default in darkDropdownTheme, shared with NotificationBell
@@ -69,43 +71,6 @@ const confirmInputTheme = {
         gray: "!border-control-border !bg-black text-text-primary placeholder:!text-text-secondary focus:!border-control-error focus:!ring-2 focus:!ring-red-500/40 focus-visible:!outline-none",
       },
     },
-  },
-};
-
-const STATUS_META: Record<
-  ProjectStatus,
-  {
-    label: string;
-    dot: string;
-    text: string;
-    badgeBg: string;
-    badgeBorder: string;
-    hoverBorder: string;
-  }
-> = {
-  IN_PROGRESS: {
-    label: "In Progress",
-    dot: "bg-status-in-progress",
-    text: "text-status-in-progress",
-    badgeBg: "bg-status-in-progress/15",
-    badgeBorder: "border-status-in-progress/30",
-    hoverBorder: "hover:border-status-in-progress/50",
-  },
-  REVIEW: {
-    label: "Review",
-    dot: "bg-status-review",
-    text: "text-status-review",
-    badgeBg: "bg-status-review/15",
-    badgeBorder: "border-status-review/30",
-    hoverBorder: "hover:border-status-review/50",
-  },
-  COMPLETED: {
-    label: "Completed",
-    dot: "bg-status-completed",
-    text: "text-status-completed",
-    badgeBg: "bg-status-completed/15",
-    badgeBorder: "border-status-completed/30",
-    hoverBorder: "hover:border-status-completed/50",
   },
 };
 
@@ -246,6 +211,7 @@ export function ProjectCard({
   }
 
   const status = STATUS_META[project.status];
+  const status = PROJECT_STATUS_STYLES[project.status];
   const formattedDeadline = project.deadline
     ? new Date(project.deadline).toLocaleDateString("en-US", {
         month: "short",
