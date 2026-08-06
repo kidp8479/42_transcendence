@@ -34,7 +34,7 @@ import { STATUS_STYLES } from "@/lib/taskStatusStyles";
 // text takes the space back. The gap BETWEEN the badges is untouched at every
 // size - that one is doing real work.
 const STATUS_PILL_CLASS =
-  "inline-block shrink-0 rounded-full border px-1.5 py-0.5 text-center text-[10px] font-semibold sm:w-24 sm:px-0";
+  "inline-block shrink-0 rounded-full border px-1.5 py-0.5 text-center text-[10px] font-semibold sm:w-20 sm:px-0";
 const SIDE_COLUMN_CLASS =
   "flex shrink-0 items-center justify-end gap-1 sm:w-20";
 

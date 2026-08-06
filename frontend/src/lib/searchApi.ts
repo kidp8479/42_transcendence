@@ -16,7 +16,7 @@ import type { TaskPriority, TaskStatus } from "@/lib/tasks";
 // DTO would reject with a 400, which is a normal UI state, not an error.
 export const SEARCH_QUERY_MIN_LENGTH = 2;
 export const SEARCH_QUERY_MAX_LENGTH = 100;
-export const SEARCH_DEFAULT_LIMIT = 20;
+export const SEARCH_DEFAULT_LIMIT = 10;
 
 // Mirror the unions SearchQueryDto validates with @IsIn.
 export type SearchType = "all" | "projects" | "tasks" | "users";

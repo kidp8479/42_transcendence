@@ -113,19 +113,6 @@ function SearchPage() {
           this page returns sibling divs - same header block as projects.tsx.
           The rule spans the full width while its text lines up with the
           results below, hence the inner wrapper. */}
-      <div className="mb-2 border-b border-surface-border">
-        <div className={`${PAGE_WIDTH_CLASS} p-6`}>
-          <h1 className="text-xl font-bold font-mono text-text-primary">
-            Search
-          </h1>
-          <p className="text-xs text-text-secondary">
-            {params.q
-              ? `Results for "${params.q}"`
-              : "Find projects, tasks and members across your workspace."}
-          </p>
-        </div>
-      </div>
-
       <div className={`${PAGE_WIDTH_CLASS} flex flex-col gap-4 p-6`}>
         {results === null ? (
           <p className={EMPTY_STATE_CLASS}>
