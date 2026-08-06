@@ -410,6 +410,15 @@ export class ProjectsService {
       );
     }
 
+    // Read before the write so the notification below can tell whether
+    // anything actually changed - dto always carries name (required) and
+    // often an unchanged description, so a no-op Save shouldn't spam every
+    // other member. Same reasoning as notifyLifecycleChange()'s before-read.
+    const previousProject = await this.prisma.project.findUniqueOrThrow({
+      where: { id },
+      select: { name: true, description: true },
+    });
+
     let updatedProject;
     try {
       updatedProject = await this.prisma.project.update({
@@ -453,26 +462,32 @@ export class ProjectsService {
     // Tells every other project member their teammate changed the
     // project's details - same "notify everyone else, not the actor"
     // pattern already used for member removal/role changes in
-    // project-members.service.ts.
-    const [actor, otherMembers] = await Promise.all([
-      this.prisma.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: { username: true },
-      }),
-      this.prisma.projectMember.findMany({
-        where: { projectId: id, userId: { not: userId } },
-        select: { userId: true },
-      }),
-    ]);
-    await Promise.all(
-      otherMembers.map((otherMember) =>
-        this.notificationsService.create(
-          otherMember.userId,
-          `${actor.username} updated "${result.name}"'s details`,
-          `/${id}/project-settings`
+    // project-members.service.ts. Skipped entirely if nothing actually
+    // changed (e.g. Save clicked with no edits).
+    if (
+      result.name !== previousProject.name ||
+      result.description !== previousProject.description
+    ) {
+      const [actor, otherMembers] = await Promise.all([
+        this.prisma.user.findUniqueOrThrow({
+          where: { id: userId },
+          select: { username: true },
+        }),
+        this.prisma.projectMember.findMany({
+          where: { projectId: id, userId: { not: userId } },
+          select: { userId: true },
+        }),
+      ]);
+      await Promise.all(
+        otherMembers.map((otherMember) =>
+          this.notificationsService.create(
+            otherMember.userId,
+            `${actor.username} updated "${result.name}"'s details`,
+            `/${id}/project-settings`
+          )
         )
-      )
-    );
+      );
+    }
 
     this.realtimeService.emitToProject(id, "project:updated", result);
 
