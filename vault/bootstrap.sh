@@ -206,6 +206,13 @@ create_approle() {
 		# portable across Docker's Podman shim.
 		chmod 0644 "${secret_dir}/role_id" "${secret_dir}/secret_id"
 	fi
+
+	if [ "$role" = "backend-runtime" ]; then
+		# The production backend image runs as node (UID 1000). Its dedicated
+		# secret volume is mounted by no other workload, so retain 0600 while
+		# assigning the files to that unprivileged runtime user.
+		chown 1000:1000 "${secret_dir}/role_id" "${secret_dir}/secret_id"
+	fi
 }
 create_approle auth-runtime
 create_approle backend-runtime
