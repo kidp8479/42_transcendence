@@ -376,7 +376,7 @@ export class TasksService {
         projectId,
         previousAssigneeIds,
         assigneeIds,
-        userId,
+        actor.kind === "USER" ? actor.userId : undefined,
         dto.title ?? existingTask.title
       );
       await this.notifyRemovedAssignees(
