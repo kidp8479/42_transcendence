@@ -86,10 +86,7 @@ import { PublicApiModule } from "./public-api/public-api.module";
       provide: APP_GUARD,
       useClass: AuthGuard,
     },
-    {
-      provide: APP_GUARD,
-      useClass: ProjectApiTokenGuard,
-    },
+    ProjectApiTokenGuard,
     // translates raw Prisma errors (ex: unique constraint violation, record not
     // found) into clean HTTP responses (409, 404, ...) globally, instead of every
     // service catching and mapping the same Prisma error codes by hand

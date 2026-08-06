@@ -1,8 +1,12 @@
-import { SetMetadata } from "@nestjs/common";
+import { applyDecorators, SetMetadata, UseGuards } from "@nestjs/common";
 import type { ProjectApiTokenPermission } from "./authenticated-request";
-
-export const PROJECT_API_TOKEN_PERMISSION_KEY = "projectApiTokenPermission";
+import { PROJECT_API_TOKEN_PERMISSION_KEY } from "./project-api-token.constants";
+import { ProjectApiTokenGuard } from "./project-api-token.guard";
 
 export const ProjectApiTokenAuthenticated = (
   permission: ProjectApiTokenPermission
-) => SetMetadata(PROJECT_API_TOKEN_PERMISSION_KEY, permission);
+) =>
+  applyDecorators(
+    SetMetadata(PROJECT_API_TOKEN_PERMISSION_KEY, permission),
+    UseGuards(ProjectApiTokenGuard)
+  );

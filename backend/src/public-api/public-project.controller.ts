@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Body,
   Delete,
@@ -134,8 +135,11 @@ export class PublicProjectController {
 }
 
 function pageSize(value: number | undefined): number {
-  if (!value || value < 1) {
+  if (value === undefined) {
     return 100;
+  }
+  if (value < 0) {
+    throw new BadRequestException("limit must be zero or greater");
   }
   return Math.min(value, 100);
 }

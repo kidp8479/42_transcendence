@@ -18,7 +18,7 @@ import type {
   ProjectApiTokenPermission,
   ProjectApiTokenRequest,
 } from "./authenticated-request";
-import { PROJECT_API_TOKEN_PERMISSION_KEY } from "./project-api-token.decorator";
+import { PROJECT_API_TOKEN_PERMISSION_KEY } from "./project-api-token.constants";
 
 interface IntrospectionResponse {
   active: true;
