@@ -8,5 +8,11 @@ export const Route = createFileRoute("/$")({
 });
 
 function NotFoundPage() {
-  return <ErrorScreen message="This page could not be found." showGoHome />;
+  return (
+    <ErrorScreen
+      title="Page not found"
+      message="This page could not be found."
+      showGoHome
+    />
+  );
 }

@@ -49,10 +49,16 @@ export function computeEvaluationChecklistProgress(
   const mandatoryPercent = sectionPercent(mandatoryItems);
   const bonusPercent = sectionPercent(bonusItems);
   const supplementalPercent = sectionPercent(supplementalItems);
+  // Exact checked-count equality, not the rounded percent - Math.round can
+  // round a section up to 100% while an item is still unchecked (e.g.
+  // 199/200 = 99.5% rounds to 100%), which would unlock the next section
+  // and inflate currentValue/completeAt one item early. An empty section
+  // stays not-complete, same as sectionPercent's own 0% for that case -
+  // preserved from the original >= 100 check, which was also false at 0%.
   const mandatoryComplete =
-    mandatoryPercent >= EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY;
+    mandatoryItems.length > 0 && mandatoryItems.every((item) => item.isChecked);
   const bonusComplete =
-    bonusPercent >= EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY;
+    bonusItems.length > 0 && bonusItems.every((item) => item.isChecked);
 
   const progress = {
     currentValue: mandatoryItems.filter((item) => item.isChecked).length,

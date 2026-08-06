@@ -692,7 +692,7 @@ export class TasksService {
     projectId: string,
     previousAssigneeIds: string[],
     newAssigneeIds: string[],
-    actingUserId: string,
+    actingUserId: string | undefined,
     taskTitle: string
   ): Promise<void> {
     const removedUserIds = previousAssigneeIds.filter(

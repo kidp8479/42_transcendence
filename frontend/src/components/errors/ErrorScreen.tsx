@@ -7,12 +7,14 @@ import { authSessionResource } from "@/lib/authState";
 // box and the same fix applies to both at once.
 interface ErrorScreenProps {
   message: string;
+  title?: string;
   onRetry?: () => void;
   showGoHome?: boolean;
 }
 
 export function ErrorScreen({
   message,
+  title = "Something went wrong",
   onRetry,
   showGoHome,
 }: ErrorScreenProps) {
@@ -35,7 +37,7 @@ export function ErrorScreen({
         role="alert"
         className="flex max-w-md flex-col items-center gap-3 rounded-lg border border-control-error bg-red-950 p-6 text-center text-red-100 shadow-lg"
       >
-        <p className="font-mono text-lg font-semibold">Something went wrong</p>
+        <p className="font-mono text-lg font-semibold">{title}</p>
         <p className="text-sm">{message}</p>
         {showGoHome && (
           <Link

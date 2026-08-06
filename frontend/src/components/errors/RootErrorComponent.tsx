@@ -6,7 +6,7 @@ import { ErrorScreen } from "./ErrorScreen";
 // Bubbles up from any route's loader/component that doesn't define its own
 // errorComponent - mounted once on __root.tsx, covers every route in the app.
 export function RootErrorComponent({ error, reset }: ErrorComponentProps) {
-  const { message, action } = classifyError(error);
+  const { message, title, action } = classifyError(error);
   const safeInvalidateRouter = useSafeRouterInvalidate();
 
   // reset() alone only clears this boundary's local error state - it never
@@ -24,6 +24,7 @@ export function RootErrorComponent({ error, reset }: ErrorComponentProps) {
   return (
     <ErrorScreen
       message={message}
+      title={title}
       onRetry={action === "retry" ? () => void handleRetry() : undefined}
       showGoHome={action === "navigate-home"}
     />
@@ -42,17 +43,20 @@ export function RootErrorComponent({ error, reset }: ErrorComponentProps) {
 // URL...), not something that becomes valid on a second try.
 function classifyError(error: unknown): {
   message: string;
+  title?: string;
   action: "retry" | "navigate-home";
 } {
   if (error instanceof ApiError) {
     if (error.status === 404) {
       return {
+        title: "Page not found",
         message: "This page could not be found.",
         action: "navigate-home",
       };
     }
     if (error.status === 401 || error.status === 403) {
       return {
+        title: "Access denied",
         message: "You don't have access to this page.",
         action: "navigate-home",
       };
