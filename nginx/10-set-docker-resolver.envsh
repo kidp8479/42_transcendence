@@ -1,0 +1,7 @@
+#!/bin/sh
+
+set -eu
+
+RESOLVERS=$(awk '/^nameserver / { print $2; exit }' /etc/resolv.conf)
+: "${RESOLVERS:?container resolver is required}"
+export RESOLVERS

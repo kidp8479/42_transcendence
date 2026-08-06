@@ -20,27 +20,31 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:alpine
+    image: owasp/modsecurity-crs@sha256:da1c183fb34b2dc13e406bd228f02d6a4bbc2e66db7a74627d2ae9398e1616dd
     ports:
       - "8080:8080"
+      - "8443:8443"
+    environment:
+      MODSEC_RULE_ENGINE: DetectionOnly
+      MODSEC_AUDIT_LOG: /dev/stdout
+      MODSEC_AUDIT_LOG_FORMAT: JSON
+      MODSEC_AUDIT_LOG_PARTS: FH
+      RESOLVER_CONFIG: valid=15s ipv6=off
     volumes:
-      # mounted as a template, not the final config: /etc/nginx/nginx.conf
-      # itself is generated at startup below (see command:), it can't also
-      # be the read-only mount target.
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
-    # nginx.conf.template has a __DOCKER_RESOLVER__ placeholder instead of a
-    # hardcoded resolver address - this fills it in with whatever nameserver
-    # this container's own /etc/resolv.conf actually has (Docker's embedded
-    # DNS and podman's aardvark-dns each write their own real, reachable
-    # address there under their own network), so nginx never wastes a DNS
-    # timeout querying a second, guessed address that doesn't exist on this
-    # particular network.
-    command: >
-      sh -c "sed \"s/__DOCKER_RESOLVER__/$$(grep '^nameserver' /etc/resolv.conf | head -1 | cut -d' ' -f2)/\" /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && exec nginx -g 'daemon off;'"
+      - ./nginx/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
+      - ./nginx/includes/application-locations.conf.template:/etc/nginx/templates/includes/application-locations.conf.template:ro
+      - ./nginx/10-set-docker-resolver.envsh:/docker-entrypoint.d/10-set-docker-resolver.envsh:ro
+      - ./nginx/99-reload-on-certificate-change.sh:/docker-entrypoint.d/99-reload-on-certificate-change.sh:ro
+      - vault_nginx_tls:/etc/nginx/ssl:ro
     depends_on:
-      - frontend
-      - backend
-      - auth
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_started
+      auth:
+        condition: service_started
+      nginx-tls-agent:
+        condition: service_healthy
     restart: unless-stopped
 
   db:
@@ -64,6 +68,8 @@ services:
 
   vault:
     image: hashicorp/vault:1.18
+    ports:
+      - "127.0.0.1:8200:8200"
     cap_add:
       - IPC_LOCK
     environment:
@@ -79,7 +85,8 @@ services:
     restart: unless-stopped
 
   vault-bootstrap:
-    image: hashicorp/vault:1.18
+    build:
+      context: ./vault
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set_vault_dev_root_token_in_env}
@@ -99,6 +106,9 @@ services:
       - vault_auth_runtime_secret:/run/secrets/auth-runtime
       - vault_backend_runtime_secret:/run/secrets/backend-runtime
       - vault_migration_secret:/run/secrets/migration
+      - vault_nginx_tls_agent_secret:/run/secrets/nginx-tls
+      - vault_pki_ca:/run/pki-ca
+      - vault_nginx_tls:/run/nginx-tls
     command: sh /vault/bootstrap/bootstrap.sh
     depends_on:
       db:
@@ -106,6 +116,26 @@ services:
       vault:
         condition: service_healthy
     restart: "no"
+
+  nginx-tls-agent:
+    image: hashicorp/vault:1.18
+    environment:
+      VAULT_ADDR: http://vault:8200
+    volumes:
+      - ./vault/nginx-tls-agent.hcl:/vault/agent/nginx-tls-agent.hcl:ro
+      - vault_nginx_tls_agent_secret:/run/secrets/nginx-tls:ro
+      - vault_nginx_tls:/run/nginx-tls
+    command: agent -config=/vault/agent/nginx-tls-agent.hcl
+    depends_on:
+      vault-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /run/nginx-tls/local.pem && test -s /run/nginx-tls/paris-42-wildcard.pem"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
 
   frontend:
     build:
@@ -271,4 +301,7 @@ volumes:
   vault_auth_runtime_secret:
   vault_backend_runtime_secret:
   vault_migration_secret:
+  vault_nginx_tls_agent_secret:
+  vault_pki_ca:
+  vault_nginx_tls:
   rustfs_data:

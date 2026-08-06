@@ -86,6 +86,26 @@ test("bearerFetch rejects cross-origin URLs before attaching a bearer", async ()
   assert.equal(called, false);
 });
 
+test("relative WebSocket URLs follow the loaded school hostname", async () => {
+  const { realtimeServerOrigin } =
+    await import("../dist-test/lib/realtimeSocketUrl.js");
+
+  assert.equal(
+    realtimeServerOrigin(
+      "/ws",
+      "https://f6r13s1.paris.42.school:8443/dashboard"
+    ),
+    "https://f6r13s1.paris.42.school:8443"
+  );
+  assert.equal(
+    realtimeServerOrigin(
+      "/ws",
+      "https://f6r13s2.paris.42.school:8443/dashboard"
+    ),
+    "https://f6r13s2.paris.42.school:8443"
+  );
+});
+
 function installBrowserGlobals(responses) {
   globalThis.window = {
     location: {

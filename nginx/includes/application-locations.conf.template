@@ -1,0 +1,97 @@
+location / {
+    set $frontend_upstream http://frontend:5173;
+    proxy_pass $frontend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location ^~ /api/public/v1/ {
+    access_log /var/log/nginx/access.log ws_redacted;
+    add_header Cache-Control "no-store" always;
+    limit_req zone=project_api_token_rate burst=30 nodelay;
+    limit_req_status 429;
+    limit_req_log_level info;
+
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location ~ ^/api/projects/[^/]+/api-tokens(?:/|$) {
+    add_header Cache-Control "no-store" always;
+
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location /api {
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location /ws {
+    access_log /var/log/nginx/access.log ws_redacted;
+    error_log /var/log/nginx/error.log crit;
+    limit_req zone=ws_handshake_rate burst=60 nodelay;
+    limit_req_status 429;
+    limit_req_log_level info;
+    limit_conn ws_handshake_concurrency 100;
+    limit_conn_status 429;
+    limit_conn_log_level info;
+
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_buffering off;
+    proxy_read_timeout 16m;
+    proxy_send_timeout 16m;
+}
+
+location = /auth/internal {
+    return 404;
+}
+
+location ^~ /auth/internal/ {
+    return 404;
+}
+
+location /auth {
+    set $auth_upstream http://auth:3001;
+    proxy_pass $auth_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}

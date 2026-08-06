@@ -124,6 +124,14 @@ rebuild-auth: $(ENV_FILE)
 logs:
 	$(COMPOSE) logs -f
 
+## follow ingress nginx logs
+logs-nginx:
+	$(COMPOSE) logs -f nginx
+
+## follow Nginx TLS Vault Agent logs
+logs-nginx-tls-agent:
+	$(COMPOSE) logs -f nginx-tls-agent
+
 ## follow frontend logs
 logs-frontend:
 	$(COMPOSE) logs -f frontend
@@ -269,6 +277,24 @@ check-frontend:
 check-backend:
 	$(COMPOSE) exec backend sh -c "npm run build && npm run test:unit"
 
+## validate the rendered ingress nginx configuration
+check-nginx:
+	$(COMPOSE) exec nginx nginx -t
+
+## verify local HTTPS ingress, HSTS, and the HTTP-to-HTTPS redirect
+check-tls:
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -sSI -H "Host: localhost" http://127.0.0.1:8080/ | grep -qi "^location: https://localhost:8443/"'
+	$(COMPOSE) exec nginx sh -c 'curl -sSI -H "Host: 127.0.0.1" http://127.0.0.1:8080/ | grep -qi "^location: https://localhost:8443/"'
+	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -showcerts </dev/null 2>/dev/null | openssl x509 -noout -subject | grep -Eq "CN ?= ?localhost"'
+	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -CAfile /etc/nginx/ssl/local.pem </dev/null 2>/dev/null | grep -F "Verify return code: 0 (ok)"'
+
+## export the local development CA for one-time browser or OS trust installation
+export-local-ca:
+	mkdir -p .local
+	$(COMPOSE) run --rm --no-deps -v "$(CURDIR)/.local:/export" vault-bootstrap \
+		sh -c 'cp /run/pki-ca/root.crt /export/task-rabbit-local-ca.crt && chmod 0644 /export/task-rabbit-local-ca.crt'
+
 ## run Go tests and static analysis inside the auth Compose service
 check-auth:
 	$(COMPOSE) exec auth sh -c "go test ./... && go vet ./..."
@@ -385,9 +411,9 @@ help:
         recreate-env wipe-db wipe-storage \
         up-db up-frontend up-backend up-auth vault-status \
         rebuild-frontend rebuild-backend rebuild-auth \
-        logs-frontend logs-backend logs-auth logs-db \
+        logs-nginx logs-nginx-tls-agent logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
         migrate migrate-dev migrate-fix-permissions prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
-        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell \
+        check-frontend check-backend check-nginx check-tls export-local-ca check-auth check-prisma format-auth check-auth-stack check-shell \
         check-vault-policies check-vault-prisma check-websocket-e2e

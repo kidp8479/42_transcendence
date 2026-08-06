@@ -56,6 +56,7 @@ func Load() (Config, error) {
 		VaultDatabasePort: envOrDefault("VAULT_DB_PORT", defaultVaultDBPort),
 		VaultDatabaseName: strings.TrimSpace(os.Getenv("VAULT_DB_NAME")),
 	}
+	var err error
 
 	if err := validateVaultConfig(cfg); err != nil {
 		return Config{}, err
@@ -63,16 +64,14 @@ func Load() (Config, error) {
 	if cfg.AppOrigin == "" {
 		return Config{}, fmt.Errorf("APP_ORIGIN is required")
 	}
-	origin, err := url.Parse(cfg.AppOrigin)
-	if err != nil || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host == "" || origin.Path != "" ||
-		origin.RawQuery != "" || origin.Fragment != "" || origin.User != nil {
-		return Config{}, fmt.Errorf("APP_ORIGIN must be an origin such as http://localhost:8080")
+	if !isValidConfiguredBrowserOrigin(cfg.AppOrigin) {
+		return Config{}, fmt.Errorf("APP_ORIGIN must be an origin such as https://localhost:8443 or https://*.paris.42.school:8443")
 	}
 	cfg.CookieSecure, err = parseRequiredBool("AUTH_COOKIE_SECURE")
 	if err != nil {
 		return Config{}, err
 	}
-	if origin.Scheme == "https" && !cfg.CookieSecure {
+	if strings.HasPrefix(cfg.AppOrigin, "https://") && !cfg.CookieSecure {
 		return Config{}, fmt.Errorf("AUTH_COOKIE_SECURE must be true when APP_ORIGIN uses https")
 	}
 	cfg.RefreshIdleTTL, err = parseRequiredDuration("AUTH_REFRESH_IDLE_TTL")
@@ -111,6 +110,43 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func (cfg Config) AllowsBrowserOrigin(origin string) bool {
+	if cfg.AppOrigin != "https://*.paris.42.school:8443" {
+		return origin == cfg.AppOrigin
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil ||
+		parsed.Scheme != "https" ||
+		parsed.Port() != "8443" ||
+		parsed.Path != "" ||
+		parsed.RawQuery != "" ||
+		parsed.Fragment != "" ||
+		parsed.User != nil {
+		return false
+	}
+	labels := strings.Split(strings.ToLower(parsed.Hostname()), ".")
+	return len(labels) == 4 &&
+		labels[0] != "" &&
+		labels[1] == "paris" &&
+		labels[2] == "42" &&
+		labels[3] == "school"
+}
+
+func isValidConfiguredBrowserOrigin(origin string) bool {
+	if origin == "https://*.paris.42.school:8443" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	return err == nil &&
+		(parsed.Scheme == "http" || parsed.Scheme == "https") &&
+		parsed.Host != "" &&
+		parsed.Path == "" &&
+		parsed.RawQuery == "" &&
+		parsed.Fragment == "" &&
+		parsed.User == nil
 }
 
 func validateVaultConfig(cfg Config) error {
