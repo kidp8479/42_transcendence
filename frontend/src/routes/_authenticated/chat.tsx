@@ -164,19 +164,29 @@ function ChatPage() {
   }, [messages.length, loadingMore]);
 
   async function handleLoadEarlier() {
-    if (!selectedProjectId || messages.length === 0) return;
+    const projectId = selectedProjectId;
+    if (!projectId || messages.length === 0) return;
     setLoadingMore(true);
     try {
-      const older = await fetchChatMessages(selectedProjectId, {
+      const older = await fetchChatMessages(projectId, {
         before: messages[0].id,
         beforeCreatedAt: messages[0].createdAt,
         take: MESSAGES_PAGE_SIZE,
       });
-      setMessages((previous) => [...older, ...previous]);
-      setHasMoreHistory(older.length === MESSAGES_PAGE_SIZE);
+      // the user may have switched conversations while this was in flight -
+      // `messages`/`hasMoreHistory` now belong to a different conversation,
+      // and prepending this response there would be wrong (same bug class
+      // as handleSend/handleDelete's own staleness guards)
+      if (projectId === selectedProjectId) {
+        setMessages((previous) => [...older, ...previous]);
+        setHasMoreHistory(older.length === MESSAGES_PAGE_SIZE);
+      }
     } catch {
       showToast({ type: "error", message: "Could not load earlier messages." });
     } finally {
+      // loadingMore isn't scoped per-conversation - always clear it so a
+      // conversation switched into isn't stuck showing "Loading..." for a
+      // fetch that belonged to the one left behind
       setLoadingMore(false);
     }
   }

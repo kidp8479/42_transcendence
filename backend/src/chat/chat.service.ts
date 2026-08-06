@@ -15,8 +15,9 @@ import { CHAT_MESSAGES_DEFAULT_PAGE_SIZE } from "./chat.constants";
 import { isRecordNotFoundError } from "../common/is-record-not-found-error";
 
 // author is not the User's full row - only what a chat bubble needs to
-// render (see MockMember in frontend's chat.tsx), same shape as
-// ProjectMembersService's member.user select.
+// render (see ChatMessageAuthor in frontend's chatApi.ts): a subset of
+// ProjectMembersService's own member.user select, which also pulls campus
+// (shown elsewhere in member lists) - chat bubbles have no use for it.
 const AUTHOR_SELECT = {
   id: true,
   username: true,
@@ -122,10 +123,26 @@ export class ChatService {
   // is legitimately unread again.
   async markRead(projectId: string, userId: string): Promise<void> {
     await this.projectsService.assertMembership(projectId, userId);
-    await this.prisma.chatReadState.upsert({
+    // one timestamp shared by both branches - the create branch used to
+    // omit lastReadAt and rely on the column's own `@default(now())`
+    // (see schema.prisma), which is a second, separately-taken wall-clock
+    // read at the moment Postgres commits the row, not the moment this
+    // request came in. Passing the same Date to both keeps a first-ever
+    // read and a subsequent one equally precise about "now".
+    const now = new Date();
+    const readState = await this.prisma.chatReadState.upsert({
       where: { userId_projectId: { userId, projectId } },
-      create: { userId, projectId },
-      update: { lastReadAt: new Date() },
+      create: { userId, projectId, lastReadAt: now },
+      update: { lastReadAt: now },
+    });
+    // same reasoning as NotificationsService.markAsRead's own
+    // emitToUser("notification:read", ...) - without this, a user's other
+    // open tabs/devices never learn this conversation was read anywhere
+    // else and keep showing its unread dot until their own background
+    // /chat/unread refetch happens to catch up.
+    this.realtimeService.emitToUser(userId, "chat:read", {
+      projectId,
+      lastReadAt: readState.lastReadAt,
     });
   }
 

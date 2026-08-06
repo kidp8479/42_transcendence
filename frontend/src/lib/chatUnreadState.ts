@@ -10,6 +10,14 @@ import { authSessionResource } from "./authState";
 
 type Listener = () => void;
 
+function isRecordWithProjectId(value: unknown): value is { projectId: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { projectId?: unknown }).projectId === "string"
+  );
+}
+
 class ChatUnreadResource {
   private projectIds: Set<string> = new Set();
   // The conversation currently open on the Chat page, if any - a message
@@ -97,6 +105,18 @@ class ChatUnreadResource {
       }
     });
     socket.on("project:deleted", refresh);
+    // this user marking a conversation read from another tab/device (see
+    // ChatService.markRead's own emitToUser) - sync this tab's dot without
+    // waiting on the next background /chat/unread refetch. Harmless no-op
+    // if this tab is the one that triggered it (markRead above already
+    // cleared it locally).
+    socket.on("chat:read", (payload: unknown) => {
+      const projectId = isRecordWithProjectId(payload)
+        ? payload.projectId
+        : null;
+      if (projectId === null) return;
+      this.markRead(projectId);
+    });
   }
 
   private recomputeSnapshot(): void {
