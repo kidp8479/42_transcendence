@@ -49,11 +49,13 @@ export function deleteProject(id: string) {
 }
 
 // PATCH /projects/:id => partial update; only provided fields are changed; caller must be ADMIN
+// name/description are NOT accepted here - use updateProjectDetails() below,
+// which enforces the optimistic-concurrency check. The backend now rejects
+// them on this route (whitelist + forbidNonWhitelisted), so this type isn't
+// just documentation - sending them would 400.
 export function updateProject(
   id: string,
   input: {
-    name?: string;
-    description?: string;
     status?: ProjectStatus;
     isArchived?: boolean;
     deadline?: string | null;
