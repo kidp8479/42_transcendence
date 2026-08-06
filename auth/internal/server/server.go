@@ -964,7 +964,7 @@ func (s *Server) requireInternal(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (s *Server) validOrigin(origin string) bool {
-	return origin == s.cfg.AppOrigin
+	return s.cfg.AllowsBrowserOrigin(origin)
 }
 
 func (s *Server) validInternalToken(authorization string) bool {

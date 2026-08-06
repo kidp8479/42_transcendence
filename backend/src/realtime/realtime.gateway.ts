@@ -22,6 +22,7 @@ import {
   WebSocketAdmission,
   WebSocketAdmissionService,
 } from "./websocket-admission.service";
+import { allowsBrowserOrigin } from "../security/origin-policy";
 
 const webSocketTicketPattern = /^[A-Za-z0-9_-]{43}$/;
 const sessionRevalidationIntervalMs = 30_000;
@@ -32,7 +33,10 @@ function allowExactOrigin(
   request: IncomingMessage,
   callback: (error: string | null | undefined, success: boolean) => void
 ): void {
-  callback(null, request.headers.origin === process.env.APP_ORIGIN);
+  callback(
+    null,
+    allowsBrowserOrigin(process.env.APP_ORIGIN ?? "", request.headers.origin)
+  );
 }
 
 // Resolves the real projectId a lockable resource belongs to, given the id

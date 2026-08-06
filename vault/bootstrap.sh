@@ -4,12 +4,17 @@
 # /vault/bootstrap, mounted read-only by the vault-bootstrap Compose service.
 set -eu
 
-# Secret files must never be readable by other users; set once, deliberately.
+# Workload secret files must never be readable by other users; set once,
+# deliberately. The Nginx Agent credentials are the sole exception below:
+# rootless Podman does not provide a portable ownership mapping between this
+# bootstrap container and HashiCorp's non-root Agent user.
 umask 077
 
 POLICY_DIR=${POLICY_DIR:-/vault/bootstrap/policies}
 SQL_DIR=${SQL_DIR:-/vault/bootstrap/sql}
 SECRETS_DIR=${SECRETS_DIR:-/run/secrets}
+PKI_CA_DIR=${PKI_CA_DIR:-/run/pki-ca}
+NGINX_TLS_DIR=${NGINX_TLS_DIR:-/run/nginx-tls}
 
 : "${VAULT_ADDR:?VAULT_ADDR is required}"
 : "${VAULT_TOKEN:?VAULT_TOKEN is required}"
@@ -63,6 +68,46 @@ enable_once secrets enable -path=transit transit
 enable_once secrets enable -path=kv -version=2 kv
 enable_once auth enable approle
 enable_once secrets enable database
+enable_once secrets enable -path=pki pki
+
+step "configuring local development PKI"
+mkdir -p "$PKI_CA_DIR" "$NGINX_TLS_DIR"
+chmod 0700 "$PKI_CA_DIR"
+# This volume is mounted only by vault-bootstrap, nginx-tls-agent, and Nginx
+# (read-only). Rootless Podman cannot portably share ownership between the
+# bootstrap image and the Agent's image user, so volume isolation—not UID
+# mapping—forms the access boundary.
+chmod 0777 "$NGINX_TLS_DIR"
+
+# Vault dev mode loses its in-memory PKI on restart. Persist this local-only
+# root so developers do not need to re-trust a new CA after every restart.
+if [ -s "$PKI_CA_DIR/root.pem" ]; then
+	quiet vault write pki/config/ca "pem_bundle=@${PKI_CA_DIR}/root.pem"
+else
+	root_json=$(mktemp)
+	vault write -format=json pki/root/generate/exported \
+		common_name="Task Rabbit local development CA" \
+		ttl=87600h >"$root_json"
+	jq -r '.data.certificate, .data.private_key' "$root_json" >"$PKI_CA_DIR/root.pem"
+	jq -r '.data.certificate' "$root_json" >"$PKI_CA_DIR/root.crt"
+	rm -f "$root_json"
+	chmod 0600 "$PKI_CA_DIR/root.pem"
+	chmod 0644 "$PKI_CA_DIR/root.crt"
+fi
+
+quiet vault secrets tune -max-lease-ttl=87600h pki
+quiet vault write pki/roles/local-dev \
+	allowed_domains=localhost \
+	allow_bare_domains=true \
+	allow_subdomains=false \
+	allow_ip_sans=true \
+	max_ttl=720h
+quiet vault write pki/roles/paris-42-wildcard \
+	allowed_domains=paris.42.school \
+	allow_bare_domains=false \
+	allow_subdomains=true \
+	allow_wildcard_certificates=true \
+	max_ttl=720h
 
 step "creating Transit signing key"
 # create-or-noop on an existing key; re-run-safe without any error tolerance
@@ -148,9 +193,18 @@ create_approle() {
 		>"${secret_dir}/role_id"
 	vault write -f -field=secret_id "auth/approle/role/${role}/secret-id" \
 		>"${secret_dir}/secret_id"
+
+	if [ "$role" = "nginx-tls" ]; then
+		# This volume is mounted exclusively by vault-bootstrap and
+		# nginx-tls-agent. Let the Agent read its inputs regardless of the
+		# rootless container UID mapping; ownership-based sharing is not
+		# portable across Docker's Podman shim.
+		chmod 0644 "${secret_dir}/role_id" "${secret_dir}/secret_id"
+	fi
 }
 create_approle auth-runtime
 create_approle backend-runtime
 create_approle migration
+create_approle nginx-tls
 
 step "Vault local development bootstrap completed"
