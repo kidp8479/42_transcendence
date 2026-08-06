@@ -108,6 +108,11 @@ quiet vault write pki/roles/paris-42-wildcard \
 	allow_subdomains=true \
 	allow_wildcard_certificates=true \
 	max_ttl=720h
+quiet vault write pki/roles/public-domains \
+	allowed_domains=tomato.iops.dev,tomato-dev.iops.dev \
+	allow_bare_domains=true \
+	allow_subdomains=false \
+	max_ttl=720h
 
 step "creating Transit signing key"
 # create-or-noop on an existing key; re-run-safe without any error tolerance

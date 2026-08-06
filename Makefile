@@ -283,11 +283,16 @@ check-nginx:
 
 ## verify local HTTPS ingress, HSTS, and the HTTP-to-HTTPS redirect
 check-tls:
-	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c '! curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/ | grep -qi "^strict-transport-security:"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve school.paris.42.school:8443:127.0.0.1 https://school.paris.42.school:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato.iops.dev:8443:127.0.0.1 https://tomato.iops.dev:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato-dev.iops.dev:8443:127.0.0.1 https://tomato-dev.iops.dev:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
 	$(COMPOSE) exec nginx sh -c 'curl -sSI -H "Host: localhost" http://127.0.0.1:8080/ | grep -qi "^location: https://localhost:8443/"'
 	$(COMPOSE) exec nginx sh -c 'curl -sSI -H "Host: 127.0.0.1" http://127.0.0.1:8080/ | grep -qi "^location: https://localhost:8443/"'
 	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -showcerts </dev/null 2>/dev/null | openssl x509 -noout -subject | grep -Eq "CN ?= ?localhost"'
 	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -CAfile /etc/nginx/ssl/local.pem </dev/null 2>/dev/null | grep -F "Verify return code: 0 (ok)"'
+	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -servername tomato.iops.dev -verify_hostname tomato.iops.dev -CAfile /etc/nginx/ssl/public-domains.pem </dev/null 2>/dev/null | grep -F "Verify return code: 0 (ok)"'
+	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -servername tomato-dev.iops.dev -verify_hostname tomato-dev.iops.dev -CAfile /etc/nginx/ssl/public-domains.pem </dev/null 2>/dev/null | grep -F "Verify return code: 0 (ok)"'
 
 ## export the local development CA for one-time browser or OS trust installation
 export-local-ca:

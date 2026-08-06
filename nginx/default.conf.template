@@ -15,6 +15,8 @@ map $host $direct_https_host {
     default "";
     localhost localhost;
     127.0.0.1 localhost;
+    tomato.iops.dev tomato.iops.dev;
+    tomato-dev.iops.dev tomato-dev.iops.dev;
     ~^[^.]+\.paris\.42\.school$ $host;
 }
 
@@ -36,7 +38,6 @@ server {
     ssl_certificate /etc/nginx/ssl/local.pem;
     ssl_certificate_key /etc/nginx/ssl/local.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     if ($direct_https_host = "") {
         return 444;
@@ -51,6 +52,22 @@ server {
 
     ssl_certificate /etc/nginx/ssl/paris-42-wildcard.pem;
     ssl_certificate_key /etc/nginx/ssl/paris-42-wildcard.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    if ($direct_https_host = "") {
+        return 444;
+    }
+
+    include /etc/nginx/includes/application-locations.conf;
+}
+
+server {
+    listen 8443 ssl;
+    server_name tomato.iops.dev tomato-dev.iops.dev;
+
+    ssl_certificate /etc/nginx/ssl/public-domains.pem;
+    ssl_certificate_key /etc/nginx/ssl/public-domains.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 

@@ -24,6 +24,7 @@ services:
     ports:
       - "8080:8080"
       - "8443:8443"
+      - "127.0.0.1:8444:8443"
     environment:
       MODSEC_RULE_ENGINE: DetectionOnly
       MODSEC_AUDIT_LOG: /dev/stdout
@@ -130,7 +131,7 @@ services:
       vault-bootstrap:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "test -s /run/nginx-tls/local.pem && test -s /run/nginx-tls/paris-42-wildcard.pem"]
+      test: ["CMD-SHELL", "test -s /run/nginx-tls/local.pem && test -s /run/nginx-tls/paris-42-wildcard.pem && test -s /run/nginx-tls/public-domains.pem"]
       interval: 5s
       timeout: 2s
       retries: 12
