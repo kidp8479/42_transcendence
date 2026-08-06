@@ -30,6 +30,8 @@ CMD ["npm", "run", "start:dev"]
 FROM dev AS build
 RUN npm run build
 
+FROM dev AS migration
+
 FROM node:22-alpine AS prod
 WORKDIR /app
 
