@@ -39,7 +39,8 @@ model User {
   authEventsAsTarget AuthEvent[]         @relation("AuthEventTarget")
   chatMessages     ChatMessage[]
   chatReadStates   ChatReadState[]
-  userRelationship  UserRelationship[]
+  requesterRelationship  UserRelationship[] @relation("RequesterRelationship")
+  addresseeRelationship  UserRelationship[] @relation("AddresseeRelationship")
 }
 
 enum AuthProvider {
@@ -586,7 +587,6 @@ model ChatReadState {
 }
 
 enum RelationshipStatus {
-  NONE
   PENDING_APPROVAL
   ACCEPTED
   BLOCKED
@@ -594,13 +594,15 @@ enum RelationshipStatus {
 
 model UserRelationship {
   id                String  @id @default(uuid())
-  RequesterId       String
-  AddresseeId       String
-  Status            RelationshipStatus   @default(NONE)
+  requesterId       String
+  addresseeId       String
+  status            RelationshipStatus   @default(PENDING_APPROVAL)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt()
 
-  user              User    @relation(fields: [RequesterId], references: [id], onDelete: Cascade)
+  requester        User    @relation("RequesterRelationship", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee        User    @relation("AddresseeRelationship", fields: [addresseeId], references: [id], onDelete: Cascade)
 
-  @@unique([RequesterId, AddresseeId])
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId])
 }
