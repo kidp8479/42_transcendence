@@ -112,10 +112,12 @@ const STATUS_META: Record<
 export interface ProjectCardData {
   id: string;
   name: string;
-  // Nullable - the raw value, not a display fallback. "No description yet."
-  // is applied at render time below, not baked in here, since this same
-  // value seeds the edit-details form - a baked-in placeholder would get
-  // saved as the real description if submitted untouched.
+  // Nullable - the raw value, not a display fallback. Rendered as-is below
+  // (null shows nothing, keeping every card the same height via the
+  // description paragraph's own reserved min-h, not a placeholder string) -
+  // this same value also seeds the edit-details form, where a baked-in
+  // placeholder would get saved as the real description if submitted
+  // untouched.
   description: string | null;
   status: ProjectStatus;
   // 0-100, computed backend-side from EvaluationChecklistItem.isChecked.
@@ -160,6 +162,16 @@ export function ProjectCard({
   const [isConfirmSubmitting, setIsConfirmSubmitting] = useState(false);
   const [isSubmittingDetails, setIsSubmittingDetails] = useState(false);
   const [detailsConflict, setDetailsConflict] = useState(false);
+  // Captured once, the instant editing mode opens - NOT read live from
+  // `project.updatedAt` at submit time. The `project` prop can refresh
+  // while this form is still open (another member's save invalidates
+  // everyone's router, including ours), and reading it live at submit time
+  // would silently pick up that fresher value - passing the concurrency
+  // check with data the visible form was never actually based on, defeating
+  // the whole point of the check.
+  const [editingBaseUpdatedAt, setEditingBaseUpdatedAt] = useState<
+    string | null
+  >(null);
   const confirmInputId = useId();
   const isOwner = role === "OWNER";
   const canManageProject = role === "OWNER" || role === "ADMIN";
@@ -190,6 +202,7 @@ export function ProjectCard({
   function handleCancelEditing() {
     setMode("view");
     setDetailsConflict(false);
+    setEditingBaseUpdatedAt(null);
   }
 
   // Calls the API directly, unlike onDeleteProject/onLeaveProject (which the
@@ -202,9 +215,12 @@ export function ProjectCard({
     setIsSubmittingDetails(true);
     setDetailsConflict(false);
     try {
+      if (editingBaseUpdatedAt === null) {
+        throw new Error("Missing base updatedAt for edit");
+      }
       await updateProjectDetails(project.id, {
         ...values,
-        updatedAt: project.updatedAt,
+        updatedAt: editingBaseUpdatedAt,
       });
       setMode("view");
       await safeInvalidateRouter();
@@ -344,7 +360,7 @@ export function ProjectCard({
         banner={
           detailsConflict ? (
             <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
-              This project was updated by someone else. Reload and try again.
+              This project was updated by someone else. Cancel and try again.
             </div>
           ) : undefined
         }
@@ -433,7 +449,10 @@ export function ProjectCard({
                 <DropdownItem
                   icon={HiOutlinePencilSquare}
                   theme={roundedDropdownItemTheme}
-                  onClick={() => setMode("editing")}
+                  onClick={() => {
+                    setEditingBaseUpdatedAt(project.updatedAt);
+                    setMode("editing");
+                  }}
                 >
                   Edit project details
                 </DropdownItem>
@@ -470,7 +489,7 @@ export function ProjectCard({
             {project.name}
           </h3>
           <p className="mt-1 min-h-10 text-sm text-text-secondary line-clamp-2">
-            {project.description ?? "No description yet."}
+            {project.description}
           </p>
         </div>
 
