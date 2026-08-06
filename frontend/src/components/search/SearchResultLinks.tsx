@@ -26,9 +26,17 @@ import { STATUS_STYLES } from "@/lib/taskStatusStyles";
 // Fixed widths, not padding: every status pill is the same box whatever the
 // label inside, so the pills line up down the page instead of drifting left
 // and right with the length of "Review" versus "In Progress".
+//
+// From sm up only. Those two columns reserve 176px whatever is in them, and on
+// a phone that is most of the row: the title collapsed to "ft..." and the
+// description to "A Tr...". Alignment is worth nothing when there is nothing
+// left to align, so below sm every badge shrinks to its own content and the
+// text takes the space back. The gap BETWEEN the badges is untouched at every
+// size - that one is doing real work.
 const STATUS_PILL_CLASS =
-  "inline-block w-24 shrink-0 rounded-full border py-0.5 text-center text-[10px] font-semibold";
-const SIDE_COLUMN_CLASS = "flex w-20 shrink-0 items-center justify-end gap-1";
+  "inline-block shrink-0 rounded-full border px-1.5 py-0.5 text-center text-[10px] font-semibold sm:w-24 sm:px-0";
+const SIDE_COLUMN_CLASS =
+  "flex shrink-0 items-center justify-end gap-1 sm:w-20";
 
 // The box behind an ICON only. Avatars don't get one - a circle inside a
 // rounded square is the bubble-in-a-bubble the chat and the board avoid.
@@ -111,7 +119,10 @@ export function TaskResultLink({ task }: { task: SearchTaskResult }) {
                 className={`h-2 w-2 rounded-full ${priority.dot}`}
                 aria-hidden
               />
-              {priority.label}
+              {/* The dot alone on a phone - "Medium" is 45px the title needs
+                  more than the priority does. sr-only rather than hidden, so
+                  the colour is never the only thing carrying the meaning. */}
+              <span className="sr-only sm:not-sr-only">{priority.label}</span>
             </span>
             <span className={`${STATUS_PILL_CLASS} ${style.statusPill}`}>
               {style.label}
@@ -159,8 +170,9 @@ export function UserResultLink({
           subtitle={user.campus}
           // Empty, and only there to reserve the room the control below needs
           // - it is positioned over the row, so nothing else keeps the title
-          // from running underneath it.
-          trailing={<span className="block w-28" aria-hidden />}
+          // from running underneath it. Narrow on a phone, where the button
+          // is its icon alone.
+          trailing={<span className="block w-16 sm:w-28" aria-hidden />}
         />
       </Link>
 
@@ -180,7 +192,9 @@ export function UserResultLink({
             className="flex items-center gap-1 rounded-md border border-surface-border bg-surface-overlay px-2 py-1 text-[10px] font-semibold text-text-secondary transition-colors hover:border-brand-500 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-surface-border disabled:hover:text-text-secondary"
           >
             <HiOutlineUserPlus className="h-3.5 w-3.5" aria-hidden />
-            Add friend
+            {/* Icon-only on a phone, where the label costs more room than the
+                username has to spare. */}
+            <span className="sr-only sm:not-sr-only">Add friend</span>
           </button>
         )}
       </div>
