@@ -19,6 +19,23 @@ COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compos
 endif
 ENV_FILE = .env
 
+# Deployment environments use separate Compose projects, external runtime
+# environment files, and loopback-only ingress overrides. The secret files
+# are intentionally not kept in the repository.
+DEPLOY_SECRETS_DIR ?= /srv/transcendence
+DEPLOY_DEV_ENV_FILE ?= $(DEPLOY_SECRETS_DIR)/development/secrets/runtime.env
+DEPLOY_DEV_COMPOSE_FILE ?= ops/compose/development.yml
+DEPLOY_DEV_PROJECT ?= transcendence-dev
+DEPLOY_DEV_COMPOSE = $(COMPOSE) --project-name $(DEPLOY_DEV_PROJECT) \
+	--env-file $(DEPLOY_DEV_ENV_FILE) -f docker-compose.yml -f $(DEPLOY_DEV_COMPOSE_FILE)
+
+# These names reserve the production interface. They deliberately do not
+# point to docker-compose.yml because it is a source-mounted, Vault-dev stack
+# and is not safe to deploy as production.
+DEPLOY_PROD_ENV_FILE ?= $(DEPLOY_SECRETS_DIR)/production/secrets/runtime.env
+DEPLOY_PROD_COMPOSE_FILE ?= ops/compose/production.yml
+DEPLOY_PROD_PROJECT ?= transcendence-prod
+
 # ---------------------------------------------------------------------------- #
 # default                                                                      #
 # ---------------------------------------------------------------------------- #
@@ -58,6 +75,19 @@ up: $(ENV_FILE)
 ## run this after pulling changes that add or remove npm dependencies
 up-build: $(ENV_FILE)
 	$(COMPOSE) up --build -d
+
+## build and start the isolated development deployment (requires runtime secrets)
+deploy-dev:
+	@test -f "$(DEPLOY_DEV_ENV_FILE)" || (echo "Missing development runtime env: $(DEPLOY_DEV_ENV_FILE)" >&2; exit 1)
+	@test -f "$(DEPLOY_DEV_COMPOSE_FILE)" || (echo "Missing development Compose override: $(DEPLOY_DEV_COMPOSE_FILE)" >&2; exit 1)
+	$(DEPLOY_DEV_COMPOSE) config --quiet
+	$(DEPLOY_DEV_COMPOSE) up --build -d
+
+## refuse production deployment until its production Compose/Vault stack exists
+deploy-prod:
+	@echo "Production deployment is blocked: $(DEPLOY_PROD_COMPOSE_FILE) is not implemented." >&2
+	@echo "The current docker-compose.yml is local-development-only and must not be used for production." >&2
+	@exit 1
 
 ## reinstall npm dependencies in running containers without rebuilding images
 ## use after pulling changes that add or remove npm dependencies (faster than up-build)
@@ -208,6 +238,18 @@ prisma-studio:
 ## inject demo data using the short-lived Vault migration lease
 seed:
 	$(COMPOSE) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
+
+## inject demo data into the isolated development deployment
+seed-dev:
+	@test -f "$(DEPLOY_DEV_ENV_FILE)" || (echo "Missing development runtime env: $(DEPLOY_DEV_ENV_FILE)" >&2; exit 1)
+	@test -f "$(DEPLOY_DEV_COMPOSE_FILE)" || (echo "Missing development Compose override: $(DEPLOY_DEV_COMPOSE_FILE)" >&2; exit 1)
+	$(DEPLOY_DEV_COMPOSE) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
+
+## refuse production seeding until its production Compose/Vault stack exists
+seed-prod:
+	@echo "Production seeding is blocked: $(DEPLOY_PROD_COMPOSE_FILE) is not implemented." >&2
+	@echo "The current docker-compose.yml is local-development-only and must not be used for production." >&2
+	@exit 1
 
 ## stop the database and remove its Compose-managed data volume
 # same portable mechanism as ffclean: match containers/volumes by label or
@@ -412,13 +454,13 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST) | sort -u
 	@printf "\n"
 
-.PHONY: all up up-build down restart build logs ps clean fclean re rere ffclean rebuild \
+.PHONY: all up up-build deploy-dev deploy-prod down restart build logs ps clean fclean re rere ffclean rebuild \
         recreate-env wipe-db wipe-storage \
         up-db up-frontend up-backend up-auth vault-status \
         rebuild-frontend rebuild-backend rebuild-auth \
         logs-nginx logs-nginx-tls-agent logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate migrate-dev migrate-fix-permissions prisma-studio install seed \
+        migrate migrate-dev migrate-fix-permissions prisma-studio install seed seed-dev seed-prod \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
         check-frontend check-backend check-nginx check-tls export-local-ca check-auth check-prisma format-auth check-auth-stack check-shell \
         check-vault-policies check-vault-prisma check-websocket-e2e
