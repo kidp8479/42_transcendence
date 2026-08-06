@@ -2,13 +2,7 @@ import type { IconType } from "react-icons";
 import { useEffect } from "react";
 import { Sidebar, SidebarItemGroup, SidebarItems } from "flowbite-react";
 import { Link, useLoaderData } from "@tanstack/react-router";
-import {
-  HiChevronLeft,
-  HiChevronRight,
-  HiX,
-  HiOutlineUsers,
-} from "react-icons/hi";
-import { HiOutlineChatBubbleLeftRight } from "react-icons/hi2";
+import { HiChevronLeft, HiChevronRight, HiX } from "react-icons/hi";
 import { MdOutlineDashboard } from "react-icons/md";
 import { GoFileDirectory } from "react-icons/go";
 import { HiOutlineChatBubbleLeftRight, HiOutlineUsers } from "react-icons/hi2";

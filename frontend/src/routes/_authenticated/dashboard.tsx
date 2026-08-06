@@ -8,6 +8,7 @@ import {
   HiOutlineFolder,
   HiOutlineUsers,
 } from "react-icons/hi2";
+import { useChatUnread } from "@/hooks/useChatUnread";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -20,6 +21,8 @@ function DashboardPage() {
   const activeProjectCount = projects.filter(
     (project) => project.status === "IN_PROGRESS" && !project.isArchived
   ).length;
+  const unreadProjectIds = useChatUnread();
+  const hasUnreadChat = unreadProjectIds.size > 0;
 
   return (
     <div className="p-6">
@@ -44,10 +47,6 @@ function DashboardPage() {
           </p>
         </Link>
 
-        {/* Draft tiles, agreed with the team on Discord 2026-08-03: chat and
-        friends aren't built yet, these just link to their (stub) pages so
-        whoever picks up that feature has a real route to wire up rather
-        than inventing the entry point later. */}
         <Link
           to="/chat"
           className="rounded-lg border border-surface-border bg-surface-raised p-4 transition hover:border-brand-500"
@@ -56,9 +55,15 @@ function DashboardPage() {
             <span className="text-sm text-text-secondary">Chat</span>
             <HiOutlineChatBubbleLeftRight className="size-5 text-brand-500" />
           </div>
-          <p className="mt-2 text-xs text-text-secondary">Coming soon</p>
+          <p className="mt-2 text-xs text-text-secondary">
+            {hasUnreadChat ? "New messages" : "No new messages"}
+          </p>
         </Link>
 
+        {/* Draft tile, agreed with the team on Discord 2026-08-03: friends
+        isn't built yet, this just links to its (stub) page so whoever picks
+        up that feature has a real route to wire up rather than inventing
+        the entry point later. */}
         <Link
           to="/friends"
           className="rounded-lg border border-surface-border bg-surface-raised p-4 transition hover:border-brand-500"
