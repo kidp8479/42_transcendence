@@ -31,6 +31,7 @@ services:
       MODSEC_AUDIT_LOG_FORMAT: JSON
       MODSEC_AUDIT_LOG_PARTS: FH
       RESOLVER_CONFIG: valid=15s ipv6=off
+      FRONTEND_PORT: 5173
     volumes:
       - ./nginx/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
       - ./nginx/includes/application-locations.conf.template:/etc/nginx/templates/includes/application-locations.conf.template:ro

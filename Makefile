@@ -29,12 +29,11 @@ DEPLOY_DEV_PROJECT ?= transcendence-dev
 DEPLOY_DEV_COMPOSE = $(COMPOSE) --project-name $(DEPLOY_DEV_PROJECT) \
 	--env-file $(DEPLOY_DEV_ENV_FILE) -f docker-compose.yml -f $(DEPLOY_DEV_COMPOSE_FILE)
 
-# These names reserve the production interface. They deliberately do not
-# point to docker-compose.yml because it is a source-mounted, Vault-dev stack
-# and is not safe to deploy as production.
 DEPLOY_PROD_ENV_FILE ?= $(DEPLOY_SECRETS_DIR)/production/secrets/runtime.env
 DEPLOY_PROD_COMPOSE_FILE ?= ops/compose/production.yml
 DEPLOY_PROD_PROJECT ?= transcendence-prod
+DEPLOY_PROD_COMPOSE = $(COMPOSE) --project-name $(DEPLOY_PROD_PROJECT) \
+	--env-file $(DEPLOY_PROD_ENV_FILE) -f docker-compose.yml -f $(DEPLOY_PROD_COMPOSE_FILE)
 
 # ---------------------------------------------------------------------------- #
 # default                                                                      #
@@ -83,11 +82,12 @@ deploy-dev:
 	$(DEPLOY_DEV_COMPOSE) config --quiet
 	$(DEPLOY_DEV_COMPOSE) up --build -d
 
-## refuse production deployment until its production Compose/Vault stack exists
+## build and start the production deployment (requires runtime secrets)
 deploy-prod:
-	@echo "Production deployment is blocked: $(DEPLOY_PROD_COMPOSE_FILE) is not implemented." >&2
-	@echo "The current docker-compose.yml is local-development-only and must not be used for production." >&2
-	@exit 1
+	@test -f "$(DEPLOY_PROD_ENV_FILE)" || (echo "Missing production runtime env: $(DEPLOY_PROD_ENV_FILE)" >&2; exit 1)
+	@test -f "$(DEPLOY_PROD_COMPOSE_FILE)" || (echo "Missing production Compose override: $(DEPLOY_PROD_COMPOSE_FILE)" >&2; exit 1)
+	$(DEPLOY_PROD_COMPOSE) config --quiet
+	$(DEPLOY_PROD_COMPOSE) up --build -d
 
 ## reinstall npm dependencies in running containers without rebuilding images
 ## use after pulling changes that add or remove npm dependencies (faster than up-build)
@@ -245,11 +245,11 @@ seed-dev:
 	@test -f "$(DEPLOY_DEV_COMPOSE_FILE)" || (echo "Missing development Compose override: $(DEPLOY_DEV_COMPOSE_FILE)" >&2; exit 1)
 	$(DEPLOY_DEV_COMPOSE) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
 
-## refuse production seeding until its production Compose/Vault stack exists
+## inject demo data into the production deployment
 seed-prod:
-	@echo "Production seeding is blocked: $(DEPLOY_PROD_COMPOSE_FILE) is not implemented." >&2
-	@echo "The current docker-compose.yml is local-development-only and must not be used for production." >&2
-	@exit 1
+	@test -f "$(DEPLOY_PROD_ENV_FILE)" || (echo "Missing production runtime env: $(DEPLOY_PROD_ENV_FILE)" >&2; exit 1)
+	@test -f "$(DEPLOY_PROD_COMPOSE_FILE)" || (echo "Missing production Compose override: $(DEPLOY_PROD_COMPOSE_FILE)" >&2; exit 1)
+	$(DEPLOY_PROD_COMPOSE) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
 
 ## stop the database and remove its Compose-managed data volume
 # same portable mechanism as ffclean: match containers/volumes by label or
