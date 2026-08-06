@@ -39,6 +39,7 @@ model User {
   authEventsAsTarget AuthEvent[]         @relation("AuthEventTarget")
   chatMessages     ChatMessage[]
   chatReadStates   ChatReadState[]
+  userRelationship  UserRelationship[]
 }
 
 enum AuthProvider {
@@ -582,4 +583,24 @@ model ChatReadState {
   project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([userId, projectId])
+}
+
+enum RelationshipStatus {
+  NONE
+  PENDING_APPROVAL
+  ACCEPTED
+  BLOCKED
+}
+
+model UserRelationship {
+  id                String  @id @default(uuid())
+  RequesterId       String
+  AddresseeId       String
+  Status            RelationshipStatus   @default(NONE)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt()
+
+  user              User    @relation(fields: [RequesterId], references: [id], onDelete: Cascade)
+
+  @@unique([RequesterId, AddresseeId])
 }
