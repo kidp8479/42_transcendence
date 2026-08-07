@@ -13,7 +13,10 @@ import { TextInput } from "flowbite-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useSearch } from "@tanstack/react-router";
 import { HiOutlineMagnifyingGlass } from "react-icons/hi2";
-import { SearchSuggestionsPanel } from "@/components/search/SearchSuggestionsPanel";
+import {
+  SearchSuggestionsPanel,
+  SUGGESTIONS_PANEL_ID,
+} from "@/components/search/SearchSuggestionsPanel";
 import {
   searchWorkspace,
   SEARCH_QUERY_MIN_LENGTH,
@@ -146,10 +149,21 @@ export function SearchBar() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setIsPanelOpen(false);
+
     if (!term) {
+      // An emptied field submitted from /search clears the page, instead of
+      // leaving results on screen for a term the bar no longer shows. Anywhere
+      // else an empty submit does nothing at all - landing on a blank results
+      // page because Enter was pressed in an empty header field would be a
+      // navigation nobody asked for. `q` is only a string on /search, which is
+      // what tells the two apart.
+      if (typeof q === "string" && q !== "") {
+        await navigate({ to: "/search", search: { q: "" } });
+      }
       return;
     }
-    setIsPanelOpen(false);
+
     await navigate({ to: "/search", search: { q: term } });
   }
 
@@ -171,6 +185,17 @@ export function SearchBar() {
       </label>
       <TextInput
         id="global-search"
+        // Deliberately NOT the full ARIA combobox: the panel holds real <a>
+        // results that Tab already walks in DOM order, and role="listbox" with
+        // role="option" children would strip them of exactly that, in exchange
+        // for arrow-key navigation this would then have to implement by hand.
+        //
+        // aria-controls only, and no aria-expanded: this input maps to the
+        // searchbox role, which supports the global properties plus a short
+        // list of its own - and aria-expanded is in neither, so an authoring
+        // tool flags it rather than reading it. What tells a screen reader the
+        // panel appeared is its aria-live region, not an attribute here.
+        aria-controls={SUGGESTIONS_PANEL_ID}
         icon={HiOutlineMagnifyingGlass}
         onChange={(event) => {
           setQuery(event.target.value);

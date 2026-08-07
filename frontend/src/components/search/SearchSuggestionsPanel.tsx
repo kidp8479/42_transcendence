@@ -27,6 +27,11 @@ interface SearchSuggestionsPanelProps {
 // under a header without turning the preview into a page of its own.
 const SUGGESTIONS_PER_TYPE = 3;
 
+// Exported so SearchBar's input can point aria-controls at this panel. One
+// constant rather than the same string typed in two files - a mismatch there
+// is silent, and only a screen reader would ever notice it.
+export const SUGGESTIONS_PANEL_ID = "global-search-suggestions";
+
 export function SearchSuggestionsPanel({
   query,
   results,
@@ -46,17 +51,33 @@ export function SearchSuggestionsPanel({
     // `border-solid` to beat their own dark:border-none default - this is a
     // hand-rolled div with no theme fighting it. No shadow though: the app
     // zeroes every --shadow-* variable, depth comes from the surface steps.
-    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-lg border border-surface-border bg-surface-overlay p-2">
+    <div
+      id={SUGGESTIONS_PANEL_ID}
+      // A landmark with a name, so the panel announces what it is when focus
+      // moves into it - the input points aria-controls here.
+      role="region"
+      aria-label="Search suggestions"
+      className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-lg border border-surface-border bg-surface-overlay p-2"
+    >
       {/* Stale results stay visible while the next request is in flight -
           swapping them for "Searching..." on every keystroke would make the
-          panel flash. The text only shows when there is nothing to show yet. */}
-      {loading && results === null ? (
-        <p className="px-2 py-3 text-sm text-text-secondary">Searching...</p>
-      ) : results === null || total === 0 ? (
-        <p className="px-2 py-3 text-sm text-text-secondary">
-          No results for &quot;{query}&quot;.
-        </p>
-      ) : (
+          panel flash. The text only shows when there is nothing to show yet.
+
+          aria-live on the wrapper, not on the messages: a live region has to be
+          in the DOM BEFORE the text it announces appears, so announcing from a
+          node that mounts with its own message announces nothing. polite, so it
+          waits for a pause in typing rather than interrupting it. */}
+      <div aria-live="polite">
+        {loading && results === null ? (
+          <p className="px-2 py-3 text-sm text-text-secondary">Searching...</p>
+        ) : results === null || total === 0 ? (
+          <p className="px-2 py-3 text-sm text-text-secondary">
+            No results for &quot;{query}&quot;.
+          </p>
+        ) : null}
+      </div>
+
+      {results !== null && total > 0 && (
         <div className="flex flex-col gap-3">
           <SuggestionGroup title="Projects" total={results.projects.total}>
             {results.projects.items
