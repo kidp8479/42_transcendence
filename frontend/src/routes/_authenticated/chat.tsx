@@ -100,6 +100,21 @@ function ChatPage() {
     (message) => {
       const author = message.author?.username ?? "Deleted user";
       setLiveAnnouncement(`${author}: ${message.content}`);
+      // Same read-watermark logic as the initial-load effect below - a
+      // message arriving live while this conversation is the one on screen
+      // is just as "read" as one fetched on open, but nothing else re-fires
+      // markChatRead for it (this callback only runs for genuinely new,
+      // in-scope messages, never for our own echo or a different
+      // conversation) - without this, the server-side watermark goes stale
+      // the moment a live message lands, and reappears as unread on reload
+      // or another device even though the user was looking right at it.
+      markChatRead(message.projectId, {
+        id: message.id,
+        createdAt: message.createdAt,
+      }).catch(() => {
+        // best-effort - a background refetch of /chat/unread will
+        // eventually reconcile if this fails
+      });
     }
   );
 
