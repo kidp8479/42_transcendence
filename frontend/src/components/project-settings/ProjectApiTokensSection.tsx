@@ -71,7 +71,7 @@ export function ProjectApiTokensSection({
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, showToast]);
+  }, [projectId]);
 
   useEffect(() => {
     void load();

@@ -35,12 +35,20 @@ import {
   HiOutlineCalendar,
   HiOutlineCog6Tooth,
   HiOutlineFolder,
+  HiOutlinePencilSquare,
   HiOutlineUsers,
   HiOutlineXMark,
 } from "react-icons/hi2";
 import { LiaTrashAltSolid } from "react-icons/lia";
 import { darkDropdownTheme } from "@/lib/flowbite";
-import type { ProjectStatus } from "@/lib/projectsApi";
+import { updateProjectDetails, type ProjectStatus } from "@/lib/projectsApi";
+import { ApiError } from "@/lib/apiClient";
+import { useToast } from "@/hooks/useToast";
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
+import {
+  ProjectDetailsForm,
+  type ProjectFormValues,
+} from "./ProjectDetailsForm";
 
 // Scoped to this card's "..." menu only - rounds the item hover highlight
 // (rectangular by default in darkDropdownTheme, shared with NotificationBell
@@ -104,7 +112,13 @@ const STATUS_META: Record<
 export interface ProjectCardData {
   id: string;
   name: string;
-  description: string;
+  // Nullable - the raw value, not a display fallback. Rendered as-is below
+  // (null shows nothing, keeping every card the same height via the
+  // description paragraph's own reserved min-h, not a placeholder string) -
+  // this same value also seeds the edit-details form, where a baked-in
+  // placeholder would get saved as the real description if submitted
+  // untouched.
+  description: string | null;
   status: ProjectStatus;
   // 0-100, computed backend-side from EvaluationChecklistItem.isChecked.
   progress: number;
@@ -114,6 +128,9 @@ export interface ProjectCardData {
   // (Project.deadline is nullable in schema.prisma and unseeded today).
   deadline: string | null;
   isArchived: boolean;
+  // ISO timestamp, Prisma-managed (@updatedAt) - the version an edit was
+  // based on, sent back on save so the backend can detect a concurrent edit.
+  updatedAt: string;
 }
 
 interface ProjectCardProps {
@@ -124,6 +141,12 @@ interface ProjectCardProps {
   onLeaveProject?: () => Promise<boolean>;
 }
 
+type ProjectCardMode =
+  | "view"
+  | "confirming-delete"
+  | "confirming-leave"
+  | "editing";
+
 export function ProjectCard({
   project,
   role,
@@ -131,22 +154,38 @@ export function ProjectCard({
   onDeleteProject,
   onLeaveProject,
 }: ProjectCardProps) {
-  const [confirmAction, setConfirmAction] = useState<"delete" | "leave" | null>(
-    null
-  );
+  // Single state for which view this card shows, instead of one boolean per
+  // view - makes "confirming AND editing at once" structurally impossible
+  // to represent, rather than something to remember not to do.
+  const [mode, setMode] = useState<ProjectCardMode>("view");
   const [confirmText, setConfirmText] = useState("");
   const [isConfirmSubmitting, setIsConfirmSubmitting] = useState(false);
+  const [isSubmittingDetails, setIsSubmittingDetails] = useState(false);
+  const [detailsConflict, setDetailsConflict] = useState(false);
+  // Captured once, the instant editing mode opens - NOT read live from
+  // `project.updatedAt` at submit time. The `project` prop can refresh
+  // while this form is still open (another member's save invalidates
+  // everyone's router, including ours), and reading it live at submit time
+  // would silently pick up that fresher value - passing the concurrency
+  // check with data the visible form was never actually based on, defeating
+  // the whole point of the check.
+  const [editingBaseUpdatedAt, setEditingBaseUpdatedAt] = useState<
+    string | null
+  >(null);
   const confirmInputId = useId();
   const isOwner = role === "OWNER";
+  const canManageProject = role === "OWNER" || role === "ADMIN";
+  const { showToast } = useToast();
+  const safeInvalidateRouter = useSafeRouterInvalidate();
 
   function handleCancelConfirm() {
-    setConfirmAction(null);
+    setMode("view");
     setConfirmText("");
   }
 
   async function handleConfirmAction() {
     const action =
-      confirmAction === "delete" ? onDeleteProject : onLeaveProject;
+      mode === "confirming-delete" ? onDeleteProject : onLeaveProject;
     if (!action) {
       return;
     }
@@ -157,6 +196,52 @@ export function ProjectCard({
       }
     } finally {
       setIsConfirmSubmitting(false);
+    }
+  }
+
+  function handleCancelEditing() {
+    setMode("view");
+    setDetailsConflict(false);
+    setEditingBaseUpdatedAt(null);
+  }
+
+  // Calls the API directly, unlike onDeleteProject/onLeaveProject (which the
+  // parent route owns) - a 409 here needs its own inline banner, not the
+  // parent's generic error toast, so the distinction has to be made right
+  // where the request happens. Matches how ProjectStatusSection/
+  // MembersSection already own their own mutation + toast + invalidate
+  // instead of going through a callback prop.
+  async function handleSubmitDetails(values: ProjectFormValues) {
+    setIsSubmittingDetails(true);
+    setDetailsConflict(false);
+    try {
+      if (editingBaseUpdatedAt === null) {
+        throw new Error("Missing base updatedAt for edit");
+      }
+      await updateProjectDetails(project.id, {
+        name: values.name,
+        // ProjectFormValues.description is undefined when the field was
+        // left blank - explicit null here (not omitted) is what tells the
+        // backend to clear an existing description instead of leaving it.
+        description: values.description ?? null,
+        updatedAt: editingBaseUpdatedAt,
+      });
+      setMode("view");
+      await safeInvalidateRouter();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setDetailsConflict(true);
+      } else {
+        showToast({
+          type: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to update project details",
+        });
+      }
+    } finally {
+      setIsSubmittingDetails(false);
     }
   }
 
@@ -186,8 +271,8 @@ export function ProjectCard({
         ? `J-${daysUntilDeadline}`
         : `J+${Math.abs(daysUntilDeadline)}`;
 
-  if (confirmAction) {
-    const isDelete = confirmAction === "delete";
+  if (mode === "confirming-delete" || mode === "confirming-leave") {
+    const isDelete = mode === "confirming-delete";
     const canConfirm = confirmText.trim() === project.name;
 
     return (
@@ -261,6 +346,29 @@ export function ProjectCard({
           </Button>
         </div>
       </div>
+    );
+  }
+
+  if (mode === "editing") {
+    return (
+      <ProjectDetailsForm
+        title="Edit project details"
+        cancelLabel="Cancel edit project details"
+        initialName={project.name}
+        initialDescription={project.description ?? undefined}
+        submitLabel="Save"
+        submittingLabel="Saving..."
+        isSubmitting={isSubmittingDetails}
+        onSubmit={(values) => void handleSubmitDetails(values)}
+        onCancel={handleCancelEditing}
+        banner={
+          detailsConflict ? (
+            <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
+              This project was updated by someone else. Cancel and try again.
+            </div>
+          ) : undefined
+        }
+      />
     );
   }
 
@@ -341,13 +449,25 @@ export function ProjectCard({
               >
                 Project settings
               </DropdownItem>
+              {canManageProject && (
+                <DropdownItem
+                  icon={HiOutlinePencilSquare}
+                  theme={roundedDropdownItemTheme}
+                  onClick={() => {
+                    setEditingBaseUpdatedAt(project.updatedAt);
+                    setMode("editing");
+                  }}
+                >
+                  Edit project details
+                </DropdownItem>
+              )}
               <DropdownDivider />
               {isOwner ? (
                 <DropdownItem
                   icon={LiaTrashAltSolid}
                   theme={roundedDropdownItemTheme}
                   className="text-red-700! dark:text-red-700!"
-                  onClick={() => setConfirmAction("delete")}
+                  onClick={() => setMode("confirming-delete")}
                 >
                   Delete project
                 </DropdownItem>
@@ -356,7 +476,7 @@ export function ProjectCard({
                   icon={HiOutlineArrowRightOnRectangle}
                   theme={roundedDropdownItemTheme}
                   className="text-red-700! dark:text-red-700!"
-                  onClick={() => setConfirmAction("leave")}
+                  onClick={() => setMode("confirming-leave")}
                 >
                   Leave project
                 </DropdownItem>

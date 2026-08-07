@@ -20,6 +20,10 @@ export interface Project {
   // count of ProjectMember rows for this project.
   memberCount: number;
   isArchived: boolean;
+  // ISO timestamp, Prisma-managed (@updatedAt) - the version an edit was
+  // based on. Sent back on a details save so the backend can detect a
+  // concurrent edit; see updateProjectDetails below.
+  updatedAt: string;
 }
 
 // GET /projects => every project the authenticated user is a member of
@@ -45,17 +49,39 @@ export function deleteProject(id: string) {
 }
 
 // PATCH /projects/:id => partial update; only provided fields are changed; caller must be ADMIN
+// name/description are NOT accepted here - use updateProjectDetails() below,
+// which enforces the optimistic-concurrency check. The backend now rejects
+// them on this route (whitelist + forbidNonWhitelisted), so this type isn't
+// just documentation - sending them would 400.
 export function updateProject(
   id: string,
   input: {
-    name?: string;
-    description?: string;
     status?: ProjectStatus;
     isArchived?: boolean;
     deadline?: string | null;
   }
 ) {
   return apiClient<unknown>(`/projects/${id}`, {
+    method: "PATCH",
+    body: input,
+  }).then(parseProject);
+}
+
+// PATCH /projects/:id/details => name/description only, OWNER/ADMIN-only.
+// Separate from updateProject() above (see projects.controller.ts for why)
+// - includes updatedAt, the version this edit was based on, so a save
+// based on stale data is rejected (409, ApiError.status) instead of
+// silently overwriting a concurrent edit from someone else.
+//
+// description is `string | null`, not optional: this call site always has
+// an opinion (the edit form's current value or null for "cleared"), and
+// sending null - not omitting the key - is what tells the backend to
+// actually clear an existing description rather than leave it untouched.
+export function updateProjectDetails(
+  id: string,
+  input: { name: string; description: string | null; updatedAt: string }
+) {
+  return apiClient<unknown>(`/projects/${id}/details`, {
     method: "PATCH",
     body: input,
   }).then(parseProject);
@@ -79,7 +105,8 @@ function parseProject(value: unknown): Project {
     !isProjectMemberRole(value.role) ||
     typeof value.progress !== "number" ||
     typeof value.memberCount !== "number" ||
-    typeof value.isArchived !== "boolean"
+    typeof value.isArchived !== "boolean" ||
+    typeof value.updatedAt !== "string"
   ) {
     throw new Error("Projects API returned an invalid project");
   }
@@ -93,6 +120,7 @@ function parseProject(value: unknown): Project {
     progress: value.progress,
     memberCount: value.memberCount,
     isArchived: value.isArchived,
+    updatedAt: value.updatedAt,
   };
 }
 

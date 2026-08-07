@@ -114,15 +114,41 @@ export class ProjectMembersService {
         },
       });
 
-      const project = await this.prisma.project.findUniqueOrThrow({
-        where: { id: projectId },
-        select: { name: true },
-      });
-      await this.notificationsService.create(
-        user.id,
-        `You were added to "${project.name}"`,
-        `/${projectId}/project-settings`
-      );
+      // Tells the rest of the team, plus the new member themselves - not the
+      // requester, who already knows what they just did. Same "notify
+      // everyone else, not the actor" pattern as removeMember/updateRole
+      // below. The member row above already exists by this point, so
+      // otherMembers has to explicitly exclude the new member too (same
+      // notIn shape as updateRole) - a plain `not: requestingUserId` would
+      // catch their own new row and double-notify them alongside the
+      // dedicated "You were added" message right below.
+      const [project, otherMembers] = await Promise.all([
+        this.prisma.project.findUniqueOrThrow({
+          where: { id: projectId },
+          select: { name: true },
+        }),
+        this.prisma.projectMember.findMany({
+          where: {
+            projectId,
+            userId: { notIn: [user.id, requestingUserId] },
+          },
+          select: { userId: true },
+        }),
+      ]);
+      await Promise.all([
+        ...otherMembers.map((otherMember) =>
+          this.notificationsService.create(
+            otherMember.userId,
+            `${user.username} was added to "${project.name}"`,
+            `/${projectId}/project-settings`
+          )
+        ),
+        this.notificationsService.create(
+          user.id,
+          `You were added to "${project.name}"`,
+          `/${projectId}/project-settings`
+        ),
+      ]);
       this.realtimeService.joinProjectRoom(user.id, projectId);
 
       this.realtimeService.emitToProject(

@@ -136,10 +136,7 @@ function ProjectsPage() {
           {visibleProjects.map((project) => (
             <ProjectCard
               key={project.id}
-              project={{
-                ...project,
-                description: project.description ?? "No description yet.",
-              }}
+              project={project}
               role={project.role}
               onOpenSettings={() =>
                 navigate({
