@@ -5,10 +5,21 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Button, Checkbox, Label, Modal, TextInput } from "flowbite-react";
+import {
+  Button,
+  Checkbox,
+  Label,
+  Modal,
+  ModalBody,
+  ModalHeader,
+  TextInput,
+} from "flowbite-react";
+import { HiOutlineExclamationTriangle } from "react-icons/hi2";
 import { useToast } from "@/hooks/useToast";
 import {
   darkSurfaceFieldClassName,
+  darkSurfaceModalCancelButtonClass,
+  darkSurfaceModalTheme,
   darkSurfaceTextInputTheme,
 } from "@/lib/flowbite";
 import {
@@ -251,7 +262,7 @@ export function ProjectApiTokensSection({
                 ))}
               </select>
             </div>
-            <div className="flex items-center gap-4 md:col-span-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 md:col-span-2">
               <Label className="flex items-center gap-2 text-text-secondary">
                 <Checkbox
                   checked
@@ -270,7 +281,7 @@ export function ProjectApiTokensSection({
                 />
                 Allow write access
               </Label>
-              <span className="text-xs text-text-secondary">
+              <span className="text-xs text-text-secondary sm:min-w-0 sm:flex-1">
                 Write access can create, update, reorder, assign, and delete
                 project tasks through the public API.
               </span>
@@ -278,7 +289,7 @@ export function ProjectApiTokensSection({
                 type="submit"
                 color="none"
                 disabled={isCreating || !label.trim()}
-                className={primaryButtonClassName}
+                className={`${primaryButtonClassName} self-start sm:self-auto`}
               >
                 {isCreating ? "Creating..." : "Create token"}
               </Button>
@@ -504,92 +515,102 @@ export function ProjectApiTokensSection({
         </div>
       </Modal>
 
+      {/* Centered, icon-led warning layout matching every other destructive
+      confirmation in this file's own settings page (RemoveMemberModal.tsx,
+      LeaveProjectModal.tsx) - same darkSurfaceModalTheme + solid color="red"
+      button, instead of this component's own previous left-aligned/ghost-red
+      outline style. */}
       <Modal
         show={pendingRevoke !== null}
+        dismissible
         size="md"
+        theme={darkSurfaceModalTheme}
         onClose={() => closeActionModal(setPendingRevoke, isRevoking)}
         popup
-        className={darkModalClassName}
-        aria-labelledby="project-api-token-revoke-title"
-        aria-describedby="project-api-token-revoke-description"
       >
-        <div className="space-y-4 p-6">
-          <h3
-            id="project-api-token-revoke-title"
-            className="text-sm font-semibold text-text-primary"
-          >
-            Revoke token?
-          </h3>
-          <p
-            id="project-api-token-revoke-description"
-            className="text-xs text-text-secondary"
-          >
-            <strong>{pendingRevoke?.label}</strong> stops working immediately.
-            This cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button
-              color="none"
-              disabled={isRevoking}
-              onClick={() => closeActionModal(setPendingRevoke, isRevoking)}
-              className={secondaryButtonClassName}
+        {/* sr-only child: Flowbite auto-wires the dialog's aria-labelledby
+        to this header's own id, so an empty ModalHeader leaves the dialog
+        with no accessible name even though a visible <h3> sits right below
+        in ModalBody - screen readers never hear it. */}
+        <ModalHeader>
+          <span className="sr-only">Revoke {pendingRevoke?.label}?</span>
+        </ModalHeader>
+        <ModalBody>
+          <div className="flex flex-col items-center gap-4 pb-2 text-center">
+            <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
+            <h3
+              aria-hidden="true"
+              className="text-lg font-semibold text-text-primary"
             >
-              Cancel
-            </Button>
-            <Button
-              color="none"
-              disabled={isRevoking}
-              onClick={() => void handleRevoke()}
-              className={destructiveButtonClassName}
-            >
-              {isRevoking ? "Revoking..." : "Revoke"}
-            </Button>
+              Revoke{" "}
+              <span className="font-semibold">{pendingRevoke?.label}</span>?
+            </h3>
+            <p className="text-sm text-text-secondary">
+              It stops working immediately. This cannot be undone.
+            </p>
+            <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
+              <Button
+                className={darkSurfaceModalCancelButtonClass}
+                disabled={isRevoking}
+                onClick={() => closeActionModal(setPendingRevoke, isRevoking)}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                disabled={isRevoking}
+                onClick={() => void handleRevoke()}
+              >
+                {isRevoking ? "Revoking..." : "Revoke"}
+              </Button>
+            </div>
           </div>
-        </div>
+        </ModalBody>
       </Modal>
 
       <Modal
         show={pendingDelete !== null}
+        dismissible
         size="md"
+        theme={darkSurfaceModalTheme}
         onClose={() => closeActionModal(setPendingDelete, isDeleting)}
         popup
-        className={darkModalClassName}
-        aria-labelledby="project-api-token-delete-title"
-        aria-describedby="project-api-token-delete-description"
       >
-        <div className="space-y-4 p-6">
-          <h3
-            id="project-api-token-delete-title"
-            className="text-sm font-semibold text-text-primary"
-          >
-            Delete token record?
-          </h3>
-          <p
-            id="project-api-token-delete-description"
-            className="text-xs text-text-secondary"
-          >
-            This removes <strong>{pendingDelete?.label}</strong> from the active
-            token history. Its audit record remains.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button
-              color="none"
-              disabled={isDeleting}
-              onClick={() => closeActionModal(setPendingDelete, isDeleting)}
-              className={secondaryButtonClassName}
+        <ModalHeader>
+          <span className="sr-only">Delete {pendingDelete?.label}?</span>
+        </ModalHeader>
+        <ModalBody>
+          <div className="flex flex-col items-center gap-4 pb-2 text-center">
+            <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
+            <h3
+              aria-hidden="true"
+              className="text-lg font-semibold text-text-primary"
             >
-              Cancel
-            </Button>
-            <Button
-              color="none"
-              disabled={isDeleting}
-              onClick={() => void handleDelete()}
-              className={destructiveButtonClassName}
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
+              Delete{" "}
+              <span className="font-semibold">{pendingDelete?.label}</span>?
+            </h3>
+            <p className="text-sm text-text-secondary">
+              This removes it from the active token history. Its audit record
+              remains.
+            </p>
+            <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
+              <Button
+                className={darkSurfaceModalCancelButtonClass}
+                disabled={isDeleting}
+                onClick={() => closeActionModal(setPendingDelete, isDeleting)}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                disabled={isDeleting}
+                onClick={() => void handleDelete()}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
           </div>
-        </div>
+        </ModalBody>
       </Modal>
     </SettingsSection>
   );

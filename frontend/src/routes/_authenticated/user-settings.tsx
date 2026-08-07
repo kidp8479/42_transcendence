@@ -12,9 +12,13 @@ import {
   TextInput,
   // ToggleSwitch,
 } from "flowbite-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { HiOutlineExclamationTriangle } from "react-icons/hi2";
-import { darkSurfaceTextInputTheme } from "@/lib/flowbite";
+import {
+  darkSurfaceModalCancelButtonClass,
+  darkSurfaceModalTheme,
+  darkSurfaceTextInputTheme,
+} from "@/lib/flowbite";
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
@@ -38,25 +42,6 @@ const MAX_AVATAR_BYTES = 1 * 1024 * 1024;
 // for a destructive, unrecoverable action.
 const DELETE_CONFIRMATION_PHRASE =
   "I acknowledge that my account will be lost forever and I want to delete it anyway";
-
-// theme override shared by the delete-account modal - matches the
-// surface/border tokens ModalLayer.tsx uses for the auth modal, instead of
-// Flowbite's default light popup card.
-const darkSurfaceModalTheme = {
-  content: {
-    inner:
-      "relative flex max-h-[90dvh] flex-col rounded-2xl border border-surface-border bg-surface-raised shadow-2xl",
-  },
-  header: {
-    base: "relative flex items-center justify-center rounded-t-2xl p-4",
-    popup: "border-b-0 p-4",
-    title: "text-sm font-semibold text-text-primary text-center",
-    close: {
-      base: "absolute right-4 top-1/2 -translate-y-1/2 inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-text-secondary hover:bg-surface-overlay hover:text-text-primary focus:outline-none",
-      icon: "h-5 w-5",
-    },
-  },
-};
 
 export const Route = createFileRoute("/_authenticated/user-settings")({
   loader: () => getMe(),
@@ -94,6 +79,15 @@ function UserSettingsPage() {
   const { showToast } = useToast();
   const [openModalUploadAvatar, setOpenModalUploadAvatar] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
+  // dragenter/dragleave fire on every element under the pointer, including
+  // the dropzone's own children (icon, text) - moving over one of those
+  // fires a dragleave on the parent label immediately followed by a
+  // dragenter back, which a plain boolean toggles off and back on for every
+  // such transition (visible as constant flicker). A counter only reports
+  // "not dragging" once it truly returns to 0 - i.e. the pointer left the
+  // whole label, not just one child inside it.
+  const dragCounterRef = useRef(0);
   const [deleteAccountStep, setDeleteAccountStep] =
     useState<DeleteAccountStep | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
@@ -148,7 +142,7 @@ function UserSettingsPage() {
           user: { ...authState.session.user, avatarUrl: updated.avatarUrl },
         });
       }
-      safeInvalidateRouter();
+      await safeInvalidateRouter();
     } catch (error) {
       // a 401 means the session is already dead server-side - same handling
       // as UserMenu.handleLogout: drop the local session and send the user
@@ -241,10 +235,20 @@ function UserSettingsPage() {
           user: { ...authState.session.user, username: updated.username },
         });
       }
-      safeInvalidateRouter();
+      await safeInvalidateRouter();
       showToast({ type: "success", message: "Changes saved." });
-    } catch {
-      showToast({ type: "error", message: "Saving failed. Please retry." });
+    } catch (error) {
+      // a taken username hits the DB's unique constraint -> 409, with a raw
+      // Prisma message ("Unique constraint failed on the fields: (`username`)")
+      // that isn't something to show a user
+      if (error instanceof ApiError && error.status === 409) {
+        showToast({
+          type: "error",
+          message: "This username is already taken.",
+        });
+      } else {
+        showToast({ type: "error", message: "Saving failed. Please retry." });
+      }
     } finally {
       setSavingChanges(false);
     }
@@ -264,7 +268,42 @@ function UserSettingsPage() {
         <div className="flex w-full items-center justify-center px-6 pb-6">
           <Label
             htmlFor="dropzone-file"
-            className="flex h-64 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 focus-within:ring-2 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600"
+            // the wrapping <label> never receives an HTML5 drop natively -
+            // only the <input> itself does - so drag-and-drop has to be
+            // wired here explicitly rather than relying on the input alone
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              dragCounterRef.current += 1;
+              setIsDraggingAvatar(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              dragCounterRef.current -= 1;
+              if (dragCounterRef.current <= 0) {
+                dragCounterRef.current = 0;
+                setIsDraggingAvatar(false);
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              dragCounterRef.current = 0;
+              setIsDraggingAvatar(false);
+              setOpenModalUploadAvatar(false);
+              handleUpload(e.dataTransfer.files[0] ?? null);
+            }}
+            className={`flex h-64 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed focus-within:ring-2 focus-within:ring-brand-500 ${
+              isDraggingAvatar
+                ? // hover:border-* repeated here even though the pointer is
+                  // already hovering while dragging: without it, the plain
+                  // (non-dragging) branch's own dark:hover:border-gray-500
+                  // rule sits later in Tailwind's generated stylesheet and
+                  // wins the cascade at equal specificity, visually
+                  // overriding this "actively accepting" brand color with
+                  // the muted "closed" one mid-drag.
+                  "border-brand-500 bg-gray-100 hover:border-brand-500 dark:border-brand-500 dark:bg-gray-600 dark:hover:border-brand-500"
+                : "border-gray-300 bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600"
+            }`}
           >
             <div className="flex flex-col items-center justify-center pb-6 pt-5">
               <svg
@@ -313,14 +352,28 @@ function UserSettingsPage() {
         onClose={closeDeleteAccountModal}
         popup
       >
-        <ModalHeader />
+        {/* sr-only child, tracking whichever step is active: Flowbite
+        auto-wires the dialog's aria-labelledby to this header's own id, so
+        an empty ModalHeader leaves the dialog with no accessible name even
+        though a visible <h3> sits right below in ModalBody - screen readers
+        never hear it. */}
+        <ModalHeader>
+          <span className="sr-only">
+            {deleteAccountStep === "confirm"
+              ? "Deleting an account is permanent, do you wish to continue?"
+              : "Last chance"}
+          </span>
+        </ModalHeader>
         <ModalBody>
           <div className="flex flex-col items-center gap-4 pb-2 text-center">
             <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
 
             {deleteAccountStep === "confirm" && (
               <>
-                <h3 className="text-lg font-semibold text-text-primary">
+                <h3
+                  aria-hidden="true"
+                  className="text-lg font-semibold text-text-primary"
+                >
                   Deleting an account is permanent, do you wish to continue?
                 </h3>
                 <p className="text-sm text-text-secondary">
@@ -329,7 +382,7 @@ function UserSettingsPage() {
                 </p>
                 <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
                   <Button
-                    className={rowUploadButtonClass}
+                    className={darkSurfaceModalCancelButtonClass}
                     onClick={(e) => {
                       e.currentTarget.blur();
                       closeDeleteAccountModal();
@@ -352,7 +405,10 @@ function UserSettingsPage() {
 
             {deleteAccountStep === "type-to-confirm" && (
               <>
-                <h3 className="text-lg font-semibold text-text-primary">
+                <h3
+                  aria-hidden="true"
+                  className="text-lg font-semibold text-text-primary"
+                >
                   Last chance
                 </h3>
                 <p
@@ -382,7 +438,7 @@ function UserSettingsPage() {
                 />
                 <div className="mt-2 flex w-full flex-col justify-center gap-3 sm:flex-row">
                   <Button
-                    className={rowUploadButtonClass}
+                    className={darkSurfaceModalCancelButtonClass}
                     disabled={deleting}
                     onClick={(e) => {
                       e.currentTarget.blur();

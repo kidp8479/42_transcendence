@@ -1,20 +1,28 @@
-// This file is a good reference for how every component in src/components/summary
-// is built - read it once and the pattern repeats everywhere else.
-//
-// - interface: a named contract describing the shape an object must have.
-//   DefenseReadinessProps below says "whoever renders <DefenseReadiness />
-//   must pass a `percent`, `checkpointsDone` and `checkpointsTotal`, all
-//   numbers, nothing more, nothing less".
-// - Props destructuring: `function DefenseReadiness({ percent, ... }: ...)`
-//   pulls each field straight out of the single props object React passes
-//   in, instead of writing `props.percent` everywhere below. Standard React
-//   style, used in every component here.
-// - Data flow: this component owns no data of its own. Everything it renders
-//   is handed down as props by the parent (routes/.../summary.tsx), which is
-//   the only place holding the real data (mock today, an API response
-//   later). That's why nothing here does any fetching - it just displays
-//   what it's given.
+// Reference for the pattern every component in this folder follows: props
+// interface, destructured in the signature, no fetching - the parent
+// (routes/.../summary.tsx) owns the data and passes it down.
+import {
+  EVALUATION_CHECKLIST_READINESS_THRESHOLD,
+  getEvaluationChecklistReadinessTier,
+} from "@/lib/evaluationChecklistProgress";
+
+// Same three colors as the checklist page's CATEGORY_STYLE (Mandatory/Bonus/
+// Supplemental) - not imported from there since that page's CATEGORY_STYLE
+// carries a lot more (icons, hover states) this widget doesn't need.
+const READINESS_TIER_BAR_COLOR = {
+  MANDATORY: "bg-brand-500",
+  BONUS: "bg-status-in-progress",
+  SUPPLEMENTAL: "bg-status-review",
+} as const;
+const READINESS_TIER_TEXT_COLOR = {
+  MANDATORY: "text-brand-500",
+  BONUS: "text-status-in-progress",
+  SUPPLEMENTAL: "text-status-review",
+} as const;
+
 interface DefenseReadinessProps {
+  // Uncapped, up to EXTRA_READY (150), same as the checklist page's Overall
+  // progress bar. Bonus/Supplemental push it past 100.
   percent: number;
   checkpointsDone: number;
   checkpointsTotal: number;
@@ -25,6 +33,10 @@ export function DefenseReadiness({
   checkpointsDone,
   checkpointsTotal,
 }: DefenseReadinessProps) {
+  const tier = getEvaluationChecklistReadinessTier(percent);
+  const barColor = READINESS_TIER_BAR_COLOR[tier];
+  const textColor = READINESS_TIER_TEXT_COLOR[tier];
+
   return (
     <section
       aria-labelledby="defense-readiness-heading"
@@ -37,23 +49,65 @@ export function DefenseReadiness({
         >
           Defense Readiness
         </h2>
-        <span className="text-sm font-bold text-brand-500">{percent}%</span>
+        <span className={`text-sm font-bold ${textColor}`}>{percent}%</span>
       </div>
       <div
-        className="h-2 w-full rounded-full bg-surface-overlay"
+        className="relative h-2 w-full rounded-full bg-surface-overlay"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}
-        aria-valuemax={100}
+        aria-valuemax={EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY}
         aria-labelledby="defense-readiness-heading"
       >
         <div
-          className="h-2 rounded-full bg-brand-500"
-          style={{ width: `${percent}%` }}
+          className={`h-2 rounded-full transition-colors ${barColor}`}
+          style={{
+            width: `${Math.min((percent / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100, 100)}%`,
+          }}
         />
+        {/* Same 100/125% tick marks as the checklist page's own "Overall
+        progress" bar, so filling past the visual "end" here reads as the
+        same gated-progress pattern instead of a bug. */}
+        {[
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY,
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY,
+        ].map((threshold) => (
+          <div
+            key={threshold}
+            className="absolute top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-text-muted/60"
+            style={{
+              left: `${(threshold / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
+            }}
+          />
+        ))}
       </div>
-      <p className="mt-2 text-xs text-text-secondary">
-        {checkpointsDone}/{checkpointsTotal} checkpoints
+      <div className="relative mt-2 flex items-center justify-between text-xs text-text-muted">
+        {[
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.READY,
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.SUPER_READY,
+          EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY,
+        ].map((threshold) => (
+          <span
+            key={threshold}
+            // text-muted-on-surface, not text-muted/70: the 70% opacity on
+            // an already-dim color was 1.76:1 on this surface-raised
+            // background, needs 4.5:1 - same fix already applied to the
+            // checklist page's own copy of this same threshold-label pattern.
+            className="absolute -translate-x-1/2 text-text-muted-on-surface"
+            style={{
+              left: `${(threshold / EVALUATION_CHECKLIST_READINESS_THRESHOLD.EXTRA_READY) * 100}%`,
+            }}
+          >
+            {threshold}%
+          </span>
+        ))}
+      </div>
+      <p className="mt-5 text-xs text-text-secondary">
+        {/* "unlocked" instead of a bare total: checkpointsTotal grows as
+        Mandatory/Bonus/Supplemental unlock (see completeAt in
+        evaluationChecklistProgress.ts), so it isn't a fixed target - it's
+        specifically what's currently unlocked. */}
+        {checkpointsDone}/{checkpointsTotal} checkpoints unlocked
       </p>
     </section>
   );

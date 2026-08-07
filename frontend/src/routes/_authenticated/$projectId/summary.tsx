@@ -1,145 +1,179 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { TaskStatusOverview } from "@/components/summary/TaskStatusOverview";
-import { ProgressByCategory } from "@/components/summary/ProgressByCategory";
-import { UpcomingEvents } from "@/components/summary/UpcomingEvents";
+import {
+  ProgressByCategory,
+  type CategoryProgress,
+} from "@/components/summary/ProgressByCategory";
+import {
+  UpcomingEvents,
+  type UpcomingEvent,
+} from "@/components/summary/UpcomingEvents";
 import { DefenseReadiness } from "@/components/summary/DefenseReadiness";
-import { TeamWorkload } from "@/components/summary/TeamWorkload";
+import {
+  TeamWorkload,
+  type TeamMemberWorkload,
+} from "@/components/summary/TeamWorkload";
+import { assigneeColorIndex } from "@/components/common/AvatarStack";
+import { listCalendarEvents } from "@/lib/calendarEventsApi";
+import { fetchEvaluationChecklistItems } from "@/lib/evaluationChecklist";
+import { computeEvaluationChecklistProgress } from "@/lib/evaluationChecklistProgress";
+import { listTasks, type Task, type TaskStatus } from "@/lib/tasks";
+import { listTaskCategories } from "@/lib/taskCategories";
+import { getMembers } from "@/lib/projectMembersApi";
+
+// Summary tab shows at most this many upcoming events - the backend has no
+// date-range/limit filter yet (see calendar.tsx's own note on this), so the
+// trim happens here after fetching every event for the project.
+const UPCOMING_EVENTS_LIMIT = 6;
+
+function buildTasksByStatus(tasks: Task[]) {
+  const tasksByStatus: Record<TaskStatus, number> = {
+    TODO: 0,
+    IN_PROGRESS: 0,
+    REVIEW: 0,
+    COMPLETED: 0,
+  };
+  for (const task of tasks) {
+    tasksByStatus[task.status] += 1;
+  }
+  return tasksByStatus;
+}
+
+// One row per category that actually has tasks - ProgressByCategory expects
+// total > 0 for every row it's given (see its own comment: 0/0 should never
+// reach it), so a category nobody has used yet is dropped here rather than
+// rendered as an empty/NaN bar.
+function buildProgressByCategory(
+  tasks: Task[],
+  taskCategories: { id: string; name: string; color: number }[]
+): CategoryProgress[] {
+  return taskCategories
+    .map((category) => {
+      const categoryTasks = tasks.filter(
+        (task) => task.categoryId === category.id
+      );
+      return {
+        name: category.name,
+        total: categoryTasks.length,
+        completed: categoryTasks.filter((task) => task.status === "COMPLETED")
+          .length,
+        color: category.color,
+      };
+    })
+    .filter((category) => category.total > 0);
+}
+
+// One row per project member, most open tasks first. "Open" = assigned and
+// not COMPLETED yet. Members with zero open tasks still show (0 open) -
+// workload balance is the point of this widget, an underloaded member is as
+// relevant to show as an overloaded one.
+function buildTeamWorkload(
+  tasks: Task[],
+  taskCategories: { id: string; name: string }[],
+  members: { user: { username: string } }[]
+): TeamMemberWorkload[] {
+  const categoryNameById = new Map(
+    taskCategories.map((category) => [category.id, category.name])
+  );
+
+  const workloads = members.map((member) => {
+    const username = member.user.username;
+    const openTasks = tasks.filter(
+      (task) =>
+        task.status !== "COMPLETED" &&
+        task.assignees.some((assignee) => assignee.username === username)
+    );
+    // Same initials recipe as AvatarStack's kanban-card avatars, so a
+    // member's initials/color don't visually diverge between the two pages.
+    const categoryNames = [
+      ...new Set(
+        openTasks
+          .map((task) => categoryNameById.get(task.categoryId ?? ""))
+          .filter((name): name is string => name !== undefined)
+      ),
+    ];
+    return {
+      username,
+      initials: username.slice(0, 2).toUpperCase(),
+      color: assigneeColorIndex(username),
+      open_tasks: openTasks.length,
+      categories: categoryNames,
+    };
+  });
+
+  return workloads.sort((a, b) => b.open_tasks - a.open_tasks);
+}
+
+async function loadSummaryPageData(projectId: string) {
+  const [events, checklistItems, tasks, taskCategories, members] =
+    await Promise.all([
+      listCalendarEvents(projectId),
+      fetchEvaluationChecklistItems(projectId),
+      listTasks(projectId),
+      listTaskCategories(projectId),
+      getMembers(projectId),
+    ]);
+
+  const now = Date.now();
+  const upcomingEvents: UpcomingEvent[] = events
+    .filter((event) => new Date(event.startAt).getTime() >= now)
+    .sort(
+      (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+    )
+    .slice(0, UPCOMING_EVENTS_LIMIT)
+    .map((event) => ({
+      id: event.id,
+      title: event.title,
+      startAt: event.startAt,
+      // category is nullable in the type (delete would SetNull it), though
+      // no UI calls deleteCalendarCategory today. Same fallback-to-0 as
+      // EventPill/CalendarDayCell on the Calendar page either way.
+      color: event.category?.color ?? 0,
+    }));
+
+  const defenseReadiness = computeEvaluationChecklistProgress(checklistItems);
+
+  return {
+    upcomingEvents,
+    defenseReadiness,
+    tasksByStatus: buildTasksByStatus(tasks),
+    progressByCategory: buildProgressByCategory(tasks, taskCategories),
+    teamWorkload: buildTeamWorkload(tasks, taskCategories, members),
+  };
+}
 
 export const Route = createFileRoute("/_authenticated/$projectId/summary")({
+  loader: ({ params }) => loadSummaryPageData(params.projectId),
   component: SummaryPage,
 });
 
 function SummaryPage() {
-  // --- beginning of mock data - will be replaced by a call to
-  // GET /api/projects/:id/summary once the backend for it exists ---
-  // Fake data standing in for the real GET /api/projects/:id/summary response.
-  // Auth is wired (see ProjectLayout) - what's still missing is the backend
-  // itself: Tasks/CalendarEvents/EvaluationChecklistItems endpoints, plus a
-  // team_workload aggregation, none of which exist yet (tracked for a
-  // follow-up PR). One object, one field per Summary section
-  // (tasks_by_status, categories, upcoming events, defense readiness, workload per member) - each field is that
-  // section's own mock block, matching what the backend will eventually send.
-  // Each field below is passed down as props to its own section component.
-  const summary_data_json_mock_up = {
-    // count of tasks per status, matches the TaskStatus enum in schema.prisma
-    tasks_by_status: {
-      TODO: 10,
-      IN_PROGRESS: 5,
-      REVIEW: 2,
-      COMPLETED: 8,
-    },
-    // color: index into CATEGORY_COLOR_PALETTE, matches TaskCategory.color (Int) in schema.prisma
-    categories: [
-      { name: "Planning", completed: 1, total: 1, color: 0 },
-      { name: "Development", completed: 5, total: 12, color: 1 },
-      { name: "Testing", completed: 0, total: 1, color: 2 },
-      { name: "Backend", completed: 1, total: 5, color: 3 },
-      { name: "Frontend", completed: 1, total: 3, color: 4 },
-      { name: "DevOps", completed: 2, total: 2, color: 5 },
-      { name: "Parsing", completed: 0, total: 2, color: 6 },
-      { name: "Documentation", completed: 1, total: 2, color: 7 },
-    ],
-    // mock up of upcoming events, displays 6 max, put a limit in the backend
-    // id will be generated by the base and used a unique key in the map
-    // color: index into CATEGORY_COLOR_PALETTE, matches CalendarCategory.color (Int)
-    // in schema.prisma - a separate table from TaskCategory, same palette-index pattern
-    upcoming_events: [
-      {
-        title: "WebSocket milestone",
-        startAt: "2026-07-22T16:30:00Z",
-        id: "evt-1",
-        color: 3,
-      },
-      {
-        title: "Auth deadline",
-        startAt: "2026-07-26T18:00:00Z",
-        id: "evt-2",
-        color: 4,
-      },
-      {
-        title: "Profile page review",
-        startAt: "2026-07-29T15:00:00Z",
-        id: "evt-3",
-        color: 1,
-      },
-    ],
-    // percent: how ready the team is for the defense, checkpoints_total: fixed
-    // list of defense prerequisites (defined elsewhere, ex: mandatory part done,
-    // bonus part done, subject compliance...) - checkpoints_done counts how many
-    // of those are currently checked off
-    defense_readiness: {
-      percent: 0,
-      checkpoints_done: 0,
-      checkpoints_total: 8,
-    },
-    // open_tasks: tasks assigned to this member that aren't COMPLETED yet.
-    // color: index into CATEGORY_COLOR_PALETTE, used for this member's avatar
-    // - it's the member's own display color, unrelated to task/calendar
-    // categories (User has no color field in schema.prisma yet, this is
-    // mock-only for now).
-    // categories: names of the categories this member has open tasks in -
-    // matched against summary_data_json_mock_up.categories (by name) to reuse
-    // the same color, instead of a separate per-category color system.
-    team_workload: [
-      {
-        username: "sboxd",
-        initials: "SA",
-        color: 1,
-        open_tasks: 5,
-        categories: ["Backend", "Testing"],
-      },
-      {
-        username: "mlebrun",
-        initials: "ML",
-        color: 5,
-        open_tasks: 4,
-        categories: ["Backend", "DevOps"],
-      },
-      {
-        username: "jdupont",
-        initials: "JD",
-        color: 2,
-        open_tasks: 5,
-        categories: ["Testing", "DevOps"],
-      },
-      {
-        username: "klaris",
-        initials: "KL",
-        color: 6,
-        open_tasks: 2,
-        categories: ["Frontend", "DevOps"],
-      },
-    ],
-  };
-  // --- end of mock data ---
+  const {
+    upcomingEvents,
+    defenseReadiness,
+    tasksByStatus,
+    progressByCategory,
+    teamWorkload,
+  } = Route.useLoaderData();
 
   return (
     <>
-      <TaskStatusOverview
-        tasksByStatus={summary_data_json_mock_up.tasks_by_status}
-      />
+      <TaskStatusOverview tasksByStatus={tasksByStatus} />
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <ProgressByCategory categories={summary_data_json_mock_up.categories} />
+        <ProgressByCategory categories={progressByCategory} />
 
         <div className="flex flex-col gap-6">
-          <UpcomingEvents events={summary_data_json_mock_up.upcoming_events} />
+          <UpcomingEvents events={upcomingEvents} />
           <DefenseReadiness
-            percent={summary_data_json_mock_up.defense_readiness.percent}
-            checkpointsDone={
-              summary_data_json_mock_up.defense_readiness.checkpoints_done
-            }
-            checkpointsTotal={
-              summary_data_json_mock_up.defense_readiness.checkpoints_total
-            }
+            percent={defenseReadiness.percent}
+            checkpointsDone={defenseReadiness.currentValue}
+            checkpointsTotal={defenseReadiness.completeAt}
           />
         </div>
       </div>
 
-      <TeamWorkload
-        members={summary_data_json_mock_up.team_workload}
-        categories={summary_data_json_mock_up.categories}
-      />
+      <TeamWorkload members={teamWorkload} categories={progressByCategory} />
     </>
   );
 }

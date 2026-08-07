@@ -100,6 +100,21 @@ function ChatPage() {
     (message) => {
       const author = message.author?.username ?? "Deleted user";
       setLiveAnnouncement(`${author}: ${message.content}`);
+      // Same read-watermark logic as the initial-load effect below - a
+      // message arriving live while this conversation is the one on screen
+      // is just as "read" as one fetched on open, but nothing else re-fires
+      // markChatRead for it (this callback only runs for genuinely new,
+      // in-scope messages, never for our own echo or a different
+      // conversation) - without this, the server-side watermark goes stale
+      // the moment a live message lands, and reappears as unread on reload
+      // or another device even though the user was looking right at it.
+      markChatRead(message.projectId, {
+        id: message.id,
+        createdAt: message.createdAt,
+      }).catch(() => {
+        // best-effort - a background refetch of /chat/unread will
+        // eventually reconcile if this fails
+      });
     }
   );
 
@@ -305,7 +320,12 @@ function ChatPage() {
         </aside>
 
         <section
-          className={`min-h-0 flex-1 flex-col md:flex ${
+          // min-w-0: without it, this flex item's default min-width:auto
+          // lets an unbroken long message (no spaces to wrap on) force this
+          // whole pane wider than its allotted space instead of wrapping -
+          // same root cause the message bubble's own min-w-0 already
+          // documents below, one level up the flex chain.
+          className={`min-h-0 min-w-0 flex-1 flex-col md:flex ${
             mobileView === "list" ? "hidden" : "flex"
           }`}
         >
@@ -349,7 +369,7 @@ function ChatPage() {
                 {liveAnnouncement}
               </div>
 
-              <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
+              <div className="min-w-0 flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
                 {loading ? (
                   <p className="text-center text-xs text-text-secondary">
                     Loading messages...
@@ -493,7 +513,15 @@ function ChatBubble({
           <span className="font-semibold text-text-primary">{username}</span>
           <span>{formatTime(message.createdAt)}</span>
         </div>
-        <div className="flex min-w-0 items-center gap-2">
+        <div
+          // max-w-full: this row's own column parent uses items-end/items-start
+          // (not stretch), so it never gets a width imposed on it from above -
+          // without max-w-full here too, this row (and the message div's own
+          // max-w-full inside it) has nothing definite to resolve a percentage
+          // against, and free-sizes to the unwrapped message's full content
+          // width instead of respecting the pane.
+          className="flex min-w-0 max-w-full items-center gap-2"
+        >
           {isSelf && (
             <button
               type="button"

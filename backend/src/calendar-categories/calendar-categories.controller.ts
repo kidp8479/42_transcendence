@@ -26,7 +26,8 @@ export class CalendarCategoriesController {
     private readonly calendarCategoriesService: CalendarCategoriesService
   ) {}
 
-  // create a label for this project
+  // create a label for this project - no frontend UI calls this today, kept
+  // for a future label-management screen
   @ApiBearerAuth("access-token")
   @Post()
   create(
@@ -50,7 +51,8 @@ export class CalendarCategoriesController {
     return this.calendarCategoriesService.findAll(projectId, request.user.id);
   }
 
-  // get one label
+  // get one label - not called from the frontend today, listCalendarCategories
+  // (findAll) covers every current use
   @Get(":id")
   findById(
     @Param("projectId", ParseUUIDPipe) projectId: string,
@@ -64,7 +66,8 @@ export class CalendarCategoriesController {
     );
   }
 
-  // rename or recolor a label
+  // rename or recolor a label - no frontend UI calls this today, kept for a
+  // future label-management screen
   @ApiBearerAuth("access-token")
   @Patch(":id")
   update(
@@ -81,7 +84,8 @@ export class CalendarCategoriesController {
     );
   }
 
-  // delete a label (returns the deleted row, so 200 not 204)
+  // delete a label (returns the deleted row, so 200 not 204) - no frontend UI
+  // calls this today, kept for a future label-management screen
   @ApiBearerAuth("access-token")
   @Delete(":id")
   delete(

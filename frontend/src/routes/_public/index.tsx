@@ -4,35 +4,40 @@
  * can resolve the application's entry point.
  * Renders the LandingPage component.
  */
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Carousel } from "flowbite-react";
 import { useModal } from "../../hooks/useModal";
 
-// TO DISCUSS: if we want logged-in users to skip the landing page and go straight to /dashboard,
-// add a beforeLoad here that checks localStorage for a token and throws redirect({ to: '/dashboard' }).
 export const Route = createFileRoute("/_public/")({
+  // Mirror of _authenticated/route.tsx's own guard: a logged-in visitor
+  // typing the site's URL expects to land on their actual workspace, not a
+  // marketing page they've already converted from.
+  beforeLoad: ({ context }) => {
+    if (context.authState.status === "authenticated") {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   component: LandingPage,
 });
 
-// TEMP placeholder screenshots - replace with final production content later - use frontend/public/images to place your images
 const CAROUSEL_SLIDES = [
   {
-    image: "/images/landing-carousel-1.png",
-    alt: "Projects list showing multiple projects with their team members",
+    image: "/images/landing-carousel-1.jpg",
+    alt: "A 42 student working at a dual-monitor desk with the app open on both screens",
     tag: "Teamwork",
     title: "Solo or with a team",
     text: "Working alone? Track your own progress from the first read of the subject to the final defense. Working with others? Create a team, invite your teammates, and split the work together. Same tool, either way.",
   },
   {
-    image: "/images/landing-carousel-2.png",
-    alt: "Project summary page with tabs for Discovery, Kanban, List, Calendar, and Evaluation Checklist",
+    image: "/images/landing-carousel-2.jpg",
+    alt: "Kanban board view with To Do, In Progress, Review, and Completed columns full of tasks",
     tag: "Workflow",
     title: "Everything you need, in one place",
     text: "Start with the discovery page to lay out your project before touching any code. Split the work into a Kanban board, switch to task lists when you need a different view, check the calendar to see deadlines and everyone's availability, and track your own defense checklist when it's time to prepare.",
   },
   {
-    image: "/images/landing-carousel-3.png",
-    alt: "Dashboard overview showing active projects, tickets, and team velocity",
+    image: "/images/landing-carousel-3.jpg",
+    alt: "A 42 Paris desk setup with the app running on screen",
     tag: "Growth",
     title: "A tool worth learning on",
     text: "We picked the best parts of the project management tools out there and built something simple enough for 42. Not sure this kind of tool is for you? This is a low-pressure way to find out. Already sold on it? It's real practice organizing a team and your own work, the same skills you'll need once you're doing this for a job.",

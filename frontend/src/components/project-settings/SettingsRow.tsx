@@ -16,7 +16,7 @@ export function SettingsRow({
   iconClassName,
 }: SettingsRowProps) {
   return (
-    <div className="flex items-start justify-between gap-6 py-4 first:pt-0 last:pb-0">
+    <div className="flex flex-col items-start gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div className="flex min-w-0 flex-1 gap-3">
         {icon && (
           <div

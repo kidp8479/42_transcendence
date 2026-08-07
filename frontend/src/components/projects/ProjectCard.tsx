@@ -296,10 +296,11 @@ export function ProjectCard({
         <div className="flex flex-1 flex-col justify-center gap-3">
           <p className="text-sm text-text-secondary">
             Type{" "}
-            <span
-              title={project.name}
-              className="inline-block max-w-full truncate align-bottom font-semibold text-text-primary"
-            >
+            {/* break-words, not truncate: this name is exactly what the
+            user has to retype below to confirm - hiding part of it behind
+            an ellipsis makes that impossible to do accurately, especially
+            for a long/random name. */}
+            <span className="break-words font-semibold text-text-primary">
               {project.name}
             </span>{" "}
             to confirm {isDelete ? "deletion" : "leaving"}.{" "}
@@ -336,11 +337,16 @@ export function ProjectCard({
                 ? "Delete"
                 : "Leave"}
           </Button>
+          {/* dark:focus:ring-brand-500/40 is required, not just the
+          base one: Flowbite's <Button> injects its own
+          dark:focus:ring-primary-800 (blue), which otherwise wins the
+          cascade since dark: variants apply after plain ones regardless
+          of class order in the source. */}
           <Button
             type="button"
             onClick={handleCancelConfirm}
             disabled={isConfirmSubmitting}
-            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40"
+            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40 dark:focus:ring-brand-500/40"
           >
             Cancel
           </Button>
@@ -466,7 +472,7 @@ export function ProjectCard({
                 <DropdownItem
                   icon={LiaTrashAltSolid}
                   theme={roundedDropdownItemTheme}
-                  className="text-red-700! dark:text-red-700!"
+                  className="text-red-400! dark:text-red-400!"
                   onClick={() => setMode("confirming-delete")}
                 >
                   Delete project
@@ -475,7 +481,7 @@ export function ProjectCard({
                 <DropdownItem
                   icon={HiOutlineArrowRightOnRectangle}
                   theme={roundedDropdownItemTheme}
-                  className="text-red-700! dark:text-red-700!"
+                  className="text-red-400! dark:text-red-400!"
                   onClick={() => setMode("confirming-leave")}
                 >
                   Leave project

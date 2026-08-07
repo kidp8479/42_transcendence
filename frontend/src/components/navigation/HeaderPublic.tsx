@@ -22,17 +22,19 @@ export function HeaderPublic({ authUnavailable = false }: HeaderPublicProps) {
         </span>
       ) : (
         <div className="flex items-center gap-2">
-          {/* primary button style */}
+          {/* primary button style - text-black, not text-white: white on
+          brand-500 is 2.27:1, fails WCAG AA's 4.5:1 minimum for normal
+          text; black on brand-500 is 9.22:1. */}
           <Button
             type="button"
             size="sm"
             onClick={() => openAuthModal("signup")}
             className="
 				bg-brand-500
-				text-white
+				text-black
 				hover:bg-brand-600
 				dark:bg-brand-500
-				dark:text-white
+				dark:text-black
 				dark:hover:bg-brand-600
 				focus:outline-none
 				focus-visible:outline-none

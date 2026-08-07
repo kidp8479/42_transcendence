@@ -56,10 +56,14 @@ export function CalendarDayCell({
         className={
           "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium " +
           (isToday
-            ? "bg-brand-500 text-white"
+            ? // !text-black, not text-white: white on brand-500 is
+              // 2.27:1, fails WCAG AA's 4.5:1 minimum for normal text
+              "bg-brand-500 text-black"
             : isCurrentMonth
               ? "text-text-primary"
-              : "text-text-muted")
+              : // text-muted-on-base, not text-muted: text-muted is only
+                // 2.47:1 on this cell's surface-base background
+                "text-text-muted-on-base")
         }
       >
         {day.format("D")}

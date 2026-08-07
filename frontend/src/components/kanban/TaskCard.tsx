@@ -39,7 +39,7 @@ import { getCategoryColor } from "@/lib/categoryColorPalette";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import type { Task } from "@/lib/tasks";
 import type { TaskCategory } from "@/lib/taskCategories";
-import { AvatarStack } from "../common/AvatarStack";
+import { AvatarStack } from "@/components/common/AvatarStack";
 import { TaskCategoryBadge } from "./TaskCategoryBadge";
 import { TaskPriorityDot } from "./TaskPriorityDot";
 
@@ -100,6 +100,10 @@ export const TaskCard = memo(function TaskCard({
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // stopPropagation so Escape only closes this confirmation - without
+        // it, the event also bubbles to SideBarCmp's own window-level Escape
+        // listener, which collapses the sidebar at the same time.
+        event.stopPropagation();
         setIsConfirmingDelete(false);
       }
     }

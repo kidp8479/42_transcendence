@@ -409,6 +409,78 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
       end: "2026-07-29T21:00:00Z",
       assignees: [arthur],
     },
+    {
+      title: "PR review: RustFS storage",
+      category: "Review",
+      start: "2026-07-31T14:00:00Z",
+      end: "2026-07-31T15:00:00Z",
+      assignees: [marvin],
+    },
+    {
+      title: "PR review: WebSocket layer + notifications",
+      category: "Review",
+      start: "2026-08-01T14:00:00Z",
+      end: "2026-08-01T15:00:00Z",
+      assignees: [arthur],
+    },
+    {
+      title: "PR review: realtime field-lock lifecycle",
+      category: "Review",
+      start: "2026-08-02T14:00:00Z",
+      end: "2026-08-02T15:00:00Z",
+      assignees: [ford],
+    },
+    {
+      title: "PR review: JWT session cutover",
+      category: "Review",
+      start: "2026-08-03T14:00:00Z",
+      end: "2026-08-03T15:00:00Z",
+      assignees: [marvin, ford],
+    },
+    {
+      title: "PR review: WebSocket ticket admission",
+      category: "Review",
+      start: "2026-08-03T15:00:00Z",
+      end: "2026-08-03T16:00:00Z",
+      assignees: [arthur],
+    },
+    {
+      title: "PR review: user profile + avatar upload",
+      category: "Review",
+      start: "2026-08-03T17:00:00Z",
+      end: "2026-08-03T18:00:00Z",
+      assignees: [marvin],
+    },
+    {
+      title: "PR review: Kanban review follow-ups",
+      category: "Review",
+      start: "2026-08-04T14:00:00Z",
+      end: "2026-08-04T15:00:00Z",
+      assignees: [ford],
+    },
+    {
+      title: "PR review: Project settings",
+      category: "Review",
+      start: "2026-08-05T14:00:00Z",
+      end: "2026-08-05T15:00:00Z",
+      assignees: [arthur],
+    },
+    {
+      title: "PR review: Public API tokens",
+      category: "Review",
+      start: "2026-08-06T14:00:00Z",
+      end: "2026-08-06T15:00:00Z",
+      assignees: [marvin],
+    },
+    {
+      // still open at seed time - dated a day ahead as an upcoming review
+      // rather than a past one, since it hasn't actually happened yet
+      title: "PR review: Group chat (upcoming)",
+      category: "Review",
+      start: "2026-08-07T14:00:00Z",
+      end: "2026-08-07T15:00:00Z",
+      assignees: [arthur],
+    },
     // --- Meetings (category: Meeting) ---
     {
       title: "First meeting: structure, ideas, scaffolding, planning",
@@ -599,7 +671,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Seed the app with demo data prepared for defense",
       category: "Planning",
-      status: TaskStatus.TODO,
+      status: TaskStatus.IN_PROGRESS,
       priority: TaskPriority.MEDIUM,
       assignees: [marvin],
       notes: "This exact task, seeding realistic data across every tab before the defense.",
@@ -623,7 +695,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Account/identity data model: roles, project ownership",
       category: "Backend",
-      status: TaskStatus.IN_PROGRESS,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.HIGH,
       assignees: [trillian],
       notes: "Extending the user model for account status and ownership rules.",
@@ -631,7 +703,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Enforce account status in current auth path",
       category: "Backend",
-      status: TaskStatus.IN_PROGRESS,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.HIGH,
       assignees: [trillian],
       notes: "Blocking login for suspended or disabled accounts at the auth layer.",
@@ -639,7 +711,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Shared project membership check + role field",
       category: "Backend",
-      status: TaskStatus.COMPLETED,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.MEDIUM,
       assignees: [ford],
       notes:
@@ -648,7 +720,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Websocket Layer + Notification System",
       category: "Backend",
-      status: TaskStatus.IN_PROGRESS,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.HIGH,
       assignees: [zaphod],
       notes: "Realtime gateway and per-user rooms are up, notification persistence next.",
@@ -656,7 +728,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "OAuth (42 + Google) and JWT session hardening",
       category: "Backend",
-      status: TaskStatus.TODO,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.MEDIUM,
       assignees: [zaphod],
       notes: "Covers 42 and Google login plus refresh token rotation.",
@@ -664,7 +736,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Public API: API-key discovery and design",
       category: "Backend",
-      status: TaskStatus.TODO,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.HIGH,
       assignees: [ford],
       notes: "Deciding how API keys are issued and rate limited before building it.",
@@ -696,7 +768,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Kanban tab (drag-and-drop task board)",
       category: "Frontend",
-      status: TaskStatus.IN_PROGRESS,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.MEDIUM,
       assignees: [arthur],
       notes: "Drag and drop ordering across the four status columns.",
@@ -720,7 +792,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Project Settings tab",
       category: "Frontend",
-      status: TaskStatus.IN_PROGRESS,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.HIGH,
       assignees: [arthur],
       notes: "Member add and remove, plus role changes for the project.",
@@ -728,7 +800,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "User Settings page",
       category: "Frontend",
-      status: TaskStatus.IN_PROGRESS,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.MEDIUM,
       assignees: [trillian],
       notes: "Profile info, avatar upload, and account preferences.",
@@ -736,7 +808,7 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
     {
       title: "Summary tab wired to real data",
       category: "Frontend",
-      status: TaskStatus.IN_PROGRESS,
+      status: TaskStatus.REVIEW,
       priority: TaskPriority.MEDIUM,
       assignees: [ford],
       notes: "Swapping each mock widget for real data as its feature lands.",
@@ -764,23 +836,6 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
       priority: TaskPriority.HIGH,
       assignees: [ford],
       notes: "make up-build brings up the whole stack in one command.",
-    },
-    {
-      title: "Infrastructure for log management (ELK), option",
-      category: "DevOps",
-      status: TaskStatus.TODO,
-      priority: TaskPriority.LOW,
-      assignees: [ford],
-      notes:
-        "ELK stack bonus module, only worth the setup cost if it stays stable through the defense.",
-    },
-    {
-      title: "Monitoring system with Prometheus and Grafana, option",
-      category: "DevOps",
-      status: TaskStatus.TODO,
-      priority: TaskPriority.LOW,
-      assignees: [ford],
-      notes: "Bonus module, dashboards and alerting layered on the existing stack.",
     },
     {
       title: "Health check and status page + DR, option",

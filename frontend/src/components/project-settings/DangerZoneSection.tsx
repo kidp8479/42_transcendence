@@ -17,18 +17,9 @@ import { useToast } from "@/hooks/useToast";
 // grid (ProjectCard.tsx), which has its own separate delete/leave
 // confirmation flow mirroring this one.
 //
-// KNOWN DUPLICATION: this delete modal's structure and styling (no icon,
-// left-aligned text, muted-red confirm button, one-off inline Modal
-// className overrides) is hand-duplicated in LeaveProjectModal.tsx and
-// RemoveMemberModal.tsx, and also diverges from the unrelated delete-account
-// modal in user-settings.tsx (which uses a centered layout, a warning icon,
-// Flowbite's solid color="red" button, and a shared theme object). A future
-// style or logic fix applied to just this file is easy to leave silently
-// unfixed in the other two - check LeaveProjectModal.tsx and
-// RemoveMemberModal.tsx before assuming a change here is complete. Not
-// unified yet on purpose: doing so means touching shared modal theming
-// across several components, scoped as its own follow-up branch rather than
-// bundled into feature work.
+// This delete modal's Delete/Cancel buttons (order, flex-1 sizing,
+// solid-red styling) match the delete/leave confirmation on the Projects
+// grid (ProjectCard.tsx) - that's the reference for THIS confirmation.
 
 interface DangerZoneSectionProps {
   projectId: string;
@@ -163,68 +154,35 @@ export function DangerZoneSection({
 						    !bg-surface-overlay
 							!text-text-primary
 							placeholder:!text-text-secondary
-							focus:!border-brand-500
-							focus-visible:!ring-0
+							focus:!border-control-error
+							focus:!ring-2
+							focus:!ring-red-500/40
 							focus-visible:!outline-none
 						  `,
                   },
                 },
               }}
             />
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleCloseDeleteModal}
-                className="
-				  !h-8
-				  !px-3
-				  !py-1
-				  !text-xs
-				  !rounded-md
-				  !border
-				  !border-control-border
-				  !bg-surface-overlay
-				  !text-text-secondary
-				  hover:!bg-surface-raised
-				  hover:!border-brand-700
-				  hover:!text-brand-700
-				  focus:!ring-0
-				  transition-colors
-                "
-              >
-                Cancel
-              </Button>
-
+            {/* Order, sizing (flex-1) and classNames mirror the delete/leave
+            confirmation on the Projects grid (ProjectCard.tsx) exactly -
+            that's the reference for this confirmation, not this section's
+            own muted trigger button style used elsewhere on this page. */}
+            <div className="flex gap-2 pt-2">
               <Button
                 type="button"
                 disabled={!canConfirmDelete || isDeleting}
                 onClick={() => void handleDeleteProject()}
-                className="
-				  !h-8
-				  !px-3
-				  !py-1
-				  !text-xs
-				  !rounded-md
-				  border
-				  border-red-500/30
-				  bg-red-500/10
-				  text-red-400
-				  hover:bg-red-500/20
-				  dark:border-red-500/30
-				  dark:bg-red-500/10
-				  dark:text-red-500
-				  dark:hover:bg-red-500/20
-				  focus-visible:!outline-none
-				  focus-visible:!ring-2
-				  focus-visible:!ring-red-500
-				  dark:focus:!ring-red-500
-				  inline-flex
-				  items-center
-				  gap-2
-				"
+                className="flex-1 bg-control-error !text-white hover:bg-red-700 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-red-300 dark:bg-control-error dark:hover:bg-red-700 dark:focus:ring-red-800"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+              <Button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleCloseDeleteModal}
+                className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40 dark:focus:ring-brand-500/40"
+              >
+                Cancel
               </Button>
             </div>
           </div>

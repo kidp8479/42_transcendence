@@ -119,6 +119,10 @@ export function DiscoveryBlockCard({
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // stopPropagation so Escape only closes this confirmation - without
+        // it, the event also bubbles to SideBarCmp's own window-level Escape
+        // listener, which collapses the sidebar at the same time.
+        event.stopPropagation();
         handleCancelDelete();
       }
     }
@@ -190,11 +194,16 @@ export function DiscoveryBlockCard({
           >
             {isDeleting ? "Deleting..." : "Delete"}
           </Button>
+          {/* dark:focus:ring-brand-500/40 is required, not just the
+          base one: Flowbite's <Button> injects its own
+          dark:focus:ring-primary-800 (blue), which otherwise wins the
+          cascade since dark: variants apply after plain ones regardless
+          of class order in the source. */}
           <Button
             type="button"
             onClick={handleCancelDelete}
             disabled={isDeleting}
-            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40"
+            className="flex-1 border border-control-border bg-transparent! text-text-secondary! hover:bg-surface-overlay! hover:text-text-primary! focus:outline-none! focus-visible:outline-none focus:ring-2 focus:ring-brand-500/40 dark:focus:ring-brand-500/40"
           >
             Cancel
           </Button>
@@ -255,17 +264,22 @@ export function DiscoveryBlockCard({
                   >
                     <DiscoveryBlockIcon />
                   </div>
-                  {/* text-base: matches every other card/section title's explicit
-                size convention in the app (summary/*.tsx). pointer-events-auto:
-                enables the title= tooltip on hover - trades away
-                click-to-navigate on this exact text (the rest of the header
-                still navigates) */}
-                  <h5
+                  {/* h2, not h5: heading level is purely semantic (Tailwind's
+                preflight strips all default heading styling, size/weight
+                here comes entirely from the className below), and h5 skipped
+                straight past h1 with nothing in between - h2 matches how
+                every other card/section title in the app nests directly
+                under the page's own h1 (see summary/*.tsx). text-base:
+                matches that same convention's explicit size.
+                pointer-events-auto: enables the title= tooltip on hover -
+                trades away click-to-navigate on this exact text (the rest of
+                the header still navigates) */}
+                  <h2
                     className="pointer-events-auto truncate font-mono text-base font-semibold text-text-primary"
                     title={discoveryBlock.title}
                   >
                     {discoveryBlock.title}
-                  </h5>
+                  </h2>
                 </div>
                 <div className="pointer-events-auto flex shrink-0 items-center gap-1">
                   <span
