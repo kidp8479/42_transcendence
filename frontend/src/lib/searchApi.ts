@@ -14,9 +14,13 @@ import type { TaskPriority, TaskStatus } from "@/lib/tasks";
 // two builds share no import (same arrangement as tasks.ts). The route uses the
 // minimum to stay quiet below two characters instead of firing a request the
 // DTO would reject with a 400, which is a normal UI state, not an error.
+//
+// The page size is deliberately NOT mirrored: nothing here sends a `limit`, so
+// the server's default is the only one there is, and it comes back in the
+// response for SearchPagination to divide by. A second copy of the number over
+// here would be one nobody reads and everybody trusts.
 export const SEARCH_QUERY_MIN_LENGTH = 2;
 export const SEARCH_QUERY_MAX_LENGTH = 100;
-export const SEARCH_DEFAULT_LIMIT = 10;
 
 // Mirror the unions SearchQueryDto validates with @IsIn.
 export type SearchType = "all" | "projects" | "tasks" | "users";
@@ -95,7 +99,9 @@ export interface SearchParams {
   sort?: SearchSort;
   order?: SearchOrder;
   page?: number;
-  limit?: number;
+  // No `limit`: the page size is the server's to decide (SEARCH_DEFAULT_LIMIT
+  // there, pinned to a preview on type=all), and it is echoed back in the
+  // response. Add it here the day a caller genuinely needs another size.
   status?: SearchStatusFilter;
   includeArchived?: boolean;
 }
@@ -131,9 +137,6 @@ function buildSearchQuery(params: SearchParams): string {
   }
   if (params.page !== undefined && params.page > 1) {
     query.set("page", String(params.page));
-  }
-  if (params.limit !== undefined && params.limit !== SEARCH_DEFAULT_LIMIT) {
-    query.set("limit", String(params.limit));
   }
   if (params.status !== undefined) {
     query.set("status", params.status);

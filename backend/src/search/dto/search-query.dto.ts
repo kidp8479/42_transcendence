@@ -109,8 +109,22 @@ export class SearchQueryDto {
   // false, and the flag would silently never turn on.
   // The string test is the load-bearing half: a query string carries "true",
   // not true, and @IsBoolean rejects that string before it can mean anything.
+  //
+  // Only the two strings that mean something are converted, and anything else
+  // is passed through UNTOUCHED so @IsBoolean can reject it. A blanket
+  // `value === "true"` would turn every typo into a silent false - the one
+  // outcome that looks like the server ignoring the parameter, which is exactly
+  // what the rest of this DTO answers 400 for.
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @Transform(({ value }) => {
+    if (value === "true") {
+      return true;
+    }
+    if (value === "false") {
+      return false;
+    }
+    return value;
+  })
   @IsBoolean()
   includeArchived?: boolean;
 }
