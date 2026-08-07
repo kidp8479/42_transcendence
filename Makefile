@@ -109,11 +109,11 @@ fclean-prod:
 
 ## remove development build caches left by bind-mounted development containers
 ffclean-dev:
-	docker run --rm -v $(CURDIR)/frontend:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/frontend:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf node_modules dist build .vite .tanstack .flowbite-react .cache .eslintcache .stylelintcache coverage *.tsbuildinfo vite.config.js vite.config.d.ts"
-	docker run --rm -v $(CURDIR)/backend:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/backend:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf node_modules dist build .cache .eslintcache coverage *.tsbuildinfo"
-	docker run --rm -v $(CURDIR)/auth:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/auth:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf tmp .cache coverage.out"
 
 ## production containers do not bind mount source files, so no host cache cleanup is needed
@@ -461,7 +461,7 @@ check-websocket-e2e:
 
 ## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
 check-shell:
-	docker run --rm -v $(CURDIR):/mnt -w /mnt koalaman/shellcheck:stable -s sh \
+	docker run --rm -v $(CURDIR):/mnt -w /mnt docker.io/koalaman/shellcheck:stable -s sh \
 		vault/bootstrap.sh vault/check-policies.sh db/init/10-vault-db-admin-password.sh hooks/pre-commit
 
 ## verify local Vault AppRole policy isolation, Transit signing, and lease renewal
@@ -527,11 +527,11 @@ ffclean:
 	# .flowbite-react/) can be root-owned on the host - clean them via a
 	# throwaway root container instead of a plain host-side rm to avoid
 	# "Permission denied"
-	docker run --rm -v $(CURDIR)/frontend:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/frontend:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf node_modules dist build .vite .tanstack .flowbite-react .cache .eslintcache .stylelintcache coverage *.tsbuildinfo vite.config.js vite.config.d.ts"
-	docker run --rm -v $(CURDIR)/backend:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/backend:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf node_modules dist build .cache .eslintcache .stylelintcache coverage *.tsbuildinfo"
-	docker run --rm -v $(CURDIR)/auth:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/auth:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf tmp .cache coverage.out"
 	@echo "Local caches and node_modules volumes cleaned. Run 'make up-build' next."
 
