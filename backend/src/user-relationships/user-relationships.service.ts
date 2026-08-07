@@ -150,7 +150,18 @@ export class UserRelationshipsService {
       },
     });
     if (!currentRelationship) {
-      throw new NotFoundException(UNKNOWN_USER_ERR_MSG);
+      // Blocking requests are always taken into account even if no prior relationship
+      if (dto.status === RelationshipStatus.BLOCKED) {
+        return await this.prisma.userRelationship.create({
+          data: {
+            requesterId: requesterId,
+            addresseeId: addresseeId,
+            status: dto.status
+          }
+        })
+      } else {
+        throw new NotFoundException(UNKNOWN_USER_ERR_MSG);
+      }
     }
 
     const currentStatus = currentRelationship.status;
