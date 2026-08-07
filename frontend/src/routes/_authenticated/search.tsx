@@ -108,48 +108,56 @@ function SearchPage() {
   }
 
   return (
-    <>
-      {/* AuthenticatedLayout's <main> is a plain block, not a flex column, so
-          this page returns sibling divs - same header block as projects.tsx.
-          The rule spans the full width while its text lines up with the
-          results below, hence the inner wrapper. */}
-      <div className={`${PAGE_WIDTH_CLASS} flex flex-col gap-4 p-6`}>
-        {results === null ? (
-          <p className={EMPTY_STATE_CLASS}>
-            {params.q.trim().length === 0
-              ? "Search from the bar at the top of the page."
-              : `Type at least ${SEARCH_QUERY_MIN_LENGTH} characters to search.`}
-          </p>
-        ) : (
-          <>
-            <SearchTabs
-              params={params}
-              counts={{
-                projects: results.projects.total,
-                tasks: results.tasks.total,
-                users: results.users.total,
-              }}
-            />
+    // AuthenticatedLayout's <main> is a plain block, not a flex column, so a
+    // page here is free to be one box - this one is a single column, capped
+    // and centred by PAGE_WIDTH_CLASS.
+    <div className={`${PAGE_WIDTH_CLASS} flex flex-col gap-4 p-6`}>
+      {/* The visible title block was dropped on purpose: the term is already
+          in the header's search field, on every page, and a second copy of it
+          pushed the tabs below the fold on a laptop. The heading itself stays,
+          screen-reader only - a page whose outline starts at <h2> reads as a
+          fragment of something else, and the term is the one thing a screen
+          reader has no other way to hear. */}
+      <h1 className="sr-only">
+        {params.q.trim().length > 0
+          ? `Search results for "${params.q}"`
+          : "Search"}
+      </h1>
+      {results === null ? (
+        <p className={EMPTY_STATE_CLASS}>
+          {params.q.trim().length === 0
+            ? "Search from the bar at the top of the page."
+            : `Type at least ${SEARCH_QUERY_MIN_LENGTH} characters to search.`}
+        </p>
+      ) : (
+        <>
+          <SearchTabs
+            params={params}
+            counts={{
+              projects: results.projects.total,
+              tasks: results.tasks.total,
+              users: results.users.total,
+            }}
+          />
 
-            {/* ml-auto rather than justify-between: SearchFilters renders
-                nothing on the Members tab, and the sort control would then
-                slide to the left of the row. */}
-            <div className="flex flex-wrap items-center gap-3">
-              <SearchFilters params={params} onChange={updateParams} />
-              <div className="ml-auto">
-                <SearchSortControl params={params} onChange={updateParams} />
-              </div>
+          {/* ml-auto rather than justify-between: SearchFilters renders
+              nothing on the Members tab, and the sort control would then
+              slide to the left of the row. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <SearchFilters params={params} onChange={updateParams} />
+            <div className="ml-auto">
+              <SearchSortControl params={params} onChange={updateParams} />
             </div>
+          </div>
 
-            <SearchResultsView
-              params={params}
-              results={results}
-              onPageChange={goToPage}
-            />
-          </>
-        )}
-      </div>
-    </>
+          <SearchResultsView
+            params={params}
+            results={results}
+            onPageChange={goToPage}
+          />
+        </>
+      )}
+    </div>
   );
 }
 
