@@ -44,8 +44,15 @@ export const Route = createFileRoute("/_authenticated/$projectId/kanban")({
   // for the search results, which used to drop you on the board and leave you
   // to find the card yourself. Optional and permissive: an unknown id just
   // opens the board, it never errors.
-  validateSearch: (search: Record<string, unknown>): { task?: string } =>
-    typeof search.task === "string" ? { task: search.task } : {},
+  //
+  // `task` is named even when it is rejected, for the reason searchPageParams.ts
+  // documents at length: the router MERGES this over the raw params instead of
+  // replacing them, so returning `{}` leaves whatever was in the URL in place.
+  // ?task=42 is parsed as a number before it gets here, and returning `{}` let
+  // that number through under a type that promises a string.
+  validateSearch: (search: Record<string, unknown>): { task?: string } => ({
+    task: typeof search.task === "string" ? search.task : undefined,
+  }),
   loader: (routeContext) => loadKanbanPageData(routeContext.params.projectId),
   component: KanbanPage,
 });

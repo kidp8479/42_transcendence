@@ -37,9 +37,19 @@ export function SearchBar() {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
+  // The term `results` currently answers, so the effect can tell "this ran
+  // again" from "this needs a new request". A ref, not state: writing it must
+  // not re-render, and nothing renders from it.
+  const fetchedTermRef = useRef<string | null>(null);
 
   const term = query.trim();
   const isTermSearchable = term.length >= SEARCH_QUERY_MIN_LENGTH;
+  // One expression for "the panel is on screen", because two things depend on
+  // it and they must not drift: the panel's own mount, and the input's
+  // aria-controls. An aria-controls pointing at an id that is not in the DOM -
+  // which is what an unconditional one does below two characters - is a
+  // dangling reference an accessibility audit flags.
+  const isPanelVisible = isPanelOpen && isTermSearchable;
 
   // Syncs on every change of the URL's q, not just on mount: two different
   // /search links visited in a row would otherwise leave the first term in the
@@ -72,9 +82,30 @@ export function SearchBar() {
   // search next to the one the route's loader is already running.
   useEffect(() => {
     // Below the minimum the DTO answers 400. The page's loader has the same
-    // guard; here there is no error boundary at all to catch it.
-    if (!isPanelOpen || !isTermSearchable) {
+    // guard; here there is no error boundary at all to catch it. The held
+    // results go with it - they answer a term that is no longer being asked.
+    if (!isTermSearchable) {
+      fetchedTermRef.current = null;
       setResults(null);
+      setLoading(false);
+      return;
+    }
+
+    // Closing the panel is NOT the same case: the results still answer the
+    // term the field is showing, so they are kept, and reopening on that same
+    // term costs no request. Clicking away and back used to fire a second
+    // identical search purely because the effect re-ran.
+    if (!isPanelOpen) {
+      setLoading(false);
+      return;
+    }
+
+    // Already answered. setLoading(false) rather than a bare return: typing
+    // ahead and deleting back within the debounce window cancels a request
+    // whose .finally is then skipped by the cancelled flag, so the flag it
+    // raised has to be lowered here or it stays up until the term changes
+    // again.
+    if (fetchedTermRef.current === term) {
       setLoading(false);
       return;
     }
@@ -85,6 +116,9 @@ export function SearchBar() {
       searchWorkspace({ q: term })
         .then((found) => {
           if (!cancelled) {
+            // Only on success, so a failed request is retried rather than
+            // remembered as answered.
+            fetchedTermRef.current = term;
             setResults(found);
           }
         })
@@ -205,7 +239,11 @@ export function SearchBar() {
         // list of its own - and aria-expanded is in neither, so an authoring
         // tool flags it rather than reading it. What tells a screen reader the
         // panel appeared is its aria-live region, not an attribute here.
-        aria-controls={SUGGESTIONS_PANEL_ID}
+        //
+        // Dropped entirely while the panel is closed, rather than pointing at
+        // an element that is not rendered: the relationship it describes only
+        // exists when both ends do.
+        aria-controls={isPanelVisible ? SUGGESTIONS_PANEL_ID : undefined}
         icon={HiOutlineMagnifyingGlass}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -222,7 +260,7 @@ export function SearchBar() {
         type="search"
         value={query}
       />
-      {isPanelOpen && isTermSearchable && (
+      {isPanelVisible && (
         <SearchSuggestionsPanel
           query={term}
           results={results}

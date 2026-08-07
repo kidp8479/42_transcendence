@@ -58,34 +58,33 @@ export interface SearchPageParams {
 export function parseSearchPageSearch(
   raw: Record<string, unknown>
 ): SearchPageSearch {
-  const search: SearchPageSearch = { q: parseQuery(raw.q) };
-
-  // Each key is only set when the URL carries a valid value, so the object
-  // round-trips through the router without gaining keys it did not have.
-  if (isSearchType(raw.type)) {
-    search.type = raw.type;
-  }
-  if (isSearchSort(raw.sort)) {
-    search.sort = raw.sort;
-  }
-  if (isSearchOrder(raw.order)) {
-    search.order = raw.order;
-  }
-  const page = parsePage(raw.page);
-  if (page !== undefined) {
-    search.page = page;
-  }
-  if (isSearchStatusFilter(raw.status)) {
-    search.status = raw.status;
-  }
-  // TanStack parses search values as JSON when it can, so this arrives as a
-  // real boolean from a router navigation and as the string "true" from a
-  // hand-typed URL. Both have to work.
-  if (raw.includeArchived === true || raw.includeArchived === "true") {
-    search.includeArchived = true;
-  }
-
-  return search;
+  // EVERY key is named, `undefined` included. The router does not replace the
+  // raw params with what comes back from here, it merges the two -
+  // `{ ...rawFromUrl, ...validateSearch(rawFromUrl) }` (router-core's
+  // Object.assign over `{ ...location.search }`, and the same spread in its
+  // validate middleware). A key this function leaves OUT is therefore a key it
+  // fails to clear: ?page=-298 would be rejected by parsePage and then sail
+  // through into Route.useSearch() anyway, because the merge had nothing to
+  // overwrite it with. Naming the key is what rejects the value.
+  //
+  // The undefineds cost nothing on the way back out: the router's query-string
+  // encoder skips undefined values, so none of these six ever appears in the
+  // address bar.
+  return {
+    q: parseQuery(raw.q),
+    type: isSearchType(raw.type) ? raw.type : undefined,
+    sort: isSearchSort(raw.sort) ? raw.sort : undefined,
+    order: isSearchOrder(raw.order) ? raw.order : undefined,
+    page: parsePage(raw.page),
+    status: isSearchStatusFilter(raw.status) ? raw.status : undefined,
+    // TanStack parses search values as JSON when it can, so this arrives as a
+    // real boolean from a router navigation and as the string "true" from a
+    // hand-typed URL. Both have to work.
+    includeArchived:
+      raw.includeArchived === true || raw.includeArchived === "true"
+        ? true
+        : undefined,
+  };
 }
 
 export function resolveSearchPageParams(
