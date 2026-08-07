@@ -5,7 +5,7 @@
 # design - see .github/copilot-instructions.md "Flat Compose network".
 services:
   rustfs:
-    image: rustfs/rustfs:1.0.0-beta.12
+    image: docker.io/rustfs/rustfs:1.0.0-beta.12
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: owasp/modsecurity-crs@sha256:da1c183fb34b2dc13e406bd228f02d6a4bbc2e66db7a74627d2ae9398e1616dd
+    image: docker.io/owasp/modsecurity-crs:4.28.0-nginx-202608050608
     ports:
       - "8080:8080"
       - "8443:8443"
@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: docker.io/library/postgres:16-alpine
     ports:
       - "127.0.0.1:5432:5432"
     environment:
@@ -71,7 +71,7 @@ services:
     restart: unless-stopped
 
   vault:
-    image: hashicorp/vault:1.18
+    image: docker.io/hashicorp/vault:1.18
     ports:
       - "127.0.0.1:8200:8200"
     cap_add:
@@ -122,7 +122,7 @@ services:
     restart: "no"
 
   nginx-tls-agent:
-    image: hashicorp/vault:1.18
+    image: docker.io/hashicorp/vault:1.18
     environment:
       VAULT_ADDR: http://vault:8200
     volumes:
@@ -219,7 +219,7 @@ services:
 
   vault-test:
     profiles: ["tests"]
-    image: hashicorp/vault:1.18
+    image: docker.io/hashicorp/vault:1.18
     entrypoint: ["/bin/sh", "/vault/check-policies.sh"]
     environment:
       VAULT_ADDR: http://vault:8200
