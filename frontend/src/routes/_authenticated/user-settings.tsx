@@ -331,14 +331,28 @@ function UserSettingsPage() {
         onClose={closeDeleteAccountModal}
         popup
       >
-        <ModalHeader />
+        {/* sr-only child, tracking whichever step is active: Flowbite
+        auto-wires the dialog's aria-labelledby to this header's own id, so
+        an empty ModalHeader leaves the dialog with no accessible name even
+        though a visible <h3> sits right below in ModalBody - screen readers
+        never hear it. */}
+        <ModalHeader>
+          <span className="sr-only">
+            {deleteAccountStep === "confirm"
+              ? "Deleting an account is permanent, do you wish to continue?"
+              : "Last chance"}
+          </span>
+        </ModalHeader>
         <ModalBody>
           <div className="flex flex-col items-center gap-4 pb-2 text-center">
             <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
 
             {deleteAccountStep === "confirm" && (
               <>
-                <h3 className="text-lg font-semibold text-text-primary">
+                <h3
+                  aria-hidden="true"
+                  className="text-lg font-semibold text-text-primary"
+                >
                   Deleting an account is permanent, do you wish to continue?
                 </h3>
                 <p className="text-sm text-text-secondary">
@@ -370,7 +384,10 @@ function UserSettingsPage() {
 
             {deleteAccountStep === "type-to-confirm" && (
               <>
-                <h3 className="text-lg font-semibold text-text-primary">
+                <h3
+                  aria-hidden="true"
+                  className="text-lg font-semibold text-text-primary"
+                >
                   Last chance
                 </h3>
                 <p

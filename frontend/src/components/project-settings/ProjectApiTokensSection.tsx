@@ -528,11 +528,20 @@ export function ProjectApiTokensSection({
         onClose={() => closeActionModal(setPendingRevoke, isRevoking)}
         popup
       >
-        <ModalHeader />
+        {/* sr-only child: Flowbite auto-wires the dialog's aria-labelledby
+        to this header's own id, so an empty ModalHeader leaves the dialog
+        with no accessible name even though a visible <h3> sits right below
+        in ModalBody - screen readers never hear it. */}
+        <ModalHeader>
+          <span className="sr-only">Revoke {pendingRevoke?.label}?</span>
+        </ModalHeader>
         <ModalBody>
           <div className="flex flex-col items-center gap-4 pb-2 text-center">
             <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
-            <h3 className="text-lg font-semibold text-text-primary">
+            <h3
+              aria-hidden="true"
+              className="text-lg font-semibold text-text-primary"
+            >
               Revoke{" "}
               <span className="font-semibold">{pendingRevoke?.label}</span>?
             </h3>
@@ -567,11 +576,16 @@ export function ProjectApiTokensSection({
         onClose={() => closeActionModal(setPendingDelete, isDeleting)}
         popup
       >
-        <ModalHeader />
+        <ModalHeader>
+          <span className="sr-only">Delete {pendingDelete?.label}?</span>
+        </ModalHeader>
         <ModalBody>
           <div className="flex flex-col items-center gap-4 pb-2 text-center">
             <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
-            <h3 className="text-lg font-semibold text-text-primary">
+            <h3
+              aria-hidden="true"
+              className="text-lg font-semibold text-text-primary"
+            >
               Delete{" "}
               <span className="font-semibold">{pendingDelete?.label}</span>?
             </h3>

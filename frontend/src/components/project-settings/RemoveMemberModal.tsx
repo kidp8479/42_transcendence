@@ -31,12 +31,23 @@ export function RemoveMemberModal({
       onClose={onClose}
       popup
     >
-      <ModalHeader />
+      {/* sr-only child: Flowbite auto-wires the dialog's aria-labelledby to
+      this header's own id, so an empty ModalHeader leaves the dialog with no
+      accessible name even though a visible <h3> sits right below in
+      ModalBody - screen readers never hear it. */}
+      <ModalHeader>
+        <span className="sr-only">
+          Remove {member?.user.username} from this project?
+        </span>
+      </ModalHeader>
       <ModalBody>
         <div className="flex flex-col items-center gap-4 pb-2 text-center">
           <HiOutlineExclamationTriangle className="h-10 w-10 text-control-error" />
 
-          <h3 className="text-lg font-semibold text-text-primary">
+          <h3
+            aria-hidden="true"
+            className="text-lg font-semibold text-text-primary"
+          >
             Are you sure you want to remove{" "}
             <span className="font-semibold">{member?.user.username}</span> from
             this project?
