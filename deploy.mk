@@ -128,6 +128,7 @@ validate-deployment-%:
 	@if [ "$*" = "dev" ] || [ "$*" = "school" ]; then \
 		env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
 		set -a; . "$$env_file"; set +a; \
+		test "$$NODE_ENV" = "development" || (echo "NODE_ENV must be development for $* deployment" >&2; exit 1); \
 		if [ "$*" = "dev" ]; then \
 			test "$$APP_ORIGIN" = "https://tomato-dev.iops.dev" || (echo "APP_ORIGIN must be https://tomato-dev.iops.dev for VM development" >&2; exit 1); \
 			test "$$AUTH_JWT_ISSUER" = "https://tomato-dev.iops.dev/auth" || (echo "AUTH_JWT_ISSUER must be https://tomato-dev.iops.dev/auth for VM development" >&2; exit 1); \
@@ -135,6 +136,10 @@ validate-deployment-%:
 			test "$$APP_ORIGIN" = "https://*.paris.42.school:8443" || (echo "APP_ORIGIN must be https://*.paris.42.school:8443 for school evaluation" >&2; exit 1); \
 			test "$$AUTH_JWT_ISSUER" = "https://*.paris.42.school:8443/auth" || (echo "AUTH_JWT_ISSUER must be https://*.paris.42.school:8443/auth for school evaluation" >&2; exit 1); \
 		fi; \
+	fi
+	@if [ "$*" = "prod" ]; then \
+		env_file="$(call deployment_env_file,$*)"; set -a; . "$$env_file"; set +a; \
+		test "$$NODE_ENV" = "production" || (echo "NODE_ENV must be production for production deployment" >&2; exit 1); \
 	fi
 
 ## validate the narrow school runtime origin and issuer

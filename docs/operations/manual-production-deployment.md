@@ -123,8 +123,10 @@ running it and restore them afterward.
 The production runtime file must set `NODE_ENV=production`, `APP_ORIGIN` to
 `https://tomato.iops.dev`, and `AUTH_JWT_ISSUER` to
 `https://tomato.iops.dev/auth`. The Fedora VM development runtime file must
-use `https://tomato-dev.iops.dev` and `https://tomato-dev.iops.dev/auth`.
-Production and development browser cookies must remain secure.
+set `NODE_ENV=development`, `APP_ORIGIN=https://tomato-dev.iops.dev`, and
+`AUTH_JWT_ISSUER=https://tomato-dev.iops.dev/auth`. The school runtime file
+must likewise set `NODE_ENV=development`. Production and development browser
+cookies must remain secure.
 
 The school-evaluation runtime file must set:
 
