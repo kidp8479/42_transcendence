@@ -2,11 +2,14 @@
 
 ## 1. Purpose and Scope
 
-This document defines the manual deployment procedure for the Task Rabbit
-application on the Fedora 44 VPS and the matching local validation
-environment. It applies to the two isolated Compose deployments named
-`transcendence-prod` and `transcendence-dev`, served respectively at
-`https://tomato.iops.dev` and `https://tomato-dev.iops.dev`.
+This document defines three distinct manual deployment profiles for the Task
+Rabbit application:
+
+| Profile | Compose project, target, and release path | Runtime origin and issuer | Ingress and WAF | Browser certificate owner |
+| --- | --- | --- | --- |
+| VM development | `transcendence-dev`, `make deploy-dev`, `/srv/transcendence/development/current` | `https://tomato-dev.iops.dev`; `https://tomato-dev.iops.dev/auth` | Native Nginx only reaches Compose at `127.0.0.1:8081/8444`; blocking mode. | VM native Nginx owns the static public `tomato-dev.iops.dev` certificate. |
+| School evaluation | `transcendence-school`, `make deploy-school`; local checkout or `/srv/transcendence/school/current` on the VM | `https://*.paris.42.school:8443`; `https://*.paris.42.school:8443/auth` | Direct Compose ingress on `0.0.0.0:8080/8443`; DetectionOnly mode; no native edge. | Compose Nginx presents the Vault-issued `*.paris.42.school` certificate. |
+| Production | `transcendence-prod`, `make deploy-prod`, `/srv/transcendence/production/current` | `https://tomato.iops.dev`; `https://tomato.iops.dev/auth` | Native Nginx only reaches Compose on loopback; blocking mode. | VPS native Nginx owns the Certbot-managed `tomato.iops.dev` certificate. |
 
 The document also defines ownership and handling of the native Nginx edge
 configuration in `ops/nginx/` and the Compose ingress configuration in
@@ -22,44 +25,68 @@ the service processes personal data or becomes a long-lived public service.
 
 ## 2. Architecture
 
-The VPS uses two TLS hops. Native Nginx owns the public ports and the
-Certbot-managed public certificates. It terminates browser TLS on ports 80 and
-443, then creates a second HTTPS connection to the relevant Compose ingress
-on loopback. The Compose ingress runs the ModSecurity WAF, presents its
-environment-specific Vault PKI certificate, serves the frontend, and proxies
-application traffic to the backend and authentication services.
+The VPS production and VM development profiles use two TLS hops. Native Nginx
+terminates browser TLS on ports 80 and 443, then creates a second HTTPS
+connection to the relevant Compose ingress on loopback. The VPS uses the
+Certbot-managed `tomato.iops.dev` certificate; VM development uses a static
+public `tomato-dev.iops.dev` certificate and private key. The Compose ingress
+runs ModSecurity in blocking mode, presents its environment-specific Vault PKI
+certificate, serves the frontend, and proxies application traffic to the
+backend and authentication services.
 
 ```text
 Browser
-  -> native Nginx on TCP 80/443, with a Certbot certificate
+  -> native Nginx on TCP 80/443, with the profile's public certificate
   -> HTTPS loopback bridge
-       tomato.iops.dev     -> 127.0.0.1:8443
-       tomato-dev.iops.dev -> 127.0.0.1:8444
+       VPS tomato.iops.dev -> 127.0.0.1:8443
+       VM tomato-dev.iops.dev -> 127.0.0.1:8444
   -> Compose Nginx with ModSecurity and a Vault PKI certificate
   -> frontend, backend, auth, PostgreSQL, Vault, and RustFS
 ```
 
+The school-evaluation profile does not use native Nginx or Certbot. It is
+normally run by students on their school computers. A DevOps operator may run
+the same profile manually on the VM, using the same path and commands, but it
+remains a direct Compose deployment. Its ingress binds to `0.0.0.0:8080` and
+`0.0.0.0:8443`, runs ModSecurity in DetectionOnly mode, redirects
+accepted HTTP requests to the matching HTTPS school hostname, and presents the
+Vault-issued `*.paris.42.school` certificate directly:
+
+```text
+Browser or evaluator
+  -> Compose Nginx with ModSecurity on TCP 8080/8443
+  -> frontend, backend, authentication, PostgreSQL, Vault, and RustFS
+```
+
 The native Nginx bridge deliberately uses `proxy_ssl_verify off` only for its
 same-host loopback upstream. The public edge and Compose ingress execute on
-the same trusted VPS boundary, and no remote service may use this exception.
-The bridge still sends SNI for the requested hostname. Native Nginx overwrites
-all forwarded headers, so the Compose ingress and application receive a
-trusted client address and scheme only when the request has crossed the
-loopback bridge.
+the same trusted VPS or VM boundary, and no remote service may use this
+exception. The bridge still sends SNI for the requested hostname. Native Nginx
+overwrites all forwarded headers, so the Compose ingress and application
+receive a trusted client address and scheme only when the request has crossed
+the loopback bridge. Direct school ingress must not trust client-supplied
+forwarded identity headers.
 
-The production and development deployments must remain independent. They use
-different Compose projects, volumes, databases, Vault instances, AppRole
-credentials, runtime environment files, storage credentials, and application
-origins. Development is a separate deployment, not a security boundary against
-a compromised VPS.
+All three deployments must remain independent. They use different Compose
+projects, volumes, databases, Vault instances, AppRole credentials, runtime
+environment files, storage credentials, and application origins. Development
+and school evaluation are separate deployments, not security boundaries
+against a compromised host.
 
 ## 3. Required Host State
 
-The VPS shall run Fedora 44 with current security updates, Docker Engine with
-the Docker Compose plugin, Nginx, Certbot with the Nginx plugin, firewalld,
-Fail2ban, Git, Make, and the deployment user's required shell utilities. The
-public firewall shall allow only TCP ports 22, 80, and 443. Docker must not
+The VPS production profile requires Fedora 44 with current security updates,
+Docker Engine with the Docker Compose plugin, Nginx, Certbot with the Nginx
+plugin, firewalld, Fail2ban, Git, Make, and the deployment user's required
+shell utilities. VM development requires the same host software except
+Certbot: its native edge uses the managed static public certificate. Their
+public firewalls shall allow only TCP ports 22, 80, and 443. Docker must not
 publish PostgreSQL, Vault, RustFS, or Docker's API to the network.
+
+A school computer requires Docker Engine with the Compose plugin, Git, Make,
+and access for evaluators to TCP ports 8080 and 8443. It does not require
+native Nginx or Certbot for this profile. `ops/compose/school.yml` publishes
+only the Compose ingress; PostgreSQL, Vault, and RustFS remain unexposed.
 
 Routine deployments shall be performed by the non-root `deploy` user. The
 application root is `/srv/transcendence`, with each environment retaining its
@@ -69,8 +96,10 @@ runtime configuration outside the Git checkout:
 /srv/transcendence/
   production/secrets/runtime.env
   development/secrets/runtime.env
+  school/secrets/runtime.env
   production/current/
   development/current/
+  school/current/
 ```
 
 The `secrets` directories must have mode `0700`, and each `runtime.env` file
@@ -78,36 +107,57 @@ must have mode `0600`. The files contain credentials and must not be copied
 into `.env`, committed, printed, pasted into shell history, or transferred to
 the local validation VM.
 
+The VM school release uses
+`/srv/transcendence/school/secrets/runtime.env`. A school profile run from any
+other checkout uses the ignored `.env.school` file in that checkout instead.
+Run `make recreate-env-school` to generate the selected runtime file from
+`.env.example` with fresh local secrets and the required school origin and
+issuer. The target creates the VM parent directory with mode `0700` and each
+runtime file with restrictive permissions. It intentionally overwrites an
+existing school runtime file; retain any evaluator-specific OAuth credentials
+before running it and restore them afterward.
+
 ## 4. Runtime Configuration and Origin Policy
 
 The production runtime file must set `APP_ORIGIN` to
 `https://tomato.iops.dev` and `AUTH_JWT_ISSUER` to
-`https://tomato.iops.dev/auth`. The development file must use
-`https://tomato-dev.iops.dev` and `https://tomato-dev.iops.dev/auth`.
+`https://tomato.iops.dev/auth`. The Fedora VM development runtime file must
+use `https://tomato-dev.iops.dev` and `https://tomato-dev.iops.dev/auth`.
 Production and development browser cookies must remain secure.
 
-The direct school-evaluation mode uses
-`https://*.paris.42.school:8443` for `APP_ORIGIN` and
-`AUTH_JWT_ISSUER`. This is a deliberately narrow policy: it accepts exactly
-one hostname label below `paris.42.school` on port 8443. It does not permit
-arbitrary wildcard origins, suffix matching, wildcard ports, or request-derived
-issuer values. A direct evaluation build must use relative API and WebSocket
-URLs so it can operate on each permitted school hostname.
+The school-evaluation runtime file must set:
 
-The development Compose override defaults to loopback ingress on ports 8081
-and 8444. A local VM used for direct school evaluation may instead set
-`APP_INGRESS_BIND_ADDRESS=0.0.0.0`, `APP_INGRESS_HTTP_PORT=8080`, and
-`APP_INGRESS_HTTPS_PORT=8443` in its development runtime file. In that mode,
-Fedora must allow these ports only from the VirtualBox host-only subnet. Those
-VM-specific values must not be copied to the VPS runtime files.
+```dotenv
+APP_ORIGIN=https://*.paris.42.school:8443
+AUTH_JWT_ISSUER=https://*.paris.42.school:8443/auth
+```
+
+`make deploy-school`, `make seed-school`, and `make rere-school` reject any
+other values. `make deploy-dev`, `make seed-dev`, and `make rere-dev` likewise
+require the exact `tomato-dev.iops.dev` origin and issuer above, without a
+port. The VM development and production runtime files are externally managed:
+their `recreate-env-*` targets validate an existing file and never generate or
+replace secrets. This deliberately narrow school policy accepts exactly one
+hostname label below `paris.42.school` on port 8443. It does not permit
+arbitrary wildcard origins, suffix matching, wildcard ports, or
+request-derived issuer values. The evaluation build uses relative API and
+WebSocket URLs so it can operate on each permitted school hostname.
+
+The Fedora VM development override remains loopback-only on ports 8081 and
+8444 and must retain the `tomato-dev.iops.dev` origin. Do not convert
+`deploy-dev` into a direct school deployment. The separate school override
+always publishes `0.0.0.0:8080` and `0.0.0.0:8443`.
 
 ## 5. Native Nginx and Certbot Procedure
 
-The native edge configuration is installed on the VPS. It is not mounted into
-containers and it is not rendered by Compose. Before requesting certificates,
-install the bootstrap configuration and ensure both DNS A records resolve to
-the VPS. The bootstrap configuration serves the ACME challenge and redirects
-all other HTTP requests to HTTPS.
+The native edge configuration is installed only on the VPS production or VM
+development profile. It is not mounted into containers and it is not rendered
+by Compose. The following bootstrap and Certbot procedure applies only to the
+VPS production edge; ensure the `tomato.iops.dev` DNS A record resolves to the
+VPS before requesting its certificate. VM development instead installs
+`ops/nginx/tomato-dev.local.conf` with its managed static certificate. Never
+install native edge files for direct school evaluation; `deploy-school` owns
+its direct 8080/8443 ingress itself.
 
 Install the files with root privileges, validate Nginx before reloading it,
 and retain the prior working configuration until the new configuration has
@@ -120,10 +170,10 @@ install -m 0644 ops/nginx/vps-bootstrap.conf \
 nginx -t
 systemctl reload nginx
 
-certbot --nginx -d tomato.iops.dev -d tomato-dev.iops.dev
+certbot --nginx -d tomato.iops.dev
 ```
 
-After Certbot has issued both certificates, remove the bootstrap server
+After Certbot has issued the production certificate, remove the bootstrap server
 configuration and install the edge configuration and its shared bridge
 include. Do not leave the bootstrap and edge configuration active together,
 because both define public HTTP servers for the same hostnames.
@@ -156,6 +206,9 @@ make deploy-prod
 
 cd /srv/transcendence/development/current
 make deploy-dev
+
+cd /srv/transcendence/school/current
+make deploy-school
 ```
 
 The initial deployment or an upgrade that includes database migrations must
@@ -165,21 +218,29 @@ applies the database runtime grants.
 ```sh
 make migrate-deploy-prod
 make migrate-deploy-dev
+make migrate-deploy-school
 ```
 
 Demo data is optional and must be applied only to the intended environment.
-It is added with `make seed-prod` or `make seed-dev`. The scoped reset targets
-are destructive: `make rere-prod` and `make rere-dev` remove the relevant
-Compose volumes, database data, RustFS data, and local images while preserving
-the externally managed runtime environment file. A complete disposable reset
-and seed sequence is therefore `make rere-prod seed-prod` or
-`make rere-dev seed-dev`. Operators must never use these commands against data
-that has not been backed up.
+It is added with `make seed-prod`, `make seed-dev`, or `make seed-school`.
+The scoped reset targets are destructive: `make rere-prod` and `make rere-dev`
+remove only their respective Compose volumes, database data, RustFS data, and
+local images while preserving the externally managed runtime environment file.
+`make rere-school` performs the same stack reset and recreates
+`/srv/transcendence/school/secrets/runtime.env` with fresh local secrets and
+the required school origin and issuer. A complete disposable reset and seed
+sequence is therefore `make rere-prod seed-prod`, `make rere-dev seed-dev`, or
+`make rere-school seed-school`. Operators must never use these commands
+against data that has not been backed up.
 
 The production ingress binds only to
-`127.0.0.1:${APP_INGRESS_PORT}` and normally uses port 8443. The development
-VPS ingress normally binds only to 127.0.0.1 on port 8444. Native Nginx is
-the only process permitted to expose the VPS application publicly.
+`127.0.0.1:${APP_INGRESS_PORT}` and normally uses port 8443. The VM
+development ingress binds only to 127.0.0.1 on ports 8081 and 8444; its native
+Nginx edge is the only public listener. The school profile, by contrast,
+binds its direct ingress to 0.0.0.0 on ports 8080 and 8443 and has no native
+edge. Both VM development and school evaluation use static frontend production
+builds on port 80, production backend and authentication targets, and no
+application-source bind mounts. Both also disable the RustFS console.
 
 ### 6.1 Image-Managed Service Discovery
 
@@ -210,21 +271,21 @@ recovers.
 ### 6.2 ModSecurity Operating Modes
 
 The base Compose configuration sets `MODSEC_RULE_ENGINE=DetectionOnly`.
-Consequently, `make up`, `make deploy-dev`, and the direct school-evaluation
-development deployment inspect and audit CRS matches without blocking the
+`ops/compose/school.yml` preserves that mode, so `make up` and
+`make deploy-school` inspect and audit CRS matches without blocking the
 request. This mode is used to observe legitimate application traffic and tune
 narrow, documented CRS policy changes. A detection-mode audit event is not
 evidence that the WAF rejected a request; application-origin or authorization
 failures must be diagnosed separately.
 
-The production override in `ops/compose/production.yml` sets
-`MODSEC_RULE_ENGINE=On`. Consequently, `make deploy-prod` runs ModSecurity
-and the OWASP Core Rule Set in blocking mode. Production audit logs are sent
-to container standard output in JSON format with the configured `FH` parts.
-Operators must not change the production rule engine to `DetectionOnly` as a
-workaround for a false positive. They must instead reproduce the request in
-development, identify the CRS rule, and commit the smallest route- and
-rule-specific correction.
+The production and VM-development overrides set `MODSEC_RULE_ENGINE=On`.
+Consequently, `make deploy-prod` and `make deploy-dev` run ModSecurity and the
+OWASP Core Rule Set in blocking mode. Their audit logs are sent to container
+standard output in JSON format with the configured `FH` parts. Operators must
+not change either blocking profile to `DetectionOnly` as a workaround for a
+false positive. They must instead reproduce the request in a safe environment,
+identify the CRS rule, and commit the smallest route- and rule-specific
+correction.
 
 Both modes mount `nginx/modsecurity/10-task-rabbit-config.conf`. This shared
 policy extends the CRS allowed-method set only for the application's supported
@@ -250,13 +311,26 @@ openssl s_client -connect tomato.iops.dev:443 -servername tomato.iops.dev \
   -showcerts </dev/null
 ```
 
-Production runs ModSecurity in blocking mode. Development uses detection mode
-unless an evaluation deployment explicitly requires blocking mode. The custom
-CRS policy permits only the REST methods used by the application:
+Production and VM development run ModSecurity in blocking mode; school
+evaluation uses DetectionOnly mode. The custom CRS policy permits only the
+REST methods used by the application:
 `GET`, `HEAD`, `POST`, `OPTIONS`, `PATCH`, and `DELETE`. A valid authenticated
 `PATCH` request must reach the backend; an unauthenticated request may return
 an application `401`, but ModSecurity must not reject the method with a
 generic WAF `403`.
+
+For direct school evaluation, replace `SCHOOL_HOST` with the actual
+single-label school hostname and verify the published Compose ports directly;
+there is no native edge or port-443 listener in this profile:
+
+```sh
+SCHOOL_HOST=f6r13s1.paris.42.school
+curl -I "http://${SCHOOL_HOST}:8080/"
+curl --fail "https://${SCHOOL_HOST}:8443/api/health"
+curl --fail "https://${SCHOOL_HOST}:8443/auth/health"
+openssl s_client -connect "${SCHOOL_HOST}:8443" -servername "${SCHOOL_HOST}" \
+  -showcerts </dev/null
+```
 
 WebSocket access logs intentionally record `$uri` rather than `$request`.
 This prevents one-use Socket.IO ticket query parameters from entering native
@@ -275,11 +349,11 @@ public-origin verification.
 
 | Repository file | Host destination and purpose | Operator action |
 | --- | --- | --- |
-| `ops/nginx/nginx.conf` | `/etc/nginx/nginx.conf`; the minimal global Nginx configuration that includes `conf.d` files. | Install during initial VPS or VM edge provisioning. Do not add application proxy rules here; keep them in the dedicated `conf.d` file. |
+| `ops/nginx/nginx.conf` | `/etc/nginx/nginx.conf`; the minimal global Nginx configuration that includes `conf.d` files. | Install during initial VPS or VM edge provisioning. Do not add application proxy rules here; keep them in the dedicated `conf.d` file. Never install it for the direct school profile. |
 | `ops/nginx/vps-bootstrap.conf` | Temporary VPS `conf.d` server configuration for ACME HTTP-01 validation and HTTPS redirects. | Install before the first Certbot request. Remove it after the certificates are issued and before enabling `vps-edge.conf`. |
-| `ops/nginx/vps-edge.conf` | `/etc/nginx/conf.d/transcendence-edge.conf`; production VPS virtual hosts, SNI rejection, public certificates, redirects, and environment-to-loopback routing. | Install after Certbot issuance. Maintain `tomato.iops.dev -> 127.0.0.1:8443` and `tomato-dev.iops.dev -> 127.0.0.1:8444`. |
+| `ops/nginx/vps-edge.conf` | `/etc/nginx/conf.d/transcendence-edge.conf`; production VPS virtual hosts, SNI rejection, public certificates, redirects, and environment-to-loopback routing. | Install after Certbot issuance. Maintain only `tomato.iops.dev -> 127.0.0.1:8443`; the VPS does not run a `tomato-dev` deployment. |
 | `ops/nginx/vps-bridge.inc` | `/etc/nginx/conf.d/transcendence-bridge.inc`; shared TLS bridge, forwarded-header, HSTS, WebSocket, and internal-auth blocking rules. | Install with `vps-edge.conf`. Do not use its disabled upstream verification for a remote upstream. |
-| `ops/nginx/tomato-dev.local.conf` | A separate local Fedora VM `conf.d` configuration for the optional native bridge to the development Compose ingress on 127.0.0.1:8444. | Use only when validating the VPS-style bridge locally. It requires the local CA leaf at the exact documented `/srv/transcendence/edge/local-ca/` paths. Do not install it on the VPS or use it for direct school evaluation ingress. |
+| `ops/nginx/tomato-dev.local.conf` | A separate Fedora VM `conf.d` configuration for the native bridge to the development Compose ingress on 127.0.0.1:8444. | Install only on the VM. It requires the static public certificate and key at `/etc/nginx/tls/tomato-dev.iops.dev/`. Do not install it on the VPS or use it for direct school evaluation ingress. |
 
 ### 8.2 `nginx/`: Compose Ingress Files
 
@@ -291,8 +365,8 @@ affected Compose stack with its matching `make deploy-*` target.
 
 | Repository file | Compose handling and purpose | Operator action |
 | --- | --- | --- |
-| `nginx/default.conf.template` | Mounted by the base and development Compose configuration as the direct ingress template. It accepts localhost, the project domains, and one-label school hostnames, and redirects accepted port-8080 requests to 8443. | Retain for local development and direct school evaluation. Do not use it as the production static frontend template. |
-| `nginx/default.production.conf.template` | Replaces the development template in `ops/compose/production.yml`. It accepts only the public project domains, rejects unknown SNI, and serves the production topology. | Retain as the production override. It must remain paired with `FRONTEND_PORT=80`. |
+| `nginx/default.conf.template` | Mounted by the base Compose configuration and retained by the school override as the direct ingress template. It accepts localhost, the project domains, and one-label school hostnames, and redirects accepted port-8080 requests to 8443. | Retain for local development and direct school evaluation. The school profile pairs it with `FRONTEND_PORT=80`. Do not use it for VM development or production. |
+| `nginx/default.production.conf.template` | Replaces the base template in both `ops/compose/development.yml` and `ops/compose/production.yml`. It accepts the public project domains, including `tomato-dev.iops.dev`, rejects unknown SNI, and serves the static frontend topology. | Retain for VM development and production. It must remain paired with `FRONTEND_PORT=80`. |
 | `nginx/includes/application-locations.conf.template` | Mounted as an included file in both ingress templates. It routes frontend, API, authentication, public API-token, and WebSocket traffic and applies sensitive-response cache controls, rate limits, redacted logs, and forwarding headers. | Treat as shared security-critical routing. Change it only when the relevant application routes and tests change. |
 | `nginx/modsecurity/10-task-rabbit-config.conf` | Mounted as an OWASP CRS plugin configuration in both base and production Compose definitions. It extends the CRS allowed-method list for the application's `PATCH` and `DELETE` routes. | Retain this narrow policy. Do not replace it with a broad CRS disablement or route-independent exclusion. |
 | `nginx/99-reload-on-certificate-change.sh` | Mounted as a container entrypoint script. It reloads the Compose Nginx process when the Vault agent renews the mounted inner certificate files. | Keep the file executable and mounted read-only. Do not restart the container solely to pick up routine Vault PKI renewal. |
@@ -323,27 +397,30 @@ certificate selected by the production ingress. A renewal of that certificate
 alone may remain inactive until another Nginx reload occurs. The reload
 fingerprint must include all certificates used by the active ingress.
 
-The Vite development configuration fixes its HMR client port at 8080, while
-the active development ingress redirects port 8080 to TLS on port 8443. The
-HMR protocol and port must be parameterized for the loaded HTTPS origin before
-the TLS development topology can be considered equivalent to the deleted
-HTTP-only standalone configuration.
+The local `make up` Vite development configuration fixes its HMR client port
+at 8080 while its active ingress redirects port 8080 to TLS on port 8443. This
+does not apply to VM development, which uses the static frontend production
+target, but the HMR protocol and port must be parameterized before the local
+TLS development topology can be considered equivalent to the deleted HTTP-only
+standalone configuration.
 
 ## 10. Certificate Handling
 
-The public Certbot certificates and the inner Vault PKI certificates serve
-different purposes and must remain distinct. Public certificates belong to
-native Nginx. The Vault agent issues the Compose ingress certificates into the
-shared `vault_nginx_tls` volume: `local.pem`,
+The VPS Certbot certificate, VM static public certificate, and inner Vault PKI
+certificates serve different purposes and must remain distinct. The public
+certificates belong to native Nginx. The Vault agent issues the Compose ingress
+certificates into the shared `vault_nginx_tls` volume: `local.pem`,
 `paris-42-wildcard.pem`, and `public-domains.pem`. The direct ingress
 templates select the appropriate file by SNI.
 
-The local VM uses a locally trusted edge CA only for
-`tomato-dev.iops.dev`. Trust that CA on the workstation when performing local
-browser testing. Never copy a Certbot private key, a production Vault PKI key,
-or a production runtime secret into the VM. For school evaluation, the
-browser must trust the Vault PKI CA that issued the
-`*.paris.42.school` certificate.
+The Fedora VM uses a static copy of the public `tomato-dev.iops.dev` leaf and
+private key at `/etc/nginx/tls/tomato-dev.iops.dev/`, with modes `0644` for
+the full chain and `0600` for the key. It is not renewed on the VM. Before it
+expires, an operator must re-export a valid certificate from a controlled
+issuer or replace the VM testing approach. The key must not be copied to
+workstations, the repository, or a school computer. For direct school
+evaluation, the browser must trust the Vault PKI CA that issued the
+`*.paris.42.school` certificate presented by the Compose ingress.
 
 ## 11. Maintenance, Recovery, and Limitations
 
