@@ -159,12 +159,24 @@ export function toSearchParams(params: SearchPageParams): SearchParams {
   };
 }
 
+// The one place `q` enters the page, so it is where its invariant is set:
+// FROM HERE ON, q IS TRIMMED. Everything downstream - the loader's minimum
+// length guard, the API call, and the term the page quotes back in its heading
+// and empty states - reads this one value, and SearchQueryDto trims server-side
+// before it searches. Without the trim, /search?q=%20%20term%20%20 renders
+// `No results for "  term  "` about a search the server actually ran for
+// "term".
+//
 // Over-long queries are truncated rather than rejected: the DTO's @MaxLength
 // would answer 400, and a 400 in a loader is the full-page error screen. A
 // 100-character prefix is a sane search; an error card is not.
+//
+// Trim, then cap, then trim the end again - the cap can land mid-space and put
+// back the trailing whitespace the first trim just removed, which is the exact
+// mismatch this is here to prevent.
 function parseQuery(value: unknown): string {
   return typeof value === "string"
-    ? value.slice(0, SEARCH_QUERY_MAX_LENGTH)
+    ? value.trim().slice(0, SEARCH_QUERY_MAX_LENGTH).trimEnd()
     : "";
 }
 

@@ -68,7 +68,7 @@ async function loadSearchPageData(
   // Below the minimum the DTO would answer 400, and a 400 inside a loader is
   // the full-page error screen. "I've only typed one letter" is a normal state
   // of the UI, so it never becomes a request at all.
-  if (params.q.trim().length < SEARCH_QUERY_MIN_LENGTH) {
+  if (params.q.length < SEARCH_QUERY_MIN_LENGTH) {
     return null;
   }
   return searchWorkspace(toSearchParams(params));
@@ -119,13 +119,11 @@ function SearchPage() {
           fragment of something else, and the term is the one thing a screen
           reader has no other way to hear. */}
       <h1 className="sr-only">
-        {params.q.trim().length > 0
-          ? `Search results for "${params.q}"`
-          : "Search"}
+        {params.q.length > 0 ? `Search results for "${params.q}"` : "Search"}
       </h1>
       {results === null ? (
         <p className={EMPTY_STATE_CLASS}>
-          {params.q.trim().length === 0
+          {params.q.length === 0
             ? "Search from the bar at the top of the page."
             : `Type at least ${SEARCH_QUERY_MIN_LENGTH} characters to search.`}
         </p>

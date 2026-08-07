@@ -158,8 +158,8 @@ function parseSearchResults(value: unknown): SearchResults {
     !isSearchType(value.type) ||
     !isSearchSort(value.sort) ||
     !isSearchOrder(value.order) ||
-    typeof value.page !== "number" ||
-    typeof value.limit !== "number"
+    !isPositiveInteger(value.page) ||
+    !isPositiveInteger(value.limit)
   ) {
     throw new Error("Search API returned an invalid response");
   }
@@ -185,7 +185,7 @@ function parseBucket<T>(
   if (
     !isRecord(value) ||
     !Array.isArray(value.items) ||
-    typeof value.total !== "number"
+    !isNonNegativeInteger(value.total)
   ) {
     throw new Error("Search API returned an invalid result group");
   }
@@ -315,6 +315,23 @@ function isTaskPriority(value: unknown): value is TaskPriority {
 // rejected on purpose - the backend always sends the key.
 function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
+}
+
+// `typeof x === "number"` is not enough for the three fields that count things:
+// SearchPagination divides total by limit, so a regressed backend answering
+// limit: 0 gives Math.ceil(n / 0) === Infinity and a paginator offering endless
+// pages, which is worse than the error this parser exists to raise. A float or
+// a negative are the same class of nonsense. Number.isInteger already rejects
+// NaN and Infinity, so neither needs its own check.
+//
+// The floors differ on purpose: a group holding zero rows is a normal answer,
+// while page 0 and a page size of 0 are not things the server can mean.
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 // Narrows unknown down to "an object whose string keys can be read". Each

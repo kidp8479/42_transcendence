@@ -110,18 +110,28 @@ export function SearchBar() {
     };
   }, [term, isTermSearchable, isPanelOpen]);
 
-  // Escape closes the panel. stopPropagation is load-bearing, for the reason
-  // DrawerShell documents: SideBarCmp listens for Escape on window, further
-  // along the bubble path, so without it closing this panel would also close
-  // the mobile sidebar. The listener only exists while the panel is open, so a
-  // closed panel leaves Escape to the browser (which clears a type="search"
-  // input) and to the sidebar.
+  // Escape closes the panel, and both calls below are load-bearing, for two
+  // unrelated reasons:
+  //
+  //   stopPropagation - SideBarCmp listens for Escape on window, further along
+  //     the bubble path, so without it closing this panel would also close the
+  //     mobile sidebar. Same conflict DrawerShell documents.
+  //   preventDefault - the field is type="search", whose browser default on
+  //     Escape is to clear itself. Without it, "Escape closes the panel" also
+  //     means "Escape wipes what I typed" - and the emptied term then falls
+  //     below the minimum, so the panel would have vanished on its own even if
+  //     the close above were removed.
+  //
+  // The listener only exists while the panel is open, so a closed panel still
+  // leaves Escape to the browser and to the sidebar, which is where clearing
+  // the field remains a reasonable thing for Escape to do.
   useEffect(() => {
     if (!isPanelOpen) {
       return;
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
         event.stopPropagation();
         setIsPanelOpen(false);
       }
