@@ -169,7 +169,9 @@ function FriendsPage() {
 
   function setStatus(id: string, status: FriendshipStatus, message: string) {
     setFriends((previous) =>
-      previous.map((friend) => (friend.id === id ? { ...friend, status } : friend))
+      previous.map((friend) =>
+        friend.id === id ? { ...friend, status } : friend
+      )
     );
     showToast({ type: "success", message });
   }
@@ -185,7 +187,9 @@ function FriendsPage() {
     // file's comment for why (SideBarCmp's own chrome height constant).
     <div className="flex h-[calc(100vh-134px)] min-h-0 flex-col overflow-hidden">
       <div className="mb-2 border-b border-surface-border p-6">
-        <h1 className="font-mono text-xl font-bold text-text-primary">Friends</h1>
+        <h1 className="font-mono text-xl font-bold text-text-primary">
+          Friends
+        </h1>
         <p className="text-xs text-text-secondary">
           Manage your friends, pending requests, and blocked users.
         </p>
@@ -350,7 +354,9 @@ function InfoRow({
     <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-overlay p-3">
       <Icon className="h-4 w-4 shrink-0 text-text-secondary" />
       <div className="min-w-0">
-        <dt className="text-[10px] leading-tight text-text-secondary">{label}</dt>
+        <dt className="text-[10px] leading-tight text-text-secondary">
+          {label}
+        </dt>
         <dd className="truncate text-xs text-text-primary">{value}</dd>
       </div>
     </div>
@@ -494,7 +500,11 @@ function ProfilePanel({
               label="Name"
               value={`${friend.firstName} ${friend.lastName}`}
             />
-            <InfoRow icon={HiOutlineEnvelope} label="Email" value={friend.email} />
+            <InfoRow
+              icon={HiOutlineEnvelope}
+              label="Email"
+              value={friend.email}
+            />
             <InfoRow
               icon={HiOutlineAcademicCap}
               label="Campus"
@@ -533,7 +543,10 @@ function ProfilePanel({
               {friend.status === "PENDING_OUTGOING" && (
                 // Same gray as UserSettingsPage's "Cancel" button in the
                 // delete-account modal.
-                <Button className={rowUploadButtonClass} onClick={onCancelRequest}>
+                <Button
+                  className={rowUploadButtonClass}
+                  onClick={onCancelRequest}
+                >
                   <HiOutlineXMark className="mr-2 h-5 w-5" />
                   Cancel request
                 </Button>

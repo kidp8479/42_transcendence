@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   BadRequestException,
   StreamableFile,
+  ParseUUIDPipe,
 } from "@nestjs/common";
 import { ApiBearerAuth } from "@nestjs/swagger";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -30,10 +31,16 @@ const MAX_AVATAR_BYTES = 1 * 1024 * 1024;
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get("me")
   @ApiBearerAuth("access-token")
+  @Get("me")
   async findMe(@Req() request: AuthenticatedRequest) {
     return this.usersService.findById(request.user.id);
+  }
+
+  @ApiBearerAuth("access-token")
+  @Get(":id")
+  async findById(@Param("id", ParseUUIDPipe) id: string) {
+    return this.usersService.findById(id);
   }
 
   @ApiBearerAuth("access-token")
