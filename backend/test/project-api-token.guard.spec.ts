@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ProjectApiTokenGuard } from "../src/auth/project-api-token.guard";
+import { PROJECT_API_TOKEN_SELF_KEY } from "../src/auth/project-api-token.constants";
 
 const projectId = "c39eb8c5-bc47-41d7-bd21-87d9b02582ec";
 
@@ -26,10 +27,14 @@ function contextFor(pathProjectId = projectId) {
 
 function guardFor(
   requiredPermission: "READ" | "READ_WRITE",
-  project: { id: string } | null
+  project: { id: string } | null,
+  isSelfReflection = false
 ) {
   const reflector = {
-    getAllAndOverride: () => requiredPermission,
+    getAllAndOverride: (key: string) =>
+      key === PROJECT_API_TOKEN_SELF_KEY
+        ? isSelfReflection
+        : requiredPermission,
   };
   const config = {
     getOrThrow: () => "http://auth",
@@ -50,9 +55,10 @@ function guardFor(
 function guardWithIntrospection(
   requiredPermission: "READ" | "READ_WRITE",
   project: { id: string } | null,
-  permission: "READ" | "READ_WRITE"
+  permission: "READ" | "READ_WRITE",
+  isSelfReflection = false
 ) {
-  const guard = guardFor(requiredPermission, project);
+  const guard = guardFor(requiredPermission, project, isSelfReflection);
   (
     guard as unknown as {
       introspect: () => Promise<{
@@ -60,7 +66,10 @@ function guardWithIntrospection(
         principalType: "PROJECT_API_TOKEN";
         tokenId: string;
         projectId: string;
+        label: string;
         permission: "READ" | "READ_WRITE";
+        expiresAt: string;
+        lastUsedAt: string;
       }>;
     }
   ).introspect = async () => ({
@@ -68,7 +77,10 @@ function guardWithIntrospection(
     principalType: "PROJECT_API_TOKEN",
     tokenId: "ff7ffeb2-b04a-4cd5-9bda-c49b79b423c6",
     projectId,
+    label: "automation",
     permission,
+    expiresAt: "2026-12-31T00:00:00.000Z",
+    lastUsedAt: "2026-08-07T00:00:00.000Z",
   });
   return guard;
 }
@@ -112,5 +124,24 @@ test("rejects malformed project IDs before introspection", async () => {
   await assert.rejects(
     guardFor("READ", { id: projectId }).canActivate(context as never),
     BadRequestException
+  );
+});
+
+test("self reflection authenticates without a project ID path parameter", async () => {
+  const { context, request } = contextFor();
+  request.params = {};
+
+  assert.equal(
+    await guardWithIntrospection(
+      "READ",
+      { id: projectId },
+      "READ",
+      true
+    ).canActivate(context as never),
+    true
+  );
+  assert.equal(
+    (request as { apiToken: { label: string } }).apiToken.label,
+    "automation"
   );
 });
