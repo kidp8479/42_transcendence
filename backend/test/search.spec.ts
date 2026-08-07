@@ -12,6 +12,10 @@ import type { SearchQueryDto } from "../src/search/dto/search-query.dto";
 
 interface FindManyArgs {
   where?: Record<string, unknown>;
+  // Captured because `select` is what actually keeps User.email inside the
+  // backend - asserting only on `where` would let a switch to `include`, or a
+  // stray `email: true`, pass every test in this file.
+  select?: Record<string, unknown>;
   orderBy?: Record<string, string>[];
   skip?: number;
   take?: number;
@@ -69,10 +73,10 @@ test("tasks are scoped through their project's membership, not by task id", asyn
 
   await service.search(makeQuery({ type: "tasks" }), "user-a");
 
-  const where = fake.calls.task[0].where;
-  assert.deepEqual(where?.project, {
-    members: { some: { userId: "user-a" } },
-  });
+  // On the membership predicate only - the same `project` object also carries
+  // the archived filter, which has its own tests below.
+  const project = fake.calls.task[0].where?.project as Record<string, unknown>;
+  assert.deepEqual(project.members, { some: { userId: "user-a" } });
 });
 
 test("users are searched by username only and never by email", async () => {
@@ -89,6 +93,47 @@ test("users are searched by username only and never by email", async () => {
   assert.equal(where.OR, undefined);
   assert.ok(where.username, "username filter is missing");
   assert.equal(where.status, "ACTIVE");
+
+  // The `where` above only decides WHICH users match; `select` is what decides
+  // what leaves the backend about them, and it is the half that actually keeps
+  // an email out of a response.
+  const select = fake.calls.user[0].select ?? {};
+  assert.equal(select.email, undefined, "email must not be selected");
+  assert.equal(select.password, undefined);
+  assert.deepEqual(Object.keys(select).sort(), [
+    "avatarUrl",
+    "campus",
+    "id",
+    "username",
+  ]);
+});
+
+test("archived projects are excluded by default, and so are their tasks", async () => {
+  const fake = createFakePrisma();
+  const service = new SearchService(fake.prisma as never);
+
+  await service.search(makeQuery(), "user-a");
+
+  assert.equal(fake.calls.project[0].where?.isArchived, false);
+  // The half that is easy to forget: archiving a project is how you get it out
+  // of the way, so its tasks have to leave the results with it - otherwise the
+  // Tasks group puts the name of the project you just hid back on screen.
+  assert.deepEqual(fake.calls.task[0].where?.project, {
+    members: { some: { userId: "user-a" } },
+    isArchived: false,
+  });
+});
+
+test("includeArchived lifts the filter on projects and tasks alike", async () => {
+  const fake = createFakePrisma();
+  const service = new SearchService(fake.prisma as never);
+
+  await service.search(makeQuery({ includeArchived: true }), "user-a");
+
+  assert.equal(fake.calls.project[0].where?.isArchived, undefined);
+  assert.deepEqual(fake.calls.task[0].where?.project, {
+    members: { some: { userId: "user-a" } },
+  });
 });
 
 test("page 2 skips exactly one page, not two", async () => {

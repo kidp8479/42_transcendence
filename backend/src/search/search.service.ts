@@ -99,8 +99,15 @@ export class SearchService {
     };
 
     const taskWhere: Prisma.TaskWhereInput = {
-      // Same rule one hop further out: a task is visible through its project.
-      project: { members: { some: { userId } } },
+      // Same rule one hop further out: a task is visible through its project -
+      // and archived the same way, for the same reason. Archiving a project is
+      // how you get it out of the way; leaving its tasks in the results would
+      // put the name of the project you just hid back on screen, in a group
+      // whose toggle would not even be able to remove it.
+      project: {
+        members: { some: { userId } },
+        ...(includeArchived ? {} : { isArchived: false }),
+      },
       OR: [{ title: contains }, { description: contains }],
       ...(type === "tasks" && isTaskStatus(query.status)
         ? { status: query.status }

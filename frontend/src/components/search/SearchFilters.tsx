@@ -4,10 +4,11 @@
 // Both are contextual, and the rule is simple - never show a control the
 // server would ignore. SearchService applies `status` only to the type that
 // owns the enum value and skips it entirely on type=all, so the dropdown
-// appears on Projects and Tasks only. `includeArchived` on the other hand is
-// applied to the projects predicate whatever the type, so the toggle stays up
-// on All: hiding it there would let an active filter silently shape the
-// results and the tab counter.
+// appears on Projects and Tasks only. `includeArchived` reaches both the
+// project predicate and the task one (a task is archived with its project), so
+// its toggle stays up on All, Projects and Tasks alike - hiding it on a tab it
+// actually filters would let it silently shape the results and the tab counter.
+// Members are the only group it says nothing about.
 //
 // Pure and prop-driven, like every component under components/. It emits a
 // patch and the route decides what that means for the URL - which is also
@@ -20,13 +21,15 @@ import {
   PROJECT_STATUS_STYLES,
 } from "@/lib/projectStatusStyles";
 import type { SearchStatusFilter } from "@/lib/searchApi";
-import type { SearchPageSearch } from "@/lib/searchPageParams";
+import type {
+  SearchPageParams,
+  SearchPageSearch,
+} from "@/lib/searchPageParams";
 import { STATUS_ORDER, STATUS_STYLES } from "@/lib/taskStatusStyles";
 import {
   SEARCH_CONTROL_TRIGGER_CLASS,
   searchDropdownItemTheme,
 } from "@/components/search/searchControlStyles";
-import type { SearchPageParams } from "@/lib/searchPageParams";
 
 interface SearchFiltersProps {
   params: SearchPageParams;
@@ -35,8 +38,10 @@ interface SearchFiltersProps {
 
 export function SearchFilters({ params, onChange }: SearchFiltersProps) {
   const statusOptions = buildStatusOptions(params.type);
-  const canIncludeArchived =
-    params.type === "all" || params.type === "projects";
+  // Everything but Members: the server filters archived projects out of the
+  // task results too, so the Tasks tab needs the same control as the Projects
+  // one - without it the filter is on and there is no way to turn it off.
+  const canIncludeArchived = params.type !== "users";
 
   // Nothing applies on the Members tab - render no toolbar rather than an
   // empty flex row that still eats a gap.
