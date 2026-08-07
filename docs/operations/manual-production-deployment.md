@@ -120,8 +120,8 @@ running it and restore them afterward.
 
 ## 4. Runtime Configuration and Origin Policy
 
-The production runtime file must set `APP_ORIGIN` to
-`https://tomato.iops.dev` and `AUTH_JWT_ISSUER` to
+The production runtime file must set `NODE_ENV=production`, `APP_ORIGIN` to
+`https://tomato.iops.dev`, and `AUTH_JWT_ISSUER` to
 `https://tomato.iops.dev/auth`. The Fedora VM development runtime file must
 use `https://tomato-dev.iops.dev` and `https://tomato-dev.iops.dev/auth`.
 Production and development browser cookies must remain secure.
