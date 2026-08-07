@@ -3,6 +3,16 @@ services:
     ports: !override
       - "127.0.0.1:8081:8080"
       - "127.0.0.1:8444:8443"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fksS --connect-timeout 2 --resolve tomato-dev.iops.dev:8443:127.0.0.1 https://tomato-dev.iops.dev:8443/ > /dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
     environment:
       MODSEC_RULE_ENGINE: "On"
       MODSEC_AUDIT_LOG: /dev/stdout
