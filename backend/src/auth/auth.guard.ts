@@ -15,7 +15,10 @@ import type {
   ProjectApiTokenPermission,
 } from "./authenticated-request";
 import { IS_PUBLIC_KEY } from "./public.decorator";
-import { PROJECT_API_TOKEN_PERMISSION_KEY } from "./project-api-token.constants";
+import {
+  PROJECT_API_TOKEN_PERMISSION_KEY,
+  PROJECT_API_TOKEN_SELF_KEY,
+} from "./project-api-token.constants";
 
 interface IntrospectionResponse {
   active: true;
@@ -56,7 +59,11 @@ export class AuthGuard implements CanActivate {
       this.reflector.getAllAndOverride<ProjectApiTokenPermission>(
         PROJECT_API_TOKEN_PERMISSION_KEY,
         [context.getHandler(), context.getClass()]
-      ) !== undefined;
+      ) !== undefined ||
+      this.reflector.getAllAndOverride<boolean>(PROJECT_API_TOKEN_SELF_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) === true;
     if (isProjectApiTokenRoute) {
       return true;
     }
