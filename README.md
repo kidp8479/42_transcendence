@@ -44,8 +44,8 @@ The team runs a dedicated Discord server, organized into channels per domain (fr
 
 ### Frontend
 
-- **React 19 + Vite + TypeScript** - the mandatory frontend framework. Vite gives fast local rebuilds; TypeScript catches a large class of bugs before they reach the browser.
-- **TanStack Router** - file-based routing with typed params and route loaders. Data fetching goes through route `loader`s (not a client-side cache library like TanStack Query) - each route asks for exactly the data it needs when it's entered, and `router.invalidate()` refreshes it after a mutation. Simpler mental model for a team new to data-fetching patterns.
+- **React 19 + Vite + TypeScript** - the mandatory frontend framework. Vite gives fast local rebuilds during development time; TypeScript catches a large class of bugs before they reach the browser.
+- **TanStack Router** - file-based routing with typed params and route loaders. Data fetching goes through route `loader`s each route asks for exactly the data it needs when it's entered, and `router.invalidate()` refreshes it after a mutation. Simpler mental model for a team new to data-fetching patterns.
 - **Tailwind CSS v4 + Flowbite React** - covers the mandatory CSS framework requirement. Flowbite supplies accessible, pre-built components (modals, dropdowns, forms) on top of Tailwind, so the team spends less time re-solving basic UI accessibility.
 - **Socket.io client** - the browser side of the realtime layer (see Backend below).
 
@@ -75,7 +75,7 @@ A dedicated **Go service**, separate from the NestJS backend. Authentication is 
 ### Infrastructure
 
 - **Docker + Docker Compose** - covers the mandatory containerized, single-command deployment requirement. One `docker compose up` starts every service (frontend, backend, auth, database, Vault, storage, nginx).
-- **Nginx** - the single entrypoint (port 8080 locally, a real domain once deployed) in front of every service. The browser only ever talks to nginx, which forwards each request to the right service internally.
+- **Nginx** - the single entrypoint (port 8080 locally, [deployed version is](https://tomato.iops.dev/)) in front of every service. The browser only ever talks to nginx, which forwards each request to the right service internally.
 
 ## Database Schema
 
@@ -157,7 +157,7 @@ Nine additional tables back the Go auth service: `AuthIdentity` + `PasswordCrede
 ### Core project workspace
 
 - **Discovery tab** - checklist blocks (with notes, color, icon) for laying out the subject before writing code. *Pauline*
-- **Kanban board** - drag-and-drop tasks across To Do / In Progress / Review / Completed, with categories, priorities, and assignees. *Carlos (initial build), Pauline (live sync, notifications, review follow-ups)*
+- **Kanban board** - drag-and-drop tasks across To Do / In Progress / Review / Completed, with categories, priorities, and assignees. *Carlos, Pauline*
 - **Calendar** - month view, categorized events, per-event assignees. *Pauline*
 - **Evaluation Checklist** - Mandatory / Bonus / Supplemental sections tracking defense readiness. *Christophe*
 - **Summary dashboard** - per-project overview (task status, progress by category, team workload, upcoming events, defense readiness), wired to real data from every other tab. *Pauline*
@@ -165,7 +165,7 @@ Nine additional tables back the Go auth service: `AuthIdentity` + `PasswordCrede
 ### Realtime & notifications
 
 - **WebSocket layer** - per-user rooms, live updates broadcast to every connected client. *Pauline*
-- **One-time WebSocket ticket admission** - short-lived, single-use tickets replace a long-lived cookie for WebSocket auth. *Andrei*
+- **One-time WebSocket ticket admission** - short-lived, single-use tickets for WebSocket auth. *Andrei*
 - **Field locks** - shows who's currently editing a field, so two people can't silently overwrite each other. *Andrei*
 - **Notification system** - in-app notifications on assignment, removal, and completion events across tasks, calendar events, checklist, and project membership. *Pauline*
 
@@ -185,21 +185,23 @@ Nine additional tables back the Go auth service: `AuthIdentity` + `PasswordCrede
 
 The subject requires 14 points minimum. Bonus points (up to 5, only counted once the 14 mandatory points are validated) come from modules implemented beyond that minimum.
 
-### Mandatory (14 points required, 17 implemented)
+### Mandatory (14 points required, 20 implemented)
 
 | Module | Type | Pts | Implemented by |
 |---|---|---|---|
-| Use a framework for both the frontend and backend | Web, Major | 2 | Christophe, Pauline, Diana |
+| Use a framework for both the frontend and backend | Web, Major | 2 | whole team |
 | Implement real-time features using WebSockets | Web, Major | 2 | Pauline, Andrei |
 | A public API with a secured API key, rate limiting, and documentation | Web, Major | 2 | Andrei |
-| An organization system | User Management, Major | 2 | Andrei, Diana |
-| Advanced permissions system | User Management, Major | 2 | Andrei, Diana |
+| An organization system | User Management, Major | 2 | Andrei, Diana, Christophe |
+| Advanced permissions system | User Management, Major | 2 | Andrei, Diana, Christophe |
 | Complete accessibility compliance (WCAG 2.1 AA) | Accessibility, Major | 2 | whole team |
-| Use an ORM for the database | Web, Minor | 1 | Christophe, Pauline, Diana |
-| Real-time collaborative features | Web, Minor | 1 | Pauline, Carlos, Christophe, Diana |
+| WAF/ModSecurity + HashiCorp Vault | Cybersecurity, Major | 2 | Andrei |
+| Use an ORM for the database | Web, Minor | 1 | whole team |
+| Real-time collaborative features | Web, Minor | 1 | Pauline, Christophe, Diana |
 | A complete notification system | Web, Minor | 1 | Pauline |
 | User activity analytics and insights dashboard | User Management, Minor | 1 | Pauline |
 | Support for additional browsers | Accessibility, Minor | 1 | whole team |
+| Advanced search functionality | Web, Minor | 1 | Carlos |
 
 - **Framework (Major)**: React (frontend) and NestJS (backend), both from the app's initial scaffolding.
 - **WebSockets (Major)**: a Socket.io gateway with per-user rooms, powering live updates on Discovery, the Evaluation Checklist, project membership, and Calendar, plus notifications and field locks.
@@ -207,35 +209,37 @@ The subject requires 14 points minimum. Bonus points (up to 5, only counted once
 - **Organization system (Major)**: a `Project` is this app's organizational unit - create/edit/delete a project, add/remove members, manage roles.
 - **Advanced permissions (Major)**: `OWNER` / `ADMIN` / `MEMBER` roles per project, with different views and actions available depending on role (e.g. only `OWNER`/`ADMIN` can remove members or delete the project).
 - **Accessibility compliance (Major)**: a page-by-page pass across the app has fixed contrast, focus rings, semantic HTML, and ARIA labeling on our pages.
+- **WAF/ModSecurity + HashiCorp Vault (Major)**: OWASP CoreRuleSet ModSecurity image fronting nginx, with a custom rule file for this app, blocking mode in production. HashiCorp Vault issues short-lived, dynamically-generated PostgreSQL credentials to both the Go auth service and the NestJS backend.
 - **ORM (Minor)**: Prisma, used for every table in the schema.
 - **Real-time collaborative features (Minor)**: live sync across Discovery, Kanban, the Evaluation Checklist, and project membership - a change made by one member appears for everyone else connected, without a page refresh.
 - **Notification system (Minor)**: in-app notifications on assignment, removal, and completion events across tasks, calendar events, checklist progress, and project membership.
 - **User activity analytics (Minor)**: the Summary dashboard, pulling live data from every other tab (task status, progress by category, team workload, upcoming events, defense readiness).
 - **Support for additional browsers (Minor)**: confirmed working on Chrome, Brave, Firefox, and Zen Browser.
+- **Advanced search (Minor)**: scoped cross-project search with filters, sorting, and pagination, available from the header on every page.
 
-### Toward the bonus (in progress)
+### Toward the bonus (in progress, temporary section)
 
 | Module | Type | Pts | Working on it |
 |---|---|---|---|
 | Allow users to interact with other users (chat, profile, friends) | Web, Major | 2 | Christophe |
 | Standard user management and authentication | User Management, Major | 2 | Christophe |
-| WAF/ModSecurity + HashiCorp Vault | Cybersecurity, Major | 2 | Andrei |
 | Implement remote authentication with OAuth 2.0 | User Management, Minor | 1 | Andrei |
-| Advanced search functionality | Web, Minor | 1 | Carlos |
 
-8 more points in progress - comfortable margin against the 5-point bonus cap, in case any single one isn't validated during evaluation.
+- **Allow users to interact with other users + Allow users to interact with other users (chat, profile, friends)**: group chat is done and merged; the friends/user-profile half of this module is still in progress, needed to validate the module as a whole.
+
+5 more points in progress - comfortable margin against the 5-point bonus cap, in case any single one isn't validated during evaluation.
 
 ## Individual Contributions
 
 **Andrei** - Auth foundation (Argon2id, sessions), the JWT + refresh-token-family cutover, one-time WebSocket ticket admission, Vault-backed dynamic database credentials, realtime field locks, and project-bound public API tokens.
 
-**Pauline** - Initial frontend (TanStack Router) and backend (NestJS + Prisma) scaffolding, landing page, project layout and Summary tab, Discovery tab, Calendar, the WebSocket layer and notification system, and the Kanban board's live-sync/notification follow-ups.
+**Carlos** - Footer and legal pages, the project list and creation flow, the Kanban board's initial build, and (in progress) the workspace search bar.
 
-**Christophe** - Also part of the initial frontend/backend scaffolding, then the sidebar, RustFS-backed storage, avatar upload and user settings, the Evaluation Checklist, and (in progress) group chat.
+**Christophe** - Initial frontend (TanStack Router) and backend (NestJS + Prisma) scaffolding, then the sidebar, RustFS-backed storage, avatar upload and user settings, the Evaluation Checklist, the friend system and the group chat.
 
 **Diana** - Also part of the initial frontend/backend scaffolding, then shared layout fixes and Project Settings (member management, roles, project lifecycle).
 
-**Carlos** - Footer and legal pages, the project list and creation flow, the Kanban board's initial build, and (in progress) the workspace search bar.
+**Pauline** - Also part of the initial frontend/backend scaffolding, landing page, project layout and Summary tab, Discovery tab, Calendar, the WebSocket layer and notification system, and the Kanban board's live-sync/notification follow-ups.
 
 ## Resources
 
@@ -253,4 +257,4 @@ The subject requires 14 points minimum. Bonus points (up to 5, only counted once
 
 ### AI usage
 
-Claude (Anthropic) was used across the project to accelerate bootstrapping and scaffolding, as a Socratic tutor when learning a new concept or tool, to help track down bugs, and as a safety net during PR review. Used deliberately and reviewed by a team member, not as a substitute for understanding the code.
+Claude + Copilot were used across the project to accelerate bootstrapping and scaffolding, as a Socratic tutor when learning a new concept or tool, to help track down bugs, and as a safety net during PR review. Used deliberately and reviewed by a team member, not as a substitute for understanding the code.
