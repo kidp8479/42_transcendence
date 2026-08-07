@@ -12,7 +12,7 @@ import {
   TextInput,
   // ToggleSwitch,
 } from "flowbite-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { HiOutlineExclamationTriangle } from "react-icons/hi2";
 import {
   darkSurfaceModalCancelButtonClass,
@@ -80,6 +80,14 @@ function UserSettingsPage() {
   const [openModalUploadAvatar, setOpenModalUploadAvatar] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
+  // dragenter/dragleave fire on every element under the pointer, including
+  // the dropzone's own children (icon, text) - moving over one of those
+  // fires a dragleave on the parent label immediately followed by a
+  // dragenter back, which a plain boolean toggles off and back on for every
+  // such transition (visible as constant flicker). A counter only reports
+  // "not dragging" once it truly returns to 0 - i.e. the pointer left the
+  // whole label, not just one child inside it.
+  const dragCounterRef = useRef(0);
   const [deleteAccountStep, setDeleteAccountStep] =
     useState<DeleteAccountStep | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
@@ -266,14 +274,20 @@ function UserSettingsPage() {
             onDragOver={(e) => e.preventDefault()}
             onDragEnter={(e) => {
               e.preventDefault();
+              dragCounterRef.current += 1;
               setIsDraggingAvatar(true);
             }}
             onDragLeave={(e) => {
               e.preventDefault();
-              setIsDraggingAvatar(false);
+              dragCounterRef.current -= 1;
+              if (dragCounterRef.current <= 0) {
+                dragCounterRef.current = 0;
+                setIsDraggingAvatar(false);
+              }
             }}
             onDrop={(e) => {
               e.preventDefault();
+              dragCounterRef.current = 0;
               setIsDraggingAvatar(false);
               setOpenModalUploadAvatar(false);
               handleUpload(e.dataTransfer.files[0] ?? null);
