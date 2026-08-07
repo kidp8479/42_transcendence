@@ -7,6 +7,16 @@ services:
   nginx:
     ports: !override
       - "127.0.0.1:${APP_INGRESS_PORT:?set_app_ingress_port}:8443"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fksS --connect-timeout 2 --resolve tomato.iops.dev:8443:127.0.0.1 https://tomato.iops.dev:8443/ > /dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
     environment:
       MODSEC_RULE_ENGINE: "On"
       MODSEC_AUDIT_LOG: /dev/stdout
