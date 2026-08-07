@@ -112,10 +112,11 @@ The VM school release uses
 other checkout uses the ignored `.env.school` file in that checkout instead.
 Run `make recreate-env-school` to generate the selected runtime file from
 `.env.example` with fresh local secrets and the required school origin and
-issuer. The target creates the VM parent directory with mode `0700` and each
-runtime file with restrictive permissions. It intentionally overwrites an
-existing school runtime file; retain any evaluator-specific OAuth credentials
-before running it and restore them afterward.
+issuer. The VM `/srv/transcendence/school/secrets` directory is host
+provisioning and must exist with mode `0700`; the target creates each runtime
+file with restrictive permissions. It intentionally overwrites an existing
+school runtime file; retain any evaluator-specific OAuth credentials before
+running it and restore them afterward.
 
 ## 4. Runtime Configuration and Origin Policy
 
