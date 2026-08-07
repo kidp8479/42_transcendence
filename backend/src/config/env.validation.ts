@@ -7,6 +7,10 @@ import * as Joi from "joi";
 import { isValidConfiguredBrowserOrigin } from "../security/origin-policy";
 
 export const envValidationSchema = Joi.object({
+  NODE_ENV: Joi.string()
+    .valid("development", "production", "test")
+    .default("development"),
+  AUTH_CSRF_COOKIE: Joi.string().default("tr_csrf"),
   PORT: Joi.number().port().default(3000),
   APP_ORIGIN: Joi.string()
     .required()
