@@ -82,7 +82,14 @@ interface FriendProfile {
   campus: string | null;
   avatarUrl: string | null;
   status: FriendshipStatus;
+  online: boolean;
 }
+
+// Presence isn't pushed live over the socket (RealtimeService.isUserOnline
+// reads it fresh per request, nothing broadcasts on connect/disconnect) - the
+// friends list re-checks everyone on screen at this interval instead so it
+// doesn't just go stale for the rest of the visit.
+const PRESENCE_REFRESH_INTERVAL_MS = 20_000;
 
 // Only shown for a relationship that isn't settled yet - an accepted friend
 // or a blocked user don't need an extra status line under their name in the
@@ -118,6 +125,7 @@ function toFriendProfile(
     campus: profile.campus,
     avatarUrl: profile.avatarUrl,
     status,
+    online: profile.online,
   };
 }
 
@@ -272,6 +280,40 @@ function FriendsPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast is stable
   }, [currentUserId]);
+
+  // Keeps online/offline honest while the page stays open (see
+  // PRESENCE_REFRESH_INTERVAL_MS's own comment). Only ACCEPTED friends ever
+  // show a presence indicator (see FriendRow/ProfilePanel), so pending
+  // requests and blocked users are excluded here too - no point spending
+  // part of the shared 300 req/60s throttle budget (app.module.ts) polling
+  // for a status nothing on screen displays. Depends on the id set, not the
+  // `friends` array itself - that array gets a new reference on every tick
+  // this effect produces, which would otherwise tear down and reschedule the
+  // interval every single cycle instead of letting it run on its own cadence.
+  const acceptedFriendIds = friends
+    .filter((friend) => friend.status === "ACCEPTED")
+    .map((friend) => friend.id)
+    .join(",");
+  useEffect(() => {
+    if (acceptedFriendIds.length === 0) return;
+    const ids = acceptedFriendIds.split(",");
+    const interval = window.setInterval(() => {
+      Promise.allSettled(ids.map((id) => getUserProfile(id))).then(
+        (settled) => {
+          setFriends((previous) =>
+            previous.map((friend) => {
+              const index = ids.indexOf(friend.id);
+              const result = index === -1 ? undefined : settled[index];
+              return result?.status === "fulfilled"
+                ? { ...friend, online: result.value.online }
+                : friend;
+            })
+          );
+        }
+      );
+    }, PRESENCE_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [acceptedFriendIds]);
 
   function setStatus(id: string, status: FriendshipStatus, message: string) {
     setFriends((previous) =>
@@ -471,12 +513,25 @@ function FriendRow({
         active ? "bg-surface-overlay" : ""
       }`}
     >
-      <Avatar
-        img={friend.avatarUrl ?? undefined}
-        placeholderInitials={initialsOf(friend)}
-        rounded
-        size="sm"
-      />
+      <div className="relative shrink-0">
+        <Avatar
+          img={friend.avatarUrl ?? undefined}
+          placeholderInitials={initialsOf(friend)}
+          rounded
+          size="sm"
+        />
+        {/* Presence only shown for settled friendships - a pending or
+            blocked relationship isn't a "friend" yet, so their connection
+            status stays private the same way it would be for a stranger. */}
+        {friend.status === "ACCEPTED" && (
+          <span
+            aria-hidden="true"
+            className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-base ${
+              friend.online ? "bg-status-completed" : "bg-text-muted"
+            }`}
+          />
+        )}
+      </div>
       <div className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-text-primary">
           {friend.displayedName}
@@ -488,6 +543,24 @@ function FriendRow({
         )}
       </div>
     </button>
+  );
+}
+
+function PresenceBadge({ online }: { online: boolean }) {
+  // Same pill shape as the project status badges (ProjectCard.tsx's
+  // STATUS_META) rather than flowbite-react's <Badge> - that component's
+  // built-in colors don't map onto this app's status-* tokens, and this repo
+  // already has an established "status pill" pattern to match instead.
+  return (
+    <span
+      className={`w-fit rounded-md px-1 py-0.5 text-[10px] font-semibold ${
+        online
+          ? "bg-status-completed/15 text-status-completed"
+          : "bg-control-error/15 text-control-error"
+      }`}
+    >
+      {online ? "Online" : "Offline"}
+    </span>
   );
 }
 
@@ -641,6 +714,11 @@ function ProfilePanel({
             <span className="text-sm font-semibold text-text-primary">
               {friend.username}
             </span>
+            {/* Same rule as FriendRow's dot - a pending/blocked relationship
+                isn't a friend yet, so no presence is shown for them. */}
+            {friend.status === "ACCEPTED" && (
+              <PresenceBadge online={friend.online} />
+            )}
           </div>
 
           <dl className="flex w-full max-w-s min-w-0 flex-col px-4 gap-2.5">

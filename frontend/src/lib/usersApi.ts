@@ -10,6 +10,10 @@ export interface PublicUserProfile {
   email: string;
   avatarUrl: string | null;
   campus: string | null;
+  // Computed fresh per request from whether the user currently has a live
+  // WebSocket connection (see RealtimeService.isUserOnline) - never a
+  // stored/cached value, so it's only ever as stale as this one response.
+  online: boolean;
 }
 
 // GET /users/:id - resolves any user id into their public profile. Used to
@@ -27,7 +31,8 @@ export function parsePublicUserProfile(value: unknown): PublicUserProfile {
     typeof value.username !== "string" ||
     typeof value.email !== "string" ||
     !isNullableString(value.avatarUrl) ||
-    !isNullableString(value.campus)
+    !isNullableString(value.campus) ||
+    typeof value.online !== "boolean"
   ) {
     throw new Error("User profile response is invalid");
   }
@@ -38,6 +43,7 @@ export function parsePublicUserProfile(value: unknown): PublicUserProfile {
     email: value.email,
     avatarUrl: value.avatarUrl,
     campus: value.campus,
+    online: value.online,
   };
 }
 

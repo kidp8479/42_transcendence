@@ -17,6 +17,16 @@ export class RealtimeService {
     this.gateway.server.to(`user:${userId}`).emit(event, payload);
   }
 
+  // A user is "online" iff they have at least one live socket in their
+  // personal room - the same room emitToUser targets, joined in
+  // RealtimeGateway.joinRooms. No separate presence state is tracked here;
+  // this just reads what Socket.IO's adapter already knows (a room is
+  // dropped the moment its last socket leaves it, so a plain `.has()` is
+  // enough - no need to also check the member count).
+  isUserOnline(userId: string): boolean {
+    return this.gateway.server.sockets.adapter.rooms.has(`user:${userId}`);
+  }
+
   async withValidatedFieldLock<T>(
     projectId: string,
     key: string,
