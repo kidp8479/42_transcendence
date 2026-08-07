@@ -27,7 +27,6 @@ import { Route as AuthenticatedFriendsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedProjectIdRouteRouteImport } from './routes/_authenticated/$projectId/route'
-import { Route as AuthenticatedUsersUsernameRouteImport } from './routes/_authenticated/users/$username'
 import { Route as AuthenticatedProjectIdSummaryRouteImport } from './routes/_authenticated/$projectId/summary'
 import { Route as AuthenticatedProjectIdProjectSettingsRouteImport } from './routes/_authenticated/$projectId/project-settings'
 import { Route as AuthenticatedProjectIdListRouteImport } from './routes/_authenticated/$projectId/list'
@@ -127,12 +126,6 @@ const AuthenticatedProjectIdRouteRoute =
     path: '/$projectId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedUsersUsernameRoute =
-  AuthenticatedUsersUsernameRouteImport.update({
-    id: '/users/$username',
-    path: '/users/$username',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedProjectIdSummaryRoute =
   AuthenticatedProjectIdSummaryRouteImport.update({
     id: '/summary',
@@ -206,7 +199,6 @@ export interface FileRoutesByFullPath {
   '/$projectId/list': typeof AuthenticatedProjectIdListRoute
   '/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
-  '/users/$username': typeof AuthenticatedUsersUsernameRoute
   '/$projectId/discovery/$discoveryBlockId/edit': typeof AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute
 }
 export interface FileRoutesByTo {
@@ -233,7 +225,6 @@ export interface FileRoutesByTo {
   '/$projectId/list': typeof AuthenticatedProjectIdListRoute
   '/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
-  '/users/$username': typeof AuthenticatedUsersUsernameRoute
   '/$projectId/discovery/$discoveryBlockId/edit': typeof AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute
 }
 export interface FileRoutesById {
@@ -263,7 +254,6 @@ export interface FileRoutesById {
   '/_authenticated/$projectId/list': typeof AuthenticatedProjectIdListRoute
   '/_authenticated/$projectId/project-settings': typeof AuthenticatedProjectIdProjectSettingsRoute
   '/_authenticated/$projectId/summary': typeof AuthenticatedProjectIdSummaryRoute
-  '/_authenticated/users/$username': typeof AuthenticatedUsersUsernameRoute
   '/_authenticated/$projectId/discovery_/$discoveryBlockId/edit': typeof AuthenticatedProjectIdDiscoveryDiscoveryBlockIdEditRoute
 }
 export interface FileRouteTypes {
@@ -292,7 +282,6 @@ export interface FileRouteTypes {
     | '/$projectId/list'
     | '/$projectId/project-settings'
     | '/$projectId/summary'
-    | '/users/$username'
     | '/$projectId/discovery/$discoveryBlockId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -319,7 +308,6 @@ export interface FileRouteTypes {
     | '/$projectId/list'
     | '/$projectId/project-settings'
     | '/$projectId/summary'
-    | '/users/$username'
     | '/$projectId/discovery/$discoveryBlockId/edit'
   id:
     | '__root__'
@@ -348,7 +336,6 @@ export interface FileRouteTypes {
     | '/_authenticated/$projectId/list'
     | '/_authenticated/$projectId/project-settings'
     | '/_authenticated/$projectId/summary'
-    | '/_authenticated/users/$username'
     | '/_authenticated/$projectId/discovery_/$discoveryBlockId/edit'
   fileRoutesById: FileRoutesById
 }
@@ -486,13 +473,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectIdRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/users/$username': {
-      id: '/_authenticated/users/$username'
-      path: '/users/$username'
-      fullPath: '/users/$username'
-      preLoaderRoute: typeof AuthenticatedUsersUsernameRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/$projectId/summary': {
       id: '/_authenticated/$projectId/summary'
       path: '/summary'
@@ -591,7 +571,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
   AuthenticatedUserSettingsRoute: typeof AuthenticatedUserSettingsRoute
-  AuthenticatedUsersUsernameRoute: typeof AuthenticatedUsersUsernameRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -603,7 +582,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
   AuthenticatedUserSettingsRoute: AuthenticatedUserSettingsRoute,
-  AuthenticatedUsersUsernameRoute: AuthenticatedUsersUsernameRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
