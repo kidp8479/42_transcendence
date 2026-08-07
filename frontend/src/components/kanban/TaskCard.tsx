@@ -100,6 +100,10 @@ export const TaskCard = memo(function TaskCard({
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // stopPropagation so Escape only closes this confirmation - without
+        // it, the event also bubbles to SideBarCmp's own window-level Escape
+        // listener, which collapses the sidebar at the same time.
+        event.stopPropagation();
         setIsConfirmingDelete(false);
       }
     }
