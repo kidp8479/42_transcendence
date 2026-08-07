@@ -29,13 +29,17 @@ export function ErrorScreen({
   const isAuthenticated = authState?.status === "authenticated";
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center p-8">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-8">
       {/* same color tokens as the error toast (ToastProvider.tsx) - full-page
       and centered instead of a corner popup, since this replaces a page that
-      failed to load rather than reacting to a transient action */}
+      failed to load rather than reacting to a transient action.
+      Centered with m-auto on the card rather than justify-center on the
+      parent: with a scrollable parent, justify-center pushes the top of an
+      overflowing child out of the scrollable region, where it can't be
+      reached. m-auto centers the same way without that failure mode. */}
       <div
         role="alert"
-        className="flex max-w-md flex-col items-center gap-3 rounded-lg border border-control-error bg-red-950 p-6 text-center text-red-100 shadow-lg"
+        className="m-auto flex max-w-md flex-col items-center gap-3 rounded-lg border border-control-error bg-red-950 p-6 text-center text-red-100 shadow-lg"
       >
         <p className="font-mono text-lg font-semibold">{title}</p>
         <p className="text-sm">{message}</p>
