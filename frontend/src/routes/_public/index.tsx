@@ -4,13 +4,19 @@
  * can resolve the application's entry point.
  * Renders the LandingPage component.
  */
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Carousel } from "flowbite-react";
 import { useModal } from "../../hooks/useModal";
 
-// TO DISCUSS: if we want logged-in users to skip the landing page and go straight to /dashboard,
-// add a beforeLoad here that checks localStorage for a token and throws redirect({ to: '/dashboard' }).
 export const Route = createFileRoute("/_public/")({
+  // Mirror of _authenticated/route.tsx's own guard: a logged-in visitor
+  // typing the site's URL expects to land on their actual workspace, not a
+  // marketing page they've already converted from.
+  beforeLoad: ({ context }) => {
+    if (context.authState.status === "authenticated") {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   component: LandingPage,
 });
 
