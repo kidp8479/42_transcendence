@@ -34,7 +34,7 @@ export class UsersController {
   @ApiBearerAuth("access-token")
   @Get("me")
   async findMe(@Req() request: AuthenticatedRequest) {
-    return this.usersService.findById(request.user.id);
+    return this.usersService.findMe(request.user.id);
   }
 
   @ApiBearerAuth("access-token")

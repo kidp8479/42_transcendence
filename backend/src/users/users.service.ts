@@ -9,6 +9,9 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService, StoredObject } from "../storage/storage.service";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { userInfo } from "os";
+
+const USER_NOT_FOUND_ERR_MSG = "User not found";
 
 // Matches the exact shape uploadAvatar generates below
 // (avatar-{userId}-{uuid}-{safeOriginalName}, where safeOriginalName is
@@ -36,6 +39,14 @@ const SAFE_USER_SELECT = {
   updatedAt: true,
 } as const;
 
+const SAFE_PUBLIC_USER_SELECT = {
+  id: true,
+  email: true,
+  username: true,
+  avatarUrl: true,
+  campus: true,
+} as const;
+
 function throwIfBadRequest(key: string) {
   if (!AVATAR_KEY_PATTERN.test(key) || key.includes("..")) {
     throw new BadRequestException("Invalid avatar key");
@@ -50,13 +61,24 @@ export class UsersService {
     private readonly config: ConfigService
   ) {}
 
-  async findById(id: string) {
+  async findMe(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: SAFE_USER_SELECT,
     });
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException(USER_NOT_FOUND_ERR_MSG);
+    }
+    return user;
+  }
+
+  async findById(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: SAFE_PUBLIC_USER_SELECT,
+    });
+    if (!user) {
+      throw new NotFoundException(USER_NOT_FOUND_ERR_MSG);
     }
     return user;
   }
