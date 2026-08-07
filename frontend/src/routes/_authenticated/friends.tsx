@@ -620,14 +620,21 @@ function FriendRow({
           rounded
           size="sm"
         />
-        {/* Presence only shown for settled friendships - a pending or
-            blocked relationship isn't a "friend" yet, so their connection
-            status stays private the same way it would be for a stranger. */}
-        {friend.status === "ACCEPTED" && (
+        {/* Presence hidden for a pending relationship - it isn't a "friend"
+            yet, so their connection status stays private the same way it
+            would be for a stranger. BLOCKED keeps the dot instead of hiding
+            it (a block shouldn't quietly reshape the layout), but always
+            pinned to offline - real presence must never leak to someone
+            you've blocked, same intent as the backend's own "a block is
+            never observable" rule (see friendsApi.ts's
+            deriveFriendshipStatus). */}
+        {(friend.status === "ACCEPTED" || friend.status === "BLOCKED") && (
           <span
             aria-hidden="true"
             className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-base ${
-              friend.online ? "bg-status-completed" : "bg-text-muted"
+              friend.status === "ACCEPTED" && friend.online
+                ? "bg-status-completed"
+                : "bg-text-muted"
             }`}
           />
         )}
@@ -814,10 +821,12 @@ function ProfilePanel({
             <span className="text-sm font-semibold text-text-primary">
               {friend.username}
             </span>
-            {/* Same rule as FriendRow's dot - a pending/blocked relationship
-                isn't a friend yet, so no presence is shown for them. */}
-            {friend.status === "ACCEPTED" && (
-              <PresenceBadge online={friend.online} />
+            {/* Same rule as FriendRow's dot - hidden for pending, kept but
+                pinned to offline for BLOCKED. */}
+            {(friend.status === "ACCEPTED" || friend.status === "BLOCKED") && (
+              <PresenceBadge
+                online={friend.status === "ACCEPTED" && friend.online}
+              />
             )}
           </div>
 
