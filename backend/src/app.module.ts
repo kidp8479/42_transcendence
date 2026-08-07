@@ -31,6 +31,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
 import { ProjectApiTokensModule } from "./project-api-tokens/project-api-tokens.module";
 import { PublicApiModule } from "./public-api/public-api.module";
 import { ChatModule } from "./chat/chat.module";
+import { SearchModule } from "./search/search.module";
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { ChatModule } from "./chat/chat.module";
     ChatModule,
     ProjectApiTokensModule,
     PublicApiModule,
+    SearchModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [

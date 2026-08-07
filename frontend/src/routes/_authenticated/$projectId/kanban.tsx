@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { KanbanCardDrawer } from "@/components/drawers/kanban/KanbanCardDrawer";
 import type { TaskDraft } from "@/components/drawers/kanban/KanbanCardDrawer";
@@ -40,6 +40,19 @@ async function loadKanbanPageData(projectId: string) {
 }
 
 export const Route = createFileRoute("/_authenticated/$projectId/kanban")({
+  // ?task=<id> opens the board with that card's drawer already open. It exists
+  // for the search results, which used to drop you on the board and leave you
+  // to find the card yourself. Optional and permissive: an unknown id just
+  // opens the board, it never errors.
+  //
+  // `task` is named even when it is rejected, for the reason searchPageParams.ts
+  // documents at length: the router MERGES this over the raw params instead of
+  // replacing them, so returning `{}` leaves whatever was in the URL in place.
+  // ?task=42 is parsed as a number before it gets here, and returning `{}` let
+  // that number through under a type that promises a string.
+  validateSearch: (search: Record<string, unknown>): { task?: string } => ({
+    task: typeof search.task === "string" ? search.task : undefined,
+  }),
   loader: (routeContext) => loadKanbanPageData(routeContext.params.projectId),
   component: KanbanPage,
 });
@@ -93,6 +106,8 @@ function sameAssignees(current: string[], previous: string[]): boolean {
 function KanbanPage() {
   const { projectId } = Route.useParams();
   const loaderData = Route.useLoaderData();
+  const { task: taskIdFromUrl } = Route.useSearch();
+  const navigate = useNavigate();
   const safeInvalidateRouter = useSafeRouterInvalidate();
   const { showToast } = useToast();
 
@@ -151,6 +166,34 @@ function KanbanPage() {
   const closeDrawer = useCallback(() => {
     setDrawer((current) => ({ ...current, isOpen: false }));
   }, []);
+
+  // ?task=<id> (a search result linking straight at a card) opens that card's
+  // drawer, then drops the parameter from the URL with a replace: it has done
+  // its job, and leaving it there would reopen the drawer on every reload and
+  // on every Back into this page. An id that isn't on this board - a stale
+  // link, another project's task - is dropped just as quietly.
+  const openedFromUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!taskIdFromUrl || openedFromUrlRef.current === taskIdFromUrl) {
+      return;
+    }
+    openedFromUrlRef.current = taskIdFromUrl;
+
+    if (tasksRef.current.some((task) => task.id === taskIdFromUrl)) {
+      openDrawer({ mode: "edit", taskId: taskIdFromUrl });
+    }
+    void navigate({
+      to: "/$projectId/kanban",
+      params: { projectId },
+      search: {},
+      replace: true,
+      // Same route, same params - this is a URL rewrite, not a page change,
+      // and jumping the board back to the top would undo the scroll the
+      // drawer opening just implied.
+      resetScroll: false,
+    });
+  }, [taskIdFromUrl, openDrawer, navigate, projectId]);
 
   // Live board sync: remote broadcasts from tasks.service.ts's
   // emitToProject calls dispatch into the same reducer as local edits, same
