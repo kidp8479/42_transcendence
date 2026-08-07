@@ -372,20 +372,24 @@ export class TasksService {
       const previousAssigneeIds = existingTask.assignees.map(
         (assignee) => assignee.id
       );
-      await this.notifyNewAssignees(
-        projectId,
-        previousAssigneeIds,
-        assigneeIds,
-        actor.kind === "USER" ? actor.userId : undefined,
-        dto.title ?? existingTask.title
-      );
-      await this.notifyRemovedAssignees(
-        projectId,
-        previousAssigneeIds,
-        assigneeIds,
-        actor.kind === "USER" ? actor.userId : undefined,
-        dto.title ?? existingTask.title
-      );
+      // Independent notification sets (added vs removed assignees), no
+      // shared state between them - safe to run concurrently.
+      await Promise.all([
+        this.notifyNewAssignees(
+          projectId,
+          previousAssigneeIds,
+          assigneeIds,
+          actor.kind === "USER" ? actor.userId : undefined,
+          dto.title ?? existingTask.title
+        ),
+        this.notifyRemovedAssignees(
+          projectId,
+          previousAssigneeIds,
+          assigneeIds,
+          actor.kind === "USER" ? actor.userId : undefined,
+          dto.title ?? existingTask.title
+        ),
+      ]);
     }
 
     // Membership already asserted by findById() at the top of update() -

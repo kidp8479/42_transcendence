@@ -254,21 +254,26 @@ export class CalendarEventsService {
       const previousAssigneeIds = existingEvent.assignees.map(
         (assignee) => assignee.id
       );
-      await this.notifyNewAssignees(
-        projectId,
-        previousAssigneeIds,
-        assigneeIds,
-        userId,
-        (projectName) => `You were added to "${eventTitle}" on "${projectName}"`
-      );
-      await this.notifyRemovedAssignees(
-        projectId,
-        previousAssigneeIds,
-        assigneeIds,
-        userId,
-        (projectName) =>
-          `You were removed from "${eventTitle}" on "${projectName}"`
-      );
+      // Independent notification sets (added vs removed assignees), no
+      // shared state between them - safe to run concurrently.
+      await Promise.all([
+        this.notifyNewAssignees(
+          projectId,
+          previousAssigneeIds,
+          assigneeIds,
+          userId,
+          (projectName) =>
+            `You were added to "${eventTitle}" on "${projectName}"`
+        ),
+        this.notifyRemovedAssignees(
+          projectId,
+          previousAssigneeIds,
+          assigneeIds,
+          userId,
+          (projectName) =>
+            `You were removed from "${eventTitle}" on "${projectName}"`
+        ),
+      ]);
     }
 
     return this.findById(id, projectId, userId);
