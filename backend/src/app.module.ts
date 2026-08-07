@@ -32,6 +32,7 @@ import { ProjectApiTokensModule } from "./project-api-tokens/project-api-tokens.
 import { PublicApiModule } from "./public-api/public-api.module";
 import { ChatModule } from "./chat/chat.module";
 import { SearchModule } from "./search/search.module";
+import { UserRelationshipsModule } from "./user-relationships/user-relationships.module";
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { SearchModule } from "./search/search.module";
     ProjectApiTokensModule,
     PublicApiModule,
     SearchModule,
+    UserRelationshipsModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [

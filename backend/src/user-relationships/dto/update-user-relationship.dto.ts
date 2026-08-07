@@ -1,4 +1,7 @@
-import { CreateUserRelationshipDto } from "./create-user-relationship.dto";
-import { PartialType } from "@nestjs/mapped-types";
+import { IsEnum } from "class-validator";
+import { RelationshipStatus } from "@prisma/client";
 
-export class UpdateUserRelationshipDto extends PartialType(CreateUserRelationshipDto) {}
+export class UpdateUserRelationshipDto {
+  @IsEnum(RelationshipStatus)
+  status: RelationshipStatus;
+}
