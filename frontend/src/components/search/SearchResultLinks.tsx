@@ -150,10 +150,13 @@ export function UserResultLink({
     // arrangement as ProjectCard's "..." menu over its stretched card link.
     <div className="relative">
       <Link
-        // First links in the repo to point at this route - it is still a stub
-        // page, but the destination is the right one.
-        to="/users/$username"
-        params={{ username: user.username }}
+        // Opens the friends page with this user preselected in the right
+        // panel (FriendsPage's focusedProfile) rather than the standalone
+        // /users/$username stub - see friends.tsx's file header for why:
+        // it reuses that page's whole profile panel + action set for free,
+        // friend or not, instead of duplicating it on a second route.
+        to="/friends"
+        search={{ userId: user.id }}
         className="block"
       >
         <SearchResultRow

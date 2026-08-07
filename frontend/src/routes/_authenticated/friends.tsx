@@ -34,6 +34,7 @@ import { authSessionResource } from "@/lib/authState";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import {
   deriveFriendshipStatus,
+  getUserRelationship,
   getUserRelationships,
   parseUserRelationship,
   removeFriendRelationship,
@@ -43,7 +44,18 @@ import {
 } from "@/lib/friendsApi";
 import { getUserProfile, type PublicUserProfile } from "@/lib/usersApi";
 
+// ?userId=<id> - how search (SearchResultLinks.tsx's UserResultLink) opens a
+// profile that isn't a friend yet: it links straight here instead of to its
+// own page, so the existing two-pane layout and action handlers below just
+// work for a stranger too (see FriendsPage's focusedProfile state).
+interface FriendsPageSearch {
+  userId?: string;
+}
+
 export const Route = createFileRoute("/_authenticated/friends")({
+  validateSearch: (search: Record<string, unknown>): FriendsPageSearch => ({
+    userId: typeof search.userId === "string" ? search.userId : undefined,
+  }),
   component: FriendsPage,
 });
 
@@ -175,6 +187,34 @@ async function loadFriends(currentUserId: string): Promise<FriendProfile[]> {
   return friends;
 }
 
+// Resolves one specific user into a FriendProfile, whatever their status -
+// unlike loadFriends, this doesn't assume a relationship already exists
+// (that's the whole point: it's how a search result that isn't a friend yet
+// gets a profile to show at all). getUserRelationship returns 0-2 rows for
+// just this pair; the mine/theirs split mirrors loadFriends' own grouping,
+// just for a single id instead of the caller's whole list.
+async function loadFocusedProfile(
+  currentUserId: string,
+  targetId: string
+): Promise<FriendProfile> {
+  const [profile, relationships] = await Promise.all([
+    getUserProfile(targetId),
+    getUserRelationship(targetId),
+  ]);
+
+  let mine: RelationshipStatus | undefined;
+  let theirs: RelationshipStatus | undefined;
+  for (const relationship of relationships) {
+    if (relationship.requesterId === currentUserId) {
+      mine = relationship.status;
+    } else {
+      theirs = relationship.status;
+    }
+  }
+
+  return toFriendProfile(profile, deriveFriendshipStatus(mine, theirs));
+}
+
 function initialsOf(friend: FriendProfile): string {
   const fromName =
     `${friend.firstName.charAt(0)}${friend.lastName.charAt(0)}`.toUpperCase();
@@ -188,6 +228,7 @@ function initialsOf(friend: FriendProfile): string {
 
 function FriendsPage() {
   const { showToast } = useToast();
+  const { userId: focusedUserId } = Route.useSearch();
   const authState = authSessionResource.getState();
   const currentUserId =
     authState?.status === "authenticated" ? authState.session.user.id : null;
@@ -195,11 +236,21 @@ function FriendsPage() {
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A profile opened from search that isn't in `friends` (no relationship
+  // exists yet) - kept separate from the relationships-backed list rather
+  // than injected into it, so it never has to be reconciled back out if the
+  // user navigates away without acting on it. `friends.find` below always
+  // wins over this once the id genuinely has a relationship (see setStatus).
+  const [focusedProfile, setFocusedProfile] = useState<FriendProfile | null>(
+    null
+  );
   // Below md, the friends list and the profile panel can't fit side-by-side,
   // so only one shows at a time - same pattern as chat.tsx's mobileView.
   const [mobileView, setMobileView] = useState<"list" | "profile">("list");
 
-  const selected = friends.find((friend) => friend.id === selectedId) ?? null;
+  const selected =
+    friends.find((friend) => friend.id === selectedId) ??
+    (focusedProfile?.id === selectedId ? focusedProfile : null);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -226,6 +277,43 @@ function FriendsPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast is stable
   }, [currentUserId]);
+
+  // Opens the profile named by ?userId= (see SearchResultLinks.tsx) even if
+  // it's nobody's friend yet. Always fetches, regardless of whether the id
+  // already happens to be in `friends` - the `selected` derivation above
+  // prefers the `friends` entry when both exist, so a redundant fetch here
+  // is harmless, and avoiding it would mean reading `friends` from this
+  // effect without depending on it (it changes every poll tick - see
+  // PRESENCE_REFRESH_INTERVAL_MS's effect) just to dodge an occasional extra
+  // GET.
+  useEffect(() => {
+    if (!currentUserId || !focusedUserId) return;
+    let cancelled = false;
+    loadFocusedProfile(currentUserId, focusedUserId)
+      .then((profile) => {
+        if (cancelled) return;
+        setFocusedProfile(profile);
+        setSelectedId(profile.id);
+        setMobileView("profile");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        showToast({ type: "error", message: "Could not load this profile." });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast is stable
+  }, [currentUserId, focusedUserId]);
+
+  // Once the general list load (or a live socket event) catches up and adds
+  // this id to `friends` for real, the standalone copy is just dead weight -
+  // drop it so it can't go stale next to the one that's actually kept live.
+  useEffect(() => {
+    if (focusedProfile && friends.some((f) => f.id === focusedProfile.id)) {
+      setFocusedProfile(null);
+    }
+  }, [friends, focusedProfile]);
 
   // Real-time: another user sending or accepting a friend request updates
   // this page without a reload. Event names/payloads match exactly what
@@ -316,16 +404,28 @@ function FriendsPage() {
   }, [acceptedFriendIds]);
 
   function setStatus(id: string, status: FriendshipStatus, message: string) {
-    setFriends((previous) =>
-      previous.map((friend) =>
-        friend.id === id ? { ...friend, status } : friend
-      )
-    );
+    setFriends((previous) => {
+      if (previous.some((friend) => friend.id === id)) {
+        return previous.map((friend) =>
+          friend.id === id ? { ...friend, status } : friend
+        );
+      }
+      // Not in the relationships list yet - this is focusedProfile
+      // transitioning for the first time (ex: a friend request just sent
+      // from a search result). It now genuinely has a relationship row, so
+      // it belongs in `friends` from here on: future socket events
+      // (friends:request-accepted, etc.) only ever look for it there by id.
+      if (focusedProfile?.id === id) {
+        return [...previous, { ...focusedProfile, status }];
+      }
+      return previous;
+    });
     showToast({ type: "success", message });
   }
 
   function removeFromList(id: string, message: string) {
     setFriends((previous) => previous.filter((friend) => friend.id !== id));
+    setFocusedProfile((previous) => (previous?.id === id ? null : previous));
     setSelectedId((current) => (current === id ? null : current));
     showToast({ type: "success", message });
   }

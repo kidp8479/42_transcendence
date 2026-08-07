@@ -37,6 +37,26 @@ export async function getUserRelationships(): Promise<UserRelationship[]> {
   return parsed as UserRelationship[];
 }
 
+// GET /users/user-relationships/:id - just the directional row(s) for one
+// specific pair, not the caller's whole relationship list. Used to resolve a
+// single external profile's status (ex: opening a search result that isn't a
+// friend yet) without re-fetching everyone.
+export async function getUserRelationship(
+  userId: string
+): Promise<UserRelationship[]> {
+  const payload = await apiClient<unknown>(
+    `/users/user-relationships/${userId}`
+  );
+  if (!Array.isArray(payload)) {
+    throw new Error("User relationship response is invalid");
+  }
+  const parsed = payload.map(parseUserRelationship);
+  if (parsed.some((relationship) => relationship === null)) {
+    throw new Error("User relationship response contains invalid items");
+  }
+  return parsed as UserRelationship[];
+}
+
 // POST /users/user-relationships/:id - sends a friend request. The backend
 // replies with a bare [requesterId, addresseeId] tuple (not a
 // UserRelationship row), which carries nothing the caller doesn't already
