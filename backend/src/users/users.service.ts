@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService, StoredObject } from "../storage/storage.service";
+import { RealtimeService } from "../realtime/realtime.service";
 import { UpdateUserDto } from "./dto/update-user.dto";
 
 const USER_NOT_FOUND_ERR_MSG = "User not found";
@@ -57,7 +58,8 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly realtimeService: RealtimeService
   ) {}
 
   async findMe(id: string) {
@@ -79,7 +81,10 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(USER_NOT_FOUND_ERR_MSG);
     }
-    return user;
+    // Not a stored column - computed fresh from whether this user currently
+    // has a live socket (see RealtimeService.isUserOnline), so it's never
+    // stale the way a cached "lastSeen" column would be between requests.
+    return { ...user, online: this.realtimeService.isUserOnline(id) };
   }
 
   async update(userId: string, dto: UpdateUserDto) {
