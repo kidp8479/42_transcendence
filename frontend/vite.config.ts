@@ -33,14 +33,11 @@ export default defineConfig({
       "tomato.iops.dev",
       "tomato-dev.iops.dev",
     ],
-    // The browser only ever talks to nginx on 8080 (5173 is Vite's internal
-    // dev server port, never published outside the Docker network). Without
-    // this, Vite's HMR client defaults to reconnecting on 5173 directly,
-    // which the browser can't reach - ERR_CONNECTION_REFUSED in the console
-    // even though the app itself works fine. This tells the client to
-    // reconnect through the port the browser can actually see.
+    // The browser reaches Vite only through Nginx's TLS listener; 5173 is
+    // internal to Docker and 8080 intentionally redirects to HTTPS.
     hmr: {
-      clientPort: 8080,
+      protocol: "wss",
+      clientPort: 8443,
     },
   },
 });

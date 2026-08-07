@@ -320,7 +320,13 @@ check-auth-stack: check-auth check-prisma check-backend check-frontend
 
 ## verify one-use WebSocket admission, exact Origin, and sid revocation
 check-websocket-e2e:
-	$(COMPOSE) exec -e RUN_WEBSOCKET_E2E=1 frontend npm run test:websocket-e2e
+	$(COMPOSE) exec \
+		-e RUN_WEBSOCKET_E2E=1 \
+		-e WEBSOCKET_E2E_URL=https://nginx:8443 \
+		-e WEBSOCKET_E2E_ORIGIN=https://localhost:8443 \
+		-e WEBSOCKET_E2E_INGRESS_HOST=localhost \
+		-e WEBSOCKET_E2E_TLS_SERVER_NAME=localhost \
+		frontend npm run test:websocket-e2e
 
 ## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
 check-shell:
