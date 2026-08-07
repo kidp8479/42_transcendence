@@ -58,6 +58,7 @@ import { UserRelationshipsModule } from "./user-relationships/user-relationships
     ]),
     PrismaModule, // registers all modules, NestJS starts them in order at boot
     HealthModule,
+    UserRelationshipsModule,
     UsersModule,
     NotificationsModule,
     ProjectMembersModule,
@@ -75,7 +76,6 @@ import { UserRelationshipsModule } from "./user-relationships/user-relationships
     ProjectApiTokensModule,
     PublicApiModule,
     SearchModule,
-    UserRelationshipsModule,
   ],
   controllers: [], // top-level controllers (most are declared inside their own module)
   providers: [

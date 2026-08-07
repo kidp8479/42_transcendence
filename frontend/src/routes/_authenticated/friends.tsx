@@ -3,13 +3,15 @@
 // two-pane layout (pick someone on the left, act on them on the right) since
 // the interaction shape is the same.
 //
-// MOCKUP: the backend's UserRelationship rows only carry
-// requesterId/addresseeId (see backend/.../user-relationships.service.ts) -
-// there is no endpoint yet to resolve those ids into a profile (name,
-// avatar, campus, email) or presence (online). This page runs on local mock
-// data until that lookup exists; swap MOCK_FRIENDS and the handlers below
-// for real calls to /users/user-relationships once it does.
-import { useState } from "react";
+// Backed by /users/user-relationships + /users/:id (see friendsApi.ts and
+// usersApi.ts) and kept live over the shared WebSocket for
+// "friends:request-received"/"friends:request-accepted" (see
+// backend/.../user-relationships.service.ts for where those are emitted).
+//
+// firstName/lastName aren't tracked by the backend yet (TR-61) - every
+// FriendProfile carries them as empty strings on purpose, see
+// toFriendProfile below.
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Avatar, Button, Dropdown, DropdownItem } from "flowbite-react";
 import {
@@ -28,6 +30,18 @@ import { IoArrowBack } from "react-icons/io5";
 import { LuUser, LuUserCheck, LuUserPlus } from "react-icons/lu";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import { useToast } from "@/hooks/useToast";
+import { authSessionResource } from "@/lib/authState";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import {
+  deriveFriendshipStatus,
+  getUserRelationships,
+  parseUserRelationship,
+  removeFriendRelationship,
+  sendFriendRequest,
+  updateFriendRelationship,
+  type RelationshipStatus,
+} from "@/lib/friendsApi";
+import { getUserProfile, type PublicUserProfile } from "@/lib/usersApi";
 
 export const Route = createFileRoute("/_authenticated/friends")({
   component: FriendsPage,
@@ -68,7 +82,6 @@ interface FriendProfile {
   campus: string | null;
   avatarUrl: string | null;
   status: FriendshipStatus;
-  online: boolean;
 }
 
 // Only shown for a relationship that isn't settled yet - an accepted friend
@@ -88,84 +101,177 @@ const ACTION_COPY: Partial<Record<FriendshipStatus, string>> = {
   PENDING_OUTGOING: "Friend request sent",
 };
 
-const MOCK_FRIENDS: FriendProfile[] = [
-  {
-    id: "1",
-    firstName: "Alice",
-    lastName: "Martin",
-    displayedName: "alice.m",
-    username: "amartin",
-    email: "alice.martin@student.42.fr",
-    campus: "42 Paris",
-    avatarUrl: null,
-    status: "ACCEPTED",
-    online: true,
-  },
-  {
-    id: "2",
-    firstName: "Benoit",
-    lastName: "Rousseau",
-    displayedName: "benoit_r",
-    username: "brousseau",
-    email: "benoit.rousseau@student.42.fr",
-    campus: "42 Lyon",
-    avatarUrl: null,
-    status: "PENDING_INCOMING",
-    online: false,
-  },
-  {
-    id: "3",
-    firstName: "Chloe",
-    lastName: "Nguyen",
-    displayedName: "chloen",
-    username: "cnguyen",
-    email: "chloe.nguyen@student.42.fr",
-    campus: "42 Paris",
-    avatarUrl: null,
-    status: "PENDING_OUTGOING",
-    online: true,
-  },
-  {
-    id: "4",
-    firstName: "David",
-    lastName: "Kim",
-    displayedName: "dkim",
-    username: "dkim",
-    email: "david.kim@student.42.fr",
-    campus: "42 Seoul",
-    avatarUrl: null,
-    status: "BLOCKED",
-    online: false,
-  },
-  {
-    id: "5",
-    firstName: "Elena",
-    lastName: "Petrova",
-    displayedName: "elena.p",
-    username: "epetrova",
-    email: "elena.petrova@student.42.fr",
-    campus: "42 Berlin",
-    avatarUrl: null,
-    status: "NONE",
-    online: true,
-  },
-];
+// firstName/lastName stay blank until the backend tracks them - see the file
+// header comment. displayedName falls back to username, the only name this
+// page actually has right now.
+function toFriendProfile(
+  profile: PublicUserProfile,
+  status: FriendshipStatus
+): FriendProfile {
+  return {
+    id: profile.id,
+    firstName: "",
+    lastName: "",
+    displayedName: profile.username,
+    username: profile.username,
+    email: profile.email,
+    campus: profile.campus,
+    avatarUrl: profile.avatarUrl,
+    status,
+  };
+}
+
+// Groups the caller's directional rows by the other user on each one, turns
+// each pair into a single display status (deriveFriendshipStatus), then
+// resolves every surviving other-user id into a profile. A profile lookup
+// that fails (ex: the other account was deleted) just drops that one entry -
+// not worth failing the whole page over.
+async function loadFriends(currentUserId: string): Promise<FriendProfile[]> {
+  const relationships = await getUserRelationships();
+
+  const byOtherUser = new Map<
+    string,
+    { mine?: RelationshipStatus; theirs?: RelationshipStatus }
+  >();
+  for (const relationship of relationships) {
+    const otherId =
+      relationship.requesterId === currentUserId
+        ? relationship.addresseeId
+        : relationship.requesterId;
+    const entry = byOtherUser.get(otherId) ?? {};
+    if (relationship.requesterId === currentUserId) {
+      entry.mine = relationship.status;
+    } else {
+      entry.theirs = relationship.status;
+    }
+    byOtherUser.set(otherId, entry);
+  }
+
+  const entries = Array.from(byOtherUser.entries())
+    .map(([otherId, { mine, theirs }]) => ({
+      otherId,
+      status: deriveFriendshipStatus(mine, theirs),
+    }))
+    .filter((entry) => entry.status !== "NONE");
+
+  const settled = await Promise.allSettled(
+    entries.map(({ otherId }) => getUserProfile(otherId))
+  );
+
+  const friends: FriendProfile[] = [];
+  settled.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      friends.push(toFriendProfile(result.value, entries[index].status));
+    }
+  });
+  return friends;
+}
 
 function initialsOf(friend: FriendProfile): string {
-  return `${friend.firstName.charAt(0)}${friend.lastName.charAt(0)}`.toUpperCase();
+  const fromName =
+    `${friend.firstName.charAt(0)}${friend.lastName.charAt(0)}`.toUpperCase();
+  if (fromName.trim().length > 0) {
+    return fromName;
+  }
+  // No first/last name yet (see the file header comment) - fall back to the
+  // username so the avatar placeholder isn't just a blank circle.
+  return friend.username.slice(0, 2).toUpperCase();
 }
 
 function FriendsPage() {
   const { showToast } = useToast();
-  const [friends, setFriends] = useState<FriendProfile[]>(MOCK_FRIENDS);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    MOCK_FRIENDS[0]?.id ?? null
-  );
+  const authState = authSessionResource.getState();
+  const currentUserId =
+    authState?.status === "authenticated" ? authState.session.user.id : null;
+
+  const [friends, setFriends] = useState<FriendProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   // Below md, the friends list and the profile panel can't fit side-by-side,
   // so only one shows at a time - same pattern as chat.tsx's mobileView.
   const [mobileView, setMobileView] = useState<"list" | "profile">("list");
 
   const selected = friends.find((friend) => friend.id === selectedId) ?? null;
+
+  useEffect(() => {
+    if (!currentUserId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    loadFriends(currentUserId)
+      .then((loaded) => {
+        if (cancelled) return;
+        setFriends(loaded);
+        setSelectedId((current) => current ?? loaded[0]?.id ?? null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        showToast({ type: "error", message: "Could not load your friends." });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast is stable
+  }, [currentUserId]);
+
+  // Real-time: another user sending or accepting a friend request updates
+  // this page without a reload. Event names/payloads match exactly what
+  // backend/.../user-relationships.service.ts emits.
+  useEffect(() => {
+    if (!currentUserId) return;
+    const socket = getRealtimeSocket();
+
+    function handleRequestReceived(payload: unknown) {
+      if (typeof payload !== "string") return;
+      const requesterId = payload;
+      getUserProfile(requesterId)
+        .then((profile) => {
+          setFriends((previous) =>
+            previous.some((friend) => friend.id === requesterId)
+              ? previous
+              : [...previous, toFriendProfile(profile, "PENDING_INCOMING")]
+          );
+          showToast({
+            type: "success",
+            message: `${profile.username} sent you a friend request.`,
+          });
+        })
+        .catch(() => {
+          // best-effort - a manual refresh will pick it up
+        });
+    }
+
+    function handleRequestAccepted(payload: unknown) {
+      const relationship = parseUserRelationship(payload);
+      if (relationship === null) return;
+      // `updated` is the accepter's own row: requesterId is the person who
+      // just accepted, addresseeId is us (see the backend emit).
+      const otherId = relationship.requesterId;
+      setFriends((previous) =>
+        previous.map((friend) =>
+          friend.id === otherId ? { ...friend, status: "ACCEPTED" } : friend
+        )
+      );
+      showToast({
+        type: "success",
+        message: "Your friend request was accepted.",
+      });
+    }
+
+    socket.on("friends:request-received", handleRequestReceived);
+    socket.on("friends:request-accepted", handleRequestAccepted);
+
+    return () => {
+      socket.off("friends:request-received", handleRequestReceived);
+      socket.off("friends:request-accepted", handleRequestAccepted);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast is stable
+  }, [currentUserId]);
 
   function setStatus(id: string, status: FriendshipStatus, message: string) {
     setFriends((previous) =>
@@ -180,6 +286,104 @@ function FriendsPage() {
     setFriends((previous) => previous.filter((friend) => friend.id !== id));
     setSelectedId((current) => (current === id ? null : current));
     showToast({ type: "success", message });
+  }
+
+  async function handleAddFriend() {
+    if (!selected) return;
+    try {
+      await sendFriendRequest(selected.id);
+      setStatus(
+        selected.id,
+        "PENDING_OUTGOING",
+        `Friend request sent to ${selected.displayedName}.`
+      );
+    } catch {
+      showToast({
+        type: "error",
+        message: "Could not send this friend request.",
+      });
+    }
+  }
+
+  async function handleAccept() {
+    if (!selected) return;
+    try {
+      await updateFriendRelationship(selected.id, "ACCEPTED");
+      setStatus(
+        selected.id,
+        "ACCEPTED",
+        `You are now friends with ${selected.displayedName}.`
+      );
+    } catch {
+      showToast({
+        type: "error",
+        message: "Could not accept this friend request.",
+      });
+    }
+  }
+
+  async function handleDecline() {
+    if (!selected) return;
+    try {
+      await removeFriendRelationship(selected.id);
+      removeFromList(selected.id, "Friend request declined.");
+    } catch {
+      showToast({
+        type: "error",
+        message: "Could not decline this friend request.",
+      });
+    }
+  }
+
+  async function handleCancelRequest() {
+    if (!selected) return;
+    try {
+      await removeFriendRelationship(selected.id);
+      removeFromList(selected.id, "Friend request cancelled.");
+    } catch {
+      showToast({
+        type: "error",
+        message: "Could not cancel this friend request.",
+      });
+    }
+  }
+
+  async function handleBlock() {
+    if (!selected) return;
+    try {
+      await updateFriendRelationship(selected.id, "BLOCKED");
+      setStatus(
+        selected.id,
+        "BLOCKED",
+        `${selected.displayedName} has been blocked.`
+      );
+    } catch {
+      showToast({ type: "error", message: "Could not block this user." });
+    }
+  }
+
+  async function handleUnblock() {
+    if (!selected) return;
+    try {
+      await updateFriendRelationship(selected.id, "ACCEPTED");
+      setStatus(
+        selected.id,
+        "ACCEPTED",
+        `${selected.displayedName} has been unblocked.`
+      );
+    } catch {
+      showToast({ type: "error", message: "Could not unblock this user." });
+    }
+  }
+
+  async function handleRemove() {
+    if (!selected) return;
+    try {
+      await removeFriendRelationship(selected.id);
+      removeFromList(selected.id, "Friend removed.");
+    } catch {
+      showToast({ type: "error", message: "Could not remove this friend." });
+    }
   }
 
   return (
@@ -202,7 +406,9 @@ function FriendsPage() {
           }`}
         >
           {friends.length === 0 ? (
-            <p className="p-4 text-xs text-text-secondary">No friends yet.</p>
+            <p className="p-4 text-xs text-text-secondary">
+              {loading ? "Loading friends..." : "No friends yet."}
+            </p>
           ) : (
             friends.map((friend) => (
               <FriendRow
@@ -231,41 +437,13 @@ function FriendsPage() {
             <ProfilePanel
               friend={selected}
               onBack={() => setMobileView("list")}
-              onAddFriend={() =>
-                setStatus(
-                  selected.id,
-                  "PENDING_OUTGOING",
-                  `Friend request sent to ${selected.displayedName}.`
-                )
-              }
-              onAccept={() =>
-                setStatus(
-                  selected.id,
-                  "ACCEPTED",
-                  `You are now friends with ${selected.displayedName}.`
-                )
-              }
-              onDecline={() =>
-                removeFromList(selected.id, "Friend request declined.")
-              }
-              onCancelRequest={() =>
-                removeFromList(selected.id, "Friend request cancelled.")
-              }
-              onBlock={() =>
-                setStatus(
-                  selected.id,
-                  "BLOCKED",
-                  `${selected.displayedName} has been blocked.`
-                )
-              }
-              onUnblock={() =>
-                setStatus(
-                  selected.id,
-                  "ACCEPTED",
-                  `${selected.displayedName} has been unblocked.`
-                )
-              }
-              onRemove={() => removeFromList(selected.id, "Friend removed.")}
+              onAddFriend={() => void handleAddFriend()}
+              onAccept={() => void handleAccept()}
+              onDecline={() => void handleDecline()}
+              onCancelRequest={() => void handleCancelRequest()}
+              onBlock={() => void handleBlock()}
+              onUnblock={() => void handleUnblock()}
+              onRemove={() => void handleRemove()}
             />
           )}
         </section>
@@ -293,22 +471,12 @@ function FriendRow({
         active ? "bg-surface-overlay" : ""
       }`}
     >
-      <div className="relative shrink-0">
-        <Avatar
-          img={friend.avatarUrl ?? undefined}
-          placeholderInitials={initialsOf(friend)}
-          rounded
-          size="sm"
-        />
-        {/* Presence only - green when online, otherwise muted. Not tied to
-            friendship status (see PENDING_STATUS_LABEL for that). */}
-        <span
-          aria-hidden="true"
-          className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-base ${
-            friend.online ? "bg-status-completed" : "bg-text-muted"
-          }`}
-        />
-      </div>
+      <Avatar
+        img={friend.avatarUrl ?? undefined}
+        placeholderInitials={initialsOf(friend)}
+        rounded
+        size="sm"
+      />
       <div className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-text-primary">
           {friend.displayedName}
@@ -320,24 +488,6 @@ function FriendRow({
         )}
       </div>
     </button>
-  );
-}
-
-function PresenceBadge({ online }: { online: boolean }) {
-  // Same pill shape as the project status badges (ProjectCard.tsx's
-  // STATUS_META) rather than flowbite-react's <Badge> - that component's
-  // built-in colors don't map onto this app's status-* tokens, and this repo
-  // already has an established "status pill" pattern to match instead.
-  return (
-    <span
-      className={`w-fit rounded-md px-1 py-0.5 text-[10px] font-semibold ${
-        online
-          ? "bg-status-completed/15 text-status-completed"
-          : "bg-control-error/15 text-control-error"
-      }`}
-    >
-      {online ? "Online" : "Offline"}
-    </span>
   );
 }
 
@@ -491,14 +641,13 @@ function ProfilePanel({
             <span className="text-sm font-semibold text-text-primary">
               {friend.username}
             </span>
-            <PresenceBadge online={friend.online} />
           </div>
 
           <dl className="flex w-full max-w-s min-w-0 flex-col px-4 gap-2.5">
             <InfoRow
               icon={HiOutlineUser}
               label="Name"
-              value={`${friend.firstName} ${friend.lastName}`}
+              value={`${friend.firstName} ${friend.lastName}`.trim()}
             />
             <InfoRow
               icon={HiOutlineEnvelope}
