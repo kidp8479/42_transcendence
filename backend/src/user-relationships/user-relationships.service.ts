@@ -76,6 +76,7 @@ export class UserRelationshipsService {
             addresseeId: requesterId,
           },
         });
+
         // Any pre-existing row on either side - pending, accepted, or blocked -
         // is treated identically: a plain conflict, no status-specific message.
         // This is deliberate: a user blocked by the addressee gets the exact
@@ -103,6 +104,9 @@ export class UserRelationshipsService {
               status: RelationshipStatus.PENDING_APPROVAL,
             },
           });
+          // Send Requester data through WebSockets
+          this.notificationService.create(addresseeId, "You have a new friend request!");
+          this.realtimeService.emitToUser(addresseeId, "friends:request-received", fromRequester);
         }
         return [requesterId, addresseeId];
       },
@@ -161,7 +165,7 @@ export class UserRelationshipsService {
 
     return await this.prisma.transaction(
       async (database) => {
-        return await database.userRelationship.update({
+        const updated = await database.userRelationship.update({
           where: {
             requesterId_addresseeId: {
               requesterId: requesterId,
@@ -172,6 +176,12 @@ export class UserRelationshipsService {
             status: dto.status,
           },
         });
+        // Inform addressee that request has been approved
+        if (dto.status === RelationshipStatus.ACCEPTED) {
+          this.notificationService.create(addresseeId, "Your friend request has been accepted!");
+          this.realtimeService.emitToUser(addresseeId, "friends:request-accepted", updated);
+        }
+        return updated;
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
