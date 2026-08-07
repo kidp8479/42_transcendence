@@ -42,6 +42,7 @@ import {
 import { LiaTrashAltSolid } from "react-icons/lia";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import { updateProjectDetails, type ProjectStatus } from "@/lib/projectsApi";
+import { PROJECT_STATUS_STYLES } from "@/lib/projectStatusStyles";
 import { ApiError } from "@/lib/apiClient";
 import { useToast } from "@/hooks/useToast";
 import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
@@ -49,8 +50,6 @@ import {
   ProjectDetailsForm,
   type ProjectFormValues,
 } from "./ProjectDetailsForm";
-import { PROJECT_STATUS_STYLES } from "@/lib/projectStatusStyles";
-import type { ProjectStatus } from "@/lib/projectsApi";
 
 // Scoped to this card's "..." menu only - rounds the item hover highlight
 // (rectangular by default in darkDropdownTheme, shared with NotificationBell
@@ -210,7 +209,6 @@ export function ProjectCard({
     }
   }
 
-  const status = STATUS_META[project.status];
   const status = PROJECT_STATUS_STYLES[project.status];
   const formattedDeadline = project.deadline
     ? new Date(project.deadline).toLocaleDateString("en-US", {
