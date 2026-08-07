@@ -182,17 +182,20 @@ type projectAPITokenResponse struct {
 	RevokedAt  *time.Time `json:"revokedAt"`
 }
 
+type projectAPITokenIntrospectionResponse struct {
+	Active        bool      `json:"active"`
+	PrincipalType string    `json:"principalType"`
+	TokenID       string    `json:"tokenId"`
+	ProjectID     string    `json:"projectId"`
+	Label         string    `json:"label"`
+	Permission    string    `json:"permission"`
+	ExpiresAt     time.Time `json:"expiresAt"`
+	LastUsedAt    time.Time `json:"lastUsedAt"`
+}
+
 type createdProjectAPITokenResponse struct {
 	Token  projectAPITokenResponse `json:"token"`
 	APIKey string                  `json:"apiKey"`
-}
-
-type projectAPITokenIntrospectionResponse struct {
-	Active        bool   `json:"active"`
-	PrincipalType string `json:"principalType"`
-	TokenID       string `json:"tokenId"`
-	ProjectID     string `json:"projectId"`
-	Permission    string `json:"permission"`
 }
 
 type errorResponse struct {
@@ -668,7 +671,9 @@ func (s *Server) handleIntrospectProjectAPIToken(w http.ResponseWriter, r *http.
 	}
 	writeJSON(w, http.StatusOK, projectAPITokenIntrospectionResponse{
 		Active: true, PrincipalType: "PROJECT_API_TOKEN", TokenID: principal.TokenID,
-		ProjectID: principal.ProjectID, Permission: string(principal.Permission),
+		ProjectID: principal.ProjectID, Label: principal.Label,
+		Permission: string(principal.Permission), ExpiresAt: principal.ExpiresAt,
+		LastUsedAt: principal.LastUsedAt,
 	})
 }
 
