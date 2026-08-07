@@ -1,21 +1,11 @@
 services:
   nginx:
     ports: !override
-      - "127.0.0.1:8081:8080"
-      - "127.0.0.1:8444:8443"
+      - "0.0.0.0:8080:8080"
+      - "0.0.0.0:8443:8443"
     environment:
-      MODSEC_RULE_ENGINE: "On"
-      MODSEC_AUDIT_LOG: /dev/stdout
-      MODSEC_AUDIT_LOG_FORMAT: JSON
-      MODSEC_AUDIT_LOG_PARTS: FH
-      RESOLVER_CONFIG: valid=15s ipv6=off
+      MODSEC_RULE_ENGINE: DetectionOnly
       FRONTEND_PORT: 80
-    volumes: !override
-      - ./nginx/default.production.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
-      - ./nginx/includes/application-locations.conf.template:/etc/nginx/templates/includes/application-locations.conf.template:ro
-      - ./nginx/modsecurity/10-task-rabbit-config.conf:/etc/modsecurity.d/owasp-crs/plugins/10-task-rabbit-config.conf:ro
-      - ./nginx/99-reload-on-certificate-change.sh:/docker-entrypoint.d/99-reload-on-certificate-change.sh:ro
-      - vault_nginx_tls:/etc/nginx/ssl:ro
 
   db:
     ports: !override []
