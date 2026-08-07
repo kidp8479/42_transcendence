@@ -142,7 +142,7 @@ function UserSettingsPage() {
           user: { ...authState.session.user, avatarUrl: updated.avatarUrl },
         });
       }
-      safeInvalidateRouter();
+      await safeInvalidateRouter();
     } catch (error) {
       // a 401 means the session is already dead server-side - same handling
       // as UserMenu.handleLogout: drop the local session and send the user
@@ -235,7 +235,7 @@ function UserSettingsPage() {
           user: { ...authState.session.user, username: updated.username },
         });
       }
-      safeInvalidateRouter();
+      await safeInvalidateRouter();
       showToast({ type: "success", message: "Changes saved." });
     } catch (error) {
       // a taken username hits the DB's unique constraint -> 409, with a raw
