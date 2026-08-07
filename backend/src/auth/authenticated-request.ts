@@ -22,7 +22,10 @@ export interface ProjectApiTokenPrincipal {
   principalType: "PROJECT_API_TOKEN";
   tokenId: string;
   projectId: string;
+  label: string;
   permission: ProjectApiTokenPermission;
+  expiresAt: string;
+  lastUsedAt: string;
 }
 
 export interface ProjectApiTokenRequest {
