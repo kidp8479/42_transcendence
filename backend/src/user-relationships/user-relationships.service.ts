@@ -10,6 +10,7 @@ import { RealtimeService } from "../realtime/realtime.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { RelationshipStatus } from "@prisma/client";
 import { throwIfAllEqual } from "../common/throwIf";
+import { UsersService } from "../users/users.service";
 
 const UNKNOWN_USER_ERR_MSG = "unknown user";
 const EXISTING_RELATION_ERR_MSG = "relationship already exists";
@@ -27,7 +28,8 @@ export class UserRelationshipsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeService: RealtimeService,
-    private readonly notificationService: NotificationsService
+    private readonly notificationService: NotificationsService,
+    private readonly userService: UsersService
   ) {}
 
   async findAll(userId: string) {
@@ -105,8 +107,16 @@ export class UserRelationshipsService {
             },
           });
           // Send Requester data through WebSockets
-          this.notificationService.create(addresseeId, "You have a new friend request!");
-          this.realtimeService.emitToUser(addresseeId, "friends:request-received", fromRequester);
+          const requester = await this.userService.findById(requesterId);
+          this.notificationService.create(
+            addresseeId,
+            requester.username + " wants to be your friend!"
+          );
+          this.realtimeService.emitToUser(
+            addresseeId,
+            "friends:request-received",
+            requesterId
+          );
         }
         return [requesterId, addresseeId];
       },
@@ -178,8 +188,16 @@ export class UserRelationshipsService {
         });
         // Inform addressee that request has been approved
         if (dto.status === RelationshipStatus.ACCEPTED) {
-          this.notificationService.create(addresseeId, "Your friend request has been accepted!");
-          this.realtimeService.emitToUser(addresseeId, "friends:request-accepted", updated);
+          const requester = await this.userService.findById(requesterId);
+          this.notificationService.create(
+            addresseeId,
+            requester.username + " is now your friend!"
+          );
+          this.realtimeService.emitToUser(
+            addresseeId,
+            "friends:request-accepted",
+            updated
+          );
         }
         return updated;
       },

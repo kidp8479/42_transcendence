@@ -9,7 +9,6 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService, StoredObject } from "../storage/storage.service";
 import { UpdateUserDto } from "./dto/update-user.dto";
-import { userInfo } from "os";
 
 const USER_NOT_FOUND_ERR_MSG = "User not found";
 
