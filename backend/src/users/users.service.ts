@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import { RelationshipStatus } from "@prisma/client";
+import { AccountStatus, RelationshipStatus } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService, StoredObject } from "../storage/storage.service";
@@ -94,8 +94,11 @@ export class UsersService {
   // viewer to check against) - skipped whenever there isn't one, or when
   // looking up your own profile.
   async findById(id: string, viewerId?: string) {
+    // A disabled or not-yet-approved account is not someone you can reach -
+    // same rule search.service.ts's userWhere enforces for search results,
+    // applied here so a direct profile/friend-request lookup can't bypass it.
     const user = await this.prisma.user.findUnique({
-      where: { id },
+      where: { id, status: AccountStatus.ACTIVE },
       select: SAFE_PUBLIC_USER_SELECT,
     });
     if (!user) {
