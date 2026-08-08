@@ -267,7 +267,11 @@ export class UserRelationshipsService {
         // own comment on fromAddressee). If there's nothing left on the
         // other side to be ACCEPTED with, unblocking just deletes this row
         // too, landing back on the same NONE state the other side is
-        // already in.
+        // already in. A counterpart that's independently BLOCKED gets the
+        // same treatment as a missing one - the other side has explicitly
+        // rejected this relationship, so jumping this row straight to
+        // ACCEPTED would fabricate the exact same one-sided illusion,
+        // just against an active refusal instead of an absence.
         if (
           currentStatus === RelationshipStatus.BLOCKED &&
           dto.status !== RelationshipStatus.BLOCKED
@@ -278,7 +282,10 @@ export class UserRelationshipsService {
               addresseeId: requesterId,
             },
           });
-          if (!counterpart) {
+          if (
+            !counterpart ||
+            counterpart.status === RelationshipStatus.BLOCKED
+          ) {
             return await database.userRelationship.delete({
               where: {
                 requesterId_addresseeId: {

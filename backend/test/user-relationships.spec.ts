@@ -275,6 +275,29 @@ test("update() deletes rather than resurrects an unblock with no counterpart row
   assert.equal(rows.has(keyOf(alice, bob)), false);
 });
 
+test("update() deletes rather than resurrects an unblock when the counterpart has independently blocked back", async () => {
+  const { service, rows } = buildService([
+    {
+      requesterId: alice,
+      addresseeId: bob,
+      status: RelationshipStatus.BLOCKED,
+    },
+    {
+      requesterId: bob,
+      addresseeId: alice,
+      status: RelationshipStatus.BLOCKED,
+    },
+  ]);
+
+  // alice lifts her own block on bob, but bob still has alice blocked.
+  await service.update(bob, { status: RelationshipStatus.ACCEPTED }, alice);
+
+  assert.equal(rows.has(keyOf(alice, bob)), false);
+  // bob's own block on alice is untouched - only alice's row was ever
+  // reachable through this call.
+  assert.equal(statusOf(rows, bob, alice), RelationshipStatus.BLOCKED);
+});
+
 // --- remove() and BLOCKED rows ----------------------------------------------
 
 test("remove() leaves a BLOCKED row untouched but deletes the other side's", async () => {

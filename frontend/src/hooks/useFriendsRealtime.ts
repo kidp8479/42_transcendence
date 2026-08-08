@@ -166,7 +166,8 @@ export function useFriendsRealtime(
   useEffect(() => {
     if (acceptedFriendIds.length === 0) return;
     const ids = acceptedFriendIds.split(",");
-    const interval = window.setInterval(() => {
+
+    function refreshPresence() {
       const tick = ++latestTickRef.current;
       // One bulk presence lookup instead of a full getUserProfile per
       // friend (see getPresence's own comment) - each tick used to burn a
@@ -192,7 +193,29 @@ export function useFriendsRealtime(
         .catch(() => {
           // best-effort - the next tick will retry
         });
-    }, PRESENCE_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    }
+
+    // A backgrounded/minimized tab has no visible presence dots to keep
+    // fresh - polling through it just spends part of the shared 300 req/60s
+    // throttle budget for no one to see. Skipped rather than cleared: the
+    // interval itself stays cheap to leave running, and this keeps the tick
+    // cadence (and latestTickRef bookkeeping) untouched.
+    function tick() {
+      if (document.hidden) return;
+      refreshPresence();
+    }
+
+    const interval = window.setInterval(tick, PRESENCE_REFRESH_INTERVAL_MS);
+    // Catches back up immediately on refocus instead of leaving presence
+    // stale for up to a full interval - the tab could have been hidden for
+    // much longer than that.
+    function handleVisibilityChange() {
+      if (!document.hidden) refreshPresence();
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [acceptedFriendIds, setFriends]);
 }
