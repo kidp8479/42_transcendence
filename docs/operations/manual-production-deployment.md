@@ -131,6 +131,18 @@ set `NODE_ENV=development`, `APP_ORIGIN=https://tomato-dev.iops.dev`, and
 must likewise set `NODE_ENV=development`. Production and development browser
 cookies must remain secure.
 
+## Edge Error Responses
+
+Compose Nginx serves a no-store static HTML page only when the frontend
+upstream is unavailable (`500`, `502`, `503`, or `504`). Application `/api`
+and `/auth` errors remain JSON, including authentication, validation,
+public-token, rate-limit, and availability responses. In blocking WAF
+profiles, malformed JSON is a native ModSecurity `400`, not an Auth response.
+The retained request error page is intentionally inactive because it would
+mask that WAF result. Malformed requests, WAF blocks, WebSocket handshakes,
+redirects, unknown-host `444` responses, and TLS handshake rejection retain
+their native response behavior.
+
 The school-evaluation runtime file must set:
 
 ```dotenv

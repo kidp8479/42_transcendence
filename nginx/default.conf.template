@@ -43,6 +43,7 @@ server {
         return 444;
     }
 
+    include /etc/nginx/includes/error-pages.conf;
     include /etc/nginx/includes/application-locations.conf;
 }
 
@@ -59,6 +60,7 @@ server {
         return 444;
     }
 
+    include /etc/nginx/includes/error-pages.conf;
     include /etc/nginx/includes/application-locations.conf;
 }
 
@@ -75,5 +77,6 @@ server {
         return 444;
     }
 
+    include /etc/nginx/includes/error-pages.conf;
     include /etc/nginx/includes/application-locations.conf;
 }
