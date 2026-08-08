@@ -19,14 +19,14 @@ COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compos
 endif
 ENV_FILE = .env
 
-include deploy.mk
-
 # ---------------------------------------------------------------------------- #
 # default                                                                      #
 # ---------------------------------------------------------------------------- #
 
 ## start the default local development stack
 all: up
+
+include deploy.mk
 
 
 # ---------------------------------------------------------------------------- #

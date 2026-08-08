@@ -79,6 +79,8 @@ chmod 0700 "$PKI_CA_DIR"
 # mapping—forms the access boundary.
 chmod 0777 "$NGINX_TLS_DIR"
 
+quiet vault secrets tune -max-lease-ttl=87600h pki
+
 # Vault dev mode loses its in-memory PKI on restart. Persist this local-only
 # root so developers do not need to re-trust a new CA after every restart.
 if [ -s "$PKI_CA_DIR/root.pem" ]; then
@@ -95,7 +97,6 @@ else
 	chmod 0644 "$PKI_CA_DIR/root.crt"
 fi
 
-quiet vault secrets tune -max-lease-ttl=87600h pki
 quiet vault write pki/roles/local-dev \
 	allowed_domains=localhost \
 	allow_bare_domains=true \

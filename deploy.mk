@@ -140,6 +140,8 @@ validate-deployment-%:
 	@if [ "$*" = "prod" ]; then \
 		env_file="$(call deployment_env_file,$*)"; set -a; . "$$env_file"; set +a; \
 		test "$$NODE_ENV" = "production" || (echo "NODE_ENV must be production for production deployment" >&2; exit 1); \
+		test "$$APP_ORIGIN" = "https://tomato.iops.dev" || (echo "APP_ORIGIN must be https://tomato.iops.dev for production deployment" >&2; exit 1); \
+		test "$$AUTH_JWT_ISSUER" = "https://tomato.iops.dev/auth" || (echo "AUTH_JWT_ISSUER must be https://tomato.iops.dev/auth for production deployment" >&2; exit 1); \
 	fi
 
 ## validate the narrow school runtime origin and issuer

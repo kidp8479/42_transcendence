@@ -2,6 +2,14 @@
 
 ## Description
 
+**42 Project Planner** is a Trello-like collaborative project management web
+app for 42 students to plan and track school projects as a team.
+
+Each project has Discovery, Kanban, Calendar, Evaluation Checklist, and Summary
+workspaces. Project members collaborate in real time through ticket-admitted
+WebSockets, receive notifications, and can use project-bound API tokens for
+reviewed external integrations.
+
 ## Instructions
 
 ### Local development
@@ -15,7 +23,8 @@
 
 The project is designed to run locally in Docker. The development stack starts:
 
-- `nginx` as the local entrypoint on [http://localhost:8080](http://localhost:8080)
+- `nginx` as the local HTTPS entrypoint on
+  [https://localhost:8443](https://localhost:8443)
 - `frontend` as a React/Vite dev server
 - `backend` as a NestJS dev server
 - `auth` as a Go service with hot reload via Air
@@ -31,22 +40,31 @@ make up
 
 On the first run, the Makefile copies `.env.example` to `.env` automatically if `.env` does not already exist. If the Docker images do not exist yet, Docker Compose builds them. After that, `make up` starts the existing development containers without forcing a rebuild.
 
-When the containers are running, open the website in your browser at [http://localhost:8080](http://localhost:8080).
+When the containers are running, trust the local Vault PKI root in your
+operating system or browser, then open
+[https://localhost:8443](https://localhost:8443). Export the root certificate
+with:
 
-You do not need to open the frontend container port directly. Docker Compose only publishes nginx on local port `8080`, and nginx forwards requests to the right service inside Docker.
+```sh
+make export-local-ca
+```
+
+Port `8080` redirects to HTTPS on `8443`. The local root certificate is
+development-only; do not install it on a shared or production machine.
+
+You do not need to open the frontend container port directly. Docker Compose
+publishes Nginx on local ports `8080` and `8443`; Nginx forwards requests to
+the right service inside Docker.
 
 Local routes:
 
-- Frontend: [http://localhost:8080/](http://localhost:8080/)
-- Backend API: [http://localhost:8080/api](http://localhost:8080/api)
-- Backend WebSocket: disabled until TR-74 adds one-time ticket admission
-- Auth service: [http://localhost:8080/auth](http://localhost:8080/auth)
+- Frontend: [https://localhost:8443/](https://localhost:8443/)
+- Backend API: [https://localhost:8443/api](https://localhost:8443/api)
+- Backend WebSocket: [wss://localhost:8443/ws](wss://localhost:8443/ws)
+- Auth service: [https://localhost:8443/auth](https://localhost:8443/auth)
 
-Realtime notifications, Discovery/Evaluation collaboration updates, and field
-locks are unavailable during this deliberate TR-70-to-TR-74 cutover window.
-HTTP APIs remain available.
-
-If [http://localhost:8080](http://localhost:8080) does not load, check that the stack is running:
+If [https://localhost:8443](https://localhost:8443) does not load, check that
+the stack is running:
 
 ```sh
 make ps
@@ -150,7 +168,11 @@ npm run dev -- --host 127.0.0.1
 
 Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/).
 
-This is only a frontend convenience loop. The canonical full application still runs through `make up` and [http://localhost:8080](http://localhost:8080). If the frontend needs the API or WebSocket routes, keep the Docker stack running with `VITE_API_URL=/api` and `VITE_WS_URL=/ws` so both target the browser's loaded origin.
+This is only a frontend convenience loop. The canonical full application still
+runs through `make up` and [https://localhost:8443](https://localhost:8443).
+If the frontend needs the API or WebSocket routes, keep the Docker stack
+running with `VITE_API_URL=/api` and `VITE_WS_URL=/ws` so both target the
+browser's loaded origin.
 
 #### Environment variables
 
@@ -272,16 +294,81 @@ Use `make fclean` with care: it removes the PostgreSQL Docker volume, so local d
 
 ## Team Information
 
+| Member | Role | Focus |
+| --- | --- | --- |
+| Diana | Product Owner | Product direction and project settings |
+| Pauline | Project Manager | Coordination, calendar, realtime UX, and notifications |
+| Andrei | Technical Lead | Authentication, Vault, ingress, realtime security, and public API |
+| Christophe | Architect | Cross-cutting architecture, storage, and chat |
+| Carlos | Developer | Project workflows, Kanban, and search |
+
 ## Project Management
+
+The team uses Notion for requirements and delivery tracking, Figma for UI
+reference, GitHub for issues and pull requests, and Discord for daily
+communication. Each feature uses an atomic Conventional Commit tagged with its
+Task Rabbit ID and lands through a pull request.
+
+GitHub Actions runs formatting, lint, and build checks. Branch protection keeps
+unreviewed changes out of `main`.
 
 ## Technical Stack
 
+- **Frontend:** React, TypeScript, Vite, TanStack Router, Tailwind CSS v4, and
+  Flowbite React.
+- **Backend:** NestJS, Prisma, Socket.io, and Swagger.
+- **Authentication:** a dedicated Go service with Argon2id password hashing,
+  JWT access tokens, refresh-token families, and one-time WebSocket tickets.
+- **Data and storage:** PostgreSQL 16 and RustFS S3-compatible object storage.
+- **Infrastructure:** Docker Compose, Nginx, ModSecurity/OWASP CRS, and
+  HashiCorp Vault for dynamic database credentials and TLS material.
+
 ## Database Schema
+
+`backend/prisma/schema.prisma` defines the project-management and authentication
+domains. Projects own members, tasks, calendar events, categories, Discovery
+blocks, evaluation items, and API tokens. Auth tables hold identities,
+credentials, sessions, refresh-token families, WebSocket tickets, and audit
+events; all are related to the shared user record.
 
 ## Features List
 
+- Email/password accounts, refresh-token sessions, account-status enforcement,
+  user profiles, and RustFS-backed avatars.
+- Project creation, member roles, lifecycle management, and project-bound API
+  tokens.
+- Discovery, Kanban, Calendar, Evaluation Checklist, and Summary workspaces.
+- Live updates, one-time ticket WebSocket admission, field locks, and
+  notifications.
+- Scoped cross-project search, public API documentation, and deployment-aware
+  status reporting.
+
 ## Modules
+
+The implementation covers the required framework, ORM, organization,
+permissions, real-time, accessibility, notification, public API, and
+cybersecurity modules. It uses React/NestJS, Prisma, Socket.io, project roles,
+WCAG-focused UI work, project-bound API tokens, ModSecurity, and Vault.
+
+Additional work in progress includes chat, friends, OAuth, and extended search.
 
 ## Individual Contributions
 
+Andrei owns auth, Vault, ingress, WebSocket admission, field locks, and public
+API tokens. Pauline built core frontend/backend scaffolding and leads Calendar,
+Discovery, realtime UX, notifications, and Summary. Christophe contributes
+architecture, storage, avatars, user settings, Evaluation Checklist, and chat.
+Diana contributes shared UI and Project Settings. Carlos contributes project
+creation, Kanban, legal pages, and search.
+
 ## Resources
+
+- [React](https://react.dev/) and
+  [TanStack Router](https://tanstack.com/router/latest)
+- [NestJS](https://docs.nestjs.com/) and
+  [Prisma](https://www.prisma.io/docs)
+- [Socket.io](https://socket.io/docs/v4/),
+  [HashiCorp Vault](https://developer.hashicorp.com/vault/docs), and
+  [Docker Compose](https://docs.docker.com/compose/)
+- [OWASP Core Rule Set](https://coreruleset.org/) and
+  [WCAG 2.1](https://www.w3.org/TR/WCAG21/)

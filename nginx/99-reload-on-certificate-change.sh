@@ -3,7 +3,7 @@
 set -eu
 
 certificate_fingerprint() {
-	sha256sum /etc/nginx/ssl/local.pem /etc/nginx/ssl/paris-42-wildcard.pem 2>/dev/null |
+	sha256sum /etc/nginx/ssl/local.pem /etc/nginx/ssl/paris-42-wildcard.pem /etc/nginx/ssl/public-domains.pem 2>/dev/null |
 		sha256sum |
 		awk '{ print $1 }'
 }
