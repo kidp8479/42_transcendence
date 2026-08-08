@@ -5,7 +5,8 @@
 //
 // Backed by /users/user-relationships + /users/:id (see friendsApi.ts and
 // usersApi.ts) and kept live over the shared WebSocket for
-// "friends:request-received"/"friends:request-accepted" (see
+// "friends:request-received"/"friends:request-accepted"/
+// "friends:relationship-removed" (see
 // backend/.../user-relationships.service.ts for where those are emitted).
 //
 // firstName/lastName aren't tracked by the backend yet (TR-61) - every
@@ -311,8 +312,9 @@ function FriendsPage() {
     }
   }, [friends, focusedProfile]);
 
-  // Real-time: another user sending or accepting a friend request updates
-  // this page without a reload. Event names/payloads match exactly what
+  // Real-time: another user sending or accepting a friend request, or
+  // declining/cancelling/unfriending, updates this page without a reload.
+  // Event names/payloads match exactly what
   // backend/.../user-relationships.service.ts emits.
   useEffect(() => {
     if (!currentUserId) return;
@@ -355,12 +357,33 @@ function FriendsPage() {
       });
     }
 
+    // The other side declined/cancelled a pending request, or unfriended us -
+    // payload is just their id (see the backend emit), same shape as
+    // request-received's.
+    function handleRelationshipRemoved(payload: unknown) {
+      if (typeof payload !== "string") return;
+      const otherId = payload;
+      setFriends((previous) =>
+        previous.filter((friend) => friend.id !== otherId)
+      );
+      setFocusedProfile((previous) =>
+        previous?.id === otherId ? null : previous
+      );
+      setSelectedId((current) => (current === otherId ? null : current));
+      // Might have been an ACCEPTED friendship (an unfriend) or might not
+      // (a declined/cancelled request never counted) - friendCountResource's
+      // own refresh() re-derives this rather than guessing here.
+      friendCountResource.refresh();
+    }
+
     socket.on("friends:request-received", handleRequestReceived);
     socket.on("friends:request-accepted", handleRequestAccepted);
+    socket.on("friends:relationship-removed", handleRelationshipRemoved);
 
     return () => {
       socket.off("friends:request-received", handleRequestReceived);
       socket.off("friends:request-accepted", handleRequestAccepted);
+      socket.off("friends:relationship-removed", handleRelationshipRemoved);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast is stable
   }, [currentUserId]);

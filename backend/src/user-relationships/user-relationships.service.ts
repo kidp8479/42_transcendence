@@ -233,7 +233,7 @@ export class UserRelationshipsService {
         // not lift a block as a side effect. deleteMany() (rather than
         // delete()) is used because a non-matching row - i.e. one that is
         // currently blocked - should silently no-op instead of throwing.
-        await database.userRelationship.deleteMany({
+        const mine = await database.userRelationship.deleteMany({
           where: {
             requesterId: requesterId,
             addresseeId: addresseeId,
@@ -241,13 +241,28 @@ export class UserRelationshipsService {
           },
         });
 
-        await database.userRelationship.deleteMany({
+        const theirs = await database.userRelationship.deleteMany({
           where: {
             requesterId: addresseeId,
             addresseeId: requesterId,
             status: { not: RelationshipStatus.BLOCKED },
           },
         });
+
+        // Unlike create()/update(), this has no block-visibility concern - a
+        // no-op against a blocked row never reaches here (excluded above), so
+        // whatever this notifies about was always something the other side
+        // could already see (a pending request or a settled friendship).
+        // Tells them live: a friend request they sent/received was
+        // declined/cancelled, or a friendship was ended - without this, their
+        // page keeps showing the stale relationship until they reload it.
+        if (mine.count > 0 || theirs.count > 0) {
+          this.realtimeService.emitToUser(
+            addresseeId,
+            "friends:relationship-removed",
+            requesterId
+          );
+        }
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
