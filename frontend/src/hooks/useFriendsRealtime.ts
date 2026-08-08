@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { friendCountResource } from "@/lib/friendCountState";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { onFriendRequestSent, parseUserRelationship } from "@/lib/friendsApi";
@@ -145,16 +145,27 @@ export function useFriendsRealtime(
     .filter((friend) => friend.status === "ACCEPTED")
     .map((friend) => friend.id)
     .join(",");
+  // Guards against a slow tick's response landing after a faster, later
+  // tick already applied newer presence data - both ticks go through the
+  // same setFriends(previous.map(...)) shape with no timing info of their
+  // own, so without this a stale response can silently overwrite fresher
+  // data (a friend flickers to the wrong state until the next tick
+  // self-corrects). Bumped synchronously before each fetch starts; a
+  // response is only applied if it's still the latest one in flight when it
+  // resolves.
+  const latestTickRef = useRef(0);
   useEffect(() => {
     if (acceptedFriendIds.length === 0) return;
     const ids = acceptedFriendIds.split(",");
     const interval = window.setInterval(() => {
+      const tick = ++latestTickRef.current;
       // One bulk presence lookup instead of a full getUserProfile per
       // friend (see getPresence's own comment) - each tick used to burn a
       // full profile fetch (plus its own blocked-by-target DB query) per
       // friend on screen just to read one boolean.
       getPresence(ids)
         .then((presence) => {
+          if (tick !== latestTickRef.current) return;
           setFriends((previous) =>
             previous.map((friend) =>
               friend.id in presence
