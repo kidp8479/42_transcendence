@@ -26,6 +26,8 @@ ENV_FILE = .env
 ## start the default local development stack
 all: up
 
+include deploy.mk
+
 
 # ---------------------------------------------------------------------------- #
 # env guard                                                                    #
@@ -38,11 +40,13 @@ $(ENV_FILE):
 ## overwrite .env with .env.example values and fresh random local secrets
 recreate-env:
 	sed \
+		-e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^AUTH_INTERNAL_TOKEN=.*|AUTH_INTERNAL_TOKEN=$$(openssl rand -hex 32)|" \
 		-e "s|^AUTH_REFRESH_SUCCESSOR_KEY=.*|AUTH_REFRESH_SUCCESSOR_KEY=$$(openssl rand -hex 32)|" \
 		-e "s|^AUTH_PROJECT_API_TOKEN_PEPPER=.*|AUTH_PROJECT_API_TOKEN_PEPPER=$$(openssl rand -hex 32)|" \
+		-e "s|^SEED_PASSWORD=.*|SEED_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^VAULT_DEV_ROOT_TOKEN=.*|VAULT_DEV_ROOT_TOKEN=$$(openssl rand -hex 32)|" \
-		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD=$$(openssl rand -hex 32)|" \
+		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		.env.example > $(ENV_FILE)
 
 
@@ -123,6 +127,14 @@ rebuild-auth: $(ENV_FILE)
 ## follow logs for all services
 logs:
 	$(COMPOSE) logs -f
+
+## follow ingress nginx logs
+logs-nginx:
+	$(COMPOSE) logs -f nginx
+
+## follow Nginx TLS Vault Agent logs
+logs-nginx-tls-agent:
+	$(COMPOSE) logs -f nginx-tls-agent
 
 ## follow frontend logs
 logs-frontend:
@@ -269,6 +281,41 @@ check-frontend:
 check-backend:
 	$(COMPOSE) exec backend sh -c "npm run build && npm run test:unit"
 
+## validate the rendered ingress nginx configuration
+check-nginx:
+	$(COMPOSE) exec nginx nginx -t
+
+## verify static Nginx error pages and preserved API/Auth JSON errors
+check-nginx-error-pages: check-nginx
+	COMPOSE="$(COMPOSE)" nginx/check-error-pages.sh
+
+## verify the static Nginx status page and its readiness probes
+check-status-page: check-nginx
+	COMPOSE="$(COMPOSE)" nginx/check-status-page.sh
+
+## verify local HTTPS ingress, HSTS, and the HTTP-to-HTTPS redirect
+check-tls:
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/ -o /tmp/hsts-root-headers && ! grep -qi "^strict-transport-security:" /tmp/hsts-root-headers'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/status -o /tmp/hsts-status-headers && ! grep -qi "^strict-transport-security:" /tmp/hsts-status-headers'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve school.paris.42.school:8443:127.0.0.1 https://school.paris.42.school:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato.iops.dev:8443:127.0.0.1 https://tomato.iops.dev:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato-dev.iops.dev:8443:127.0.0.1 https://tomato-dev.iops.dev:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve school.paris.42.school:8443:127.0.0.1 https://school.paris.42.school:8443/status | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato.iops.dev:8443:127.0.0.1 https://tomato.iops.dev:8443/status | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato-dev.iops.dev:8443:127.0.0.1 https://tomato-dev.iops.dev:8443/status | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -sSI -H "Host: localhost" http://127.0.0.1:8080/ | grep -qi "^location: https://localhost:8443/"'
+	$(COMPOSE) exec nginx sh -c 'curl -sSI -H "Host: 127.0.0.1" http://127.0.0.1:8080/ | grep -qi "^location: https://localhost:8443/"'
+	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -showcerts </dev/null 2>/dev/null | openssl x509 -noout -subject | grep -Eq "CN ?= ?localhost"'
+	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -CAfile /etc/nginx/ssl/local.pem </dev/null 2>/dev/null | grep -F "Verify return code: 0 (ok)"'
+	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -servername tomato.iops.dev -verify_hostname tomato.iops.dev -CAfile /etc/nginx/ssl/public-domains.pem </dev/null 2>/dev/null | grep -F "Verify return code: 0 (ok)"'
+	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -servername tomato-dev.iops.dev -verify_hostname tomato-dev.iops.dev -CAfile /etc/nginx/ssl/public-domains.pem </dev/null 2>/dev/null | grep -F "Verify return code: 0 (ok)"'
+
+## export the local development CA for one-time browser or OS trust installation
+export-local-ca:
+	mkdir -p .local
+	$(COMPOSE) run --rm --no-deps -v "$(CURDIR)/.local:/export" vault-bootstrap \
+		sh -c 'cp /run/pki-ca/root.crt /export/task-rabbit-local-ca.crt && chmod 0644 /export/task-rabbit-local-ca.crt'
+
 ## run Go tests and static analysis inside the auth Compose service
 check-auth:
 	$(COMPOSE) exec auth sh -c "go test ./... && go vet ./..."
@@ -286,12 +333,23 @@ check-auth-stack: check-auth check-prisma check-backend check-frontend
 
 ## verify one-use WebSocket admission, exact Origin, and sid revocation
 check-websocket-e2e:
-	$(COMPOSE) exec -e RUN_WEBSOCKET_E2E=1 frontend npm run test:websocket-e2e
+	@set -e; \
+	vault_token="$$(sed -n 's/^VAULT_DEV_ROOT_TOKEN=//p' $(ENV_FILE))"; \
+	seed_password="$$($(COMPOSE) exec -T -e VAULT_TOKEN="$$vault_token" vault sh -c 'VAULT_ADDR=http://127.0.0.1:8200 vault kv get -field=password kv/seed/demo-users')"; \
+	$(COMPOSE) exec \
+		-e RUN_WEBSOCKET_E2E=1 \
+		-e WEBSOCKET_E2E_URL=https://nginx:8443 \
+		-e WEBSOCKET_E2E_ORIGIN=https://localhost:8443 \
+		-e WEBSOCKET_E2E_INGRESS_HOST=localhost \
+		-e WEBSOCKET_E2E_TLS_SERVER_NAME=localhost \
+		-e WEBSOCKET_E2E_PASSWORD="$$seed_password" \
+		frontend npm run test:websocket-e2e
 
 ## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
 check-shell:
-	docker run --rm -v $(CURDIR):/mnt -w /mnt koalaman/shellcheck:stable -s sh \
-		vault/bootstrap.sh vault/check-policies.sh db/init/10-vault-db-admin-password.sh hooks/pre-commit
+	docker run --rm -v $(CURDIR):/mnt -w /mnt docker.io/koalaman/shellcheck:stable -s sh \
+		vault/bootstrap.sh vault/check-policies.sh db/init/10-vault-db-admin-password.sh \
+		hooks/pre-commit nginx/check-error-pages.sh nginx/check-status-page.sh
 
 ## verify local Vault AppRole policy isolation, Transit signing, and lease renewal
 check-vault-policies: $(ENV_FILE)
@@ -356,11 +414,11 @@ ffclean:
 	# .flowbite-react/) can be root-owned on the host - clean them via a
 	# throwaway root container instead of a plain host-side rm to avoid
 	# "Permission denied"
-	docker run --rm -v $(CURDIR)/frontend:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/frontend:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf node_modules dist build .vite .tanstack .flowbite-react .cache .eslintcache .stylelintcache coverage *.tsbuildinfo vite.config.js vite.config.d.ts"
-	docker run --rm -v $(CURDIR)/backend:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/backend:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf node_modules dist build .cache .eslintcache .stylelintcache coverage *.tsbuildinfo"
-	docker run --rm -v $(CURDIR)/auth:/target -w /target alpine \
+	docker run --rm -v $(CURDIR)/auth:/target -w /target docker.io/library/alpine \
 		sh -c "rm -rf tmp .cache coverage.out"
 	@echo "Local caches and node_modules volumes cleaned. Run 'make up-build' next."
 
@@ -385,9 +443,9 @@ help:
         recreate-env wipe-db wipe-storage \
         up-db up-frontend up-backend up-auth vault-status \
         rebuild-frontend rebuild-backend rebuild-auth \
-        logs-frontend logs-backend logs-auth logs-db \
+        logs-nginx logs-nginx-tls-agent logs-frontend logs-backend logs-auth logs-db \
         shell-frontend shell-backend shell-auth shell-db \
         migrate migrate-dev migrate-fix-permissions prisma-studio install seed \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
-        check-frontend check-backend check-auth check-prisma format-auth check-auth-stack check-shell \
+        check-frontend check-backend check-nginx check-tls export-local-ca check-auth check-prisma format-auth check-auth-stack check-shell \
         check-vault-policies check-vault-prisma check-websocket-e2e

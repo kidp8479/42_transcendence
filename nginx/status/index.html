@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>42 Project Planner status</title>
+    <link rel="stylesheet" href="/status/status.css" />
+    <script src="/status/status.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <p class="eyebrow">42 Project Planner</p>
+        <h1>System status</h1>
+        <p class="lede">
+          This status page remains available independently of the application.
+        </p>
+      </header>
+
+      <section
+        class="overview"
+        id="status-summary"
+        aria-busy="true"
+        aria-labelledby="overview-heading"
+      >
+        <div>
+          <p class="eyebrow" id="overview-heading">Current availability</p>
+          <p class="overall-status" id="overall-status" role="status">
+            Checking availability
+          </p>
+        </div>
+        <button type="button" id="refresh-status">Check again</button>
+      </section>
+
+      <section aria-labelledby="services-heading">
+        <div class="section-heading">
+          <p class="eyebrow" id="services-heading">Availability</p>
+          <p id="last-checked">Awaiting first check</p>
+        </div>
+        <ul class="services">
+          <li class="service service--checking" data-service="website">
+            <span class="indicator" aria-hidden="true"></span>
+            <div>
+              <h2>Website</h2>
+              <p>Open 42 Project Planner.</p>
+            </div>
+            <strong>Checking</strong>
+          </li>
+          <li class="service service--checking" data-service="workspace">
+            <span class="indicator" aria-hidden="true"></span>
+            <div>
+              <h2>Planner workspace</h2>
+              <p>View and manage project work.</p>
+            </div>
+            <strong>Checking</strong>
+          </li>
+          <li class="service service--checking" data-service="auth">
+            <span class="indicator" aria-hidden="true"></span>
+            <div>
+              <h2>Sign-in and accounts</h2>
+              <p>Sign in and use account features.</p>
+            </div>
+            <strong>Checking</strong>
+          </li>
+          <li class="service service--checking" data-service="attachments">
+            <span class="indicator" aria-hidden="true"></span>
+            <div>
+              <h2>Planner data and attachments</h2>
+              <p>Store planner data and upload or retrieve project files.</p>
+            </div>
+            <strong>Checking</strong>
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        Updated automatically while this page is open.
+      </footer>
+      <noscript>
+        <p class="noscript">
+          Live checks are unavailable. This status page itself is reachable.
+        </p>
+      </noscript>
+    </main>
+  </body>
+</html>

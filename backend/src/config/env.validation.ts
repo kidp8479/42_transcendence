@@ -4,30 +4,24 @@
 // (ex: a Vault configuration error surfacing only during the first query).
 
 import * as Joi from "joi";
+import { isValidConfiguredBrowserOrigin } from "../security/origin-policy";
 
 export const envValidationSchema = Joi.object({
+  NODE_ENV: Joi.string()
+    .empty("")
+    .valid("development", "production", "test")
+    .default("development"),
+  AUTH_CSRF_COOKIE: Joi.string().empty("").default("tr_csrf"),
   PORT: Joi.number().port().default(3000),
   APP_ORIGIN: Joi.string()
     .required()
-    .custom((value: string, helpers) => {
-      try {
-        const origin = new URL(value);
-        if (
-          (origin.protocol !== "http:" && origin.protocol !== "https:") ||
-          origin.username !== "" ||
-          origin.password !== "" ||
-          origin.pathname !== "/" ||
-          origin.search !== "" ||
-          origin.hash !== "" ||
-          origin.origin !== value
-        ) {
-          return helpers.error("any.invalid");
-        }
-        return value;
-      } catch {
-        return helpers.error("any.invalid");
-      }
-    }, "exact HTTP origin"),
+    .custom(
+      (value: string, helpers) =>
+        isValidConfiguredBrowserOrigin(value)
+          ? value
+          : helpers.error("any.invalid"),
+      "configured browser origin"
+    ),
   AUTH_SERVICE_URL: Joi.string().uri().required(),
   VAULT_ADDR: Joi.string().uri().required(),
   VAULT_ROLE_ID_FILE: Joi.string().required(),

@@ -14,7 +14,7 @@
 # Version:		v0.1.0
 #################################################################
 
-FROM node:22-alpine AS dev
+FROM docker.io/library/node:22-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
 # only schema.prisma is needed for "npm install" (its postinstall runs "prisma
@@ -30,7 +30,9 @@ CMD ["npm", "run", "start:dev"]
 FROM dev AS build
 RUN npm run build
 
-FROM node:22-alpine AS prod
+FROM dev AS migration
+
+FROM docker.io/library/node:22-alpine AS prod
 WORKDIR /app
 
 # Only production deps, install fresh instead of inheriting devDependencies from the build stage

@@ -18,14 +18,20 @@ import type {
   ProjectApiTokenPermission,
   ProjectApiTokenRequest,
 } from "./authenticated-request";
-import { PROJECT_API_TOKEN_PERMISSION_KEY } from "./project-api-token.constants";
+import {
+  PROJECT_API_TOKEN_PERMISSION_KEY,
+  PROJECT_API_TOKEN_SELF_KEY,
+} from "./project-api-token.constants";
 
 interface IntrospectionResponse {
   active: true;
   principalType: "PROJECT_API_TOKEN";
   tokenId: string;
   projectId: string;
+  label: string;
   permission: ProjectApiTokenPermission;
+  expiresAt: string;
+  lastUsedAt: string;
 }
 
 @Injectable()
@@ -47,7 +53,11 @@ export class ProjectApiTokenGuard implements CanActivate {
         PROJECT_API_TOKEN_PERMISSION_KEY,
         [context.getHandler(), context.getClass()]
       );
-    if (!requiredPermission) {
+    const isSelfReflection = this.reflector.getAllAndOverride<boolean>(
+      PROJECT_API_TOKEN_SELF_KEY,
+      [context.getHandler(), context.getClass()]
+    );
+    if (!requiredPermission && !isSelfReflection) {
       return true;
     }
 
@@ -57,7 +67,12 @@ export class ProjectApiTokenGuard implements CanActivate {
         ProjectApiTokenRequest & { params: { projectId?: string } }
       >();
     const projectId = request.params.projectId;
-    if (!projectId || !isUUID(projectId)) {
+    if (isSelfReflection && projectId !== undefined) {
+      throw new BadRequestException(
+        "Project API token self-reflection must not use a projectId path parameter"
+      );
+    }
+    if (!isSelfReflection && (!projectId || !isUUID(projectId))) {
       throw new BadRequestException("projectId must be a UUID");
     }
     const rawAPIKey = request.headers["x-api-key"];
@@ -70,15 +85,17 @@ export class ProjectApiTokenGuard implements CanActivate {
     }
 
     const principal = await this.introspect(apiKey);
-    const project = await this.prisma.project.findFirst({
-      where: { id: principal.projectId, isArchived: false },
-      select: { id: true },
-    });
-    if (!project) {
-      throw new NotFoundException("Project not found");
-    }
-    if (projectId.toLowerCase() !== principal.projectId.toLowerCase()) {
-      throw new NotFoundException("Project not found");
+    if (!isSelfReflection) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: principal.projectId, isArchived: false },
+        select: { id: true },
+      });
+      if (!project) {
+        throw new NotFoundException("Project not found");
+      }
+      if (projectId.toLowerCase() !== principal.projectId.toLowerCase()) {
+        throw new NotFoundException("Project not found");
+      }
     }
     if (
       requiredPermission === "READ_WRITE" &&
@@ -127,7 +144,10 @@ export class ProjectApiTokenGuard implements CanActivate {
       result.principalType !== "PROJECT_API_TOKEN" ||
       typeof result.tokenId !== "string" ||
       typeof result.projectId !== "string" ||
-      (result.permission !== "READ" && result.permission !== "READ_WRITE")
+      typeof result.label !== "string" ||
+      (result.permission !== "READ" && result.permission !== "READ_WRITE") ||
+      typeof result.expiresAt !== "string" ||
+      typeof result.lastUsedAt !== "string"
     ) {
       throw new ServiceUnavailableException(
         "Authentication service returned an invalid project API token response"

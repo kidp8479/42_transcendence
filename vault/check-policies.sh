@@ -53,6 +53,9 @@ deny "$backend_token" vault read kv/data/auth/refresh-successor
 deny "$backend_token" vault read kv/data/auth/project-api-token-pepper
 deny "$migration_token" vault read kv/data/auth/project-api-token-pepper
 deny "$migration_token" vault read kv/data/internal/backend-auth
+allow "$migration_token" vault read kv/data/seed/demo-users
+deny "$auth_token" vault read kv/data/seed/demo-users
+deny "$backend_token" vault read kv/data/seed/demo-users
 
 # Transit can sign and verify but can never export the private signing key.
 input=$(printf '%s' vault-policy-check | base64 | tr -d '\n')

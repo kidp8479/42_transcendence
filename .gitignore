@@ -33,6 +33,7 @@ desktop.ini
 !AGENTS.md
 !.github/copilot-instructions.md
 !docs/architecture/authentication-authorization.md
+!docs/operations/manual-production-deployment.md
 
 # ============================================================
 # Environment & secrets

@@ -1,10 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 
-// every seeded user shares this password, so anyone on the team can log in
-// locally as "andrei@42.fr" / SEED_PASSWORD, etc. - only for local dev, never
-// for anything resembling a real deployment
-export const SEED_PASSWORD = "SeedPassword123!";
-
 // the Go auth service rate-limits /auth/register to 20 requests per IP per
 // rolling 60s window (auth/internal/server/server.go's registerIPLimiter) -
 // seeding more than that in a tight loop trips it, so this pauses just past
@@ -22,13 +17,25 @@ function sleep(ms: number): Promise<void> {
 // so the account is actually loggable - auth.register() creates the User row
 // itself, plus the AuthIdentity/PasswordCredential rows the seed has no
 // business writing to directly (argon2id hashing lives in the auth service).
-// AUTH_SERVICE_URL comes from docker-compose env (internal network address,
-// ex: http://auth:3001) - Origin must match APP_ORIGIN or the auth service
-// rejects the request (same check a real browser request goes through).
+// AUTH_SERVICE_URL normally comes from the Compose environment; the internal
+// service address preserves the prior seed-script default. Origin must match
+// APP_ORIGIN or the auth service rejects the request.
+export function seedRequestOrigin(
+  configuredOrigin = process.env.APP_ORIGIN ?? "https://localhost:8443"
+): string {
+  const origin = new URL(configuredOrigin);
+  if (origin.hostname.startsWith("*.")) {
+    origin.hostname = `seed.${origin.hostname.slice(2)}`;
+    return origin.origin;
+  }
+  return configuredOrigin;
+}
+
 export async function registerSeedUser(
   prisma: PrismaClient,
   email: string,
-  username: string
+  username: string,
+  password: string
 ): Promise<string> {
   if (registrationsInCurrentWindow >= REGISTER_REQUESTS_PER_MINUTE) {
     await sleep(61_000);
@@ -36,13 +43,14 @@ export async function registerSeedUser(
   }
   registrationsInCurrentWindow = registrationsInCurrentWindow + 1;
 
-  const res = await fetch(`${process.env.AUTH_SERVICE_URL}/auth/register`, {
+  const authServiceUrl = process.env.AUTH_SERVICE_URL ?? "http://auth:3001";
+  const res = await fetch(`${authServiceUrl}/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Origin: process.env.APP_ORIGIN ?? "http://localhost:8080",
+      Origin: seedRequestOrigin(),
     },
-    body: JSON.stringify({ email, username, password: SEED_PASSWORD }),
+    body: JSON.stringify({ email, username, password }),
   });
 
   if (res.status === 201) {

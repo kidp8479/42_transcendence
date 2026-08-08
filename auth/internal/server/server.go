@@ -34,6 +34,7 @@ const (
 	passwordConcurrency       = 2
 	projectAPITokenDefaultTTL = 90 * 24 * time.Hour
 	projectAPITokenMaxTTL     = 365 * 24 * time.Hour
+	healthCheckTimeout        = 2 * time.Second
 )
 
 var (
@@ -63,6 +64,7 @@ type Server struct {
 }
 
 type authStore interface {
+	Ping(context.Context) error
 	CreateLocalAccount(context.Context, string, string, string) (store.User, error)
 	FindLocalCredential(context.Context, string) (store.LocalCredential, error)
 	CreateRefreshFamily(context.Context, store.User, string, time.Duration, time.Duration, *string, *string) (store.CreatedRefreshSession, error)
@@ -182,17 +184,20 @@ type projectAPITokenResponse struct {
 	RevokedAt  *time.Time `json:"revokedAt"`
 }
 
+type projectAPITokenIntrospectionResponse struct {
+	Active        bool      `json:"active"`
+	PrincipalType string    `json:"principalType"`
+	TokenID       string    `json:"tokenId"`
+	ProjectID     string    `json:"projectId"`
+	Label         string    `json:"label"`
+	Permission    string    `json:"permission"`
+	ExpiresAt     time.Time `json:"expiresAt"`
+	LastUsedAt    time.Time `json:"lastUsedAt"`
+}
+
 type createdProjectAPITokenResponse struct {
 	Token  projectAPITokenResponse `json:"token"`
 	APIKey string                  `json:"apiKey"`
-}
-
-type projectAPITokenIntrospectionResponse struct {
-	Active        bool   `json:"active"`
-	PrincipalType string `json:"principalType"`
-	TokenID       string `json:"tokenId"`
-	ProjectID     string `json:"projectId"`
-	Permission    string `json:"permission"`
 }
 
 type errorResponse struct {
@@ -269,8 +274,14 @@ func NewWithReadiness(
 	return server.recoverPanic(server.securityHeaders(server.requireReady(mux))), nil
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if !s.ready() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), healthCheckTimeout)
+	defer cancel()
+	if err := s.store.Ping(ctx); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
 		return
 	}
@@ -668,7 +679,9 @@ func (s *Server) handleIntrospectProjectAPIToken(w http.ResponseWriter, r *http.
 	}
 	writeJSON(w, http.StatusOK, projectAPITokenIntrospectionResponse{
 		Active: true, PrincipalType: "PROJECT_API_TOKEN", TokenID: principal.TokenID,
-		ProjectID: principal.ProjectID, Permission: string(principal.Permission),
+		ProjectID: principal.ProjectID, Label: principal.Label,
+		Permission: string(principal.Permission), ExpiresAt: principal.ExpiresAt,
+		LastUsedAt: principal.LastUsedAt,
 	})
 }
 
@@ -964,7 +977,7 @@ func (s *Server) requireInternal(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (s *Server) validOrigin(origin string) bool {
-	return origin == s.cfg.AppOrigin
+	return s.cfg.AllowsBrowserOrigin(origin)
 }
 
 func (s *Server) validInternalToken(authorization string) bool {

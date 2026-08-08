@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import https from "node:https";
 import test from "node:test";
 import { io } from "socket.io-client";
 
@@ -7,6 +8,9 @@ const baseUrl = process.env.WEBSOCKET_E2E_URL ?? "http://nginx:8080";
 const configuredSocketUrl =
   process.env.WEBSOCKET_E2E_SOCKET_URL ?? `${baseUrl}/ws`;
 const appOrigin = process.env.WEBSOCKET_E2E_ORIGIN ?? "http://localhost:8080";
+const usesTLS = new URL(baseUrl).protocol === "https:";
+const ingressHost = process.env.WEBSOCKET_E2E_INGRESS_HOST ?? "localhost";
+const tlsServerName = process.env.WEBSOCKET_E2E_TLS_SERVER_NAME ?? ingressHost;
 
 function realtimeServerOrigin(socketUrl, expectedOrigin) {
   const parsed = new URL(socketUrl, expectedOrigin);
@@ -24,7 +28,12 @@ test(
   "enforces ticket-only websocket admission and sid revocation",
   { skip: !run, timeout: 50_000 },
   async () => {
-    const login = await fetch(`${baseUrl}/auth/login`, {
+    const password = process.env.WEBSOCKET_E2E_PASSWORD;
+    assert.ok(
+      password,
+      "WEBSOCKET_E2E_PASSWORD is required when websocket E2E testing is enabled"
+    );
+    const login = await e2eFetch(`${baseUrl}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -32,7 +41,7 @@ test(
       },
       body: JSON.stringify({
         email: process.env.WEBSOCKET_E2E_EMAIL ?? "andrei@42.fr",
-        password: process.env.WEBSOCKET_E2E_PASSWORD ?? "SeedPassword123!",
+        password,
       }),
     });
     await assertStatus(login, 200);
@@ -83,7 +92,7 @@ test(
     });
 
     const disconnected = waitForDisconnect(primary);
-    const logout = await fetch(`${baseUrl}/auth/logout`, {
+    const logout = await e2eFetch(`${baseUrl}/auth/logout`, {
       method: "POST",
       headers: {
         Cookie: cookies,
@@ -94,7 +103,7 @@ test(
     await assertStatus(logout, 204);
     await disconnected;
 
-    const inactive = await fetch(`${baseUrl}/auth/ws-ticket`, {
+    const inactive = await e2eFetch(`${baseUrl}/auth/ws-ticket`, {
       method: "POST",
       headers: {
         Authorization: "Bearer " + session.accessToken,
@@ -107,7 +116,7 @@ test(
 );
 
 async function issueTicket(accessToken) {
-  const response = await fetch(`${baseUrl}/auth/ws-ticket`, {
+  const response = await e2eFetch(`${baseUrl}/auth/ws-ticket`, {
     method: "POST",
     headers: {
       Authorization: "Bearer " + accessToken,
@@ -122,7 +131,7 @@ async function issueTicket(accessToken) {
 }
 
 async function firstChecklistItem(accessToken) {
-  const projectsResponse = await fetch(`${baseUrl}/api/projects`, {
+  const projectsResponse = await e2eFetch(`${baseUrl}/api/projects`, {
     headers: { Authorization: "Bearer " + accessToken },
   });
   await assertStatus(projectsResponse, 200);
@@ -133,7 +142,7 @@ async function firstChecklistItem(accessToken) {
     if (!project || typeof project.id !== "string") {
       continue;
     }
-    const itemsResponse = await fetch(
+    const itemsResponse = await e2eFetch(
       `${baseUrl}/api/projects/${project.id}/evaluation-checklist-items`,
       { headers: { Authorization: "Bearer " + accessToken } }
     );
@@ -146,6 +155,46 @@ async function firstChecklistItem(accessToken) {
   assert.fail("expected a seeded checklist item");
 }
 
+function e2eFetch(url, options = {}) {
+  if (!usesTLS) {
+    return fetch(url, options);
+  }
+  const target = new URL(url);
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      {
+        hostname: target.hostname,
+        port: target.port || 443,
+        path: `${target.pathname}${target.search}`,
+        method: options.method ?? "GET",
+        headers: { ...options.headers, Host: ingressHost },
+        servername: tlsServerName,
+        rejectUnauthorized: false,
+      },
+      (response) => {
+        const chunks = [];
+        response.on("data", (chunk) => chunks.push(chunk));
+        response.on("end", () => {
+          const body = Buffer.concat(chunks).toString();
+          resolve({
+            status: response.statusCode ?? 0,
+            headers: {
+              getSetCookie: () => response.headers["set-cookie"] ?? [],
+            },
+            json: async () => JSON.parse(body),
+            text: async () => body,
+          });
+        });
+      }
+    );
+    request.once("error", reject);
+    if (options.body) {
+      request.write(options.body);
+    }
+    request.end();
+  });
+}
+
 function connect({ ticket, query, origin, cookie }) {
   return new Promise((resolve, reject) => {
     const socket = io(realtimeServerOrigin(configuredSocketUrl, baseUrl), {
@@ -155,9 +204,13 @@ function connect({ ticket, query, origin, cookie }) {
       timeout: 5_000,
       query: query ?? { ticket },
       extraHeaders: {
+        ...(usesTLS ? { Host: ingressHost } : {}),
         Origin: origin,
         ...(cookie ? { Cookie: cookie } : {}),
       },
+      ...(usesTLS
+        ? { rejectUnauthorized: false, servername: tlsServerName }
+        : {}),
     });
     socket.once("connect", () => resolve(socket));
     socket.once("connect_error", (error) => {

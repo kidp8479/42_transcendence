@@ -57,7 +57,10 @@ type CreateProjectAPITokenRequest struct {
 type ProjectAPITokenPrincipal struct {
 	TokenID    string
 	ProjectID  string
+	Label      string
 	Permission ProjectAPITokenPermission
+	ExpiresAt  time.Time
+	LastUsedAt time.Time
 }
 
 func (s *Store) SetProjectAPITokenPepper(value string) error {
@@ -268,14 +271,21 @@ func (s *Store) IntrospectProjectAPIToken(
 	// observe or return a still-active credential.
 	err = tx.QueryRow(
 		ctx,
-		`SELECT "id", "projectId", "permission"::text, "secretHmac"
+		`SELECT "id", "projectId", "label", "permission"::text, "expiresAt", "secretHmac"
 		 FROM "ProjectApiToken"
 		 WHERE "selector" = $1
 		   AND "revokedAt" IS NULL
 		   AND "expiresAt" > CURRENT_TIMESTAMP
 		 FOR UPDATE`,
 		selector,
-	).Scan(&principal.TokenID, &principal.ProjectID, &principal.Permission, &digest)
+	).Scan(
+		&principal.TokenID,
+		&principal.ProjectID,
+		&principal.Label,
+		&principal.Permission,
+		&principal.ExpiresAt,
+		&digest,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ProjectAPITokenPrincipal{}, ErrNotFound
 	}
@@ -285,11 +295,14 @@ func (s *Store) IntrospectProjectAPIToken(
 	if !hmac.Equal([]byte(projectAPITokenHMAC(pepper, selector, secret)), []byte(digest)) {
 		return ProjectAPITokenPrincipal{}, ErrNotFound
 	}
-	if _, err := tx.Exec(
+	if err := tx.QueryRow(
 		ctx,
-		`UPDATE "ProjectApiToken" SET "lastUsedAt" = CURRENT_TIMESTAMP WHERE "id" = $1`,
+		`UPDATE "ProjectApiToken"
+		 SET "lastUsedAt" = CURRENT_TIMESTAMP
+		 WHERE "id" = $1
+		 RETURNING "lastUsedAt"`,
 		principal.TokenID,
-	); err != nil {
+	).Scan(&principal.LastUsedAt); err != nil {
 		return ProjectAPITokenPrincipal{}, fmt.Errorf("update project API token last use: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {

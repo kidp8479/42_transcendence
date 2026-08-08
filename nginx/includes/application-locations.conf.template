@@ -1,0 +1,273 @@
+location = /status {
+    root /usr/share/nginx/html;
+    try_files /health/index.html =404;
+    add_header Cache-Control "no-store, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'" always;
+    add_header Strict-Transport-Security $health_hsts always;
+}
+
+location = /status/status.css {
+    root /usr/share/nginx/html;
+    try_files /health/status.css =404;
+    add_header Cache-Control "no-store, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security $health_hsts always;
+}
+
+location = /status/status.js {
+    root /usr/share/nginx/html;
+    try_files /health/status.js =404;
+    add_header Cache-Control "no-store, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security $health_hsts always;
+}
+
+location = /status/frontend {
+    if ($args != "") {
+        return 404;
+    }
+    if ($request_method !~ ^(GET|HEAD)$) {
+        add_header Allow "GET, HEAD" always;
+        return 405;
+    }
+
+    set $frontend_upstream http://frontend:${FRONTEND_PORT};
+    proxy_pass $frontend_upstream/__status.json;
+    proxy_intercept_errors off;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Authorization "";
+    proxy_set_header Cookie "";
+    proxy_set_header X-API-Key "";
+    proxy_http_version 1.1;
+    proxy_connect_timeout 2s;
+    proxy_read_timeout 3s;
+    proxy_send_timeout 3s;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    add_header Cache-Control "no-store, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security $health_hsts always;
+}
+
+location ^~ /status/ {
+    return 404;
+}
+
+location = /api/health {
+    if ($args != "") {
+        return 404;
+    }
+    if ($request_method !~ ^(GET|HEAD)$) {
+        add_header Allow "GET, HEAD" always;
+        return 405;
+    }
+
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream/api/health;
+    proxy_intercept_errors off;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Authorization "";
+    proxy_set_header Cookie "";
+    proxy_set_header X-API-Key "";
+    proxy_http_version 1.1;
+    proxy_connect_timeout 2s;
+    proxy_read_timeout 3s;
+    proxy_send_timeout 3s;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    add_header Cache-Control "no-store, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security $health_hsts always;
+}
+
+location = /auth/health {
+    if ($args != "") {
+        return 404;
+    }
+    if ($request_method !~ ^(GET|HEAD)$) {
+        add_header Allow "GET, HEAD" always;
+        return 405;
+    }
+
+    set $auth_upstream http://auth:3001;
+    proxy_pass $auth_upstream/auth/health;
+    proxy_intercept_errors off;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Authorization "";
+    proxy_set_header Cookie "";
+    proxy_set_header X-API-Key "";
+    proxy_http_version 1.1;
+    proxy_connect_timeout 2s;
+    proxy_read_timeout 3s;
+    proxy_send_timeout 3s;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    add_header Cache-Control "no-store, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security $health_hsts always;
+}
+
+location = /api/health/storage {
+    if ($args != "") {
+        return 404;
+    }
+    if ($request_method !~ ^(GET|HEAD)$) {
+        add_header Allow "GET, HEAD" always;
+        return 405;
+    }
+
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream/api/health/storage;
+    proxy_intercept_errors off;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Authorization "";
+    proxy_set_header Cookie "";
+    proxy_set_header X-API-Key "";
+    proxy_http_version 1.1;
+    proxy_connect_timeout 2s;
+    proxy_read_timeout 3s;
+    proxy_send_timeout 3s;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    add_header Cache-Control "no-store, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security $health_hsts always;
+}
+
+location / {
+    set $frontend_upstream http://frontend:${FRONTEND_PORT};
+    proxy_pass $frontend_upstream;
+    proxy_intercept_errors on;
+    error_page 500 502 503 504 /__edge-errors/50x.html;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location ^~ /api/public/v1/ {
+    access_log /var/log/nginx/access.log ws_redacted;
+    add_header Cache-Control "no-store" always;
+    proxy_hide_header Cache-Control;
+    limit_req zone=project_api_token_rate burst=30 nodelay;
+    limit_req_status 429;
+    limit_req_log_level info;
+
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream;
+    proxy_intercept_errors off;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location ~ ^/api/projects/[^/]+/api-tokens(?:/|$) {
+    add_header Cache-Control "no-store" always;
+    proxy_hide_header Cache-Control;
+
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream;
+    proxy_intercept_errors off;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location /api {
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream;
+    proxy_intercept_errors off;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location /ws {
+    access_log /var/log/nginx/access.log ws_redacted;
+    error_log /var/log/nginx/error.log crit;
+    limit_req zone=ws_handshake_rate burst=60 nodelay;
+    limit_req_status 429;
+    limit_req_log_level info;
+    limit_conn ws_handshake_concurrency 100;
+    limit_conn_status 429;
+    limit_conn_log_level info;
+
+    set $backend_upstream http://backend:3000;
+    proxy_pass $backend_upstream;
+    proxy_intercept_errors off;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_buffering off;
+    proxy_read_timeout 16m;
+    proxy_send_timeout 16m;
+}
+
+location = /auth/internal {
+    return 404;
+}
+
+location ^~ /auth/internal/ {
+    return 404;
+}
+
+location /auth {
+    set $auth_upstream http://auth:3001;
+    proxy_pass $auth_upstream;
+    proxy_intercept_errors off;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+}

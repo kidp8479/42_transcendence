@@ -93,3 +93,28 @@ func TestLoadDoesNotFallBackToOpaqueSessionSettings(t *testing.T) {
 		t.Fatal("Load() accepted opaque session settings without explicit refresh settings")
 	}
 }
+
+func TestAllowsBrowserOrigin(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		configured string
+		origin     string
+		allowed    bool
+	}{
+		{"local exact origin", "https://localhost:8443", "https://localhost:8443", true},
+		{"local wrong port", "https://localhost:8443", "https://localhost:8080", false},
+		{"school computer", "https://*.paris.42.school:8443", "https://f6r13s1.paris.42.school:8443", true},
+		{"school multi-label hostname", "https://*.paris.42.school:8443", "https://lab.f6r13s1.paris.42.school:8443", false},
+		{"school wrong port", "https://*.paris.42.school:8443", "https://f6r13s1.paris.42.school:443", false},
+		{"school lookalike", "https://*.paris.42.school:8443", "https://f6r13s1.paris.42.school.evil.example:8443", false},
+		{"school wildcard sentinel", "https://*.paris.42.school:8443", "https://*.paris.42.school:8443", false},
+		{"production rejects development", "https://tomato.iops.dev", "https://tomato-dev.iops.dev", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := Config{AppOrigin: test.configured}
+			if allowed := cfg.AllowsBrowserOrigin(test.origin); allowed != test.allowed {
+				t.Fatalf("AllowsBrowserOrigin(%q) = %t, want %t", test.origin, allowed, test.allowed)
+			}
+		})
+	}
+}

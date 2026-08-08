@@ -5,7 +5,7 @@
 # design - see .github/copilot-instructions.md "Flat Compose network".
 services:
   rustfs:
-    image: rustfs/rustfs:1.0.0-beta.12
+    image: docker.io/rustfs/rustfs:1.0.0-beta.12
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -20,31 +20,34 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:alpine
+    image: docker.io/owasp/modsecurity-crs:4.28.0-nginx-202608050608
     ports:
       - "8080:8080"
+      - "8443:8443"
+      - "127.0.0.1:8444:8443"
+    environment:
+      MODSEC_RULE_ENGINE: DetectionOnly
+      MODSEC_AUDIT_LOG: /dev/stdout
+      MODSEC_AUDIT_LOG_FORMAT: JSON
+      MODSEC_AUDIT_LOG_PARTS: FH
+      RESOLVER_CONFIG: valid=15s ipv6=off
+      FRONTEND_PORT: 5173
     volumes:
-      # mounted as a template, not the final config: /etc/nginx/nginx.conf
-      # itself is generated at startup below (see command:), it can't also
-      # be the read-only mount target.
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
-    # nginx.conf.template has a __DOCKER_RESOLVER__ placeholder instead of a
-    # hardcoded resolver address - this fills it in with whatever nameserver
-    # this container's own /etc/resolv.conf actually has (Docker's embedded
-    # DNS and podman's aardvark-dns each write their own real, reachable
-    # address there under their own network), so nginx never wastes a DNS
-    # timeout querying a second, guessed address that doesn't exist on this
-    # particular network.
-    command: >
-      sh -c "sed \"s/__DOCKER_RESOLVER__/$$(grep '^nameserver' /etc/resolv.conf | head -1 | cut -d' ' -f2)/\" /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && exec nginx -g 'daemon off;'"
+      - ./nginx/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
+      - ./nginx/includes/application-locations.conf.template:/etc/nginx/templates/includes/application-locations.conf.template:ro
+      - ./nginx/includes/error-pages.conf.template:/etc/nginx/templates/includes/error-pages.conf.template:ro
+      - ./nginx/errors:/usr/share/nginx/html/__edge-errors:ro
+      - ./nginx/status:/usr/share/nginx/html/health:ro
+      - ./nginx/modsecurity/10-task-rabbit-config.conf:/etc/modsecurity.d/owasp-crs/plugins/10-task-rabbit-config.conf:ro
+      - ./nginx/99-reload-on-certificate-change.sh:/docker-entrypoint.d/99-reload-on-certificate-change.sh:ro
+      - vault_nginx_tls:/etc/nginx/ssl:ro
     depends_on:
-      - frontend
-      - backend
-      - auth
+      nginx-tls-agent:
+        condition: service_healthy
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: docker.io/library/postgres:16-alpine
     ports:
       - "127.0.0.1:5432:5432"
     environment:
@@ -59,11 +62,14 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
 
   vault:
-    image: hashicorp/vault:1.18
+    image: docker.io/hashicorp/vault:1.18
+    ports:
+      - "127.0.0.1:8200:8200"
     cap_add:
       - IPC_LOCK
     environment:
@@ -79,7 +85,8 @@ services:
     restart: unless-stopped
 
   vault-bootstrap:
-    image: hashicorp/vault:1.18
+    build:
+      context: ./vault
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set_vault_dev_root_token_in_env}
@@ -88,6 +95,7 @@ services:
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN}
       AUTH_REFRESH_SUCCESSOR_KEY: ${AUTH_REFRESH_SUCCESSOR_KEY:?set_auth_refresh_successor_key_in_env}
       AUTH_PROJECT_API_TOKEN_PEPPER: ${AUTH_PROJECT_API_TOKEN_PEPPER:?set_auth_project_api_token_pepper_in_env}
+      SEED_PASSWORD: ${SEED_PASSWORD:?set_seed_password_in_env}
       OAUTH_42_CLIENT_ID: ${OAUTH_42_CLIENT_ID}
       OAUTH_42_CLIENT_SECRET: ${OAUTH_42_CLIENT_SECRET}
       OAUTH_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID}
@@ -99,6 +107,9 @@ services:
       - vault_auth_runtime_secret:/run/secrets/auth-runtime
       - vault_backend_runtime_secret:/run/secrets/backend-runtime
       - vault_migration_secret:/run/secrets/migration
+      - vault_nginx_tls_agent_secret:/run/secrets/nginx-tls
+      - vault_pki_ca:/run/pki-ca
+      - vault_nginx_tls:/run/nginx-tls
     command: sh /vault/bootstrap/bootstrap.sh
     depends_on:
       db:
@@ -106,6 +117,26 @@ services:
       vault:
         condition: service_healthy
     restart: "no"
+
+  nginx-tls-agent:
+    image: docker.io/hashicorp/vault:1.18
+    environment:
+      VAULT_ADDR: http://vault:8200
+    volumes:
+      - ./vault/nginx-tls-agent.hcl:/vault/agent/nginx-tls-agent.hcl:ro
+      - vault_nginx_tls_agent_secret:/run/secrets/nginx-tls:ro
+      - vault_nginx_tls:/run/nginx-tls
+    command: agent -config=/vault/agent/nginx-tls-agent.hcl
+    depends_on:
+      vault-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /run/nginx-tls/local.pem && test -s /run/nginx-tls/paris-42-wildcard.pem && test -s /run/nginx-tls/public-domains.pem"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
 
   frontend:
     build:
@@ -124,8 +155,10 @@ services:
       context: ./backend
       target: dev
     environment:
+      - NODE_ENV=${NODE_ENV}
       - APP_ORIGIN=${APP_ORIGIN}
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - AUTH_CSRF_COOKIE=${AUTH_CSRF_COOKIE}
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID_FILE=/run/secrets/vault/role_id
       - VAULT_SECRET_ID_FILE=/run/secrets/vault/secret_id
@@ -164,6 +197,8 @@ services:
       target: dev
     command: npx tsx scripts/vault-migrate.ts
     environment:
+      - APP_ORIGIN=${APP_ORIGIN}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID_FILE=/run/secrets/vault/role_id
       - VAULT_SECRET_ID_FILE=/run/secrets/vault/secret_id
@@ -183,7 +218,7 @@ services:
 
   vault-test:
     profiles: ["tests"]
-    image: hashicorp/vault:1.18
+    image: docker.io/hashicorp/vault:1.18
     entrypoint: ["/bin/sh", "/vault/check-policies.sh"]
     environment:
       VAULT_ADDR: http://vault:8200
@@ -271,4 +306,7 @@ volumes:
   vault_auth_runtime_secret:
   vault_backend_runtime_secret:
   vault_migration_secret:
+  vault_nginx_tls_agent_secret:
+  vault_pki_ca:
+  vault_nginx_tls:
   rustfs_data:

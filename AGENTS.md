@@ -14,7 +14,10 @@ and open `http://127.0.0.1:5173/`, but use it as a frontend-only convenience loo
 ## Verification
 
 - Prefer `make up`, `make ps`, and service logs when checking the integrated stack.
-- Use `cd frontend && npm run build` to validate frontend TypeScript and Vite changes.
+- Prefer existing Make/Docker wrapper targets over direct host package tools for dependency restoration, tests, linting, and builds.
+- Before a full end-to-end test, run `make rere seed` to wipe and reprovision the Compose environment; this prevents stale artifacts from producing misleading failures or migration decisions.
+- After changing `.env.example`, run `make rere seed` before validation because regenerating `.env` rotates dependent secrets.
+- Use `make check-frontend` to validate frontend TypeScript and Vite changes.
 - Keep changes scoped and avoid resetting Docker volumes unless the user explicitly asks for a clean reset.
 
 ## Git workflow

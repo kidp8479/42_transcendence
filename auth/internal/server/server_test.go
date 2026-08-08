@@ -25,6 +25,7 @@ type testAuthStore struct {
 	family            store.RefreshFamily
 	access            store.AccessState
 	err               error
+	healthErr         error
 	createFamilyCalls int
 	rotateCalls       int
 	revokeCalls       int
@@ -35,6 +36,11 @@ type testAuthStore struct {
 	admission         store.WebSocketAdmission
 	projectToken      store.CreatedProjectAPIToken
 	projectRequest    store.CreateProjectAPITokenRequest
+	projectPrincipal  store.ProjectAPITokenPrincipal
+}
+
+func (s *testAuthStore) Ping(context.Context) error {
+	return s.healthErr
 }
 
 func (s *testAuthStore) CreateLocalAccount(context.Context, string, string, string) (store.User, error) {
@@ -126,7 +132,7 @@ func (s *testAuthStore) IntrospectProjectAPIToken(
 	context.Context,
 	string,
 ) (store.ProjectAPITokenPrincipal, error) {
-	return store.ProjectAPITokenPrincipal{}, s.err
+	return s.projectPrincipal, s.err
 }
 
 type testTokenService struct {
@@ -250,6 +256,39 @@ func TestHandleCreateProjectAPITokenMapsStaleProjectAndExpiryFailures(t *testing
 				t.Fatalf("status = %d, want %d; body = %s", response.Code, test.wantStatus, response.Body.String())
 			}
 		})
+	}
+}
+
+func TestHandleIntrospectProjectAPITokenReturnsMetadata(t *testing.T) {
+	expiresAt := testNow.Add(90 * 24 * time.Hour)
+	lastUsedAt := testNow.Add(-time.Minute)
+	server := &Server{
+		internalToken: "internal-token",
+		store: &testAuthStore{projectPrincipal: store.ProjectAPITokenPrincipal{
+			TokenID: "6ba7b812-9dad-11d1-80b4-00c04fd430c8", ProjectID: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+			Label: "automation", Permission: store.ProjectAPITokenReadWrite,
+			ExpiresAt: expiresAt, LastUsedAt: lastUsedAt,
+		}},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/auth/internal/project-api-tokens/introspect",
+		strings.NewReader(`{"apiKey":"trp_v1_selector.secret"}`))
+	request.Header.Set("Authorization", "Bearer internal-token")
+	response := httptest.NewRecorder()
+
+	server.handleIntrospectProjectAPIToken(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	for _, value := range []string{
+		`"label":"automation"`,
+		`"permission":"READ_WRITE"`,
+		expiresAt.Format(time.RFC3339Nano),
+		lastUsedAt.Format(time.RFC3339Nano),
+	} {
+		if !strings.Contains(response.Body.String(), value) {
+			t.Errorf("response = %s, want %s", response.Body.String(), value)
+		}
 	}
 }
 
@@ -467,11 +506,26 @@ func TestNormalizeEmail(t *testing.T) {
 }
 
 func TestHandleHealthFailsWhenRuntimeIsUnavailable(t *testing.T) {
-	server := &Server{ready: func() bool { return false }}
+	server := &Server{ready: func() bool { return false }, store: &testAuthStore{}}
 	response := httptest.NewRecorder()
 	server.handleHealth(response, httptest.NewRequest(http.MethodGet, "/auth/health", nil))
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", response.Code)
+	}
+}
+
+func TestHandleHealthFailsWhenDatabaseIsUnavailable(t *testing.T) {
+	server := &Server{
+		ready: func() bool { return true },
+		store: &testAuthStore{healthErr: errors.New("database unavailable")},
+	}
+	response := httptest.NewRecorder()
+	server.handleHealth(response, httptest.NewRequest(http.MethodGet, "/auth/health", nil))
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", response.Code)
+	}
+	if response.Body.String() != "{\"status\":\"unavailable\"}\n" {
+		t.Fatalf("body = %q", response.Body.String())
 	}
 }
 
