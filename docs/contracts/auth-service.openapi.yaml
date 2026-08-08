@@ -117,15 +117,22 @@ paths:
           $ref: "#/components/responses/ServiceUnavailable"
   /oauth/42/start:
     get:
-      x-implementation-status: planned
+      x-implementation-status: implemented
       operationId: start42Login
       security: []
+      parameters:
+        - in: query
+          name: returnTo
+          required: false
+          schema:
+            type: string
+          description: Safe application path (/dashboard, /projects, /profile, /settings, or /user-settings); invalid values fall back to /dashboard.
       responses:
         "302":
           description: Redirect to the 42 OAuth authorization endpoint.
   /oauth/42/callback:
     get:
-      x-implementation-status: planned
+      x-implementation-status: implemented
       operationId: complete42Login
       description: Completes either login or an authenticated explicit-link transaction, as recorded by OAuthTransaction.
       security: []
@@ -248,7 +255,7 @@ paths:
           $ref: "#/components/responses/BadRequest"
   /account/link/{provider}:
     post:
-      x-implementation-status: planned
+      x-implementation-status: implemented
       operationId: startAccountLink
       description: The normal provider callback completes the link using the OAuthTransaction purpose.
       security:
@@ -262,6 +269,14 @@ paths:
       responses:
         "200":
           description: Returns the provider authorization URL for explicit linking.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authorizationUrl]
+                properties:
+                  authorizationUrl:
+                    type: string
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":

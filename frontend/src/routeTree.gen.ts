@@ -18,7 +18,6 @@ import { Route as PublicResetPasswordRouteImport } from './routes/_public/reset-
 import { Route as PublicPrivacyRouteImport } from './routes/_public/privacy'
 import { Route as PublicDontPanicRouteImport } from './routes/_public/dont-panic'
 import { Route as PublicContactRouteImport } from './routes/_public/contact'
-import { Route as PublicAuthCallbackRouteImport } from './routes/_public/auth-callback'
 import { Route as PublicAboutRouteImport } from './routes/_public/about'
 import { Route as AuthenticatedUserSettingsRouteImport } from './routes/_authenticated/user-settings'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
@@ -77,11 +76,6 @@ const PublicDontPanicRoute = PublicDontPanicRouteImport.update({
 const PublicContactRoute = PublicContactRouteImport.update({
   id: '/contact',
   path: '/contact',
-  getParentRoute: () => PublicRouteRoute,
-} as any)
-const PublicAuthCallbackRoute = PublicAuthCallbackRouteImport.update({
-  id: '/auth-callback',
-  path: '/auth-callback',
   getParentRoute: () => PublicRouteRoute,
 } as any)
 const PublicAboutRoute = PublicAboutRouteImport.update({
@@ -186,7 +180,6 @@ export interface FileRoutesByFullPath {
   '/search': typeof AuthenticatedSearchRoute
   '/user-settings': typeof AuthenticatedUserSettingsRoute
   '/about': typeof PublicAboutRoute
-  '/auth-callback': typeof PublicAuthCallbackRoute
   '/contact': typeof PublicContactRoute
   '/dont-panic': typeof PublicDontPanicRoute
   '/privacy': typeof PublicPrivacyRoute
@@ -212,7 +205,6 @@ export interface FileRoutesByTo {
   '/search': typeof AuthenticatedSearchRoute
   '/user-settings': typeof AuthenticatedUserSettingsRoute
   '/about': typeof PublicAboutRoute
-  '/auth-callback': typeof PublicAuthCallbackRoute
   '/contact': typeof PublicContactRoute
   '/dont-panic': typeof PublicDontPanicRoute
   '/privacy': typeof PublicPrivacyRoute
@@ -240,7 +232,6 @@ export interface FileRoutesById {
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/_authenticated/user-settings': typeof AuthenticatedUserSettingsRoute
   '/_public/about': typeof PublicAboutRoute
-  '/_public/auth-callback': typeof PublicAuthCallbackRoute
   '/_public/contact': typeof PublicContactRoute
   '/_public/dont-panic': typeof PublicDontPanicRoute
   '/_public/privacy': typeof PublicPrivacyRoute
@@ -269,7 +260,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/user-settings'
     | '/about'
-    | '/auth-callback'
     | '/contact'
     | '/dont-panic'
     | '/privacy'
@@ -295,7 +285,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/user-settings'
     | '/about'
-    | '/auth-callback'
     | '/contact'
     | '/dont-panic'
     | '/privacy'
@@ -322,7 +311,6 @@ export interface FileRouteTypes {
     | '/_authenticated/search'
     | '/_authenticated/user-settings'
     | '/_public/about'
-    | '/_public/auth-callback'
     | '/_public/contact'
     | '/_public/dont-panic'
     | '/_public/privacy'
@@ -408,13 +396,6 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof PublicContactRouteImport
-      parentRoute: typeof PublicRouteRoute
-    }
-    '/_public/auth-callback': {
-      id: '/_public/auth-callback'
-      path: '/auth-callback'
-      fullPath: '/auth-callback'
-      preLoaderRoute: typeof PublicAuthCallbackRouteImport
       parentRoute: typeof PublicRouteRoute
     }
     '/_public/about': {
@@ -589,7 +570,6 @@ const AuthenticatedRouteRouteWithChildren =
 
 interface PublicRouteRouteChildren {
   PublicAboutRoute: typeof PublicAboutRoute
-  PublicAuthCallbackRoute: typeof PublicAuthCallbackRoute
   PublicContactRoute: typeof PublicContactRoute
   PublicDontPanicRoute: typeof PublicDontPanicRoute
   PublicPrivacyRoute: typeof PublicPrivacyRoute
@@ -600,7 +580,6 @@ interface PublicRouteRouteChildren {
 
 const PublicRouteRouteChildren: PublicRouteRouteChildren = {
   PublicAboutRoute: PublicAboutRoute,
-  PublicAuthCallbackRoute: PublicAuthCallbackRoute,
   PublicContactRoute: PublicContactRoute,
   PublicDontPanicRoute: PublicDontPanicRoute,
   PublicPrivacyRoute: PublicPrivacyRoute,

@@ -125,9 +125,11 @@ running it and restore them afterward.
 
 The production runtime file must set `NODE_ENV=production`, `APP_ORIGIN` to
 `https://tomato.iops.dev`, and `AUTH_JWT_ISSUER` to
-`https://tomato.iops.dev/auth`. The Fedora VM development runtime file must
+`https://tomato.iops.dev/auth`. It must set
+`AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=https://tomato.iops.dev`. The Fedora VM development runtime file must
 set `NODE_ENV=development`, `APP_ORIGIN=https://tomato-dev.iops.dev`, and
-`AUTH_JWT_ISSUER=https://tomato-dev.iops.dev/auth`. The school runtime file
+`AUTH_JWT_ISSUER=https://tomato-dev.iops.dev/auth`, and
+`AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=https://tomato-dev.iops.dev`. The school runtime file
 must likewise set `NODE_ENV=development`. Production and development browser
 cookies must remain secure.
 
@@ -147,13 +149,16 @@ The school-evaluation runtime file must set:
 
 ```dotenv
 APP_ORIGIN=https://*.paris.42.school:8443
+AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=
 AUTH_JWT_ISSUER=https://*.paris.42.school:8443/auth
 ```
 
 `make deploy-school`, `make seed-school`, and `make rere-school` reject any
-other values. `make deploy-dev`, `make seed-dev`, and `make rere-dev` likewise
-require the exact `tomato-dev.iops.dev` origin and issuer above, without a
-port. The VM development and production runtime files are externally managed:
+other values. The empty OAuth-providers callback origin keeps OAuth flows
+disabled for the school profile. `make deploy-dev`, `make seed-dev`, and
+`make rere-dev` likewise require the exact `tomato-dev.iops.dev` origin,
+issuer, and OAuth-providers callback origin above, without a port. The VM
+development and production runtime files are externally managed:
 their `recreate-env-*` targets preserve deployment-specific configuration but
 rotate dynamically generated secrets before a destructive reset. This
 deliberately narrow school policy accepts exactly one

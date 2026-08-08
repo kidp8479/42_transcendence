@@ -113,6 +113,24 @@ export function SigninForm({ onCreateAccount }: SigninFormProps) {
         {submitting ? "Signing in..." : "Sign in"}
       </Button>
 
+      <div className="flex items-center gap-3 text-xs text-text-secondary">
+        <span className="h-px flex-1 bg-surface-border" />
+        or
+        <span className="h-px flex-1 bg-surface-border" />
+      </div>
+
+      <a
+        href="/auth/oauth/42/start"
+        className="
+          flex w-full items-center justify-center rounded-lg border border-brand-500
+          px-5 py-2.5 text-sm font-medium text-brand-500
+          hover:bg-brand-500/10 focus:outline-none focus:ring-4 focus:ring-green-300
+          dark:focus:ring-green-800
+        "
+      >
+        Continue with 42
+      </a>
+
       <p className="text-center text-sm text-text-secondary">
         New here?{" "}
         <button
