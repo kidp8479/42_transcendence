@@ -146,55 +146,69 @@ export class UserRelationshipsService {
       BOTH_ID_EQUAL_ERR_MSG
     );
 
-    // requesterId here is always the caller (see the controller), so this can
-    // only ever match the caller's own directional row - the other side's row
-    // is never reachable through this query, and therefore never editable by
-    // the caller.
-    const currentRelationship = await this.prisma.userRelationship.findUnique({
-      where: {
-        requesterId_addresseeId: {
-          requesterId,
-          addresseeId,
-        },
-      },
-    });
-    if (!currentRelationship) {
-      // Blocking requests are always taken into account even if no prior relationship
-      if (dto.status === RelationshipStatus.BLOCKED) {
-        return await this.prisma.userRelationship.create({
-          data: {
-            requesterId: requesterId,
-            addresseeId: addresseeId,
-            status: dto.status,
-          },
-        });
-      } else {
-        throw new NotFoundException(UNKNOWN_USER_ERR_MSG);
-      }
-    }
-
-    const currentStatus = currentRelationship.status;
-
-    // Reject no-op updates (same status requested twice).
-    throwIfAllEqual(
-      [dto.status, currentStatus],
-      ForbiddenException,
-      BOTH_ID_EQUAL_ERR_MSG
-    );
-
-    // PENDING_APPROVAL is only ever a starting state, produced by create().
-    // It is never a valid PATCH target, so this is the only transition rule
-    // needed on top of the no-op check above: every other transition
-    // (accept, block from either state, unblock) is allowed.
-    if (
-      currentStatus !== RelationshipStatus.PENDING_APPROVAL &&
-      dto.status === RelationshipStatus.PENDING_APPROVAL
-    ) {
-      throw new ForbiddenException(INVALID_STATUS_SEQUENCE_ERR_MSG);
-    }
+    // Captured from inside the transaction below - needed after it resolves,
+    // for the notification check past the transaction's own return.
+    let currentStatus: RelationshipStatus | undefined;
 
     const updated = await this.prisma.transaction(
       async (database) => {
+        // requesterId here is always the caller (see the controller), so
+        // this can only ever match the caller's own directional row - the
+        // other side's row is never reachable through this query, and
+        // therefore never editable by the caller. Read through `database`
+        // (the transaction's own client), not a plain `this.prisma` call
+        // made before the transaction opens - a pre-transaction read lets
+        // two concurrent PATCHes on the same row (double-click Accept, two
+        // open tabs) both validate against the same stale snapshot and both
+        // proceed into their own transaction; whichever commits second then
+        // hits a raw Prisma conflict instead of the intended, readable
+        // ForbiddenException/NotFoundException. Reading here means the
+        // second transaction re-validates against what the first one
+        // actually committed.
+        const currentRelationship = await database.userRelationship.findUnique({
+          where: {
+            requesterId_addresseeId: {
+              requesterId,
+              addresseeId,
+            },
+          },
+        });
+        if (!currentRelationship) {
+          // Blocking requests are always taken into account even if no prior relationship
+          if (dto.status === RelationshipStatus.BLOCKED) {
+            return await database.userRelationship.create({
+              data: {
+                requesterId: requesterId,
+                addresseeId: addresseeId,
+                status: dto.status,
+              },
+            });
+          } else {
+            throw new NotFoundException(UNKNOWN_USER_ERR_MSG);
+          }
+        }
+
+        currentStatus = currentRelationship.status;
+
+        // Reject no-op updates (same status requested twice).
+        throwIfAllEqual(
+          [dto.status, currentStatus],
+          ForbiddenException,
+          BOTH_ID_EQUAL_ERR_MSG
+        );
+
+        // PENDING_APPROVAL is only ever a starting state, produced by
+        // create(). It is never a valid PATCH target, so this is the only
+        // transition rule needed on top of the no-op check above: every
+        // other transition (accept, block from either state, unblock) is
+        // allowed.
+        if (
+          currentStatus !== RelationshipStatus.PENDING_APPROVAL &&
+          dto.status === RelationshipStatus.PENDING_APPROVAL
+        ) {
+          throw new ForbiddenException(INVALID_STATUS_SEQUENCE_ERR_MSG);
+        }
+
         // Unblocking is the one transition that can't be a plain status
         // flip: remove() deliberately excludes BLOCKED rows from deletion
         // (so unfriending someone never lifts a block as a side effect),
@@ -228,7 +242,7 @@ export class UserRelationshipsService {
           }
         }
 
-        const updated = await database.userRelationship.update({
+        return await database.userRelationship.update({
           where: {
             requesterId_addresseeId: {
               requesterId: requesterId,
@@ -239,7 +253,6 @@ export class UserRelationshipsService {
             status: dto.status,
           },
         });
-        return updated;
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
