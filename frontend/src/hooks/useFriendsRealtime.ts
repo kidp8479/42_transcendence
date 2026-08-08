@@ -168,7 +168,13 @@ export function useFriendsRealtime(
           if (tick !== latestTickRef.current) return;
           setFriends((previous) =>
             previous.map((friend) =>
-              friend.id in presence
+              // Only allocate a new object when the value actually
+              // changed - FriendRow is memoized (see its own comment) on
+              // the assumption that a friend nothing changed for keeps the
+              // same object reference between ticks. Spreading
+              // unconditionally here would hand memo a "new" friend prop
+              // every 20s for every row regardless, defeating it entirely.
+              friend.id in presence && friend.online !== presence[friend.id]
                 ? { ...friend, online: presence[friend.id] }
                 : friend
             )

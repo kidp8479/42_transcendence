@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Avatar } from "flowbite-react";
 import {
   initialsOf,
@@ -13,20 +14,31 @@ const PENDING_STATUS_LABEL: Partial<Record<FriendshipStatus, string>> = {
   PENDING_OUTGOING: "Request sent",
 };
 
-export function FriendRow({
+// Memoized: the friends list re-renders every 20s presence-poll tick with a
+// new top-level `friends` array reference (see useFriendsRealtime.ts), which
+// would otherwise re-render every row even when most friends' displayed data
+// didn't change. Only pays off as long as `friend`/`onSelect` keep a stable
+// reference across ticks for rows nothing changed on - see friends.tsx's own
+// comments on the presence-poll merge and the memoized onSelect callback.
+// Takes `onSelect(id)` rather than a bare `onClick`, specifically so
+// friends.tsx can pass one memoized function shared by every row instead of
+// a fresh `() => handleSelect(friend.id)` closure per row per render - the
+// latter would hand memo a "new" prop every time regardless of this
+// component's own memoization.
+export const FriendRow = memo(function FriendRow({
   friend,
   active,
-  onClick,
+  onSelect,
 }: {
   friend: FriendProfile;
   active: boolean;
-  onClick: () => void;
+  onSelect: (id: string) => void;
 }) {
   const pendingLabel = PENDING_STATUS_LABEL[friend.status];
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => onSelect(friend.id)}
       aria-current={active ? "true" : undefined}
       className={`flex w-full items-center gap-3 border-b border-surface-border px-4 py-3 text-left transition-colors hover:bg-surface-overlay ${
         active ? "bg-surface-overlay" : ""
@@ -82,4 +94,4 @@ export function FriendRow({
       </div>
     </button>
   );
-}
+});
