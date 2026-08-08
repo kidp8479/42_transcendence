@@ -58,19 +58,16 @@ export async function getUserRelationship(
 }
 
 // POST /users/user-relationships/:id - sends a friend request. The backend
-// replies with a bare [requesterId, addresseeId] tuple (not a
-// UserRelationship row), which carries nothing the caller doesn't already
-// know - nothing to parse, nothing to return.
+// replies with a bare [requesterId, addresseeId] tuple, which carries
+// nothing the caller doesn't already know - nothing to parse, nothing to
+// return.
 //
-// Two different places call this (the search bar's own inline "Add friend"
-// button in SearchResultLinks.tsx, and friends.tsx's own action panel), and
-// either one can be sending a request for a profile the OTHER one currently
-// has open - the backend only pushes "friends:request-received" to the
-// addressee, never back to the requester (same reasoning as
-// friendCountResource.adjust's own comment), so the requester's own open
-// views need telling some other way. Notifying friendRequestSentListeners
-// here, in the one function every caller already goes through, means
-// neither call site has to know the other exists.
+// Notifies friendRequestSentListeners once the call succeeds: the backend
+// only pushes "friends:request-received" to the addressee, never back to the
+// requester, so any other open view of this same profile (ex: sent from the
+// search bar while friends.tsx has that profile open) needs telling some
+// other way. Every caller goes through this one function, so neither has to
+// know the other exists.
 export async function sendFriendRequest(userId: string): Promise<void> {
   await apiClient<unknown>(`/users/user-relationships/${userId}`, {
     method: "POST",
