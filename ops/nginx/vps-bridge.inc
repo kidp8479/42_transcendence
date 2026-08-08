@@ -1,4 +1,5 @@
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+proxy_hide_header Strict-Transport-Security;
 
 proxy_http_version 1.1;
 proxy_ssl_server_name on;

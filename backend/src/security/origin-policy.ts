@@ -24,6 +24,7 @@ export function allowsBrowserOrigin(
       parsed.password === "" &&
       labels.length === 4 &&
       labels[0] !== "" &&
+      labels[0] !== "*" &&
       labels[1] === "paris" &&
       labels[2] === "42" &&
       labels[3] === "school"

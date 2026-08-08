@@ -286,7 +286,7 @@ check-nginx:
 
 ## verify local HTTPS ingress, HSTS, and the HTTP-to-HTTPS redirect
 check-tls:
-	$(COMPOSE) exec nginx sh -c '! curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/ | grep -qi "^strict-transport-security:"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/ -o /tmp/hsts-root-headers && ! grep -qi "^strict-transport-security:" /tmp/hsts-root-headers'
 	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve school.paris.42.school:8443:127.0.0.1 https://school.paris.42.school:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
 	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato.iops.dev:8443:127.0.0.1 https://tomato.iops.dev:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
 	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato-dev.iops.dev:8443:127.0.0.1 https://tomato-dev.iops.dev:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'

@@ -130,6 +130,7 @@ func (cfg Config) AllowsBrowserOrigin(origin string) bool {
 	labels := strings.Split(strings.ToLower(parsed.Hostname()), ".")
 	return len(labels) == 4 &&
 		labels[0] != "" &&
+		labels[0] != "*" &&
 		labels[1] == "paris" &&
 		labels[2] == "42" &&
 		labels[3] == "school"

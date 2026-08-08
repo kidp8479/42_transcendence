@@ -107,6 +107,7 @@ func TestAllowsBrowserOrigin(t *testing.T) {
 		{"school multi-label hostname", "https://*.paris.42.school:8443", "https://lab.f6r13s1.paris.42.school:8443", false},
 		{"school wrong port", "https://*.paris.42.school:8443", "https://f6r13s1.paris.42.school:443", false},
 		{"school lookalike", "https://*.paris.42.school:8443", "https://f6r13s1.paris.42.school.evil.example:8443", false},
+		{"school wildcard sentinel", "https://*.paris.42.school:8443", "https://*.paris.42.school:8443", false},
 		{"production rejects development", "https://tomato.iops.dev", "https://tomato-dev.iops.dev", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {

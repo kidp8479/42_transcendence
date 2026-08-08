@@ -47,6 +47,7 @@ test("allows only one school hostname label on port 8443", () => {
     ),
     false
   );
+  assert.equal(allowsBrowserOrigin(configuredOrigin, configuredOrigin), false);
 });
 
 test("only the school value enables wildcard matching", () => {
