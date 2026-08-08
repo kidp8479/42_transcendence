@@ -25,6 +25,17 @@ function sleep(ms: number): Promise<void> {
 // AUTH_SERVICE_URL comes from docker-compose env (internal network address,
 // ex: http://auth:3001) - Origin must match APP_ORIGIN or the auth service
 // rejects the request (same check a real browser request goes through).
+export function seedRequestOrigin(
+  configuredOrigin = process.env.APP_ORIGIN ?? "https://localhost:8443"
+): string {
+  const origin = new URL(configuredOrigin);
+  if (origin.hostname.startsWith("*.")) {
+    origin.hostname = `seed.${origin.hostname.slice(2)}`;
+    return origin.origin;
+  }
+  return configuredOrigin;
+}
+
 export async function registerSeedUser(
   prisma: PrismaClient,
   email: string,
@@ -40,7 +51,7 @@ export async function registerSeedUser(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Origin: process.env.APP_ORIGIN ?? "https://localhost:8443",
+      Origin: seedRequestOrigin(),
     },
     body: JSON.stringify({ email, username, password: SEED_PASSWORD }),
   });
