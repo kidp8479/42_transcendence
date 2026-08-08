@@ -554,6 +554,7 @@ function FriendsPage() {
     if (!selected) return;
     try {
       await removeFriendRelationship(selected.id);
+      removeFromList(selected.id);
       friendCountResource.adjust(-1);
     } catch {
       showToast({ type: "error", message: "Could not remove this friend." });
