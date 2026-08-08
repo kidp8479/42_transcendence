@@ -586,14 +586,37 @@ function FriendsPage() {
   }
 
   async function handleUnblock() {
-    if (!selected) return;
+    if (!selected || !currentUserId) return;
     try {
       await updateFriendRelationship(selected.id, "ACCEPTED");
-      setStatus(
-        selected.id,
-        "ACCEPTED",
-      );
-      friendCountResource.adjust(1);
+      // Unblocking only ever touches the caller's OWN row - it can't assume
+      // ACCEPTED on both sides the way handleAccept can, because the other
+      // side's row might not even be there any more (ex: they removed the
+      // relationship while blocked - remove()'s own comment on
+      // user-relationships.service.ts excludes BLOCKED rows from that
+      // delete on purpose, so only the caller's row survived to be
+      // unblocked). Re-deriving from both directional rows, the same way
+      // loadFocusedProfile does, is what tells "we're friends again" apart
+      // from "nothing left to unblock".
+      const relationships = await getUserRelationship(selected.id);
+      let mine: RelationshipStatus | undefined;
+      let theirs: RelationshipStatus | undefined;
+      for (const relationship of relationships) {
+        if (relationship.requesterId === currentUserId) {
+          mine = relationship.status;
+        } else {
+          theirs = relationship.status;
+        }
+      }
+      const derived = deriveFriendshipStatus(mine, theirs);
+      if (derived === "NONE") {
+        removeFromList(selected.id);
+      } else {
+        setStatus(selected.id, derived);
+      }
+      if (derived === "ACCEPTED") {
+        friendCountResource.adjust(1);
+      }
     } catch {
       showToast({ type: "error", message: "Could not unblock this user." });
     }
