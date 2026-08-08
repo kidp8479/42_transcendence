@@ -84,7 +84,10 @@ export class UserRelationshipsService {
         // This is deliberate: a user blocked by the addressee gets the exact
         // same response as a plain duplicate request, so a block is never
         // observable from the requester's side.
-        if ((fromRequester && fromAddressee) || fromAddressee?.status === RelationshipStatus.BLOCKED) {
+        if (
+          (fromRequester && fromAddressee) ||
+          fromAddressee?.status === RelationshipStatus.BLOCKED
+        ) {
           throw new ForbiddenException(EXISTING_RELATION_ERR_MSG);
         }
 
@@ -115,7 +118,7 @@ export class UserRelationshipsService {
     );
     // Send Requester data through WebSockets
     const requester = await this.userService.findById(requesterId);
-    this.notificationService.create(
+    await this.notificationService.create(
       addresseeId,
       requester.username + " wants to be your friend!",
       `/friends?userId=${requesterId}`
@@ -124,7 +127,7 @@ export class UserRelationshipsService {
       addresseeId,
       "friends:request-received",
       requesterId
-    );    
+    );
     return created;
   }
 
@@ -206,9 +209,12 @@ export class UserRelationshipsService {
       }
     );
     // Inform addressee that request has been approved
-    if (currentStatus == RelationshipStatus.PENDING_APPROVAL && dto.status === RelationshipStatus.ACCEPTED) {
+    if (
+      currentStatus == RelationshipStatus.PENDING_APPROVAL &&
+      dto.status === RelationshipStatus.ACCEPTED
+    ) {
       const requester = await this.userService.findById(requesterId);
-      this.notificationService.create(
+      await this.notificationService.create(
         addresseeId,
         requester.username + " is now your friend!",
         `/friends?userId=${requesterId}`
