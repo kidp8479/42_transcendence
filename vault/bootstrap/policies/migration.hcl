@@ -2,6 +2,10 @@ path "database/creds/migration" {
   capabilities = ["read"]
 }
 
+path "kv/data/seed/demo-users" {
+  capabilities = ["read"]
+}
+
 path "auth/token/renew-self" {
   capabilities = ["update"]
 }

@@ -50,19 +50,44 @@ deploy-%: validate-deployment-%
 	$(call deployment_compose,$*) config --quiet
 	$(call deployment_compose,$*) up --build -d
 
-## validate an externally managed deployment runtime environment without replacing it
-recreate-env-%: validate-deployment-%
-	@:
+## rotate locally generated secrets while retaining deployment-specific configuration
+recreate-env-%:
+	@env_file="$(call deployment_env_file,$*)"; \
+	test -f "$$env_file" || (echo "Missing $(call deployment_name,$*) runtime env: $$env_file" >&2; exit 1); \
+	postgres_password="$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)"; \
+	auth_internal_token="$$(openssl rand -hex 32)"; \
+	auth_refresh_successor_key="$$(openssl rand -hex 32)"; \
+	auth_project_api_token_pepper="$$(openssl rand -hex 32)"; \
+	seed_password="$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)"; \
+	vault_dev_root_token="$$(openssl rand -hex 32)"; \
+	vault_db_admin_password="$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)"; \
+	set_env_value() { \
+		key="$$1"; value="$$2"; \
+		if grep -q "^$$key=" "$$env_file"; then \
+			sed -i "s|^$$key=.*|$$key=$$value|" "$$env_file"; \
+		else \
+			printf '\n%s=%s\n' "$$key" "$$value" >>"$$env_file"; \
+		fi; \
+	}; \
+	set_env_value POSTGRES_PASSWORD "'$$postgres_password'"; \
+	set_env_value AUTH_INTERNAL_TOKEN "$$auth_internal_token"; \
+	set_env_value AUTH_REFRESH_SUCCESSOR_KEY "$$auth_refresh_successor_key"; \
+	set_env_value AUTH_PROJECT_API_TOKEN_PEPPER "$$auth_project_api_token_pepper"; \
+	set_env_value SEED_PASSWORD "'$$seed_password'"; \
+	set_env_value VAULT_DEV_ROOT_TOKEN "$$vault_dev_root_token"; \
+	set_env_value VAULT_DB_ADMIN_PASSWORD "'$$vault_db_admin_password'"; \
+	chmod 0600 "$$env_file"
 
 ## recreate the school runtime environment with fresh local secrets and the required school origin
 recreate-env-school:
 	@umask 077; sed \
-		-e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)|" \
+		-e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^AUTH_INTERNAL_TOKEN=.*|AUTH_INTERNAL_TOKEN=$$(openssl rand -hex 32)|" \
 		-e "s|^AUTH_REFRESH_SUCCESSOR_KEY=.*|AUTH_REFRESH_SUCCESSOR_KEY=$$(openssl rand -hex 32)|" \
 		-e "s|^AUTH_PROJECT_API_TOKEN_PEPPER=.*|AUTH_PROJECT_API_TOKEN_PEPPER=$$(openssl rand -hex 32)|" \
+		-e "s|^SEED_PASSWORD=.*|SEED_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^VAULT_DEV_ROOT_TOKEN=.*|VAULT_DEV_ROOT_TOKEN=$$(openssl rand -hex 32)|" \
-		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD=$$(openssl rand -hex 32)|" \
+		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^APP_ORIGIN=.*|APP_ORIGIN=https://*.paris.42.school:8443|" \
 		-e "s|^AUTH_JWT_ISSUER=.*|AUTH_JWT_ISSUER=https://*.paris.42.school:8443/auth|" \
 		.env.example > "$(DEPLOY_SCHOOL_ENV_FILE)"
@@ -125,6 +150,8 @@ validate-deployment-%:
 	@test -n "$(filter $*,$(DEPLOYMENTS))" || (echo "Unknown deployment profile: $*" >&2; exit 1)
 	@test -f "$(call deployment_env_file,$*)" || (echo "Missing $(call deployment_name,$*) runtime env: $(call deployment_env_file,$*)" >&2; exit 1)
 	@test -f "$(call deployment_compose_file,$*)" || (echo "Missing $(call deployment_name,$*) Compose override: $(call deployment_compose_file,$*)" >&2; exit 1)
+	@env_file="$(call deployment_env_file,$*)"; set -a; . "$$env_file"; set +a; \
+		test -n "$$SEED_PASSWORD" || (echo "SEED_PASSWORD must be set for $* deployment" >&2; exit 1)
 	@if [ "$*" = "dev" ] || [ "$*" = "school" ]; then \
 		env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
 		set -a; . "$$env_file"; set +a; \

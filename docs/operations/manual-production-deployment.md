@@ -154,8 +154,9 @@ AUTH_JWT_ISSUER=https://*.paris.42.school:8443/auth
 other values. `make deploy-dev`, `make seed-dev`, and `make rere-dev` likewise
 require the exact `tomato-dev.iops.dev` origin and issuer above, without a
 port. The VM development and production runtime files are externally managed:
-their `recreate-env-*` targets validate an existing file and never generate or
-replace secrets. This deliberately narrow school policy accepts exactly one
+their `recreate-env-*` targets preserve deployment-specific configuration but
+rotate dynamically generated secrets before a destructive reset. This
+deliberately narrow school policy accepts exactly one
 hostname label below `paris.42.school` on port 8443. It does not permit
 arbitrary wildcard origins, suffix matching, wildcard ports, or
 request-derived issuer values. The evaluation build uses relative API and
@@ -243,7 +244,8 @@ Demo data is optional and must be applied only to the intended environment.
 It is added with `make seed-prod`, `make seed-dev`, or `make seed-school`.
 The scoped reset targets are destructive: `make rere-prod` and `make rere-dev`
 remove only their respective Compose volumes, database data, RustFS data, and
-local images while preserving the externally managed runtime environment file.
+local images. They preserve deployment-specific runtime configuration but
+rotate dynamically generated secrets required for the new stack.
 `make rere-school` performs the same stack reset and recreates
 `/srv/transcendence/school/secrets/runtime.env` with fresh local secrets and
 the required school origin and issuer. A complete disposable reset and seed

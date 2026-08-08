@@ -23,6 +23,7 @@ NGINX_TLS_DIR=${NGINX_TLS_DIR:-/run/nginx-tls}
 : "${AUTH_INTERNAL_TOKEN:?AUTH_INTERNAL_TOKEN is required}"
 : "${AUTH_REFRESH_SUCCESSOR_KEY:?AUTH_REFRESH_SUCCESSOR_KEY is required}"
 : "${AUTH_PROJECT_API_TOKEN_PEPPER:?AUTH_PROJECT_API_TOKEN_PEPPER is required}"
+: "${SEED_PASSWORD:?SEED_PASSWORD is required}"
 
 on_exit() {
 	rc=$?
@@ -136,6 +137,9 @@ quiet vault kv put kv/auth/refresh-successor cipher_key="$AUTH_REFRESH_SUCCESSOR
 # an existing secret, including an older incompatible secret shape.
 if ! vault kv get -format=json kv/auth/project-api-token-pepper >/dev/null 2>&1; then
 	quiet vault kv put kv/auth/project-api-token-pepper pepper="$AUTH_PROJECT_API_TOKEN_PEPPER"
+fi
+if ! vault kv get -format=json kv/seed/demo-users >/dev/null 2>&1; then
+	quiet vault kv put kv/seed/demo-users password="$SEED_PASSWORD"
 fi
 
 step "configuring PostgreSQL database secrets engine"
