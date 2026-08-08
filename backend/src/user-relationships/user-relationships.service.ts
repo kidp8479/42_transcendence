@@ -199,7 +199,7 @@ export class UserRelationshipsService {
           },
         });
         // Inform addressee that request has been approved
-        if (dto.status === RelationshipStatus.ACCEPTED) {
+        if (currentStatus == RelationshipStatus.PENDING_APPROVAL && dto.status === RelationshipStatus.ACCEPTED) {
           const requester = await this.userService.findById(requesterId);
           this.notificationService.create(
             addresseeId,
