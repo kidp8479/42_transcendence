@@ -810,7 +810,10 @@ function ProfilePanel({
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
-        <div className="flex items-center gap-8 border-b border-surface-border pb-6">
+        {/* Stacked and centered below sm (same shape as UserSettingsPage's
+            own avatar block) - side by side with the avatar only once there's
+            room for both without cramming. */}
+        <div className="flex flex-col items-center gap-4 border-b border-surface-border pb-6 sm:flex-row sm:gap-8">
           <div className="flex shrink-0 flex-col items-center gap-1.5">
             <Avatar
               img={friend.avatarUrl ?? undefined}
@@ -830,7 +833,12 @@ function ProfilePanel({
             )}
           </div>
 
-          <dl className="flex w-full max-w-s min-w-0 flex-col px-4 gap-2.5">
+          {/* max-w-s isn't a real Tailwind class (no custom "s" size is
+              defined anywhere), so this had no effective cap at all - on a
+              wide screen the info rows stretched the full remaining width,
+              which is what looked wrong. Uncapped (w-full) while stacked
+              under the avatar on a phone, capped once it sits beside it. */}
+          <dl className="flex w-full min-w-0 flex-col gap-2.5 sm:max-w-md sm:px-4">
             <InfoRow
               icon={HiOutlineUser}
               label="Name"
@@ -855,7 +863,12 @@ function ProfilePanel({
               {ACTION_COPY[friend.status]}
             </p>
 
-            <div className="flex flex-wrap gap-2">
+            {/* Stacked full-width on a phone (flex-col's default
+                align-items: stretch already does the widening, no w-full
+                needed on the buttons themselves) - a row of two half-width
+                buttons is a small tap target on a narrow screen. Same
+                sm:flex-row hand-off as UserSettingsPage's own button rows. */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               {friend.status === "PENDING_INCOMING" && (
                 <>
                   {/* Same green as UserSettingsPage's "Save changes" and same
