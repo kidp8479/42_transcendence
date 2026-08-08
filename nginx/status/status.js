@@ -33,7 +33,7 @@ function hasExpectedStatus(body, status) {
   return (
     body !== null &&
     typeof body === "object" &&
-    Object.keys(body).length === 1 &&
+    !Array.isArray(body) &&
     body.status === status
   );
 }
