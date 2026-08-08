@@ -114,7 +114,7 @@
 
 The browser supplies its current application path before OAuth begins. Go stores a normalized path in the OAuth transaction and never trusts a callback-supplied return target.
 
-Allowed prefixes are `/dashboard`, `/projects`, `/profile`, and `/settings`. Validation requires exactly one leading slash, rejects `//`, absolute URLs, backslashes, and control characters, normalizes before prefix comparison, and discards query strings and fragments. Invalid paths fall back to `/dashboard`.
+Allowed prefixes are `/dashboard`, `/projects`, `/profile`, `/settings`, and `/user-settings`. `/user-settings` is a compatibility route for the current account-management UI. Validation requires exactly one leading slash, rejects `//`, absolute URLs, backslashes, and control characters, normalizes before prefix comparison, and discards query strings and fragments. Invalid paths fall back to `/dashboard`.
 
 ## 4. Access-token and refresh-token lifecycle
 

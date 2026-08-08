@@ -20,41 +20,43 @@ const (
 )
 
 type Config struct {
-	Port               string
-	AppOrigin          string
-	RefreshCookieName  string
-	CSRFCookieName     string
-	CookieSecure       bool
-	RefreshIdleTTL     time.Duration
-	RefreshAbsoluteTTL time.Duration
-	JWTIssuer          string
-	JWTAudience        string
-	JWTAccessTTL       time.Duration
-	JWTLeeway          time.Duration
-	VaultAddress       string
-	VaultRoleIDFile    string
-	VaultSecretIDFile  string
-	VaultDatabaseRole  string
-	VaultDatabaseHost  string
-	VaultDatabasePort  string
-	VaultDatabaseName  string
+	Port                         string
+	AppOrigin                    string
+	OAuthProvidersCallbackOrigin string
+	RefreshCookieName            string
+	CSRFCookieName               string
+	CookieSecure                 bool
+	RefreshIdleTTL               time.Duration
+	RefreshAbsoluteTTL           time.Duration
+	JWTIssuer                    string
+	JWTAudience                  string
+	JWTAccessTTL                 time.Duration
+	JWTLeeway                    time.Duration
+	VaultAddress                 string
+	VaultRoleIDFile              string
+	VaultSecretIDFile            string
+	VaultDatabaseRole            string
+	VaultDatabaseHost            string
+	VaultDatabasePort            string
+	VaultDatabaseName            string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Port:              envOrDefault("PORT", defaultPort),
-		AppOrigin:         strings.TrimRight(strings.TrimSpace(os.Getenv("APP_ORIGIN")), "/"),
-		RefreshCookieName: strings.TrimSpace(os.Getenv("AUTH_REFRESH_COOKIE")),
-		CSRFCookieName:    strings.TrimSpace(os.Getenv("AUTH_CSRF_COOKIE")),
-		JWTIssuer:         strings.TrimSpace(os.Getenv("AUTH_JWT_ISSUER")),
-		JWTAudience:       strings.TrimSpace(os.Getenv("AUTH_JWT_AUDIENCE")),
-		VaultAddress:      strings.TrimRight(strings.TrimSpace(os.Getenv("VAULT_ADDR")), "/"),
-		VaultRoleIDFile:   strings.TrimSpace(os.Getenv("VAULT_ROLE_ID_FILE")),
-		VaultSecretIDFile: strings.TrimSpace(os.Getenv("VAULT_SECRET_ID_FILE")),
-		VaultDatabaseRole: strings.TrimSpace(os.Getenv("VAULT_DB_ROLE")),
-		VaultDatabaseHost: envOrDefault("VAULT_DB_HOST", defaultVaultDBHost),
-		VaultDatabasePort: envOrDefault("VAULT_DB_PORT", defaultVaultDBPort),
-		VaultDatabaseName: strings.TrimSpace(os.Getenv("VAULT_DB_NAME")),
+		Port:                         envOrDefault("PORT", defaultPort),
+		AppOrigin:                    strings.TrimRight(strings.TrimSpace(os.Getenv("APP_ORIGIN")), "/"),
+		OAuthProvidersCallbackOrigin: strings.TrimRight(strings.TrimSpace(os.Getenv("AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN")), "/"),
+		RefreshCookieName:            strings.TrimSpace(os.Getenv("AUTH_REFRESH_COOKIE")),
+		CSRFCookieName:               strings.TrimSpace(os.Getenv("AUTH_CSRF_COOKIE")),
+		JWTIssuer:                    strings.TrimSpace(os.Getenv("AUTH_JWT_ISSUER")),
+		JWTAudience:                  strings.TrimSpace(os.Getenv("AUTH_JWT_AUDIENCE")),
+		VaultAddress:                 strings.TrimRight(strings.TrimSpace(os.Getenv("VAULT_ADDR")), "/"),
+		VaultRoleIDFile:              strings.TrimSpace(os.Getenv("VAULT_ROLE_ID_FILE")),
+		VaultSecretIDFile:            strings.TrimSpace(os.Getenv("VAULT_SECRET_ID_FILE")),
+		VaultDatabaseRole:            strings.TrimSpace(os.Getenv("VAULT_DB_ROLE")),
+		VaultDatabaseHost:            envOrDefault("VAULT_DB_HOST", defaultVaultDBHost),
+		VaultDatabasePort:            envOrDefault("VAULT_DB_PORT", defaultVaultDBPort),
+		VaultDatabaseName:            strings.TrimSpace(os.Getenv("VAULT_DB_NAME")),
 	}
 	var err error
 
@@ -66,6 +68,9 @@ func Load() (Config, error) {
 	}
 	if !isValidConfiguredBrowserOrigin(cfg.AppOrigin) {
 		return Config{}, fmt.Errorf("APP_ORIGIN must be an origin such as https://localhost:8443 or https://*.paris.42.school:8443")
+	}
+	if cfg.OAuthProvidersCallbackOrigin != "" && !isValidConcreteOrigin(cfg.OAuthProvidersCallbackOrigin) {
+		return Config{}, fmt.Errorf("AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN must be a concrete http or https origin")
 	}
 	cfg.CookieSecure, err = parseRequiredBool("AUTH_COOKIE_SECURE")
 	if err != nil {
@@ -144,6 +149,18 @@ func isValidConfiguredBrowserOrigin(origin string) bool {
 	return err == nil &&
 		(parsed.Scheme == "http" || parsed.Scheme == "https") &&
 		parsed.Host != "" &&
+		parsed.Path == "" &&
+		parsed.RawQuery == "" &&
+		parsed.Fragment == "" &&
+		parsed.User == nil
+}
+
+func isValidConcreteOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	return err == nil &&
+		(parsed.Scheme == "http" || parsed.Scheme == "https") &&
+		parsed.Host != "" &&
+		!strings.Contains(parsed.Hostname(), "*") &&
 		parsed.Path == "" &&
 		parsed.RawQuery == "" &&
 		parsed.Fragment == "" &&

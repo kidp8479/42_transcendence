@@ -8,23 +8,42 @@ import (
 func setRequiredEnvironment(t *testing.T) {
 	t.Helper()
 	for name, value := range map[string]string{
-		"APP_ORIGIN":                "http://localhost:8080",
-		"AUTH_COOKIE_SECURE":        "false",
-		"AUTH_REFRESH_COOKIE":       "tr_refresh",
-		"AUTH_CSRF_COOKIE":          "tr_csrf",
-		"AUTH_REFRESH_IDLE_TTL":     "168h",
-		"AUTH_REFRESH_ABSOLUTE_TTL": "720h",
-		"AUTH_JWT_ISSUER":           "http://localhost:8080/auth",
-		"AUTH_JWT_AUDIENCE":         "transcendence-api",
-		"AUTH_JWT_ACCESS_TTL":       "15m",
-		"AUTH_JWT_LEEWAY":           "30s",
-		"VAULT_ADDR":                "http://vault:8200",
-		"VAULT_ROLE_ID_FILE":        "/run/secrets/role-id",
-		"VAULT_SECRET_ID_FILE":      "/run/secrets/secret-id",
-		"VAULT_DB_ROLE":             "auth-runtime",
-		"VAULT_DB_NAME":             "transcendence",
+		"APP_ORIGIN":                           "http://localhost:8080",
+		"AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN": "http://localhost:8080",
+		"AUTH_COOKIE_SECURE":                   "false",
+		"AUTH_REFRESH_COOKIE":                  "tr_refresh",
+		"AUTH_CSRF_COOKIE":                     "tr_csrf",
+		"AUTH_REFRESH_IDLE_TTL":                "168h",
+		"AUTH_REFRESH_ABSOLUTE_TTL":            "720h",
+		"AUTH_JWT_ISSUER":                      "http://localhost:8080/auth",
+		"AUTH_JWT_AUDIENCE":                    "transcendence-api",
+		"AUTH_JWT_ACCESS_TTL":                  "15m",
+		"AUTH_JWT_LEEWAY":                      "30s",
+		"VAULT_ADDR":                           "http://vault:8200",
+		"VAULT_ROLE_ID_FILE":                   "/run/secrets/role-id",
+		"VAULT_SECRET_ID_FILE":                 "/run/secrets/secret-id",
+		"VAULT_DB_ROLE":                        "auth-runtime",
+		"VAULT_DB_NAME":                        "transcendence",
 	} {
 		t.Setenv(name, value)
+	}
+}
+
+func TestLoadAllowsDisabledOAuthAndRejectsWildcardCallbackOrigin(t *testing.T) {
+	setRequiredEnvironment(t)
+	t.Setenv("AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN", "")
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load() rejected disabled OAuth: %v", err)
+	}
+	t.Setenv("APP_ORIGIN", "https://*.paris.42.school:8443")
+	t.Setenv("AUTH_COOKIE_SECURE", "true")
+	t.Setenv("AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN", "https://f6r13s1.paris.42.school:8443")
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load() rejected a concrete callback for wildcard APP_ORIGIN: %v", err)
+	}
+	t.Setenv("AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN", "https://*.paris.42.school:8443")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() accepted a wildcard OAuth callback origin")
 	}
 }
 

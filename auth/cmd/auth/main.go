@@ -87,8 +87,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("create access token service: %v", err)
 	}
-	handler, err := server.NewWithReadiness(
-		cfg, secrets.InternalToken, authStore, passwords, tokens, runtime.Ready,
+	handler, err := server.NewWithOAuthReadiness(
+		cfg, secrets.InternalToken, authStore, passwords, tokens,
+		server.OAuth42Config{
+			ClientID: secrets.OAuth.FortyTwoClientID, ClientSecret: secrets.OAuth.FortyTwoClientSecret,
+			HTTPClient: &http.Client{Timeout: 10 * time.Second},
+		},
+		runtime.Ready,
 	)
 	if err != nil {
 		log.Fatalf("create auth server: %v", err)
