@@ -64,7 +64,7 @@ export class UserRelationshipsService {
       BOTH_ID_EQUAL_ERR_MSG
     );
 
-    const created = this.prisma.transaction(
+    const created = await this.prisma.transaction(
       async (database) => {
         const fromRequester = await database.userRelationship.findFirst({
           where: {
@@ -79,15 +79,19 @@ export class UserRelationshipsService {
           },
         });
 
-        // Any pre-existing row on either side - pending, accepted, or blocked -
-        // is treated identically: a plain conflict, no status-specific message.
-        // This is deliberate: a user blocked by the addressee gets the exact
-        // same response as a plain duplicate request, so a block is never
-        // observable from the requester's side.
-        if (
-          (fromRequester && fromAddressee) ||
-          fromAddressee?.status === RelationshipStatus.BLOCKED
-        ) {
+        // Any pre-existing row from the addressee - pending, accepted, or
+        // blocked - is treated identically: a plain conflict, no
+        // status-specific message. This is deliberate for two reasons: a
+        // user blocked by the addressee gets the exact same response as a
+        // plain duplicate request (so a block is never observable from the
+        // requester's side), and an addressee row can outlive the
+        // requester's own (remove() excludes BLOCKED rows from deletion,
+        // see its own comment) - if that survivor later gets unblocked, it
+        // becomes a lone ACCEPTED/PENDING_APPROVAL row with no counterpart.
+        // Without this check, a fresh create() from the other side would
+        // silently create an ACCEPTED row here (below) instead of going
+        // through a real accept.
+        if (fromAddressee) {
           throw new ForbiddenException(EXISTING_RELATION_ERR_MSG);
         }
 
@@ -101,15 +105,15 @@ export class UserRelationshipsService {
           });
         }
 
-        if (!fromAddressee) {
-          await database.userRelationship.create({
-            data: {
-              requesterId: addresseeId,
-              addresseeId: requesterId,
-              status: RelationshipStatus.PENDING_APPROVAL,
-            },
-          });
-        }
+        // fromAddressee is always null here - the check above already threw
+        // otherwise.
+        await database.userRelationship.create({
+          data: {
+            requesterId: addresseeId,
+            addresseeId: requesterId,
+            status: RelationshipStatus.PENDING_APPROVAL,
+          },
+        });
         return [requesterId, addresseeId];
       },
       {
@@ -191,6 +195,39 @@ export class UserRelationshipsService {
 
     const updated = await this.prisma.transaction(
       async (database) => {
+        // Unblocking is the one transition that can't be a plain status
+        // flip: remove() deliberately excludes BLOCKED rows from deletion
+        // (so unfriending someone never lifts a block as a side effect),
+        // which means the counterpart row can already be gone by the time
+        // this row gets unblocked. Resurrecting this row as ACCEPTED in
+        // that case would fabricate a one-sided "friendship" the other
+        // side never agreed to (and that later poisons create() - see its
+        // own comment on fromAddressee). If there's nothing left on the
+        // other side to be ACCEPTED with, unblocking just deletes this row
+        // too, landing back on the same NONE state the other side is
+        // already in.
+        if (
+          currentStatus === RelationshipStatus.BLOCKED &&
+          dto.status !== RelationshipStatus.BLOCKED
+        ) {
+          const counterpart = await database.userRelationship.findFirst({
+            where: {
+              requesterId: addresseeId,
+              addresseeId: requesterId,
+            },
+          });
+          if (!counterpart) {
+            return await database.userRelationship.delete({
+              where: {
+                requesterId_addresseeId: {
+                  requesterId: requesterId,
+                  addresseeId: addresseeId,
+                },
+              },
+            });
+          }
+        }
+
         const updated = await database.userRelationship.update({
           where: {
             requesterId_addresseeId: {
