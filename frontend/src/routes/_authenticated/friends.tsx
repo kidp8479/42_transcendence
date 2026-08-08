@@ -507,10 +507,7 @@ function FriendsPage() {
     if (!selected) return;
     try {
       await sendFriendRequest(selected.id);
-      setStatus(
-        selected.id,
-        "PENDING_OUTGOING",
-      );
+      setStatus(selected.id, "PENDING_OUTGOING");
     } catch {
       showToast({
         type: "error",
@@ -523,10 +520,7 @@ function FriendsPage() {
     if (!selected) return;
     try {
       await updateFriendRelationship(selected.id, "ACCEPTED");
-      setStatus(
-        selected.id,
-        "ACCEPTED",
-      );
+      setStatus(selected.id, "ACCEPTED");
       // The other side's "friends:request-accepted" push only reaches them,
       // never the caller who just performed the accept (see
       // friendCountState.ts's own comment) - apply it locally instead.
@@ -570,10 +564,7 @@ function FriendsPage() {
     const wasAccepted = selected.status === "ACCEPTED";
     try {
       await updateFriendRelationship(selected.id, "BLOCKED");
-      setStatus(
-        selected.id,
-        "BLOCKED",
-      );
+      setStatus(selected.id, "BLOCKED");
       // Only a settled friendship counted toward the dashboard tile in the
       // first place - blocking a pending/stranger relationship leaves it
       // unchanged.
@@ -787,7 +778,8 @@ function PresenceBadge({
   status: "ACCEPTED" | "BLOCKED";
   online: boolean;
 }) {
-  const label = status === "BLOCKED" ? "Blocked" : online ? "Online" : "Offline";
+  const label =
+    status === "BLOCKED" ? "Blocked" : online ? "Online" : "Offline";
   // Same pill shape as the project status badges (ProjectCard.tsx's
   // STATUS_META) rather than flowbite-react's <Badge> - that component's
   // built-in colors don't map onto this app's status-* tokens, and this repo
