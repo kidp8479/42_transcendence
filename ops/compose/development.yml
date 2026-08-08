@@ -23,6 +23,8 @@ services:
     volumes: !override
       - ./nginx/default.production.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
       - ./nginx/includes/application-locations.conf.template:/etc/nginx/templates/includes/application-locations.conf.template:ro
+      - ./nginx/includes/error-pages.conf.template:/etc/nginx/templates/includes/error-pages.conf.template:ro
+      - ./nginx/errors:/usr/share/nginx/html/__edge-errors:ro
       - ./nginx/modsecurity/10-task-rabbit-config.conf:/etc/modsecurity.d/owasp-crs/plugins/10-task-rabbit-config.conf:ro
       - ./nginx/99-reload-on-certificate-change.sh:/docker-entrypoint.d/99-reload-on-certificate-change.sh:ro
       - vault_nginx_tls:/etc/nginx/ssl:ro

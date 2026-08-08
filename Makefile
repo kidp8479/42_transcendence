@@ -284,6 +284,10 @@ check-backend:
 check-nginx:
 	$(COMPOSE) exec nginx nginx -t
 
+## verify static Nginx error pages and preserved API/Auth JSON errors
+check-nginx-error-pages: check-nginx
+	COMPOSE="$(COMPOSE)" nginx/check-error-pages.sh
+
 ## verify local HTTPS ingress, HSTS, and the HTTP-to-HTTPS redirect
 check-tls:
 	$(COMPOSE) exec nginx sh -c '! curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/ | grep -qi "^strict-transport-security:"'
@@ -331,7 +335,8 @@ check-websocket-e2e:
 ## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
 check-shell:
 	docker run --rm -v $(CURDIR):/mnt -w /mnt docker.io/koalaman/shellcheck:stable -s sh \
-		vault/bootstrap.sh vault/check-policies.sh db/init/10-vault-db-admin-password.sh hooks/pre-commit
+		vault/bootstrap.sh vault/check-policies.sh db/init/10-vault-db-admin-password.sh \
+		hooks/pre-commit nginx/check-error-pages.sh
 
 ## verify local Vault AppRole policy isolation, Transit signing, and lease renewal
 check-vault-policies: $(ENV_FILE)

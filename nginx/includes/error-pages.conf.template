@@ -1,0 +1,19 @@
+# Do not enable this server-wide mapping yet. In blocking WAF profiles,
+# ModSecurity's malformed-JSON 400 would be replaced before Auth can return
+# its required JSON validation response. Keep the page for a future scope that
+# can distinguish request-parser errors from application and WAF responses.
+# error_page 400 414 431 /__edge-errors/400.html;
+#
+# location = /__edge-errors/400.html {
+#     internal;
+#     root /usr/share/nginx/html;
+#     add_header Cache-Control "no-store" always;
+#     add_header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" always;
+# }
+
+location = /__edge-errors/50x.html {
+    internal;
+    root /usr/share/nginx/html;
+    add_header Cache-Control "no-store" always;
+    add_header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" always;
+}
