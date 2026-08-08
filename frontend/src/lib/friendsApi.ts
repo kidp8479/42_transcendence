@@ -140,22 +140,20 @@ export function deriveFriendshipStatus(
   if (mine === "BLOCKED") {
     return "BLOCKED";
   }
-  // A block must stay unobservable from the blocked side (create()'s own
-  // duplicate-request handling already enforces this for a fresh request) -
-  // falling through to "NONE" here would do the opposite: the friend's row
-  // would vanish from the list entirely the moment they blocked me, which is
-  // a bigger tell than anything it's supposed to hide. Treating their row as
-  // still ACCEPTED keeps the relationship looking exactly like it did before
-  // the block, for both people it can legitimately mean (a settled
-  // friendship, or the other side never having answered my request yet).
-  const effectiveTheirs = theirs === "BLOCKED" ? "ACCEPTED" : theirs;
-  if (mine === "ACCEPTED" && effectiveTheirs === "ACCEPTED") {
+  // A block must stay unobservable from the blocked side. The backend
+  // enforces this at the source (user-relationships.service.ts's
+  // maskCounterpartBlocks): `theirs` never arrives here as BLOCKED, it's
+  // already masked to ACCEPTED - the relationship looking exactly like it
+  // did before the block, for both people it can legitimately mean (a
+  // settled friendship, or the other side never having answered my request
+  // yet).
+  if (mine === "ACCEPTED" && theirs === "ACCEPTED") {
     return "ACCEPTED";
   }
-  if (mine === "ACCEPTED" && effectiveTheirs === "PENDING_APPROVAL") {
+  if (mine === "ACCEPTED" && theirs === "PENDING_APPROVAL") {
     return "PENDING_OUTGOING";
   }
-  if (mine === "PENDING_APPROVAL" && effectiveTheirs === "ACCEPTED") {
+  if (mine === "PENDING_APPROVAL" && theirs === "ACCEPTED") {
     return "PENDING_INCOMING";
   }
   return "NONE";

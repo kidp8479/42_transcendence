@@ -32,12 +32,27 @@ export class UserRelationshipsService {
     private readonly userService: UsersService
   ) {}
 
+  // A row the caller doesn't own is the other side's stance; a block on it
+  // must read exactly like the relationship did before the block, so it
+  // never becomes observable from the blocked side (see the same invariant
+  // in create()'s comment and users.service.ts's blockedByTarget checks).
+  private maskCounterpartBlocks<
+    T extends { requesterId: string; status: RelationshipStatus },
+  >(rows: T[], callerId: string): T[] {
+    return rows.map((row) =>
+      row.requesterId !== callerId && row.status === RelationshipStatus.BLOCKED
+        ? { ...row, status: RelationshipStatus.ACCEPTED }
+        : row
+    );
+  }
+
   async findAll(userId: string) {
-    return await this.prisma.userRelationship.findMany({
+    const rows = await this.prisma.userRelationship.findMany({
       where: {
         OR: [{ requesterId: userId }, { addresseeId: userId }],
       },
     });
+    return this.maskCounterpartBlocks(rows, userId);
   }
 
   async findById(addresseeId: string, requesterId: string) {
@@ -47,7 +62,7 @@ export class UserRelationshipsService {
       return [];
     }
 
-    return await this.prisma.userRelationship.findMany({
+    const rows = await this.prisma.userRelationship.findMany({
       where: {
         OR: [
           { requesterId, addresseeId },
@@ -55,6 +70,7 @@ export class UserRelationshipsService {
         ],
       },
     });
+    return this.maskCounterpartBlocks(rows, requesterId);
   }
 
   async create(addresseeId: string, requesterId: string) {
