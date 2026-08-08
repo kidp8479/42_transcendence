@@ -15,7 +15,9 @@ auto_auth {
 }
 
 template_config {
-  static_secret_render_interval = "24h"
+  # Renew 72-hour local certificates every 48 hours, preserving one full day
+  # to recover from a missed Agent render before the active certificate expires.
+  static_secret_render_interval = "48h"
 }
 
 template {
@@ -23,6 +25,7 @@ template {
 {{ with pkiCert "pki/issue/local-dev" "common_name=localhost" "ip_sans=127.0.0.1" "ttl=72h" }}{{ .Key }}{{ .Cert }}{{ .CA }}{{ end }}
 EOF
   destination = "/run/nginx-tls/local.pem"
+  # This local-only volume's lax permissions are documented in bootstrap.sh.
   perms = "0644"
 }
 

@@ -73,10 +73,11 @@ enable_once secrets enable -path=pki pki
 step "configuring local development PKI"
 mkdir -p "$PKI_CA_DIR" "$NGINX_TLS_DIR"
 chmod 0700 "$PKI_CA_DIR"
-# This volume is mounted only by vault-bootstrap, nginx-tls-agent, and Nginx
-# (read-only). Rootless Podman cannot portably share ownership between the
-# bootstrap image and the Agent's image user, so volume isolation—not UID
-# mapping—forms the access boundary.
+# Deliberately lax for this disposable student-project stack: this volume is
+# mounted only by vault-bootstrap, nginx-tls-agent, and Nginx (read-only).
+# Rootless Podman cannot portably share ownership between the bootstrap image
+# and the Agent's image user. Restrict ownership and permissions before any
+# deployment that runs untrusted workloads or uses a persistent Vault.
 chmod 0777 "$NGINX_TLS_DIR"
 
 quiet vault secrets tune -max-lease-ttl=87600h pki
@@ -201,10 +202,10 @@ create_approle() {
 		>"${secret_dir}/secret_id"
 
 	if [ "$role" = "nginx-tls" ]; then
-		# This volume is mounted exclusively by vault-bootstrap and
-		# nginx-tls-agent. Let the Agent read its inputs regardless of the
-		# rootless container UID mapping; ownership-based sharing is not
-		# portable across Docker's Podman shim.
+		# Deliberately lax for the same rootless student-project portability
+		# tradeoff as the shared TLS volume above. This credential volume is
+		# mounted only by vault-bootstrap and nginx-tls-agent; use Agent-only
+		# ownership and 0600 files before production or untrusted workloads.
 		chmod 0644 "${secret_dir}/role_id" "${secret_dir}/secret_id"
 	fi
 

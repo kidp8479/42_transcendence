@@ -87,6 +87,9 @@ A school computer requires Docker Engine with the Compose plugin, Git, Make,
 and access for evaluators to TCP ports 8080 and 8443. It does not require
 native Nginx or Certbot for this profile. `ops/compose/school.yml` publishes
 only the Compose ingress; PostgreSQL, Vault, and RustFS remain unexposed.
+HSTS is intentionally scoped to the VM-development and production native
+Nginx edges. The local and direct school profiles still require TLS on 8443,
+but do not persist HSTS for local CA and evaluation hostnames.
 
 Routine deployments shall be performed by the non-root `deploy` user. The
 application root is `/srv/transcendence`, with each environment retaining its
@@ -371,7 +374,7 @@ affected Compose stack with its matching `make deploy-*` target.
 | `nginx/default.conf.template` | Mounted by the base Compose configuration and retained by the school override as the direct ingress template. It accepts localhost, the project domains, and one-label school hostnames, and redirects accepted port-8080 requests to 8443. | Retain for local development and direct school evaluation. The school profile pairs it with `FRONTEND_PORT=80`. Do not use it for VM development or production. |
 | `nginx/default.production.conf.template` | Replaces the base template in both `ops/compose/development.yml` and `ops/compose/production.yml`. It accepts the public project domains, including `tomato-dev.iops.dev`, rejects unknown SNI, and serves the static frontend topology. | Retain for VM development and production. It must remain paired with `FRONTEND_PORT=80`. |
 | `nginx/includes/application-locations.conf.template` | Mounted as an included file in both ingress templates. It routes frontend, API, authentication, public API-token, and WebSocket traffic and applies sensitive-response cache controls, rate limits, redacted logs, and forwarding headers. | Treat as shared security-critical routing. Change it only when the relevant application routes and tests change. |
-| `nginx/modsecurity/10-task-rabbit-config.conf` | Mounted as an OWASP CRS plugin configuration in both base and production Compose definitions. It extends the CRS allowed-method list for the application's `PATCH` and `DELETE` routes. | Retain this narrow policy. Do not replace it with a broad CRS disablement or route-independent exclusion. |
+| `nginx/modsecurity/10-task-rabbit-config.conf` | Mounted as an OWASP CRS plugin configuration in both base and production Compose definitions. It globally extends the CRS allowed-method list for the application's supported REST methods. | Retain this narrow policy. Do not replace it with a broad CRS disablement or route-independent exclusion. |
 | `nginx/99-reload-on-certificate-change.sh` | Mounted as a container entrypoint script. It reloads the Compose Nginx process when the Vault agent renews the mounted inner certificate files. | Keep the file executable and mounted read-only. Do not restart the container solely to pick up routine Vault PKI renewal. |
 The former standalone `nginx/nginx.conf` was deleted because it was not
 mounted by any active Compose configuration and duplicated security-critical
@@ -415,6 +418,18 @@ certificates belong to native Nginx. The Vault agent issues the Compose ingress
 certificates into the shared `vault_nginx_tls` volume: `local.pem`,
 `paris-42-wildcard.pem`, and `public-domains.pem`. The direct ingress
 templates select the appropriate file by SNI.
+
+The local-only TLS and Nginx TLS-Agent credential volumes intentionally use
+portable, lax permissions (`0777` for the certificate directory and `0644`
+for rendered PEMs and AppRole credential files). This is an accepted
+student-project tradeoff for Docker and rootless Podman UID compatibility:
+only the bootstrap container, TLS Agent, and read-only Nginx mount receive
+these volumes. It is not a production isolation boundary. Before introducing
+untrusted workloads, persistent Vault, or a production deployment, assign the
+Agent's UID/GID exclusive ownership and restrict directories and key material
+to `0700` and `0600`, respectively. The Agent renews its 72-hour local
+certificates every 48 hours, retaining a 24-hour recovery margin if an Agent
+render is missed.
 
 The Fedora VM uses a static copy of the public `tomato-dev.iops.dev` leaf and
 private key at `/etc/nginx/tls/tomato-dev.iops.dev/`, with modes `0644` for
