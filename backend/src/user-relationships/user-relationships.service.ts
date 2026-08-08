@@ -185,7 +185,7 @@ export class UserRelationshipsService {
       throw new ForbiddenException(INVALID_STATUS_SEQUENCE_ERR_MSG);
     }
 
-    return await this.prisma.transaction(
+    const updated = await this.prisma.transaction(
       async (database) => {
         const updated = await database.userRelationship.update({
           where: {
@@ -198,26 +198,27 @@ export class UserRelationshipsService {
             status: dto.status,
           },
         });
-        // Inform addressee that request has been approved
-        if (currentStatus == RelationshipStatus.PENDING_APPROVAL && dto.status === RelationshipStatus.ACCEPTED) {
-          const requester = await this.userService.findById(requesterId);
-          this.notificationService.create(
-            addresseeId,
-            requester.username + " is now your friend!",
-            `/friends?userId=${requesterId}`
-          );
-          this.realtimeService.emitToUser(
-            addresseeId,
-            "friends:request-accepted",
-            updated
-          );
-        }
         return updated;
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       }
     );
+    // Inform addressee that request has been approved
+    if (currentStatus == RelationshipStatus.PENDING_APPROVAL && dto.status === RelationshipStatus.ACCEPTED) {
+      const requester = await this.userService.findById(requesterId);
+      this.notificationService.create(
+        addresseeId,
+        requester.username + " is now your friend!",
+        `/friends?userId=${requesterId}`
+      );
+      this.realtimeService.emitToUser(
+        addresseeId,
+        "friends:request-accepted",
+        updated
+      );
+    }
+    return updated;
   }
 
   async remove(addresseeId: string, requesterId: string) {
