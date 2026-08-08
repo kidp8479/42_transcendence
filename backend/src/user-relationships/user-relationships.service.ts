@@ -64,6 +64,8 @@ export class UserRelationshipsService {
       BOTH_ID_EQUAL_ERR_MSG
     );
 
+    await this.userService.findById(addresseeId);
+
     const created = await this.prisma.transaction(
       async (database) => {
         const fromRequester = await database.userRelationship.findFirst({
