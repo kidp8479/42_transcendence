@@ -161,6 +161,28 @@ export function deriveFriendshipStatus(
   return "NONE";
 }
 
+// Single-pair counterpart to groupRelationshipsByOtherUser below - for the
+// getUserRelationship(id) shape (0-2 rows for just one other user, as
+// opposed to getUserRelationships()'s whole-list shape), splitting by
+// requesterId into deriveFriendshipStatus's mine/theirs was copy-pasted as
+// the same three-line loop in friends.tsx (loadFocusedProfile, handleUnblock)
+// and SearchResultLinks.tsx's UserResultLink. One implementation here keeps
+// all three in sync with deriveFriendshipStatus's own expectations.
+export function splitRelationshipPair(
+  relationships: UserRelationship[],
+  currentUserId: string
+): { mine?: RelationshipStatus; theirs?: RelationshipStatus } {
+  const pair: { mine?: RelationshipStatus; theirs?: RelationshipStatus } = {};
+  for (const relationship of relationships) {
+    if (relationship.requesterId === currentUserId) {
+      pair.mine = relationship.status;
+    } else {
+      pair.theirs = relationship.status;
+    }
+  }
+  return pair;
+}
+
 // Groups the caller's directional relationship rows by the other user on
 // each row. Shared by friends.tsx's loadFriends (needs full profiles for
 // every surviving entry) and dashboard.tsx (only needs the ACCEPTED count),
