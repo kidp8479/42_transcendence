@@ -1,7 +1,9 @@
 import { memo } from "react";
 import { Avatar } from "flowbite-react";
 import {
+  hasPresence,
   initialsOf,
+  presenceLabel,
   type FriendProfile,
   type FriendshipStatus,
 } from "@/lib/friendProfile";
@@ -51,20 +53,18 @@ export const FriendRow = memo(function FriendRow({
           rounded
           size="sm"
         />
-        {/* Presence hidden for a pending relationship - it isn't a "friend"
-            yet, so their connection status stays private the same way it
-            would be for a stranger. BLOCKED keeps the dot instead of hiding
-            it (a block shouldn't quietly reshape the layout) - this row only
-            ever renders BLOCKED on the blocker's own side (a block is never
-            observable from the blocked side, see friendsApi.ts's
-            deriveFriendshipStatus), so it reads "Blocked" rather than a real
-            presence value that side has no business seeing anyway. */}
-        {(friend.status === "ACCEPTED" || friend.status === "BLOCKED") && (
+        {/* Gate and label come from friendProfile.ts's hasPresence/
+            presenceLabel (shared with ProfilePanel's PresenceBadge) - a
+            block shouldn't quietly reshape the layout, so BLOCKED keeps the
+            dot instead of hiding it, reading "Blocked" rather than a real
+            presence value that side has no business seeing (see
+            presenceLabel's own comment). */}
+        {hasPresence(friend.status) && (
           <>
             <span
               aria-hidden="true"
               className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-base ${
-                friend.status === "ACCEPTED" && friend.online
+                presenceLabel(friend.status, friend.online) === "Online"
                   ? "bg-status-completed"
                   : "bg-text-muted"
               }`}
@@ -73,11 +73,7 @@ export const FriendRow = memo(function FriendRow({
                 text equivalent, so the connection status isn't lost to
                 screen reader users browsing the list. */}
             <span className="sr-only">
-              {friend.status === "BLOCKED"
-                ? "Blocked"
-                : friend.online
-                  ? "Online"
-                  : "Offline"}
+              {presenceLabel(friend.status, friend.online)}
             </span>
           </>
         )}

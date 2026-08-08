@@ -46,6 +46,30 @@ export function toFriendProfile(
   };
 }
 
+// A presence indicator (dot in FriendRow, badge in ProfilePanel) only ever
+// shows for ACCEPTED or BLOCKED - a pending relationship isn't a "friend"
+// yet, so their connection status stays private the same way it would for a
+// stranger. Both components independently encoded this same gate plus the
+// label rule below; a type predicate here also lets callers narrow `status`
+// to what presenceLabel expects without restating the check.
+export function hasPresence(
+  status: FriendshipStatus
+): status is "ACCEPTED" | "BLOCKED" {
+  return status === "ACCEPTED" || status === "BLOCKED";
+}
+
+// BLOCKED always reads as "Blocked" regardless of the real online value -
+// this only ever renders on the blocker's own side (a block is never
+// observable from the blocked side, see friendsApi.ts's
+// deriveFriendshipStatus), so there's no real presence value that side has
+// any business seeing anyway.
+export function presenceLabel(
+  status: "ACCEPTED" | "BLOCKED",
+  online: boolean
+): "Blocked" | "Online" | "Offline" {
+  return status === "BLOCKED" ? "Blocked" : online ? "Online" : "Offline";
+}
+
 export function initialsOf(friend: FriendProfile): string {
   const fromName =
     `${friend.firstName.charAt(0)}${friend.lastName.charAt(0)}`.toUpperCase();
