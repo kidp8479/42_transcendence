@@ -348,8 +348,21 @@ reference, GitHub for issues and pull requests, and Discord for daily
 communication. Each feature uses an atomic Conventional Commit tagged with its
 Task Rabbit ID and lands through a pull request.
 
-GitHub Actions runs formatting, lint, and build checks. Branch protection keeps
-unreviewed changes out of `main`.
+- **Notion** - the team's shared source of truth: module selection and point tracking, feature breakdown, per-feature implementation pages, and session/decision logs.
+- **Figma** - UI prototyping and the design reference for pages and components before they get built.
+- **Miro** - whiteboarding for early planning and architecture discussions.
+- **GitHub** - code, issues, and pull requests (see workflow below).
+- **Discord** - day-to-day communication (see below).
+
+### Git workflow
+
+Each feature is developed on its own branch, named after its Notion ticket (`feature/TR-61-friends-user-profile`, `docs/TR-89-defense-preparation-read-me`, ...), with atomic, [Conventional Commits](https://www.conventionalcommits.org/)-style commits (`feat(TR-XX): ...`, `fix(TR-XX): ...`, `chore(TR-XX): ...`), each tagged with the corresponding task ID. A feature branch is rebased onto `main` to stay current and keep its history clean before merging. Branch protection on `main` requires a pull request before merging - nothing lands directly. In practice, `main`'s history is a straight line of PR merge commits; the only commits pushed directly are the project's original bootstrap (first commit, `.gitignore`, initial README, issue templates), before the workflow was in place.
+
+A GitHub Actions workflow (`.github/workflows/lint.yml`) runs on every push and pull request: ESLint, Prettier formatting checks, and a build check, for both the frontend and the backend, in parallel jobs. A failing check blocks the PR from looking mergeable, keeping obviously broken or unformatted code out of review.
+
+### Communication
+
+The team runs a dedicated Discord server, organized into channels per domain (frontend, backend, infra/devops, etc.) plus a daily channel for quick async updates. Beyond async communication, the team holds regular sync meetings to review progress, unblock each other, and make joint decisions (module choices, architecture calls, scope changes). Work happens both remotely and in person, with the same Discord/GitHub workflow used either way.
 
 ## Technical Stack
 
