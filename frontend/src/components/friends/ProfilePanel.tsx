@@ -16,7 +16,9 @@ import { IoArrowBack } from "react-icons/io5";
 import { LuUserCheck, LuUserPlus } from "react-icons/lu";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import {
+  hasPresence,
   initialsOf,
+  presenceLabel,
   type FriendProfile,
   type FriendshipStatus,
 } from "@/lib/friendProfile";
@@ -48,10 +50,10 @@ const ACTION_COPY: Partial<Record<FriendshipStatus, string>> = {
   PENDING_OUTGOING: "Friend request sent",
 };
 
-// Only ever rendered for ACCEPTED or BLOCKED - BLOCKED only ever shows on
-// the blocker's own side (a block is never observable from the blocked
-// side, see friendsApi.ts's deriveFriendshipStatus), so it reads "Blocked"
-// rather than a real presence value that side has no business seeing.
+// Gate (only ACCEPTED/BLOCKED get a badge at all) and label come from
+// friendProfile.ts's hasPresence/presenceLabel - shared with FriendRow's own
+// presence dot, see presenceLabel's own comment for why BLOCKED always reads
+// "Blocked" regardless of the real online value.
 function PresenceBadge({
   status,
   online,
@@ -59,8 +61,7 @@ function PresenceBadge({
   status: "ACCEPTED" | "BLOCKED";
   online: boolean;
 }) {
-  const label =
-    status === "BLOCKED" ? "Blocked" : online ? "Online" : "Offline";
+  const label = presenceLabel(status, online);
   // Same pill shape as the project status badges (ProjectCard.tsx's
   // STATUS_META) rather than flowbite-react's <Badge> - that component's
   // built-in colors don't map onto this app's status-* tokens, and this repo
@@ -68,7 +69,7 @@ function PresenceBadge({
   return (
     <span
       className={`w-fit rounded-md px-1 py-0.5 text-[10px] font-semibold ${
-        status === "ACCEPTED" && online
+        label === "Online"
           ? "bg-status-completed/15 text-status-completed"
           : "bg-control-error/15 text-control-error"
       }`}
@@ -245,9 +246,7 @@ export const ProfilePanel = memo(function ProfilePanel({
             <span className="text-sm font-semibold text-text-primary">
               {friend.username}
             </span>
-            {/* Same rule as FriendRow's dot - hidden for pending, reads
-                "Blocked" instead of a presence value for BLOCKED. */}
-            {(friend.status === "ACCEPTED" || friend.status === "BLOCKED") && (
+            {hasPresence(friend.status) && (
               <PresenceBadge status={friend.status} online={friend.online} />
             )}
           </div>
