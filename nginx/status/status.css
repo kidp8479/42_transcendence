@@ -1,13 +1,14 @@
 :root {
   color-scheme: dark;
-  --ink: #eaf1ed;
-  --muted: #9cae9f;
-  --surface: #111a17;
-  --surface-raised: #192621;
-  --line: #30473c;
-  --ready: #78d39b;
-  --warning: #f0b96a;
-  --danger: #ed8982;
+  --ink: #f4f4f5;
+  --muted: #adadb6;
+  --surface: #141414;
+  --surface-raised: #1c1c1c;
+  --line: #2a2a2a;
+  --brand: #22c55e;
+  --limited: #f59e0b;
+  --unavailable: #ef4444;
+  --unknown: #7a8aa8;
 }
 
 * {
@@ -18,12 +19,10 @@ body {
   min-height: 100vh;
   margin: 0;
   color: var(--ink);
-  font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Menlo, monospace;
-  background:
-    linear-gradient(90deg, rgb(120 211 155 / 5%) 1px, transparent 1px),
-    linear-gradient(rgb(120 211 155 / 5%) 1px, transparent 1px),
-    #0a100d;
-  background-size: 28px 28px;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #0f0f0f;
 }
 
 main {
@@ -32,14 +31,10 @@ main {
   padding: clamp(3rem, 9vh, 7rem) 0 2rem;
 }
 
-.masthead {
-  border-left: 3px solid var(--ready);
-  padding-left: 1.25rem;
-}
-
 .eyebrow {
   margin: 0;
-  color: var(--ready);
+  color: var(--brand);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.13em;
@@ -54,8 +49,8 @@ p {
 
 h1 {
   margin: 0.5rem 0 0.75rem;
-  font-size: clamp(2.1rem, 6vw, 4rem);
-  letter-spacing: -0.07em;
+  font-size: clamp(2.25rem, 6vw, 3.75rem);
+  letter-spacing: -0.05em;
 }
 
 .lede,
@@ -77,10 +72,12 @@ footer {
   align-items: end;
   justify-content: space-between;
   gap: 1rem;
-  margin: 3rem 0 1.5rem;
+  margin: 2.5rem 0 1.5rem;
   padding: 1.5rem;
   border: 1px solid var(--line);
-  background: linear-gradient(110deg, var(--surface-raised), var(--surface));
+  border-radius: 1rem;
+  background: var(--surface-raised);
+  box-shadow: 0 18px 45px rgb(0 0 0 / 22%);
 }
 
 .overall-status {
@@ -91,20 +88,20 @@ footer {
 
 button {
   min-height: 2.75rem;
-  border: 1px solid var(--ready);
-  border-radius: 0;
+  border: 1px solid var(--brand);
+  border-radius: 0.625rem;
   padding: 0.6rem 0.9rem;
   color: #08100b;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
-  background: var(--ready);
+  background: var(--brand);
   cursor: pointer;
 }
 
 button:hover,
 button:focus-visible {
-  background: #b3edc8;
+  background: #4ade80;
 }
 
 button:disabled {
@@ -137,10 +134,11 @@ button:disabled {
   grid-template-columns: auto 1fr auto;
   gap: 1rem;
   align-items: center;
-  min-height: 5.75rem;
+  min-height: 6rem;
   padding: 1rem 1.25rem;
   border: 1px solid var(--line);
-  background: rgb(17 26 23 / 92%);
+  border-radius: 0.875rem;
+  background: var(--surface);
 }
 
 .service h2 {
@@ -158,52 +156,53 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.indicator,
-.pulse {
+.indicator {
   display: inline-block;
   width: 0.7rem;
   height: 0.7rem;
   border-radius: 50%;
-  background: var(--ready);
-  box-shadow: 0 0 0 0 rgb(120 211 155 / 45%);
+  background: var(--brand);
 }
 
-.service--checking .indicator {
-  background: var(--warning);
+.service--checking .indicator,
+.service--limited .indicator {
+  background: var(--limited);
 }
 
-.service--not-ready .indicator,
 .service--unavailable .indicator {
-  background: var(--danger);
+  background: var(--unavailable);
 }
 
-.service--not-ready strong,
+.service--unknown .indicator {
+  background: var(--unknown);
+}
+
+.service--checking strong,
+.service--limited strong {
+  color: var(--limited);
+}
+
 .service--unavailable strong {
-  color: var(--danger);
+  color: var(--unavailable);
 }
 
-.service--checking strong {
-  color: var(--warning);
+.service--unknown strong {
+  color: var(--unknown);
 }
 
 footer {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
   margin-top: 2rem;
 }
 
-.pulse {
-  animation: signal 2s infinite;
-}
-
-@keyframes signal {
-  70% {
-    box-shadow: 0 0 0 0.5rem transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
+.noscript {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--limited);
+  border-radius: 0.875rem;
+  color: var(--ink);
+  background: var(--surface);
 }
 
 @media (max-width: 36rem) {
@@ -223,11 +222,5 @@ footer {
 
   .service strong {
     grid-column: 2;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pulse {
-    animation: none;
   }
 }
