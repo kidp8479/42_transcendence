@@ -2,8 +2,7 @@
 
 ## Description
 
-**42 Project Planner** is a Trello-like collaborative project management web
-app for 42 students to plan and track school projects as a team.
+**42 Project Planner** is a Trello-like collaborative project management web app for 42 students to plan and track a school project as a team.
 
 Each project gets its own workspace with a Discovery page (lay out the subject before writing code), a Kanban board (split work into tasks, drag them across statuses), a Calendar (deadlines, meetings, everyone's availability), an Evaluation Checklist (track defense readiness against the subject's requirements), a group chat, and a Summary dashboard pulling live data from all of the above. Multiple team members work in the same project at the same time - task moves, checklist updates, calendar changes, and chat messages sync live to everyone connected, and notifications keep people informed of changes made while they were away.
 
@@ -333,20 +332,15 @@ For an isolated VM or production deployment, see
 
 ## Team Information
 
-| Member | Role | Focus |
-| --- | --- | --- |
-| Diana | Product Owner | Product direction and project settings |
-| Pauline | Project Manager | Coordination, calendar, realtime UX, and notifications |
-| Andrei | Technical Lead | Authentication, Vault, ingress, realtime security, and public API |
-| Christophe | Architect | Cross-cutting architecture, storage, and chat |
-| Carlos | Developer | Project workflows, Kanban, and search |
+- **diade-so** (Diana) - Product Owner: defines the product vision, prioritizes features, maintains the backlog, validates completed work. Also contributes as a developer.
+- **pafroidu** (Pauline) - Project Manager: organizes team coordination, tracks progress and deadlines, manages risks and blockers. Also contributes as a developer.
+- **abelov** (Andrei) - Technical Lead: makes technology stack and architecture decisions, oversees auth/realtime infrastructure, reviews critical code changes. Also contributes as a developer.
+- **cgajean** (Christophe) - Architect: works alongside the Technical Lead on system architecture and cross-cutting technical decisions. Also contributes as a developer.
+- **cade-jes** (Carlos) - Developer: implements features and modules, participates in code reviews, tests and documents their work.
 
 ## Project Management
 
-The team uses Notion for requirements and delivery tracking, Figma for UI
-reference, GitHub for issues and pull requests, and Discord for daily
-communication. Each feature uses an atomic Conventional Commit tagged with its
-Task Rabbit ID and lands through a pull request.
+### Tools
 
 - **Notion** - the team's shared source of truth: module selection and point tracking, feature breakdown, per-feature implementation pages, and session/decision logs.
 - **Figma** - UI prototyping and the design reference for pages and components before they get built.
@@ -515,10 +509,7 @@ Nine additional tables back the Go auth service: `AuthIdentity` + `PasswordCrede
 
 ## Modules
 
-The implementation covers the required framework, ORM, organization,
-permissions, real-time, accessibility, notification, public API, and
-cybersecurity modules. It uses React/NestJS, Prisma, Socket.io, project roles,
-WCAG-focused UI work, project-bound API tokens, ModSecurity, and Vault.
+The subject requires 14 points minimum. Bonus points (up to 5, only counted once the 14 mandatory points are validated) come from modules implemented beyond that minimum.
 
 ### Mandatory (14 points required, up to 5 more count as bonus once the 14 are validated, 28 implemented in total)
 
