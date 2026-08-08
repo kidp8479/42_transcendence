@@ -27,15 +27,17 @@ import {
 } from "react-icons/hi2";
 import type { IconType } from "react-icons";
 import { IoArrowBack } from "react-icons/io5";
-import { LuUser, LuUserCheck, LuUserPlus } from "react-icons/lu";
+import { LuUserCheck, LuUserPlus } from "react-icons/lu";
 import { darkDropdownTheme } from "@/lib/flowbite";
 import { useToast } from "@/hooks/useToast";
 import { authSessionResource } from "@/lib/authState";
+import { friendCountResource } from "@/lib/friendCountState";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import {
   deriveFriendshipStatus,
   getUserRelationship,
   getUserRelationships,
+  groupRelationshipsByOtherUser,
   parseUserRelationship,
   removeFriendRelationship,
   sendFriendRequest,
@@ -156,24 +158,10 @@ function toFriendProfile(
 // not worth failing the whole page over.
 async function loadFriends(currentUserId: string): Promise<FriendProfile[]> {
   const relationships = await getUserRelationships();
-
-  const byOtherUser = new Map<
-    string,
-    { mine?: RelationshipStatus; theirs?: RelationshipStatus }
-  >();
-  for (const relationship of relationships) {
-    const otherId =
-      relationship.requesterId === currentUserId
-        ? relationship.addresseeId
-        : relationship.requesterId;
-    const entry = byOtherUser.get(otherId) ?? {};
-    if (relationship.requesterId === currentUserId) {
-      entry.mine = relationship.status;
-    } else {
-      entry.theirs = relationship.status;
-    }
-    byOtherUser.set(otherId, entry);
-  }
+  const byOtherUser = groupRelationshipsByOtherUser(
+    relationships,
+    currentUserId
+  );
 
   const entries = Array.from(byOtherUser.entries())
     .map(([otherId, { mine, theirs }]) => ({
@@ -481,6 +469,10 @@ function FriendsPage() {
         "ACCEPTED",
         `You are now friends with ${selected.displayedName}.`
       );
+      // The other side's "friends:request-accepted" push only reaches them,
+      // never the caller who just performed the accept (see
+      // friendCountState.ts's own comment) - apply it locally instead.
+      friendCountResource.adjust(1);
     } catch {
       showToast({
         type: "error",
@@ -517,6 +509,7 @@ function FriendsPage() {
 
   async function handleBlock() {
     if (!selected) return;
+    const wasAccepted = selected.status === "ACCEPTED";
     try {
       await updateFriendRelationship(selected.id, "BLOCKED");
       setStatus(
@@ -524,6 +517,12 @@ function FriendsPage() {
         "BLOCKED",
         `${selected.displayedName} has been blocked.`
       );
+      // Only a settled friendship counted toward the dashboard tile in the
+      // first place - blocking a pending/stranger relationship leaves it
+      // unchanged.
+      if (wasAccepted) {
+        friendCountResource.adjust(-1);
+      }
     } catch {
       showToast({ type: "error", message: "Could not block this user." });
     }
@@ -538,6 +537,7 @@ function FriendsPage() {
         "ACCEPTED",
         `${selected.displayedName} has been unblocked.`
       );
+      friendCountResource.adjust(1);
     } catch {
       showToast({ type: "error", message: "Could not unblock this user." });
     }
@@ -548,6 +548,7 @@ function FriendsPage() {
     try {
       await removeFriendRelationship(selected.id);
       removeFromList(selected.id, "Friend removed.");
+      friendCountResource.adjust(-1);
     } catch {
       showToast({ type: "error", message: "Could not remove this friend." });
     }
@@ -786,10 +787,10 @@ function ProfilePanel({
 
         <div className="flex items-center gap-1">
           {/* Discord-style quick relationship indicator: + to send a request,
-              a tick to accept one that's waiting on me, a plain friend icon
-              once we're already connected (removing lives in the menu below,
-              not here). Blocked/outgoing stay on the explicit buttons further
-              down - a single icon can't express "cancel" or "unblock". */}
+              a tick to accept one that's waiting on me. Nothing shown once
+              already friends - removing lives in the menu below, not here.
+              Blocked/outgoing stay on the explicit buttons further down - a
+              single icon can't express "cancel" or "unblock". */}
           {friend.status === "NONE" && (
             <button
               type="button"
@@ -809,15 +810,6 @@ function ProfilePanel({
             >
               <LuUserCheck className="h-5 w-5" />
             </button>
-          )}
-          {friend.status === "ACCEPTED" && (
-            <span
-              aria-label="Friends"
-              title="Friends"
-              className="shrink-0 p-1 text-text-muted"
-            >
-              <LuUser className="h-5 w-5" />
-            </span>
           )}
 
           {/* Always available regardless of friendship status - block/unblock

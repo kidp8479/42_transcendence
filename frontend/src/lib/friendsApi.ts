@@ -136,6 +136,56 @@ export function deriveFriendshipStatus(
   return "NONE";
 }
 
+// Groups the caller's directional relationship rows by the other user on
+// each row. Shared by friends.tsx's loadFriends (needs full profiles for
+// every surviving entry) and dashboard.tsx (only needs the ACCEPTED count),
+// so the grouping itself only has one implementation to keep in sync with
+// deriveFriendshipStatus's mine/theirs expectations.
+export function groupRelationshipsByOtherUser(
+  relationships: UserRelationship[],
+  currentUserId: string
+): Map<string, { mine?: RelationshipStatus; theirs?: RelationshipStatus }> {
+  const byOtherUser = new Map<
+    string,
+    { mine?: RelationshipStatus; theirs?: RelationshipStatus }
+  >();
+  for (const relationship of relationships) {
+    const otherId =
+      relationship.requesterId === currentUserId
+        ? relationship.addresseeId
+        : relationship.requesterId;
+    const entry = byOtherUser.get(otherId) ?? {};
+    if (relationship.requesterId === currentUserId) {
+      entry.mine = relationship.status;
+    } else {
+      entry.theirs = relationship.status;
+    }
+    byOtherUser.set(otherId, entry);
+  }
+  return byOtherUser;
+}
+
+// GET /users/user-relationships, reduced to a single count of settled
+// (ACCEPTED both sides) friendships - what dashboard.tsx's "Friends" tile
+// shows. Deliberately skips the per-user profile fetches loadFriends does in
+// friends.tsx: a badge count has no use for the profiles themselves.
+export async function getAcceptedFriendCount(
+  currentUserId: string
+): Promise<number> {
+  const relationships = await getUserRelationships();
+  const byOtherUser = groupRelationshipsByOtherUser(
+    relationships,
+    currentUserId
+  );
+  let count = 0;
+  for (const { mine, theirs } of byOtherUser.values()) {
+    if (deriveFriendshipStatus(mine, theirs) === "ACCEPTED") {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 // Non-throwing (returns null on a malformed value) rather than throwing like
 // the rest of this file's parsers - this one doubles as the validator for
 // the "friends:request-accepted" socket payload (see friends.tsx), where one
