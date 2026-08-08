@@ -19,7 +19,17 @@ frontend_stopped=false
 
 cleanup() {
   if [ "$frontend_stopped" = true ]; then
-    compose start frontend >/dev/null
+    compose start frontend >/dev/null || true
+    attempts=0
+    while [ "$attempts" -lt 15 ]; do
+      frontend_status="$(curl -ksS -o /dev/null -w '%{http_code}' https://localhost:8443/ || true)"
+      if [ "$frontend_status" = "200" ]; then
+        break
+      fi
+      sleep 1
+      attempts=$((attempts + 1))
+    done
+    [ "$frontend_status" = "200" ]
   fi
   rm -rf "$tmp_dir"
 }
