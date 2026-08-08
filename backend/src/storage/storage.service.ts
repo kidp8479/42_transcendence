@@ -7,6 +7,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   S3Client,
+  ListBucketsCommand,
   HeadBucketCommand,
   CreateBucketCommand,
   PutObjectCommand,
@@ -14,6 +15,8 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import type { Readable } from "stream";
+
+const healthCheckTimeoutMs = 1_500;
 
 export interface StoredObject {
   body: Readable;
@@ -23,12 +26,13 @@ export interface StoredObject {
 @Injectable()
 export class StorageService {
   private readonly client: S3Client;
+  private readonly healthClient: S3Client;
   // Buckets we've already confirmed/created this process lifetime, so
   // ensureBucket doesn't round-trip to RustFS on every single upload.
   private readonly ensuredBuckets = new Set<string>();
 
   constructor(config: ConfigService) {
-    this.client = new S3Client({
+    const clientConfig = {
       endpoint: config.getOrThrow<string>("RUSTFS_ENDPOINT"),
       region: config.getOrThrow<string>("RUSTFS_REGION"),
       forcePathStyle: true,
@@ -36,6 +40,14 @@ export class StorageService {
         accessKeyId: config.getOrThrow<string>("RUSTFS_ACCESS_KEY"),
         secretAccessKey: config.getOrThrow<string>("RUSTFS_SECRET_KEY"),
       },
+    };
+    this.client = new S3Client(clientConfig);
+    this.healthClient = new S3Client({ ...clientConfig, maxAttempts: 1 });
+  }
+
+  async ping(): Promise<void> {
+    await this.healthClient.send(new ListBucketsCommand(), {
+      abortSignal: AbortSignal.timeout(healthCheckTimeoutMs),
     });
   }
 

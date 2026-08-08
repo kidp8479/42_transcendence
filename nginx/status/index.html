@@ -4,58 +4,70 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>Task Rabbit system status</title>
-    <link rel="stylesheet" href="/health/status.css" />
-    <script src="/health/status.js" defer></script>
+    <title>42 Project Planner status</title>
+    <link rel="stylesheet" href="/status/status.css" />
+    <script src="/status/status.js" defer></script>
   </head>
   <body>
     <main>
       <header class="masthead">
-        <p class="eyebrow">Task Rabbit / operational status</p>
-        <h1>Edge control panel</h1>
+        <p class="eyebrow">42 Project Planner</p>
+        <h1>System status</h1>
         <p class="lede">
-          This page is served directly by the ingress and remains available
-          when the application is not.
+          This status page remains available independently of the application.
         </p>
       </header>
 
-      <section class="overview" aria-labelledby="overview-heading">
+      <section
+        class="overview"
+        id="status-summary"
+        aria-busy="true"
+        aria-labelledby="overview-heading"
+      >
         <div>
-          <p class="eyebrow" id="overview-heading">Current signal</p>
-          <p class="overall-status" id="overall-status" aria-live="polite">
-            Checking services
+          <p class="eyebrow" id="overview-heading">Current availability</p>
+          <p class="overall-status" id="overall-status" role="status">
+            Checking availability
           </p>
         </div>
-        <button type="button" id="refresh-status">Check now</button>
+        <button type="button" id="refresh-status">Check again</button>
       </section>
 
       <section aria-labelledby="services-heading">
         <div class="section-heading">
-          <p class="eyebrow" id="services-heading">Service readiness</p>
-          <p id="last-checked" aria-live="polite">Awaiting first probe</p>
+          <p class="eyebrow" id="services-heading">Availability</p>
+          <p id="last-checked">Awaiting first check</p>
         </div>
-        <ul class="services" aria-live="polite">
-          <li class="service service--ready" data-service="edge">
+        <ul class="services">
+          <li class="service service--checking" data-service="website">
             <span class="indicator" aria-hidden="true"></span>
             <div>
-              <h2>HTTPS ingress</h2>
-              <p>Static status surface is reachable.</p>
+              <h2>Website</h2>
+              <p>Open 42 Project Planner.</p>
             </div>
-            <strong>Ready</strong>
+            <strong>Checking</strong>
           </li>
-          <li class="service service--checking" data-service="backend">
+          <li class="service service--checking" data-service="workspace">
             <span class="indicator" aria-hidden="true"></span>
             <div>
-              <h2>Application API</h2>
-              <p>Vault runtime and database connection.</p>
+              <h2>Planner workspace</h2>
+              <p>View and manage project work.</p>
             </div>
             <strong>Checking</strong>
           </li>
           <li class="service service--checking" data-service="auth">
             <span class="indicator" aria-hidden="true"></span>
             <div>
-              <h2>Authentication</h2>
-              <p>Vault runtime and database connection.</p>
+              <h2>Sign-in and accounts</h2>
+              <p>Sign in and use account features.</p>
+            </div>
+            <strong>Checking</strong>
+          </li>
+          <li class="service service--checking" data-service="attachments">
+            <span class="indicator" aria-hidden="true"></span>
+            <div>
+              <h2>File attachments</h2>
+              <p>Upload and retrieve project files.</p>
             </div>
             <strong>Checking</strong>
           </li>
@@ -63,9 +75,13 @@
       </section>
 
       <footer>
-        <span class="pulse" aria-hidden="true"></span>
-        Readiness probes refresh every 15 seconds.
+        Updated automatically while this page is open.
       </footer>
+      <noscript>
+        <p class="noscript">
+          Live checks are unavailable. This status page itself is reachable.
+        </p>
+      </noscript>
     </main>
   </body>
 </html>
