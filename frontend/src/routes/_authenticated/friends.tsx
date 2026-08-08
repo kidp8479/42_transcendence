@@ -677,11 +677,11 @@ function FriendRow({
         {/* Presence hidden for a pending relationship - it isn't a "friend"
             yet, so their connection status stays private the same way it
             would be for a stranger. BLOCKED keeps the dot instead of hiding
-            it (a block shouldn't quietly reshape the layout), but always
-            pinned to offline - real presence must never leak to someone
-            you've blocked, same intent as the backend's own "a block is
-            never observable" rule (see friendsApi.ts's
-            deriveFriendshipStatus). */}
+            it (a block shouldn't quietly reshape the layout) - this row only
+            ever renders BLOCKED on the blocker's own side (a block is never
+            observable from the blocked side, see friendsApi.ts's
+            deriveFriendshipStatus), so it reads "Blocked" rather than a real
+            presence value that side has no business seeing anyway. */}
         {(friend.status === "ACCEPTED" || friend.status === "BLOCKED") && (
           <>
             <span
@@ -696,9 +696,11 @@ function FriendRow({
                 text equivalent, so the connection status isn't lost to
                 screen reader users browsing the list. */}
             <span className="sr-only">
-              {friend.status === "ACCEPTED" && friend.online
-                ? "Online"
-                : "Offline"}
+              {friend.status === "BLOCKED"
+                ? "Blocked"
+                : friend.online
+                  ? "Online"
+                  : "Offline"}
             </span>
           </>
         )}
@@ -717,7 +719,19 @@ function FriendRow({
   );
 }
 
-function PresenceBadge({ online }: { online: boolean }) {
+// Only ever rendered for ACCEPTED or BLOCKED (see ProfilePanel) - BLOCKED
+// only ever shows on the blocker's own side (a block is never observable
+// from the blocked side, see friendsApi.ts's deriveFriendshipStatus), so it
+// reads "Blocked" rather than a real presence value that side has no
+// business seeing anyway.
+function PresenceBadge({
+  status,
+  online,
+}: {
+  status: "ACCEPTED" | "BLOCKED";
+  online: boolean;
+}) {
+  const label = status === "BLOCKED" ? "Blocked" : online ? "Online" : "Offline";
   // Same pill shape as the project status badges (ProjectCard.tsx's
   // STATUS_META) rather than flowbite-react's <Badge> - that component's
   // built-in colors don't map onto this app's status-* tokens, and this repo
@@ -725,12 +739,12 @@ function PresenceBadge({ online }: { online: boolean }) {
   return (
     <span
       className={`w-fit rounded-md px-1 py-0.5 text-[10px] font-semibold ${
-        online
+        status === "ACCEPTED" && online
           ? "bg-status-completed/15 text-status-completed"
           : "bg-control-error/15 text-control-error"
       }`}
     >
-      {online ? "Online" : "Offline"}
+      {label}
     </span>
   );
 }
@@ -894,12 +908,10 @@ function ProfilePanel({
             <span className="text-sm font-semibold text-text-primary">
               {friend.username}
             </span>
-            {/* Same rule as FriendRow's dot - hidden for pending, kept but
-                pinned to offline for BLOCKED. */}
+            {/* Same rule as FriendRow's dot - hidden for pending, reads
+                "Blocked" instead of a presence value for BLOCKED. */}
             {(friend.status === "ACCEPTED" || friend.status === "BLOCKED") && (
-              <PresenceBadge
-                online={friend.status === "ACCEPTED" && friend.online}
-              />
+              <PresenceBadge status={friend.status} online={friend.online} />
             )}
           </div>
 
