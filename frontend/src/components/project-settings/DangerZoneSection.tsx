@@ -66,18 +66,22 @@ export function DangerZoneSection({
     setIsDeleting(true);
     try {
       await deleteProject(projectId);
-      handleCloseDeleteModal();
-      await onDeleteProjectSuccess();
-      await safeInvalidateRouter();
     } catch (error) {
       showToast({
         type: "error",
         message:
           error instanceof Error ? error.message : "Failed to delete project",
       });
+      return;
     } finally {
       setIsDeleting(false);
     }
+    handleCloseDeleteModal();
+    // Outside the try/catch on purpose - see useSafeRouterInvalidate.ts's own
+    // comment: a failure here (or in navigation) must never be mistaken for
+    // the delete itself failing, which already succeeded by this point.
+    await onDeleteProjectSuccess();
+    await safeInvalidateRouter();
   }
 
   return (
