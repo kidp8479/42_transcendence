@@ -64,7 +64,7 @@ export class UserRelationshipsService {
       BOTH_ID_EQUAL_ERR_MSG
     );
 
-    return this.prisma.transaction(
+    const created = this.prisma.transaction(
       async (database) => {
         const fromRequester = await database.userRelationship.findFirst({
           where: {
@@ -106,18 +106,6 @@ export class UserRelationshipsService {
               status: RelationshipStatus.PENDING_APPROVAL,
             },
           });
-          // Send Requester data through WebSockets
-          const requester = await this.userService.findById(requesterId);
-          this.notificationService.create(
-            addresseeId,
-            requester.username + " wants to be your friend!",
-            `/friends?userId=${requesterId}`
-          );
-          this.realtimeService.emitToUser(
-            addresseeId,
-            "friends:request-received",
-            requesterId
-          );
         }
         return [requesterId, addresseeId];
       },
@@ -125,6 +113,19 @@ export class UserRelationshipsService {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       }
     );
+    // Send Requester data through WebSockets
+    const requester = await this.userService.findById(requesterId);
+    this.notificationService.create(
+      addresseeId,
+      requester.username + " wants to be your friend!",
+      `/friends?userId=${requesterId}`
+    );
+    this.realtimeService.emitToUser(
+      addresseeId,
+      "friends:request-received",
+      requesterId
+    );    
+    return created;
   }
 
   async update(
