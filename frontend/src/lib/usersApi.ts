@@ -24,6 +24,33 @@ export async function getUserProfile(id: string): Promise<PublicUserProfile> {
   return parsePublicUserProfile(payload);
 }
 
+// GET /users/presence?ids=... - bulk online/offline for the friends list's
+// presence poll (useFriendsRealtime.ts), backed by RealtimeService's O(1)
+// in-memory check. Replaces one getUserProfile per friend (full profile +
+// a blocked-by-target DB query each, just to read one boolean) with a
+// single request. Missing/unknown ids simply don't appear in the result -
+// nothing to parse or validate beyond "is this a boolean".
+export async function getPresence(
+  ids: string[]
+): Promise<Record<string, boolean>> {
+  if (ids.length === 0) {
+    return {};
+  }
+  const payload = await apiClient<unknown>(
+    `/users/presence?ids=${ids.map(encodeURIComponent).join(",")}`
+  );
+  if (!isRecord(payload)) {
+    throw new Error("Presence response is invalid");
+  }
+  const presence: Record<string, boolean> = {};
+  for (const [id, online] of Object.entries(payload)) {
+    if (typeof online === "boolean") {
+      presence[id] = online;
+    }
+  }
+  return presence;
+}
+
 export function parsePublicUserProfile(value: unknown): PublicUserProfile {
   if (
     !isRecord(value) ||

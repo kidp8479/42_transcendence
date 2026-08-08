@@ -115,6 +115,46 @@ export class UsersService {
     };
   }
 
+  // Bulk counterpart to findById's `online` field, for the friends list's
+  // presence poll (useFriendsRealtime.ts) - reads RealtimeService.isUserOnline
+  // (an O(1) in-memory check) for every id in one call instead of the poll
+  // firing a full getUserProfile per friend just to read one boolean each.
+  //
+  // Same block-hiding rule as findById: this is only ever polled for ids the
+  // caller's friends list already shows as ACCEPTED, and
+  // deriveFriendshipStatus on the frontend keeps showing a blocker as a
+  // normal ACCEPTED friend to the person they blocked - so a blocked target
+  // can end up in here. Without checking blockedByTarget too, presence would
+  // leak the one signal deriveFriendshipStatus's ACCEPTED-rewrite was built
+  // to hide.
+  async getPresence(
+    ids: string[],
+    viewerId: string
+  ): Promise<Record<string, boolean>> {
+    const targetIds = [...new Set(ids)].filter((id) => id !== viewerId);
+    if (targetIds.length === 0) {
+      return {};
+    }
+
+    const blockedByRows = await this.prisma.userRelationship.findMany({
+      where: {
+        requesterId: { in: targetIds },
+        addresseeId: viewerId,
+        status: RelationshipStatus.BLOCKED,
+      },
+      select: { requesterId: true },
+    });
+    const blockedByIds = new Set(blockedByRows.map((row) => row.requesterId));
+
+    const presence: Record<string, boolean> = {};
+    for (const id of targetIds) {
+      presence[id] = blockedByIds.has(id)
+        ? false
+        : this.realtimeService.isUserOnline(id);
+    }
+    return presence;
+  }
+
   async update(userId: string, dto: UpdateUserDto) {
     return await this.prisma.user.update({
       where: { id: userId },

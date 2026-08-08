@@ -6,6 +6,7 @@ import {
   Delete,
   Post,
   Param,
+  Query,
   Req,
   UploadedFile,
   UseInterceptors,
@@ -24,6 +25,7 @@ import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { detectImageMimetype } from "../common/detect-image-type";
 import { UsersService } from "./users.service";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { GetPresenceQueryDto } from "./dto/get-presence.dto";
 
 const MAX_AVATAR_BYTES = 1 * 1024 * 1024;
 
@@ -35,6 +37,18 @@ export class UsersController {
   @Get("me")
   async findMe(@Req() request: AuthenticatedRequest) {
     return this.usersService.findMe(request.user.id);
+  }
+
+  // Registered ahead of :id below - Nest matches routes in declaration
+  // order, and ParseUUIDPipe on :id would otherwise reject the literal
+  // string "presence" as an invalid UUID before this ever gets a turn.
+  @ApiBearerAuth("access-token")
+  @Get("presence")
+  async getPresence(
+    @Query() query: GetPresenceQueryDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.usersService.getPresence(query.ids, request.user.id);
   }
 
   @ApiBearerAuth("access-token")
