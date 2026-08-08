@@ -310,7 +310,7 @@ export class UserRelationshipsService {
     // already committed above; a failed notification must not turn a
     // successful request into a 500.
     if (
-      currentStatus == RelationshipStatus.PENDING_APPROVAL &&
+      currentStatus === RelationshipStatus.PENDING_APPROVAL &&
       dto.status === RelationshipStatus.ACCEPTED
     ) {
       try {
