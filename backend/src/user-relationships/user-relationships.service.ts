@@ -84,7 +84,7 @@ export class UserRelationshipsService {
         // This is deliberate: a user blocked by the addressee gets the exact
         // same response as a plain duplicate request, so a block is never
         // observable from the requester's side.
-        if (fromRequester && fromAddressee) {
+        if ((fromRequester && fromAddressee) || fromAddressee?.status === RelationshipStatus.BLOCKED) {
           throw new ForbiddenException(EXISTING_RELATION_ERR_MSG);
         }
 
