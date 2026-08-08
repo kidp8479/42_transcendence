@@ -1,6 +1,8 @@
 location / {
     set $frontend_upstream http://frontend:${FRONTEND_PORT};
     proxy_pass $frontend_upstream;
+    proxy_intercept_errors on;
+    error_page 500 502 503 504 /__edge-errors/50x.html;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
@@ -21,6 +23,7 @@ location ^~ /api/public/v1/ {
 
     set $backend_upstream http://backend:3000;
     proxy_pass $backend_upstream;
+    proxy_intercept_errors off;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -35,6 +38,7 @@ location ~ ^/api/projects/[^/]+/api-tokens(?:/|$) {
 
     set $backend_upstream http://backend:3000;
     proxy_pass $backend_upstream;
+    proxy_intercept_errors off;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -46,6 +50,7 @@ location ~ ^/api/projects/[^/]+/api-tokens(?:/|$) {
 location /api {
     set $backend_upstream http://backend:3000;
     proxy_pass $backend_upstream;
+    proxy_intercept_errors off;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -66,6 +71,7 @@ location /ws {
 
     set $backend_upstream http://backend:3000;
     proxy_pass $backend_upstream;
+    proxy_intercept_errors off;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
@@ -90,6 +96,7 @@ location ^~ /auth/internal/ {
 location /auth {
     set $auth_upstream http://auth:3001;
     proxy_pass $auth_upstream;
+    proxy_intercept_errors off;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
