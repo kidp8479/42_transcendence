@@ -288,12 +288,20 @@ check-nginx:
 check-nginx-error-pages: check-nginx
 	COMPOSE="$(COMPOSE)" nginx/check-error-pages.sh
 
+## verify the static Nginx health page and its readiness probes
+check-health-page: check-nginx
+	COMPOSE="$(COMPOSE)" nginx/check-health-page.sh
+
 ## verify local HTTPS ingress, HSTS, and the HTTP-to-HTTPS redirect
 check-tls:
 	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/ -o /tmp/hsts-root-headers && ! grep -qi "^strict-transport-security:" /tmp/hsts-root-headers'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve localhost:8443:127.0.0.1 https://localhost:8443/health -o /tmp/hsts-health-headers && ! grep -qi "^strict-transport-security:" /tmp/hsts-health-headers'
 	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve school.paris.42.school:8443:127.0.0.1 https://school.paris.42.school:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
 	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato.iops.dev:8443:127.0.0.1 https://tomato.iops.dev:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
 	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato-dev.iops.dev:8443:127.0.0.1 https://tomato-dev.iops.dev:8443/ | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve school.paris.42.school:8443:127.0.0.1 https://school.paris.42.school:8443/health | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato.iops.dev:8443:127.0.0.1 https://tomato.iops.dev:8443/health | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
+	$(COMPOSE) exec nginx sh -c 'curl -ksSI --resolve tomato-dev.iops.dev:8443:127.0.0.1 https://tomato-dev.iops.dev:8443/health | grep -qi "^strict-transport-security: max-age=31536000; includesubdomains"'
 	$(COMPOSE) exec nginx sh -c 'curl -sSI -H "Host: localhost" http://127.0.0.1:8080/ | grep -qi "^location: https://localhost:8443/"'
 	$(COMPOSE) exec nginx sh -c 'curl -sSI -H "Host: 127.0.0.1" http://127.0.0.1:8080/ | grep -qi "^location: https://localhost:8443/"'
 	$(COMPOSE) exec nginx sh -c 'openssl s_client -connect 127.0.0.1:8443 -showcerts </dev/null 2>/dev/null | openssl x509 -noout -subject | grep -Eq "CN ?= ?localhost"'
@@ -336,7 +344,7 @@ check-websocket-e2e:
 check-shell:
 	docker run --rm -v $(CURDIR):/mnt -w /mnt docker.io/koalaman/shellcheck:stable -s sh \
 		vault/bootstrap.sh vault/check-policies.sh db/init/10-vault-db-admin-password.sh \
-		hooks/pre-commit nginx/check-error-pages.sh
+		hooks/pre-commit nginx/check-error-pages.sh nginx/check-health-page.sh
 
 ## verify local Vault AppRole policy isolation, Transit signing, and lease renewal
 check-vault-policies: $(ENV_FILE)
