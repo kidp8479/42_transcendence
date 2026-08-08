@@ -555,6 +555,10 @@ The subject requires 14 points minimum. Bonus points (up to 5, only counted once
 
 ## Individual Contributions
 
+### Challenges
+
+The team started from close to zero: five people learning a new stack (React, NestJS, Prisma, Socket.io, Docker, Vault) from scratch at the same time, with no prior shared codebase or workflow. The biggest recurring obstacles were environment and setup conflicts (Docker vs Podman across different machines, port clashes, stale `node_modules` volumes after dependency changes), networking inside Docker Compose (getting nginx, the frontend, the backend, and the auth service to talk to each other and to the browser through the right hostnames and ports), and simply coordinating a five-person team on a project this size without stepping on each other's work. None of these were solved by any one person - they were worked through by talking early when something was blocking, pairing on the harder infrastructure pieces, and keeping the Discord channels and sync meetings active enough that nobody stayed stuck alone for long.
+
 **Andrei** - Auth foundation (Argon2id, sessions), the JWT + refresh-token-family cutover, one-time WebSocket ticket admission, Vault-backed dynamic database credentials, realtime field locks, project-bound public API tokens, the Docker Compose stack, the WAF/ModSecurity hardening, the health check and status page, and splitting the backend into single-responsibility services.
 
 **Carlos** - Footer and legal pages, the project list and creation flow, the Kanban board's initial build, and the workspace search bar.
