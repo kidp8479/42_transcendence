@@ -32,7 +32,7 @@ import {
   splitRelationshipPair,
   updateFriendRelationship,
 } from "@/lib/friendsApi";
-import { getUserProfile } from "@/lib/usersApi";
+import { getFriendEmail, getUserProfile } from "@/lib/usersApi";
 
 // ?userId=<id> - how search (SearchResultLinks.tsx's UserResultLink) opens a
 // profile that isn't a friend yet: it links straight here instead of to its
@@ -222,6 +222,38 @@ function FriendsPage() {
     setFocusedProfile,
     setSelectedId
   );
+
+  // Email isn't part of FriendProfile (see friendProfile.ts's own comment) -
+  // fetched separately, only while `selected` is a genuine ACCEPTED friend,
+  // via the one backend route that checks that server-side
+  // (usersApi.ts's getFriendEmail). Cleared eagerly on every id/status
+  // change so a stale email from a previous selection can never flash
+  // before the fetch for the new one resolves. Cancellation guard tied to
+  // the effect's own teardown - same fix as useFriendsRealtime's own two
+  // socket/pub-sub effects (a `cancelled` flag declared inside a bare
+  // `.then()` callback with nothing to invoke it isn't a guard at all).
+  const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
+  useEffect(() => {
+    setSelectedEmail(null);
+    if (!selected || selected.status !== "ACCEPTED") return;
+    let cancelled = false;
+    getFriendEmail(selected.id)
+      .then((email) => {
+        if (cancelled) return;
+        setSelectedEmail(email);
+      })
+      .catch(() => {
+        // best-effort - the InfoRow just stays hidden
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately keyed on id/status, not the whole `selected` object:
+    // that reference also changes on every presence-poll tick
+    // (selected.online), which would refetch the email every 20s for no
+    // reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id, selected?.status]);
 
   // Moves focus into whichever pane just became the active one, so a
   // keyboard/screen reader user isn't left on an element that just vanished
@@ -442,6 +474,7 @@ function FriendsPage() {
           ) : (
             <ProfilePanel
               friend={selected}
+              email={selectedEmail}
               headingId={PROFILE_HEADING_ID}
               onBack={() => setMobileView("list")}
               onAddFriend={() => void handleAddFriend()}

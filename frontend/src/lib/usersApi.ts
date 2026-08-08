@@ -1,13 +1,13 @@
-import { apiClient } from "./apiClient";
+import { ApiError, apiClient } from "./apiClient";
 
 // Mirrors SAFE_PUBLIC_USER_SELECT in backend/src/users/users.service.ts -
 // the subset of a User safe to hand to another authenticated user. Unlike
 // GET /users/me, this is reachable for any user id, not just the caller's
-// own.
+// own. No email - see getFriendEmail below for the one path allowed to
+// hand that out, and SAFE_PUBLIC_USER_SELECT's own comment for why.
 export interface PublicUserProfile {
   id: string;
   username: string;
-  email: string;
   avatarUrl: string | null;
   campus: string | null;
   // Computed fresh per request from whether the user currently has a live
@@ -56,7 +56,6 @@ export function parsePublicUserProfile(value: unknown): PublicUserProfile {
     !isRecord(value) ||
     typeof value.id !== "string" ||
     typeof value.username !== "string" ||
-    typeof value.email !== "string" ||
     !isNullableString(value.avatarUrl) ||
     !isNullableString(value.campus) ||
     typeof value.online !== "boolean"
@@ -67,11 +66,33 @@ export function parsePublicUserProfile(value: unknown): PublicUserProfile {
   return {
     id: value.id,
     username: value.username,
-    email: value.email,
     avatarUrl: value.avatarUrl,
     campus: value.campus,
     online: value.online,
   };
+}
+
+// GET /users/:id/email - only returns a real value when the caller and `id`
+// have a genuine mutual ACCEPTED relationship (checked server-side, see
+// UsersService.findEmail's own comment - never trust the frontend's own
+// derived status for this). A 403 here just means "not authorized", which
+// is expected and not worth surfacing as an error - the caller only ever
+// invokes this when its own state already believes the two are friends,
+// so a 403 means that belief was stale (ex: silently blocked - the whole
+// point is for that to look identical to "not friends", not a toast).
+export async function getFriendEmail(id: string): Promise<string | null> {
+  try {
+    const payload = await apiClient<unknown>(`/users/${id}/email`);
+    if (!isRecord(payload) || typeof payload.email !== "string") {
+      throw new Error("Friend email response is invalid");
+    }
+    return payload.email;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function isNullableString(value: unknown): value is string | null {

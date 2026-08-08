@@ -60,6 +60,21 @@ export class UsersController {
     return this.usersService.findById(id, request.user.id);
   }
 
+  // Separate from findById on purpose - SAFE_PUBLIC_USER_SELECT never
+  // includes email (see its own comment), so this is the only route that
+  // can hand it out, gated on a real mutual ACCEPTED relationship
+  // (findEmail's own comment). :id/email doesn't collide with the bare :id
+  // route above - different path shape, no declaration-order concern like
+  // presence/:id.
+  @ApiBearerAuth("access-token")
+  @Get(":id/email")
+  async findEmail(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return { email: await this.usersService.findEmail(id, request.user.id) };
+  }
+
   @ApiBearerAuth("access-token")
   @Patch("me")
   async updateMe(

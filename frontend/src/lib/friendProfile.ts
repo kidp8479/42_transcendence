@@ -11,14 +11,15 @@ export type FriendshipStatus =
   | "BLOCKED";
 
 // The view model friends.tsx and its components render: a PublicUserProfile
-// merged with the caller's relationship status toward that user.
+// merged with the caller's relationship status toward that user. No email -
+// that's fetched separately, only for a genuinely ACCEPTED pair, see
+// usersApi.ts's getFriendEmail and ProfilePanel's own `email` prop.
 export interface FriendProfile {
   id: string;
   firstName: string;
   lastName: string;
   displayedName: string;
   username: string;
-  email: string;
   campus: string | null;
   avatarUrl: string | null;
   status: FriendshipStatus;
@@ -38,7 +39,6 @@ export function toFriendProfile(
     lastName: "",
     displayedName: profile.username,
     username: profile.username,
-    email: profile.email,
     campus: profile.campus,
     avatarUrl: profile.avatarUrl,
     status,

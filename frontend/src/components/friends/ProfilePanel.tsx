@@ -116,6 +116,7 @@ function InfoRow({
 // guards against future re-renders that don't touch friend/handlers at all).
 export const ProfilePanel = memo(function ProfilePanel({
   friend,
+  email,
   headingId,
   onBack,
   onAddFriend,
@@ -127,6 +128,10 @@ export const ProfilePanel = memo(function ProfilePanel({
   onRemove,
 }: {
   friend: FriendProfile;
+  // Fetched separately from `friend` (see usersApi.ts's getFriendEmail) and
+  // only non-null for a genuinely ACCEPTED pair - null just means "don't
+  // show the row", not an error state, so no separate loading/error prop.
+  email: string | null;
   headingId: string;
   onBack: () => void;
   onAddFriend: () => void;
@@ -263,11 +268,9 @@ export const ProfilePanel = memo(function ProfilePanel({
                 friend.username
               }
             />
-            <InfoRow
-              icon={HiOutlineEnvelope}
-              label="Email"
-              value={friend.email}
-            />
+            {email && (
+              <InfoRow icon={HiOutlineEnvelope} label="Email" value={email} />
+            )}
             <InfoRow
               icon={HiOutlineAcademicCap}
               label="Campus"

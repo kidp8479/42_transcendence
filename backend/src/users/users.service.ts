@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -40,9 +41,15 @@ const SAFE_USER_SELECT = {
   updatedAt: true,
 } as const;
 
+// No email here on purpose - unlike SAFE_USER_SELECT (your own profile),
+// this shape is reachable for any user id by anyone with an account (see
+// findById below), and searchApi.ts's own SearchUserResult already leaves
+// email out for the same reason: nothing should let one account harvest
+// every other account's email by walking ids. See findEmail below for the
+// one path that's actually allowed to hand it out, gated on a real
+// ACCEPTED relationship rather than the frontend's derived status.
 const SAFE_PUBLIC_USER_SELECT = {
   id: true,
-  email: true,
   username: true,
   avatarUrl: true,
   campus: true,
@@ -113,6 +120,45 @@ export class UsersService {
       ...user,
       online: blockedByTarget ? false : this.realtimeService.isUserOnline(id),
     };
+  }
+
+  // Deliberately checks the raw DB rows, not deriveFriendshipStatus's
+  // frontend-facing notion of ACCEPTED - that helper intentionally treats a
+  // BLOCKED row from the other side as if it were still ACCEPTED, precisely
+  // so a block stays invisible to the blocked party (see its own comment).
+  // Reusing that illusion here would hand the blocked party the blocker's
+  // real email on the strength of a status that only exists to look
+  // unchanged to them. Both directional rows have to be genuinely ACCEPTED.
+  // Same ForbiddenException either way (not-friends vs. blocked) so the
+  // response itself never distinguishes the two - same principle as
+  // create()'s EXISTING_RELATION_ERR_MSG.
+  async findEmail(id: string, viewerId: string): Promise<string> {
+    const [mine, theirs] = await Promise.all([
+      this.prisma.userRelationship.findUnique({
+        where: {
+          requesterId_addresseeId: { requesterId: viewerId, addresseeId: id },
+        },
+      }),
+      this.prisma.userRelationship.findUnique({
+        where: {
+          requesterId_addresseeId: { requesterId: id, addresseeId: viewerId },
+        },
+      }),
+    ]);
+    if (
+      mine?.status !== RelationshipStatus.ACCEPTED ||
+      theirs?.status !== RelationshipStatus.ACCEPTED
+    ) {
+      throw new ForbiddenException("Not authorized to view this user's email");
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { email: true },
+    });
+    if (!user) {
+      throw new NotFoundException(USER_NOT_FOUND_ERR_MSG);
+    }
+    return user.email;
   }
 
   // Bulk counterpart to findById's `online` field, for the friends list's
