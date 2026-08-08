@@ -14,6 +14,7 @@ location / {
 location ^~ /api/public/v1/ {
     access_log /var/log/nginx/access.log ws_redacted;
     add_header Cache-Control "no-store" always;
+    proxy_hide_header Cache-Control;
     limit_req zone=project_api_token_rate burst=30 nodelay;
     limit_req_status 429;
     limit_req_log_level info;
@@ -30,6 +31,7 @@ location ^~ /api/public/v1/ {
 
 location ~ ^/api/projects/[^/]+/api-tokens(?:/|$) {
     add_header Cache-Control "no-store" always;
+    proxy_hide_header Cache-Control;
 
     set $backend_upstream http://backend:3000;
     proxy_pass $backend_upstream;
