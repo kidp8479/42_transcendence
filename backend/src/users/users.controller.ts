@@ -39,8 +39,11 @@ export class UsersController {
 
   @ApiBearerAuth("access-token")
   @Get(":id")
-  async findById(@Param("id", ParseUUIDPipe) id: string) {
-    return this.usersService.findById(id);
+  async findById(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.usersService.findById(id, request.user.id);
   }
 
   @ApiBearerAuth("access-token")

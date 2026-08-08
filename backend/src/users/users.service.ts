@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { randomUUID } from "crypto";
+import { RelationshipStatus } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService, StoredObject } from "../storage/storage.service";
@@ -73,7 +74,19 @@ export class UsersService {
     return user;
   }
 
-  async findById(id: string) {
+  // viewerId is who's asking, not just who's being looked up - a block must
+  // stay unobservable from the blocked side (same rule
+  // UserRelationshipsService's create()/update() enforce for the
+  // relationship status itself: deriveFriendshipStatus on the frontend keeps
+  // showing the blocker as a normal ACCEPTED friend to the person they
+  // blocked). Without checking here too, that same blocked viewer would
+  // still see the blocker's real online/offline state on every profile
+  // fetch, which is exactly the tell the status-hiding was meant to prevent.
+  // Optional (self-lookups from uploadAvatar/removeAvatar below, and
+  // UserRelationshipsService's own username-only lookups, have no distinct
+  // viewer to check against) - skipped whenever there isn't one, or when
+  // looking up your own profile.
+  async findById(id: string, viewerId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: SAFE_PUBLIC_USER_SELECT,
@@ -81,10 +94,25 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(USER_NOT_FOUND_ERR_MSG);
     }
+    const blockedByTarget =
+      viewerId !== undefined &&
+      viewerId !== id &&
+      (await this.prisma.userRelationship.findUnique({
+        where: {
+          requesterId_addresseeId: {
+            requesterId: id,
+            addresseeId: viewerId,
+          },
+          status: RelationshipStatus.BLOCKED,
+        },
+      })) !== null;
     // Not a stored column - computed fresh from whether this user currently
     // has a live socket (see RealtimeService.isUserOnline), so it's never
     // stale the way a cached "lastSeen" column would be between requests.
-    return { ...user, online: this.realtimeService.isUserOnline(id) };
+    return {
+      ...user,
+      online: blockedByTarget ? false : this.realtimeService.isUserOnline(id),
+    };
   }
 
   async update(userId: string, dto: UpdateUserDto) {
