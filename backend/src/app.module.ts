@@ -32,6 +32,7 @@ import { ProjectApiTokensModule } from "./project-api-tokens/project-api-tokens.
 import { PublicApiModule } from "./public-api/public-api.module";
 import { ChatModule } from "./chat/chat.module";
 import { SearchModule } from "./search/search.module";
+import { UserRelationshipsModule } from "./user-relationships/user-relationships.module";
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { SearchModule } from "./search/search.module";
     ]),
     PrismaModule, // registers all modules, NestJS starts them in order at boot
     HealthModule,
+    UserRelationshipsModule,
     UsersModule,
     NotificationsModule,
     ProjectMembersModule,
