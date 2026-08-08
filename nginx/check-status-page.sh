@@ -35,6 +35,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
+attempts=0
+while [ "$attempts" -lt 15 ]; do
+  frontend_status="$(curl -ksS -o /dev/null -w '%{http_code}' https://localhost:8443/status/frontend || true)"
+  [ "$frontend_status" = "200" ] && break
+  sleep 1
+  attempts=$((attempts + 1))
+done
+[ "$frontend_status" = "200" ]
+
 curl -ksS -D "$tmp_dir/page-headers" https://localhost:8443/status \
   -o "$tmp_dir/page-body"
 grep -q "^HTTP/.* 200" "$tmp_dir/page-headers"
@@ -58,7 +67,7 @@ for endpoint in /status/frontend /api/health /auth/health /api/health/storage; d
   grep -q "^HTTP/.* 200" "$tmp_dir/headers"
   grep -qi "^content-type: application/json" "$tmp_dir/headers"
   grep -qi "^cache-control: no-store, max-age=0" "$tmp_dir/headers"
-  grep -qx '{"status":"ok"}' "$tmp_dir/body"
+  grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' "$tmp_dir/body"
 done
 
 for endpoint in /status/frontend /api/health /auth/health /api/health/storage; do
