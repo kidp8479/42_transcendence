@@ -82,6 +82,14 @@ export class UserRelationshipsService {
 
     await this.userService.findById(addresseeId);
 
+    // Set inside the transaction when the addressee has blocked the
+    // requester - the transaction still returns normally (so the caller
+    // sees the same success response as a real request, per the
+    // block-must-stay-unobservable-from-the-requester's-side invariant
+    // below), but nothing was written, so the notification/realtime step
+    // after the transaction must not run either.
+    let blocked = false;
+
     const created = await this.prisma.transaction(
       async (database) => {
         const fromRequester = await database.userRelationship.findFirst({
@@ -90,13 +98,16 @@ export class UserRelationshipsService {
             addresseeId: addresseeId,
           },
         });
+        if (fromRequester?.status === RelationshipStatus.BLOCKED) {
+          throw new ForbiddenException(EXISTING_RELATION_ERR_MSG);
+        }
+
         const fromAddressee = await database.userRelationship.findFirst({
           where: {
             requesterId: addresseeId,
             addresseeId: requesterId,
           },
         });
-
         // Any pre-existing row from the addressee - pending, accepted, or
         // blocked - is treated identically: a plain conflict, no
         // status-specific message. This is deliberate for two reasons: a
@@ -109,47 +120,59 @@ export class UserRelationshipsService {
         // Without this check, a fresh create() from the other side would
         // silently create an ACCEPTED row here (below) instead of going
         // through a real accept.
-        if (fromAddressee) {
-          throw new ForbiddenException(EXISTING_RELATION_ERR_MSG);
-        }
+        switch (fromAddressee?.status) {
+          case RelationshipStatus.ACCEPTED:
+            throw new ForbiddenException(EXISTING_RELATION_ERR_MSG);
 
-        if (!fromRequester) {
-          await database.userRelationship.create({
-            data: {
-              requesterId: requesterId,
-              addresseeId: addresseeId,
-              status: RelationshipStatus.ACCEPTED,
-            },
-          });
-        }
+          case RelationshipStatus.BLOCKED:
+            blocked = true;
+            return [requesterId, addresseeId];
 
-        // fromAddressee is always null here - the check above already threw
-        // otherwise.
-        await database.userRelationship.create({
-          data: {
-            requesterId: addresseeId,
-            addresseeId: requesterId,
-            status: RelationshipStatus.PENDING_APPROVAL,
-          },
-        });
-        return [requesterId, addresseeId];
+          default:
+            if (!fromRequester) {
+              await database.userRelationship.create({
+                data: {
+                  requesterId: requesterId,
+                  addresseeId: addresseeId,
+                  status: RelationshipStatus.ACCEPTED,
+                },
+              });
+            }
+            // fromAddressee is always null here - the check above already threw
+            // otherwise.
+            if (!fromAddressee) {
+              await database.userRelationship.create({
+                data: {
+                  requesterId: addresseeId,
+                  addresseeId: requesterId,
+                  status: RelationshipStatus.PENDING_APPROVAL,
+                },
+              });
+            }
+            return [requesterId, addresseeId];
+        }
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       }
     );
-    // Send Requester data through WebSockets
-    const requester = await this.userService.findById(requesterId);
-    await this.notificationService.create(
-      addresseeId,
-      requester.username + " wants to be your friend!",
-      `/friends?userId=${requesterId}`
-    );
-    this.realtimeService.emitToUser(
-      addresseeId,
-      "friends:request-received",
-      requesterId
-    );
+    // Send Requester data through WebSockets - skipped when the addressee
+    // has blocked the requester: nothing was written above, and notifying
+    // the blocker of an invitation they'll never see the effect of is
+    // exactly the tell the BLOCKED case above was meant to suppress.
+    if (!blocked) {
+      const requester = await this.userService.findById(requesterId);
+      await this.notificationService.create(
+        addresseeId,
+        requester.username + " wants to be your friend!",
+        `/friends?userId=${requesterId}`
+      );
+      this.realtimeService.emitToUser(
+        addresseeId,
+        "friends:request-received",
+        requesterId
+      );
+    }
     return created;
   }
 
