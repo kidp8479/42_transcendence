@@ -330,10 +330,6 @@ function FriendsPage() {
               ? previous
               : [...previous, toFriendProfile(profile, "PENDING_INCOMING")]
           );
-          showToast({
-            type: "success",
-            message: `${profile.username} sent you a friend request.`,
-          });
         })
         .catch(() => {
           // best-effort - a manual refresh will pick it up
@@ -351,10 +347,6 @@ function FriendsPage() {
           friend.id === otherId ? { ...friend, status: "ACCEPTED" } : friend
         )
       );
-      showToast({
-        type: "success",
-        message: "Your friend request was accepted.",
-      });
     }
 
     // The other side declined/cancelled a pending request, or unfriended us -
@@ -439,7 +431,7 @@ function FriendsPage() {
     document.getElementById(targetId)?.focus();
   }, [mobileView]);
 
-  function setStatus(id: string, status: FriendshipStatus, message: string) {
+  function setStatus(id: string, status: FriendshipStatus) {
     setFriends((previous) => {
       if (previous.some((friend) => friend.id === id)) {
         return previous.map((friend) =>
@@ -456,14 +448,12 @@ function FriendsPage() {
       }
       return previous;
     });
-    showToast({ type: "success", message });
   }
 
-  function removeFromList(id: string, message: string) {
+  function removeFromList(id: string) {
     setFriends((previous) => previous.filter((friend) => friend.id !== id));
     setFocusedProfile((previous) => (previous?.id === id ? null : previous));
     setSelectedId((current) => (current === id ? null : current));
-    showToast({ type: "success", message });
   }
 
   async function handleAddFriend() {
@@ -473,7 +463,6 @@ function FriendsPage() {
       setStatus(
         selected.id,
         "PENDING_OUTGOING",
-        `Friend request sent to ${selected.displayedName}.`
       );
     } catch {
       showToast({
@@ -490,7 +479,6 @@ function FriendsPage() {
       setStatus(
         selected.id,
         "ACCEPTED",
-        `You are now friends with ${selected.displayedName}.`
       );
       // The other side's "friends:request-accepted" push only reaches them,
       // never the caller who just performed the accept (see
@@ -508,7 +496,6 @@ function FriendsPage() {
     if (!selected) return;
     try {
       await removeFriendRelationship(selected.id);
-      removeFromList(selected.id, "Friend request declined.");
     } catch {
       showToast({
         type: "error",
@@ -521,7 +508,6 @@ function FriendsPage() {
     if (!selected) return;
     try {
       await removeFriendRelationship(selected.id);
-      removeFromList(selected.id, "Friend request cancelled.");
     } catch {
       showToast({
         type: "error",
@@ -538,7 +524,6 @@ function FriendsPage() {
       setStatus(
         selected.id,
         "BLOCKED",
-        `${selected.displayedName} has been blocked.`
       );
       // Only a settled friendship counted toward the dashboard tile in the
       // first place - blocking a pending/stranger relationship leaves it
@@ -558,7 +543,6 @@ function FriendsPage() {
       setStatus(
         selected.id,
         "ACCEPTED",
-        `${selected.displayedName} has been unblocked.`
       );
       friendCountResource.adjust(1);
     } catch {
@@ -570,7 +554,6 @@ function FriendsPage() {
     if (!selected) return;
     try {
       await removeFriendRelationship(selected.id);
-      removeFromList(selected.id, "Friend removed.");
       friendCountResource.adjust(-1);
     } catch {
       showToast({ type: "error", message: "Could not remove this friend." });
