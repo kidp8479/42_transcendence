@@ -161,17 +161,23 @@ export class UserRelationshipsService {
     // the blocker of an invitation they'll never see the effect of is
     // exactly the tell the BLOCKED case above was meant to suppress.
     if (!blocked) {
-      const requester = await this.userService.findById(requesterId);
-      await this.notificationService.create(
-        addresseeId,
-        requester.username + " wants to be your friend!",
-        `/friends?userId=${requesterId}`
-      );
-      this.realtimeService.emitToUser(
-        addresseeId,
-        "friends:request-received",
-        requesterId
-      );
+      // The relationship is already committed above; a failed notification
+      // must not turn a successful request into a 500.
+      try {
+        const requester = await this.userService.findById(requesterId);
+        await this.notificationService.create(
+          addresseeId,
+          requester.username + " wants to be your friend!",
+          `/friends?userId=${requesterId}`
+        );
+        this.realtimeService.emitToUser(
+          addresseeId,
+          "friends:request-received",
+          requesterId
+        );
+      } catch (error) {
+        console.error("friend request notification failed", error);
+      }
     }
     return created;
   }
@@ -299,22 +305,28 @@ export class UserRelationshipsService {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       }
     );
-    // Inform addressee that request has been approved
+    // Inform addressee that request has been approved. The relationship is
+    // already committed above; a failed notification must not turn a
+    // successful request into a 500.
     if (
       currentStatus == RelationshipStatus.PENDING_APPROVAL &&
       dto.status === RelationshipStatus.ACCEPTED
     ) {
-      const requester = await this.userService.findById(requesterId);
-      await this.notificationService.create(
-        addresseeId,
-        requester.username + " is now your friend!",
-        `/friends?userId=${requesterId}`
-      );
-      this.realtimeService.emitToUser(
-        addresseeId,
-        "friends:request-accepted",
-        updated
-      );
+      try {
+        const requester = await this.userService.findById(requesterId);
+        await this.notificationService.create(
+          addresseeId,
+          requester.username + " is now your friend!",
+          `/friends?userId=${requesterId}`
+        );
+        this.realtimeService.emitToUser(
+          addresseeId,
+          "friends:request-accepted",
+          updated
+        );
+      } catch (error) {
+        console.error("friend acceptance notification failed", error);
+      }
     }
     return updated;
   }
@@ -332,7 +344,7 @@ export class UserRelationshipsService {
         // not lift a block as a side effect. deleteMany() (rather than
         // delete()) is used because a non-matching row - i.e. one that is
         // currently blocked - should silently no-op instead of throwing.
-        const mine = await database.userRelationship.deleteMany({
+        await database.userRelationship.deleteMany({
           where: {
             requesterId: requesterId,
             addresseeId: addresseeId,
@@ -340,28 +352,13 @@ export class UserRelationshipsService {
           },
         });
 
-        const theirs = await database.userRelationship.deleteMany({
+        await database.userRelationship.deleteMany({
           where: {
             requesterId: addresseeId,
             addresseeId: requesterId,
             status: { not: RelationshipStatus.BLOCKED },
           },
         });
-
-        // Unlike create()/update(), this has no block-visibility concern - a
-        // no-op against a blocked row never reaches here (excluded above), so
-        // whatever this notifies about was always something the other side
-        // could already see (a pending request or a settled friendship).
-        // Tells them live: a friend request they sent/received was
-        // declined/cancelled, or a friendship was ended - without this, their
-        // page keeps showing the stale relationship until they reload it.
-        if (mine.count > 0 || theirs.count > 0) {
-          this.realtimeService.emitToUser(
-            addresseeId,
-            "friends:relationship-removed",
-            requesterId
-          );
-        }
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
