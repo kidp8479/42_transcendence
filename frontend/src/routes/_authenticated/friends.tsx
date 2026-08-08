@@ -39,6 +39,7 @@ import {
   getUserRelationship,
   getUserRelationships,
   groupRelationshipsByOtherUser,
+  onFriendRequestSent,
   parseUserRelationship,
   removeFriendRelationship,
   sendFriendRequest,
@@ -391,6 +392,25 @@ function FriendsPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast is stable
   }, [currentUserId]);
+
+  // Mirrors a request the caller just sent from somewhere other than this
+  // page's own action panel (ex: the header search bar's inline "Add
+  // friend" button) - see sendFriendRequest's own comment for why the
+  // backend push alone can't cover this. setStatus already handles both
+  // cases on its own: an id already in `friends` gets its status flipped,
+  // and one that's only the standalone `focusedProfile` (this page open on
+  // that stranger's profile via ?userId=) gets promoted into `friends` the
+  // same way a same-page "Add friend" click would.
+  useEffect(() => {
+    return onFriendRequestSent((userId) => {
+      setStatus(userId, "PENDING_OUTGOING");
+    });
+    // setStatus's fallback path (promoting a stranger who's only
+    // `focusedProfile` into `friends`) reads focusedProfile from this
+    // closure - resubscribing whenever it changes is what keeps that read
+    // from pinning to whatever it was when the page first mounted (usually
+    // null, since focusedProfile only exists after ?userId= resolves).
+  }, [focusedProfile]);
 
   // Keeps online/offline honest while the page stays open (see
   // PRESENCE_REFRESH_INTERVAL_MS's own comment). Only ACCEPTED friends ever
