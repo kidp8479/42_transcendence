@@ -43,7 +43,7 @@ Beyond the core project workspace, the app also has user accounts with profiles 
 
 ### Git workflow
 
-Each feature is developed on its own branch, with atomic, [Conventional Commits](https://www.conventionalcommits.org/)-style commits (`feat(TR-XX): ...`, `fix(TR-XX): ...`, `chore(TR-XX): ...`), each tagged with the corresponding task ID. Branch protection on `main` requires a pull request before merging - nothing lands directly. In practice, `main`'s history is a straight line of PR merges; the only commits pushed directly are the project's original bootstrap (first commit, `.gitignore`, initial README, issue templates), before the workflow was in place.
+Each feature is developed on its own branch, named after its Notion ticket (`feature/TR-61-friends-user-profile`, `docs/TR-89-defense-preparation-read-me`, ...), with atomic, [Conventional Commits](https://www.conventionalcommits.org/)-style commits (`feat(TR-XX): ...`, `fix(TR-XX): ...`, `chore(TR-XX): ...`), each tagged with the corresponding task ID. A feature branch is rebased onto `main` to stay current and keep its history clean before merging. Branch protection on `main` requires a pull request before merging - nothing lands directly. In practice, `main`'s history is a straight line of PR merge commits; the only commits pushed directly are the project's original bootstrap (first commit, `.gitignore`, initial README, issue templates), before the workflow was in place.
 
 A GitHub Actions workflow (`.github/workflows/lint.yml`) runs on every push and pull request: ESLint, Prettier formatting checks, and a build check, for both the frontend and the backend, in parallel jobs. A failing check blocks the PR from looking mergeable, keeping obviously broken or unformatted code out of review.
 
