@@ -9,7 +9,7 @@
 // sync with events the page didn't itself cause. See friendsApi.ts for the
 // API layer and friendProfile.ts for the FriendProfile view model shared by
 // all of the above.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { FriendRow } from "@/components/friends/FriendRow";
 import { ProfilePanel } from "@/components/friends/ProfilePanel";
@@ -266,6 +266,16 @@ function FriendsPage() {
     setSelectedId((current) => (current === id ? null : current));
   }
 
+  // useCallback with an empty dep array (setSelectedId/setMobileView are
+  // both stable setters) so every FriendRow gets the same onClick reference
+  // across renders - FriendRow is memoized (see its own comment) on that
+  // assumption. An inline `() => {...}` per row here would hand memo a new
+  // prop every render regardless of whether that row's own data changed.
+  const handleSelectFriend = useCallback((id: string) => {
+    setSelectedId(id);
+    setMobileView("profile");
+  }, []);
+
   async function handleAddFriend() {
     if (!selected) return;
     try {
@@ -420,10 +430,7 @@ function FriendsPage() {
                 key={friend.id}
                 friend={friend}
                 active={friend.id === selectedId}
-                onClick={() => {
-                  setSelectedId(friend.id);
-                  setMobileView("profile");
-                }}
+                onSelect={handleSelectFriend}
               />
             ))
           )}

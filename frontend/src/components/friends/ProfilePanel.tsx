@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Avatar, Button, Dropdown, DropdownItem } from "flowbite-react";
 import {
   HiOutlineAcademicCap,
@@ -106,7 +107,13 @@ function InfoRow({
   );
 }
 
-export function ProfilePanel({
+// Memoized per the same reasoning as FriendRow - though as the single
+// focused-profile pane (not a list item), this only pays off if `friend` and
+// the handler props themselves stay referentially stable across a re-render
+// that didn't actually change this profile (ex: friends.tsx's handlers
+// would need useCallback for that to hold - not yet done, so this mostly
+// guards against future re-renders that don't touch friend/handlers at all).
+export const ProfilePanel = memo(function ProfilePanel({
   friend,
   headingId,
   onBack,
@@ -320,4 +327,4 @@ export function ProfilePanel({
       </div>
     </>
   );
-}
+});
