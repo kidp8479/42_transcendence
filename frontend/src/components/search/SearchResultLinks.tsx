@@ -146,17 +146,23 @@ export function TaskResultLink({ task }: { task: SearchTaskResult }) {
 // "loading"/"error" render nothing in the control slot - better an empty
 // space for a moment than a button that might be wrong (ex: briefly
 // offering "Add friend" to someone already accepted). Collapses
-// PENDING_INCOMING and BLOCKED into "PENDING" alongside PENDING_OUTGOING:
-// none of the three should offer "Add friend" (a relationship already
-// exists, re-sending would just error), and the row's own Link already
-// opens the full picture in the friends panel for anyone who wants the
-// detail.
+// PENDING_INCOMING into "PENDING" alongside PENDING_OUTGOING: neither should
+// offer "Add friend" (a relationship already exists, re-sending would just
+// error), and the row's own Link already opens the full picture in the
+// friends panel for anyone who wants the detail. BLOCKED gets its own state
+// rather than folding into "PENDING" too - deriveFriendshipStatus only ever
+// returns it for a block the viewer made themselves (a block against the
+// viewer is hidden behind ACCEPTED/NONE there on purpose, see its own
+// comment), so unlike the other two states there's nothing to protect by
+// blurring it into "Pending" - it's the viewer's own action being reported
+// back to them.
 type FriendControlStatus =
   | "loading"
   | "error"
   | "NONE"
   | "PENDING"
-  | "ACCEPTED";
+  | "ACCEPTED"
+  | "BLOCKED";
 
 export function UserResultLink({ user }: { user: SearchUserResult }) {
   const { showToast } = useToast();
@@ -184,7 +190,11 @@ export function UserResultLink({ user }: { user: SearchUserResult }) {
         }
         const derived = deriveFriendshipStatus(mine, theirs);
         setStatus(
-          derived === "NONE" || derived === "ACCEPTED" ? derived : "PENDING"
+          derived === "NONE" ||
+            derived === "ACCEPTED" ||
+            derived === "BLOCKED"
+            ? derived
+            : "PENDING"
         );
       })
       .catch(() => {
@@ -249,6 +259,11 @@ export function UserResultLink({ user }: { user: SearchUserResult }) {
         {status === "PENDING" && (
           <span className="rounded-full border border-surface-border bg-surface-overlay px-2 py-0.5 text-[10px] font-semibold text-text-secondary">
             Pending
+          </span>
+        )}
+        {status === "BLOCKED" && (
+          <span className="rounded-full border border-surface-border bg-surface-overlay px-2 py-0.5 text-[10px] font-semibold text-text-secondary">
+            Blocked
           </span>
         )}
         {status === "NONE" && (
