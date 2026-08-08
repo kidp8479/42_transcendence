@@ -28,6 +28,11 @@ test(
   "enforces ticket-only websocket admission and sid revocation",
   { skip: !run, timeout: 50_000 },
   async () => {
+    const password = process.env.WEBSOCKET_E2E_PASSWORD;
+    assert.ok(
+      password,
+      "WEBSOCKET_E2E_PASSWORD is required when websocket E2E testing is enabled"
+    );
     const login = await e2eFetch(`${baseUrl}/auth/login`, {
       method: "POST",
       headers: {
@@ -36,7 +41,7 @@ test(
       },
       body: JSON.stringify({
         email: process.env.WEBSOCKET_E2E_EMAIL ?? "andrei@42.fr",
-        password: process.env.WEBSOCKET_E2E_PASSWORD ?? "SeedPassword123!",
+        password,
       }),
     });
     await assertStatus(login, 200);
