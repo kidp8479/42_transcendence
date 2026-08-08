@@ -81,6 +81,17 @@ export class VaultClient {
     return token;
   }
 
+  async readSeedPassword(): Promise<string> {
+    const response = (await this.client.read(
+      "kv/data/seed/demo-users"
+    )) as KVResponse;
+    const password = response.data?.data?.password;
+    if (!password || password.length < 12 || password.length > 128) {
+      throw new Error("Vault seed password must be 12-128 characters");
+    }
+    return password;
+  }
+
   async issueDatabaseCredentials(role: string): Promise<DatabaseCredentials> {
     const response = (await this.client.read(
       `database/creds/${encodeURIComponent(role)}`
@@ -119,7 +130,7 @@ interface TokenRenewalResponse {
 }
 
 interface KVResponse {
-  data?: { data?: { internal_token?: string } };
+  data?: { data?: { internal_token?: string; password?: string } };
 }
 
 interface DatabaseResponse {

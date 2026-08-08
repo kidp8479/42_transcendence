@@ -1,10 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 
-// every seeded user shares this password, so anyone on the team can log in
-// locally as "andrei@42.fr" / SEED_PASSWORD, etc. - only for local dev, never
-// for anything resembling a real deployment
-export const SEED_PASSWORD = "SeedPassword123!";
-
 // the Go auth service rate-limits /auth/register to 20 requests per IP per
 // rolling 60s window (auth/internal/server/server.go's registerIPLimiter) -
 // seeding more than that in a tight loop trips it, so this pauses just past
@@ -28,7 +23,8 @@ function sleep(ms: number): Promise<void> {
 export async function registerSeedUser(
   prisma: PrismaClient,
   email: string,
-  username: string
+  username: string,
+  password: string
 ): Promise<string> {
   if (registrationsInCurrentWindow >= REGISTER_REQUESTS_PER_MINUTE) {
     await sleep(61_000);
@@ -42,7 +38,7 @@ export async function registerSeedUser(
       "Content-Type": "application/json",
       Origin: process.env.APP_ORIGIN ?? "https://localhost:8443",
     },
-    body: JSON.stringify({ email, username, password: SEED_PASSWORD }),
+    body: JSON.stringify({ email, username, password }),
   });
 
   if (res.status === 201) {
