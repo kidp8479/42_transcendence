@@ -10,7 +10,50 @@ Beyond the core project workspace, the app also has user accounts with profiles 
 
 ## Instructions
 
-*To be completed when production instructions are ready.*
+### Prerequisites
+
+- **Docker Engine** with the **Compose v2 plugin** (Podman + `podman-compose` also works, auto-detected).
+- **GNU Make**.
+- **OpenSSL** - used on the host to generate local secrets (`.env` values); preinstalled on Linux/macOS, available through WSL2 on Windows.
+- **Git**.
+
+No other host tooling is required. Node, npm, and every language runtime run inside the containers, not on the host.
+
+### Quick start
+
+```sh
+git clone <repo-url>
+cd transcendence
+make rere seed
+```
+
+`make rere seed` is the single command that provisions the whole stack: it generates a fresh, random `.env` from `.env.example` (database password, JWT signing keys, Vault tokens, seed password), builds and starts every service (frontend, backend, auth, PostgreSQL, HashiCorp Vault, RustFS, nginx), applies Prisma migrations, and seeds demo projects/tasks/users. It also destroys any existing local database/storage volumes first, so only run it when you want a clean environment (subsequent restarts just need `make up`, no rebuild or reset).
+
+Once it finishes, trust the local TLS certificate so the browser stops warning about it:
+
+```sh
+make export-local-ca
+```
+
+This drops the certificate authority at `.local/task-rabbit-local-ca.crt`. Import it into your OS/browser's trusted root certificate store, then open **https://localhost:8443**.
+
+Sign in with a seeded demo account (`<username>@42.fr`, password is the current `SEED_PASSWORD` value inside your local `.env` - it's regenerated on every `rere`, there is no fixed shared password) or create your own account.
+
+### Configuration
+
+Every environment variable the app needs is documented in `.env.example`. `make recreate-env` (called by `rere`) copies it to `.env` and replaces every secret-bearing value with a fresh random one; `.env` itself is git-ignored and never committed. OAuth login (42, Google) is optional - leave `OAUTH_42_CLIENT_ID`/`OAUTH_GOOGLE_CLIENT_ID` blank to keep those buttons hidden, or fill in real provider credentials to enable them.
+
+### Everyday commands
+
+| Command | What it does |
+| --- | --- |
+| `make up` / `make down` | Start or stop the stack without rebuilding. |
+| `make up-build` | Rebuild images and start (after pulling dependency changes). |
+| `make logs` | Follow every service's logs. |
+| `make ps` | Show container status. |
+| `make help` | List every available target. |
+
+For running an isolated VM or production deployment instead of local development, see [`docs/operations/manual-production-deployment.md`](docs/operations/manual-production-deployment.md).
 
 ## Team Information
 
