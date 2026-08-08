@@ -202,11 +202,18 @@ function FriendsPage() {
   // Once the general list load (or a live socket event) catches up and adds
   // this id to `friends` for real, the standalone copy is just dead weight -
   // drop it so it can't go stale next to the one that's actually kept live.
+  // Keyed on the id set, not the `friends` array itself - same reasoning as
+  // useFriendsRealtime's own acceptedFriendIds: that array gets a new
+  // reference every presence-poll tick, which would otherwise re-run this
+  // effect every 20s for a membership check that only actually changes when
+  // someone is added to or removed from `friends`.
+  const friendIds = friends.map((friend) => friend.id).join(",");
   useEffect(() => {
-    if (focusedProfile && friends.some((f) => f.id === focusedProfile.id)) {
+    if (!focusedProfile) return;
+    if (friendIds.split(",").includes(focusedProfile.id)) {
       setFocusedProfile(null);
     }
-  }, [friends, focusedProfile]);
+  }, [friendIds, focusedProfile]);
 
   useFriendsRealtime(
     currentUserId,
