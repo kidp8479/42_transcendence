@@ -285,7 +285,7 @@ func TestFortyTwoCallbackConsumesThenUsesNumericProfile(t *testing.T) {
 	}
 	client := &queuedOAuthClient{responses: []*http.Response{
 		oauthResponse(http.StatusOK, `{"access_token":"provider-token"}`),
-		oauthResponse(http.StatusOK, `{"id":42,"login":"forty-two","email":"student@example.test","displayname":"Student"}`),
+		oauthResponse(http.StatusOK, `{"id":42,"login":"forty-two","email":"student@example.test","first_name":"Student","last_name":"Example","image":{"link":"https://cdn.example.test/avatar.png"},"campus":[{"name":"42 London"}],"displayname":"Student"}`),
 	}}
 	server := newLoginTestServer(authStore, testTokenService{compact: "access"})
 	server.oauth42 = OAuth42Config{ClientID: "id", ClientSecret: "secret", HTTPClient: client}
@@ -296,6 +296,12 @@ func TestFortyTwoCallbackConsumesThenUsesNumericProfile(t *testing.T) {
 
 	if response.Code != http.StatusFound || authStore.oauthConsumeCalls != 1 || authStore.oauthProfile.Subject != "42" {
 		t.Fatalf("status=%d consumes=%d profile=%#v", response.Code, authStore.oauthConsumeCalls, authStore.oauthProfile)
+	}
+	if authStore.oauthProfile.FirstName == nil || *authStore.oauthProfile.FirstName != "Student" ||
+		authStore.oauthProfile.LastName == nil || *authStore.oauthProfile.LastName != "Example" ||
+		authStore.oauthProfile.AvatarURL == nil || *authStore.oauthProfile.AvatarURL != "https://cdn.example.test/avatar.png" ||
+		authStore.oauthProfile.Campus == nil || *authStore.oauthProfile.Campus != "42 London" {
+		t.Fatalf("profile enrichment fields = %#v", authStore.oauthProfile)
 	}
 	if len(client.requests) != 2 || client.requests[1].Header.Get("Authorization") != "Bearer provider-token" {
 		t.Fatalf("provider calls were not a server-side token exchange and profile request")

@@ -28,6 +28,8 @@ type FortyTwoProfile struct {
 	Email       string
 	Username    string
 	DisplayName string
+	FirstName   *string
+	LastName    *string
 	AvatarURL   *string
 	Campus      *string
 }
@@ -78,6 +80,13 @@ func (s *Store) ResolveFortyTwoLogin(ctx context.Context, profile FortyTwoProfil
 		return User{}, err
 	}
 	if found {
+		user, err = enrichFortyTwoUser(ctx, tx, user, profile)
+		if err != nil {
+			return User{}, err
+		}
+		if err := updateFortyTwoIdentity(ctx, tx, user.ID, profile); err != nil {
+			return User{}, err
+		}
 		if err := tx.Commit(ctx); err != nil {
 			return User{}, fmt.Errorf("commit 42 identity resolution: %w", err)
 		}
@@ -106,6 +115,10 @@ func (s *Store) ResolveFortyTwoLogin(ctx context.Context, profile FortyTwoProfil
 		}
 		return User{}, err
 	}
+	user, err = enrichFortyTwoUser(ctx, tx, user, profile)
+	if err != nil {
+		return User{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return User{}, mapWriteError("commit 42 identity resolution", err)
 	}
@@ -126,9 +139,30 @@ func (s *Store) LinkFortyTwoIdentity(ctx context.Context, userID string, profile
 		if existing.ID != userID {
 			return ErrConflict
 		}
+		if _, err := enrichFortyTwoUser(ctx, tx, existing, profile); err != nil {
+			return err
+		}
+		if err := updateFortyTwoIdentity(ctx, tx, userID, profile); err != nil {
+			return err
+		}
 		return tx.Commit(ctx)
 	}
 	if err := insertFortyTwoIdentity(ctx, tx, userID, profile); err != nil {
+		return err
+	}
+	var user User
+	if err := tx.QueryRow(ctx,
+		`SELECT "id", "email", "emailVerified", "username", "firstName", "lastName", "avatarUrl", "campus", "status"::text, "globalRole"::text
+		 FROM "User" WHERE "id" = $1 FOR UPDATE`,
+		userID,
+	).Scan(&user.ID, &user.Email, &user.EmailVerified, &user.Username, &user.FirstName, &user.LastName,
+		&user.AvatarURL, &user.Campus, &user.Status, &user.GlobalRole); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("find user for 42 identity link: %w", err)
+	}
+	if _, err := enrichFortyTwoUser(ctx, tx, user, profile); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -140,11 +174,12 @@ func (s *Store) LinkFortyTwoIdentity(ctx context.Context, userID string, profile
 func findIdentityUser(ctx context.Context, tx pgx.Tx, provider, subject string) (User, bool, error) {
 	var user User
 	err := tx.QueryRow(ctx,
-		`SELECT u."id", u."email", u."emailVerified", u."username", u."avatarUrl", u."campus", u."status"::text, u."globalRole"::text
+		`SELECT u."id", u."email", u."emailVerified", u."username", u."firstName", u."lastName", u."avatarUrl", u."campus", u."status"::text, u."globalRole"::text
 		 FROM "AuthIdentity" ai JOIN "User" u ON u."id" = ai."userId"
 		 WHERE ai."provider" = CAST($1 AS "AuthProvider") AND ai."providerSubject" = $2 FOR UPDATE OF ai`,
 		provider, subject,
-	).Scan(&user.ID, &user.Email, &user.EmailVerified, &user.Username, &user.AvatarURL, &user.Campus, &user.Status, &user.GlobalRole)
+	).Scan(&user.ID, &user.Email, &user.EmailVerified, &user.Username, &user.FirstName, &user.LastName,
+		&user.AvatarURL, &user.Campus, &user.Status, &user.GlobalRole)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, false, nil
 	}
@@ -162,15 +197,16 @@ func createFortyTwoUser(ctx context.Context, tx pgx.Tx, profile FortyTwoProfile)
 		if attempt > 0 {
 			username = fmt.Sprintf("%s-%s", base[:min(len(base), 24)], strings.ReplaceAll(uuid.NewString()[:7], "-", ""))
 		}
-		user := User{ID: uuid.NewString(), Email: profile.Email, Username: username, AvatarURL: profile.AvatarURL,
+		user := User{ID: uuid.NewString(), Email: profile.Email, EmailVerified: true, Username: username,
+			FirstName: profile.FirstName, LastName: profile.LastName, AvatarURL: profile.AvatarURL,
 			Campus: profile.Campus, Status: AccountStatusActive, GlobalRole: "USER"}
 		var insertedID string
 		err := tx.QueryRow(ctx,
-			`INSERT INTO "User" ("id", "email", "emailVerified", "username", "avatarUrl", "campus", "twoFactorEnabled", "status", "globalRole", "createdAt", "updatedAt")
-			 VALUES ($1, $2, false, $3, $4, $5, false, CAST('ACTIVE' AS "AccountStatus"), CAST('USER' AS "GlobalRole"), $6, $6)
+			`INSERT INTO "User" ("id", "email", "emailVerified", "username", "firstName", "lastName", "avatarUrl", "campus", "twoFactorEnabled", "status", "globalRole", "createdAt", "updatedAt")
+			 VALUES ($1, $2, true, $3, $4, $5, $6, $7, false, CAST('ACTIVE' AS "AccountStatus"), CAST('USER' AS "GlobalRole"), $8, $8)
 			 ON CONFLICT ("username") DO NOTHING
 			 RETURNING "id"`,
-			user.ID, user.Email, user.Username, user.AvatarURL, user.Campus, now,
+			user.ID, user.Email, user.Username, user.FirstName, user.LastName, user.AvatarURL, user.Campus, now,
 		).Scan(&insertedID)
 		if err == nil && insertedID == user.ID {
 			return user, nil
@@ -192,12 +228,63 @@ func insertFortyTwoIdentity(ctx context.Context, tx pgx.Tx, userID string, profi
 	}
 	_, err = tx.Exec(ctx,
 		`INSERT INTO "AuthIdentity" ("id", "userId", "provider", "providerSubject", "email", "emailVerified", "displayName", "profile", "createdAt", "updatedAt")
-		 VALUES ($1, $2, CAST('FORTY_TWO' AS "AuthProvider"), $3, $4, false, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		 VALUES ($1, $2, CAST('FORTY_TWO' AS "AuthProvider"), $3, $4, true, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
 		uuid.NewString(), userID, profile.Subject, profile.Email, nullableString(profile.DisplayName), metadata)
 	if err != nil {
 		return mapWriteError("insert 42 identity", err)
 	}
 	return nil
+}
+
+func updateFortyTwoIdentity(ctx context.Context, tx pgx.Tx, userID string, profile FortyTwoProfile) error {
+	command, err := tx.Exec(ctx,
+		`UPDATE "AuthIdentity"
+		 SET "email" = $3, "emailVerified" = true, "updatedAt" = CURRENT_TIMESTAMP
+		 WHERE "userId" = $1
+		   AND "provider" = CAST('FORTY_TWO' AS "AuthProvider")
+		   AND "providerSubject" = $2`,
+		userID, profile.Subject, profile.Email,
+	)
+	if err != nil {
+		return fmt.Errorf("update 42 identity: %w", err)
+	}
+	if command.RowsAffected() != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// enrichFortyTwoUser only fills blank profile fields; provider data never
+// changes a user's username, email, or nonblank profile values.
+func enrichFortyTwoUser(ctx context.Context, tx pgx.Tx, user User, profile FortyTwoProfile) (User, error) {
+	err := tx.QueryRow(ctx,
+		`UPDATE "User"
+		 SET "firstName" = CASE
+				 WHEN NULLIF(BTRIM("firstName"), '') IS NULL AND NULLIF(BTRIM($2), '') IS NOT NULL THEN BTRIM($2)
+				 ELSE "firstName" END,
+		     "lastName" = CASE
+				 WHEN NULLIF(BTRIM("lastName"), '') IS NULL AND NULLIF(BTRIM($3), '') IS NOT NULL THEN BTRIM($3)
+				 ELSE "lastName" END,
+		     "avatarUrl" = CASE
+				 WHEN NULLIF(BTRIM("avatarUrl"), '') IS NULL AND NULLIF(BTRIM($4), '') IS NOT NULL THEN BTRIM($4)
+				 ELSE "avatarUrl" END,
+		     "campus" = CASE
+				 WHEN NULLIF(BTRIM("campus"), '') IS NULL AND NULLIF(BTRIM($5), '') IS NOT NULL THEN BTRIM($5)
+				 ELSE "campus" END,
+		     "emailVerified" = CASE WHEN "email" = $6 THEN true ELSE "emailVerified" END,
+		     "updatedAt" = CURRENT_TIMESTAMP
+		 WHERE "id" = $1
+		 RETURNING "id", "email", "emailVerified", "username", "firstName", "lastName", "avatarUrl", "campus", "status"::text, "globalRole"::text`,
+		user.ID, profile.FirstName, profile.LastName, profile.AvatarURL, profile.Campus, profile.Email,
+	).Scan(&user.ID, &user.Email, &user.EmailVerified, &user.Username, &user.FirstName, &user.LastName,
+		&user.AvatarURL, &user.Campus, &user.Status, &user.GlobalRole)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("enrich 42 user profile: %w", err)
+	}
+	return user, nil
 }
 
 func sanitizedUsername(value string) string {
@@ -232,11 +319,12 @@ func isUniqueViolation(err error) bool {
 func findIdentityUserPool(ctx context.Context, s *Store, provider, subject string) (User, bool, error) {
 	var user User
 	err := s.currentPool().QueryRow(ctx,
-		`SELECT u."id", u."email", u."emailVerified", u."username", u."avatarUrl", u."campus", u."status"::text, u."globalRole"::text
+		`SELECT u."id", u."email", u."emailVerified", u."username", u."firstName", u."lastName", u."avatarUrl", u."campus", u."status"::text, u."globalRole"::text
 		 FROM "AuthIdentity" ai JOIN "User" u ON u."id" = ai."userId"
 		 WHERE ai."provider" = CAST($1 AS "AuthProvider") AND ai."providerSubject" = $2`,
 		provider, subject,
-	).Scan(&user.ID, &user.Email, &user.EmailVerified, &user.Username, &user.AvatarURL, &user.Campus, &user.Status, &user.GlobalRole)
+	).Scan(&user.ID, &user.Email, &user.EmailVerified, &user.Username, &user.FirstName, &user.LastName,
+		&user.AvatarURL, &user.Campus, &user.Status, &user.GlobalRole)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, false, nil
 	}
