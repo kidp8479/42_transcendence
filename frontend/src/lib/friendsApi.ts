@@ -61,10 +61,38 @@ export async function getUserRelationship(
 // replies with a bare [requesterId, addresseeId] tuple (not a
 // UserRelationship row), which carries nothing the caller doesn't already
 // know - nothing to parse, nothing to return.
+//
+// Two different places call this (the search bar's own inline "Add friend"
+// button in SearchResultLinks.tsx, and friends.tsx's own action panel), and
+// either one can be sending a request for a profile the OTHER one currently
+// has open - the backend only pushes "friends:request-received" to the
+// addressee, never back to the requester (same reasoning as
+// friendCountResource.adjust's own comment), so the requester's own open
+// views need telling some other way. Notifying friendRequestSentListeners
+// here, in the one function every caller already goes through, means
+// neither call site has to know the other exists.
 export async function sendFriendRequest(userId: string): Promise<void> {
   await apiClient<unknown>(`/users/user-relationships/${userId}`, {
     method: "POST",
   });
+  for (const listener of friendRequestSentListeners) {
+    listener(userId);
+  }
+}
+
+type FriendRequestSentListener = (userId: string) => void;
+const friendRequestSentListeners = new Set<FriendRequestSentListener>();
+
+// Lets any open view of `userId` (ex: friends.tsx's profile panel) reflect a
+// request the caller just sent from somewhere else (ex: the header search
+// bar) without waiting on a reload - see sendFriendRequest's own comment.
+export function onFriendRequestSent(
+  listener: FriendRequestSentListener
+): () => void {
+  friendRequestSentListeners.add(listener);
+  return () => {
+    friendRequestSentListeners.delete(listener);
+  };
 }
 
 // PATCH /users/user-relationships/:id - accept, block, or unblock. `userId`
