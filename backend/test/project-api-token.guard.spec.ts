@@ -132,16 +132,24 @@ test("self reflection authenticates without a project ID path parameter", async 
   request.params = {};
 
   assert.equal(
-    await guardWithIntrospection(
-      "READ",
-      { id: projectId },
-      "READ",
-      true
-    ).canActivate(context as never),
+    await guardWithIntrospection("READ", null, "READ", true).canActivate(
+      context as never
+    ),
     true
   );
   assert.equal(
     (request as { apiToken: { label: string } }).apiToken.label,
     "automation"
+  );
+});
+
+test("self reflection rejects a project ID path parameter", async () => {
+  const { context } = contextFor();
+
+  await assert.rejects(
+    guardWithIntrospection("READ", { id: projectId }, "READ", true).canActivate(
+      context as never
+    ),
+    BadRequestException
   );
 });

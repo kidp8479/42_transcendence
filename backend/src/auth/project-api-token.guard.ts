@@ -67,6 +67,11 @@ export class ProjectApiTokenGuard implements CanActivate {
         ProjectApiTokenRequest & { params: { projectId?: string } }
       >();
     const projectId = request.params.projectId;
+    if (isSelfReflection && projectId !== undefined) {
+      throw new BadRequestException(
+        "Project API token self-reflection must not use a projectId path parameter"
+      );
+    }
     if (!isSelfReflection && (!projectId || !isUUID(projectId))) {
       throw new BadRequestException("projectId must be a UUID");
     }
@@ -80,14 +85,14 @@ export class ProjectApiTokenGuard implements CanActivate {
     }
 
     const principal = await this.introspect(apiKey);
-    const project = await this.prisma.project.findFirst({
-      where: { id: principal.projectId, isArchived: false },
-      select: { id: true },
-    });
-    if (!project) {
-      throw new NotFoundException("Project not found");
-    }
     if (!isSelfReflection) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: principal.projectId, isArchived: false },
+        select: { id: true },
+      });
+      if (!project) {
+        throw new NotFoundException("Project not found");
+      }
       if (projectId.toLowerCase() !== principal.projectId.toLowerCase()) {
         throw new NotFoundException("Project not found");
       }
