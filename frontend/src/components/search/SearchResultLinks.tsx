@@ -190,9 +190,7 @@ export function UserResultLink({ user }: { user: SearchUserResult }) {
         }
         const derived = deriveFriendshipStatus(mine, theirs);
         setStatus(
-          derived === "NONE" ||
-            derived === "ACCEPTED" ||
-            derived === "BLOCKED"
+          derived === "NONE" || derived === "ACCEPTED" || derived === "BLOCKED"
             ? derived
             : "PENDING"
         );
