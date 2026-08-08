@@ -150,7 +150,8 @@ validate-deployment-%:
 	@test -n "$(filter $*,$(DEPLOYMENTS))" || (echo "Unknown deployment profile: $*" >&2; exit 1)
 	@test -f "$(call deployment_env_file,$*)" || (echo "Missing $(call deployment_name,$*) runtime env: $(call deployment_env_file,$*)" >&2; exit 1)
 	@test -f "$(call deployment_compose_file,$*)" || (echo "Missing $(call deployment_name,$*) Compose override: $(call deployment_compose_file,$*)" >&2; exit 1)
-	@env_file="$(call deployment_env_file,$*)"; set -a; . "$$env_file"; set +a; \
+	@env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
+		set -a; . "$$env_file"; set +a; \
 		test -n "$$SEED_PASSWORD" || (echo "SEED_PASSWORD must be set for $* deployment" >&2; exit 1)
 	@if [ "$*" = "dev" ] || [ "$*" = "school" ]; then \
 		env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
@@ -165,7 +166,8 @@ validate-deployment-%:
 		fi; \
 	fi
 	@if [ "$*" = "prod" ]; then \
-		env_file="$(call deployment_env_file,$*)"; set -a; . "$$env_file"; set +a; \
+		env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
+		set -a; . "$$env_file"; set +a; \
 		test "$$NODE_ENV" = "production" || (echo "NODE_ENV must be production for production deployment" >&2; exit 1); \
 		test "$$APP_ORIGIN" = "https://tomato.iops.dev" || (echo "APP_ORIGIN must be https://tomato.iops.dev for production deployment" >&2; exit 1); \
 		test "$$AUTH_JWT_ISSUER" = "https://tomato.iops.dev/auth" || (echo "AUTH_JWT_ISSUER must be https://tomato.iops.dev/auth for production deployment" >&2; exit 1); \
