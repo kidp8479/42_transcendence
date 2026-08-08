@@ -11,7 +11,7 @@
 // firstName/lastName aren't tracked by the backend yet (TR-61) - every
 // FriendProfile carries them as empty strings on purpose, see
 // toFriendProfile below.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Avatar, Button, Dropdown, DropdownItem } from "flowbite-react";
 import {
@@ -102,6 +102,14 @@ interface FriendProfile {
 // friends list re-checks everyone on screen at this interval instead so it
 // doesn't just go stale for the rest of the visit.
 const PRESENCE_REFRESH_INTERVAL_MS = 20_000;
+
+// Focus targets for the mobile list<->profile transition (see FriendsPage's
+// mobileView effect) - switching panes hides whatever was focused (the
+// FriendRow button, or the back button), which otherwise drops a
+// keyboard/screen reader user's focus to the document body with no
+// indication anything changed.
+const FRIENDS_LIST_ID = "friends-list";
+const PROFILE_HEADING_ID = "friend-profile-heading";
 
 // Only shown for a relationship that isn't settled yet - an accepted friend
 // or a blocked user don't need an extra status line under their name in the
@@ -403,6 +411,23 @@ function FriendsPage() {
     return () => window.clearInterval(interval);
   }, [acceptedFriendIds]);
 
+  // Moves focus into whichever pane just became the active one, so a
+  // keyboard/screen reader user isn't left on an element that just vanished
+  // (see FRIENDS_LIST_ID/PROFILE_HEADING_ID's own comment). Skipped on the
+  // very first render - mobileView already starts at "list", and grabbing
+  // focus on page load (before the user has done anything) would be its own
+  // a11y bug.
+  const isInitialMobileView = useRef(true);
+  useEffect(() => {
+    if (isInitialMobileView.current) {
+      isInitialMobileView.current = false;
+      return;
+    }
+    const targetId =
+      mobileView === "profile" ? PROFILE_HEADING_ID : FRIENDS_LIST_ID;
+    document.getElementById(targetId)?.focus();
+  }, [mobileView]);
+
   function setStatus(id: string, status: FriendshipStatus, message: string) {
     setFriends((previous) => {
       if (previous.some((friend) => friend.id === id)) {
@@ -543,12 +568,17 @@ function FriendsPage() {
 
       <div className="flex min-h-0 flex-1">
         <aside
+          id={FRIENDS_LIST_ID}
+          // -1: focusable only by the mobile back-navigation effect above,
+          // never by Tab - it's a landmark to land on, not a stop in the
+          // normal tab order.
+          tabIndex={-1}
           className={`w-full shrink-0 overflow-y-auto border-r border-surface-border md:block md:w-72 ${
             mobileView === "profile" ? "hidden" : "block"
           }`}
         >
           {friends.length === 0 ? (
-            <p className="p-4 text-xs text-text-secondary">
+            <p role="status" className="p-4 text-xs text-text-secondary">
               {loading ? "Loading friends..." : "No friends yet."}
             </p>
           ) : (
@@ -629,14 +659,24 @@ function FriendRow({
             never observable" rule (see friendsApi.ts's
             deriveFriendshipStatus). */}
         {(friend.status === "ACCEPTED" || friend.status === "BLOCKED") && (
-          <span
-            aria-hidden="true"
-            className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-base ${
-              friend.status === "ACCEPTED" && friend.online
-                ? "bg-status-completed"
-                : "bg-text-muted"
-            }`}
-          />
+          <>
+            <span
+              aria-hidden="true"
+              className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-base ${
+                friend.status === "ACCEPTED" && friend.online
+                  ? "bg-status-completed"
+                  : "bg-text-muted"
+              }`}
+            />
+            {/* The dot above is color-only and aria-hidden - this is the
+                text equivalent, so the connection status isn't lost to
+                screen reader users browsing the list. */}
+            <span className="sr-only">
+              {friend.status === "ACCEPTED" && friend.online
+                ? "Online"
+                : "Offline"}
+            </span>
+          </>
         )}
       </div>
       <div className="min-w-0 flex-1">
@@ -680,14 +720,21 @@ function InfoRow({
   label: string;
   value: string;
 }) {
+  // Plain div/p, not dl/dt/dd: a real description list requires each dt/dd
+  // pair to be a direct child of the dl (or of a wrapper div containing only
+  // dt/dd) - the icon in between breaks that, which would leave the
+  // term/value relationship unreliable for screen readers. Reading the label
+  // then the value in document order already reads the same way sighted
+  // users see it, no list semantics needed for that.
   return (
     <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-overlay p-3">
-      <Icon className="h-4 w-4 shrink-0 text-text-secondary" />
+      <Icon
+        className="h-4 w-4 shrink-0 text-text-secondary"
+        aria-hidden="true"
+      />
       <div className="min-w-0">
-        <dt className="text-[10px] leading-tight text-text-secondary">
-          {label}
-        </dt>
-        <dd className="truncate text-xs text-text-primary">{value}</dd>
+        <p className="text-[10px] leading-tight text-text-secondary">{label}</p>
+        <p className="truncate text-xs text-text-primary">{value}</p>
       </div>
     </div>
   );
@@ -726,7 +773,15 @@ function ProfilePanel({
           >
             <IoArrowBack className="h-5 w-5" />
           </button>
-          <h2 className="text-sm font-semibold text-text-primary">Profile</h2>
+          <h2
+            id={PROFILE_HEADING_ID}
+            // -1: focusable only by the mobile pane-switch effect, not by
+            // Tab - see FRIENDS_LIST_ID/PROFILE_HEADING_ID's own comment.
+            tabIndex={-1}
+            className="text-sm font-semibold text-text-primary"
+          >
+            Profile
+          </h2>
         </div>
 
         <div className="flex items-center gap-1">
@@ -838,7 +893,7 @@ function ProfilePanel({
               wide screen the info rows stretched the full remaining width,
               which is what looked wrong. Uncapped (w-full) while stacked
               under the avatar on a phone, capped once it sits beside it. */}
-          <dl className="flex w-full min-w-0 flex-col gap-2.5 sm:max-w-md sm:px-4">
+          <div className="flex w-full min-w-0 flex-col gap-2.5 sm:max-w-md sm:px-4">
             <InfoRow
               icon={HiOutlineUser}
               label="Name"
@@ -854,14 +909,18 @@ function ProfilePanel({
               label="Campus"
               value={friend.campus ?? "Unknown"}
             />
-          </dl>
+          </div>
         </div>
 
         {ACTION_COPY[friend.status] && (
           <div className="flex flex-col gap-3 pt-6">
-            <p className="text-sm font-semibold text-text-primary">
+            {/* h3, not p: it's a heading for the action(s) below it (nests
+                under this panel's own h2 "Profile"), not a paragraph of
+                content - screen reader users can jump straight to it via
+                heading navigation instead of reading the whole panel. */}
+            <h3 className="text-sm font-semibold text-text-primary">
               {ACTION_COPY[friend.status]}
-            </p>
+            </h3>
 
             {/* Stacked full-width on a phone (flex-col's default
                 align-items: stretch already does the widening, no w-full
