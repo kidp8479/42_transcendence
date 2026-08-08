@@ -16,6 +16,7 @@ const UNKNOWN_USER_ERR_MSG = "unknown user";
 const EXISTING_RELATION_ERR_MSG = "relationship already exists";
 const BOTH_ID_EQUAL_ERR_MSG = "requesterId and addresseeId are equal";
 const INVALID_STATUS_SEQUENCE_ERR_MSG = "Invalid status sequence";
+const SAME_STATUS_ERR_MSG = "relationship already has this status";
 
 // A relationship between two users is stored as TWO directional rows, one per
 // participant (requesterId -> addresseeId each way). Each row represents that
@@ -82,7 +83,7 @@ export class UserRelationshipsService {
 
     await this.userService.findById(addresseeId);
 
-    // Set inside the transaction when the addressee has blocked the
+    // Set inside the transaction when the addressee has blocked thethrowIfA
     // requester - the transaction still returns normally (so the caller
     // sees the same success response as a real request, per the
     // block-must-stay-unobservable-from-the-requester's-side invariant
@@ -241,7 +242,7 @@ export class UserRelationshipsService {
         throwIfAllEqual(
           [dto.status, currentStatus],
           ForbiddenException,
-          BOTH_ID_EQUAL_ERR_MSG
+          SAME_STATUS_ERR_MSG
         );
 
         // PENDING_APPROVAL is only ever a starting state, produced by
