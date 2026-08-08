@@ -6,11 +6,13 @@ import {
   Delete,
   Post,
   Param,
+  Query,
   Req,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
   StreamableFile,
+  ParseUUIDPipe,
 } from "@nestjs/common";
 import { ApiBearerAuth } from "@nestjs/swagger";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -23,6 +25,7 @@ import type { AuthenticatedRequest } from "../auth/authenticated-request";
 import { detectImageMimetype } from "../common/detect-image-type";
 import { UsersService } from "./users.service";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { GetPresenceQueryDto } from "./dto/get-presence.dto";
 
 const MAX_AVATAR_BYTES = 1 * 1024 * 1024;
 
@@ -30,10 +33,46 @@ const MAX_AVATAR_BYTES = 1 * 1024 * 1024;
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get("me")
   @ApiBearerAuth("access-token")
+  @Get("me")
   async findMe(@Req() request: AuthenticatedRequest) {
-    return this.usersService.findById(request.user.id);
+    return this.usersService.findMe(request.user.id);
+  }
+
+  // Registered ahead of :id below - Nest matches routes in declaration
+  // order, and ParseUUIDPipe on :id would otherwise reject the literal
+  // string "presence" as an invalid UUID before this ever gets a turn.
+  @ApiBearerAuth("access-token")
+  @Get("presence")
+  async getPresence(
+    @Query() query: GetPresenceQueryDto,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.usersService.getPresence(query.ids, request.user.id);
+  }
+
+  @ApiBearerAuth("access-token")
+  @Get(":id")
+  async findById(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return this.usersService.findById(id, request.user.id);
+  }
+
+  // Separate from findById on purpose - SAFE_PUBLIC_USER_SELECT never
+  // includes email (see its own comment), so this is the only route that
+  // can hand it out, gated on a real mutual ACCEPTED relationship
+  // (findEmail's own comment). :id/email doesn't collide with the bare :id
+  // route above - different path shape, no declaration-order concern like
+  // presence/:id.
+  @ApiBearerAuth("access-token")
+  @Get(":id/email")
+  async findEmail(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest
+  ) {
+    return { email: await this.usersService.findEmail(id, request.user.id) };
   }
 
   @ApiBearerAuth("access-token")

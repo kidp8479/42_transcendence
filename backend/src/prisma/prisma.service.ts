@@ -7,6 +7,7 @@ const poolDrainTimeoutMs = 30_000;
 export type ApplicationDatabaseTransaction = Pick<
   Prisma.TransactionClient,
   | "user"
+  | "userRelationship"
   | "project"
   | "projectMember"
   | "evaluationChecklistItem"
@@ -35,6 +36,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly drainTimers = new Set<NodeJS.Timeout>();
 
   constructor(private readonly vaultRuntime: VaultRuntimeService) {}
+
+  get userRelationship(): PrismaClient["userRelationship"] {
+    return this.currentClient().userRelationship;
+  }
 
   get user(): PrismaClient["user"] {
     return this.currentClient().user;

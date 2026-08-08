@@ -1,14 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { randomUUID } from "crypto";
+import { RelationshipStatus } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService, StoredObject } from "../storage/storage.service";
+import { RealtimeService } from "../realtime/realtime.service";
 import { UpdateUserDto } from "./dto/update-user.dto";
+
+const USER_NOT_FOUND_ERR_MSG = "User not found";
 
 // Matches the exact shape uploadAvatar generates below
 // (avatar-{userId}-{uuid}-{safeOriginalName}, where safeOriginalName is
@@ -36,6 +41,20 @@ const SAFE_USER_SELECT = {
   updatedAt: true,
 } as const;
 
+// No email here on purpose - unlike SAFE_USER_SELECT (your own profile),
+// this shape is reachable for any user id by anyone with an account (see
+// findById below), and searchApi.ts's own SearchUserResult already leaves
+// email out for the same reason: nothing should let one account harvest
+// every other account's email by walking ids. See findEmail below for the
+// one path that's actually allowed to hand it out, gated on a real
+// ACCEPTED relationship rather than the frontend's derived status.
+const SAFE_PUBLIC_USER_SELECT = {
+  id: true,
+  username: true,
+  avatarUrl: true,
+  campus: true,
+} as const;
+
 function throwIfBadRequest(key: string) {
   if (!AVATAR_KEY_PATTERN.test(key) || key.includes("..")) {
     throw new BadRequestException("Invalid avatar key");
@@ -47,18 +66,139 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly realtimeService: RealtimeService
   ) {}
 
-  async findById(id: string) {
+  async findMe(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: SAFE_USER_SELECT,
     });
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException(USER_NOT_FOUND_ERR_MSG);
     }
     return user;
+  }
+
+  // viewerId is who's asking, not just who's being looked up - a block must
+  // stay unobservable from the blocked side (same rule
+  // UserRelationshipsService's create()/update() enforce for the
+  // relationship status itself: deriveFriendshipStatus on the frontend keeps
+  // showing the blocker as a normal ACCEPTED friend to the person they
+  // blocked). Without checking here too, that same blocked viewer would
+  // still see the blocker's real online/offline state on every profile
+  // fetch, which is exactly the tell the status-hiding was meant to prevent.
+  // Optional (self-lookups from uploadAvatar/removeAvatar below, and
+  // UserRelationshipsService's own username-only lookups, have no distinct
+  // viewer to check against) - skipped whenever there isn't one, or when
+  // looking up your own profile.
+  async findById(id: string, viewerId?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: SAFE_PUBLIC_USER_SELECT,
+    });
+    if (!user) {
+      throw new NotFoundException(USER_NOT_FOUND_ERR_MSG);
+    }
+    const blockedByTarget =
+      viewerId !== undefined &&
+      viewerId !== id &&
+      (await this.prisma.userRelationship.findUnique({
+        where: {
+          requesterId_addresseeId: {
+            requesterId: id,
+            addresseeId: viewerId,
+          },
+          status: RelationshipStatus.BLOCKED,
+        },
+      })) !== null;
+    // Not a stored column - computed fresh from whether this user currently
+    // has a live socket (see RealtimeService.isUserOnline), so it's never
+    // stale the way a cached "lastSeen" column would be between requests.
+    return {
+      ...user,
+      online: blockedByTarget ? false : this.realtimeService.isUserOnline(id),
+    };
+  }
+
+  // Deliberately checks the raw DB rows, not deriveFriendshipStatus's
+  // frontend-facing notion of ACCEPTED - that helper intentionally treats a
+  // BLOCKED row from the other side as if it were still ACCEPTED, precisely
+  // so a block stays invisible to the blocked party (see its own comment).
+  // Reusing that illusion here would hand the blocked party the blocker's
+  // real email on the strength of a status that only exists to look
+  // unchanged to them. Both directional rows have to be genuinely ACCEPTED.
+  // Same ForbiddenException either way (not-friends vs. blocked) so the
+  // response itself never distinguishes the two - same principle as
+  // create()'s EXISTING_RELATION_ERR_MSG.
+  async findEmail(id: string, viewerId: string): Promise<string> {
+    const [mine, theirs] = await Promise.all([
+      this.prisma.userRelationship.findUnique({
+        where: {
+          requesterId_addresseeId: { requesterId: viewerId, addresseeId: id },
+        },
+      }),
+      this.prisma.userRelationship.findUnique({
+        where: {
+          requesterId_addresseeId: { requesterId: id, addresseeId: viewerId },
+        },
+      }),
+    ]);
+    if (
+      mine?.status !== RelationshipStatus.ACCEPTED ||
+      theirs?.status !== RelationshipStatus.ACCEPTED
+    ) {
+      throw new ForbiddenException("Not authorized to view this user's email");
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { email: true },
+    });
+    if (!user) {
+      throw new NotFoundException(USER_NOT_FOUND_ERR_MSG);
+    }
+    return user.email;
+  }
+
+  // Bulk counterpart to findById's `online` field, for the friends list's
+  // presence poll (useFriendsRealtime.ts) - reads RealtimeService.isUserOnline
+  // (an O(1) in-memory check) for every id in one call instead of the poll
+  // firing a full getUserProfile per friend just to read one boolean each.
+  //
+  // Same block-hiding rule as findById: this is only ever polled for ids the
+  // caller's friends list already shows as ACCEPTED, and
+  // deriveFriendshipStatus on the frontend keeps showing a blocker as a
+  // normal ACCEPTED friend to the person they blocked - so a blocked target
+  // can end up in here. Without checking blockedByTarget too, presence would
+  // leak the one signal deriveFriendshipStatus's ACCEPTED-rewrite was built
+  // to hide.
+  async getPresence(
+    ids: string[],
+    viewerId: string
+  ): Promise<Record<string, boolean>> {
+    const targetIds = [...new Set(ids)].filter((id) => id !== viewerId);
+    if (targetIds.length === 0) {
+      return {};
+    }
+
+    const blockedByRows = await this.prisma.userRelationship.findMany({
+      where: {
+        requesterId: { in: targetIds },
+        addresseeId: viewerId,
+        status: RelationshipStatus.BLOCKED,
+      },
+      select: { requesterId: true },
+    });
+    const blockedByIds = new Set(blockedByRows.map((row) => row.requesterId));
+
+    const presence: Record<string, boolean> = {};
+    for (const id of targetIds) {
+      presence[id] = blockedByIds.has(id)
+        ? false
+        : this.realtimeService.isUserOnline(id);
+    }
+    return presence;
   }
 
   async update(userId: string, dto: UpdateUserDto) {
