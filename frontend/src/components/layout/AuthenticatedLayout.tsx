@@ -61,12 +61,19 @@ export function AuthenticatedLayout() {
       void safeInvalidateRouterRef.current();
     }
 
+    // Non-empty-string checks below: a malformed/empty payload field would
+    // otherwise coincidentally equal an idle currentProjectId() (undefined
+    // on /projects), false-positiving a "this was deleted" navigation.
     function handleProjectDeleted(payload: unknown) {
       const affectedId =
         typeof payload === "object" && payload !== null && "id" in payload
           ? payload.id
           : undefined;
-      if (affectedId === currentProjectId()) {
+      if (
+        typeof affectedId === "string" &&
+        affectedId.length > 0 &&
+        affectedId === currentProjectId()
+      ) {
         void leaveDeadProject("This project was deleted.");
         return;
       }
@@ -86,7 +93,11 @@ export function AuthenticatedLayout() {
       // Both conditions: projectId alone would also match someone ELSE
       // being removed - MembersSection's own listener already handles that.
       if (
+        typeof removed.projectId === "string" &&
+        removed.projectId.length > 0 &&
         removed.projectId === currentProjectId() &&
+        typeof removed.userId === "string" &&
+        removed.userId.length > 0 &&
         removed.userId === currentUserId
       ) {
         void leaveDeadProject("You were removed from this project.");

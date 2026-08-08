@@ -6,6 +6,7 @@ import { SettingsActionRow } from "./SettingsActionRow";
 import { LiaTrashAltSolid } from "react-icons/lia";
 import { deleteProject } from "@/lib/projectsApi";
 import { useToast } from "@/hooks/useToast";
+import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 
 // Displays destructive project actions inside the Project Settings page.
 // Isolated from the other settings sections because these actions are
@@ -24,7 +25,7 @@ import { useToast } from "@/hooks/useToast";
 interface DangerZoneSectionProps {
   projectId: string;
   projectName: string;
-  onDeleteProjectSuccess: () => void;
+  onDeleteProjectSuccess: () => void | Promise<void>;
 }
 
 export function DangerZoneSection({
@@ -36,6 +37,7 @@ export function DangerZoneSection({
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const { showToast } = useToast();
+  const safeInvalidateRouter = useSafeRouterInvalidate();
 
   const canConfirmDelete = confirmText.trim() === projectName;
 
@@ -51,8 +53,11 @@ export function DangerZoneSection({
 
   // DELETE /api/projects/:id (projectsApi.ts) - requires typing the exact
   // project name first. On success the caller (project-settings.tsx)
-  // redirects back to /projects, which - via the existing "project:deleted"
-  // websocket sync - also disappears live for every other connected member.
+  // redirects back to /projects. The backend excludes the acting user's own
+  // sockets from project:deleted (see RealtimeService.emitToProject), so
+  // this tab gets no echo to refresh the sidebar/grid off of - navigate away
+  // from the now-dead route first, then invalidate directly, same ordering
+  // as AuthenticatedLayout.leaveDeadProject.
   async function handleDeleteProject() {
     if (!canConfirmDelete) {
       return;
@@ -62,7 +67,8 @@ export function DangerZoneSection({
     try {
       await deleteProject(projectId);
       handleCloseDeleteModal();
-      onDeleteProjectSuccess();
+      await onDeleteProjectSuccess();
+      await safeInvalidateRouter();
     } catch (error) {
       showToast({
         type: "error",
