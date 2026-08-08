@@ -1,5 +1,9 @@
 import { Avatar } from "flowbite-react";
-import { initialsOf, type FriendProfile, type FriendshipStatus } from "@/lib/friendProfile";
+import {
+  initialsOf,
+  type FriendProfile,
+  type FriendshipStatus,
+} from "@/lib/friendProfile";
 
 // Only shown for a relationship that isn't settled yet - an accepted friend
 // or a blocked user don't need an extra status line under their name, the

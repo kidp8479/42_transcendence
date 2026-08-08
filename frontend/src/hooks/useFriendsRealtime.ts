@@ -1,10 +1,7 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { friendCountResource } from "@/lib/friendCountState";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
-import {
-  onFriendRequestSent,
-  parseUserRelationship,
-} from "@/lib/friendsApi";
+import { onFriendRequestSent, parseUserRelationship } from "@/lib/friendsApi";
 import { toFriendProfile, type FriendProfile } from "@/lib/friendProfile";
 import { getUserProfile } from "@/lib/usersApi";
 
