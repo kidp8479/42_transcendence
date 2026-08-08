@@ -396,21 +396,36 @@ function FriendsPage() {
   // Mirrors a request the caller just sent from somewhere other than this
   // page's own action panel (ex: the header search bar's inline "Add
   // friend" button) - see sendFriendRequest's own comment for why the
-  // backend push alone can't cover this. setStatus already handles both
-  // cases on its own: an id already in `friends` gets its status flipped,
-  // and one that's only the standalone `focusedProfile` (this page open on
-  // that stranger's profile via ?userId=) gets promoted into `friends` the
-  // same way a same-page "Add friend" click would.
+  // backend push alone can't cover this. Unlike setStatus, this doesn't
+  // assume the id is already known to this page (in `friends` or
+  // `focusedProfile`) - added straight from the search bar, it's neither:
+  // this page's own "Add friend" is the only path that already has a
+  // profile in hand, so everyone else needs the same fetch-then-merge
+  // handleRequestReceived above uses for an incoming request.
   useEffect(() => {
     return onFriendRequestSent((userId) => {
-      setStatus(userId, "PENDING_OUTGOING");
+      getUserProfile(userId)
+        .then((profile) => {
+          setFriends((previous) =>
+            previous.some((friend) => friend.id === userId)
+              ? previous.map((friend) =>
+                  friend.id === userId
+                    ? { ...friend, status: "PENDING_OUTGOING" }
+                    : friend
+                )
+              : [...previous, toFriendProfile(profile, "PENDING_OUTGOING")]
+          );
+          setFocusedProfile((previous) =>
+            previous?.id === userId
+              ? { ...previous, status: "PENDING_OUTGOING" }
+              : previous
+          );
+        })
+        .catch(() => {
+          // best-effort - a manual refresh will pick it up
+        });
     });
-    // setStatus's fallback path (promoting a stranger who's only
-    // `focusedProfile` into `friends`) reads focusedProfile from this
-    // closure - resubscribing whenever it changes is what keeps that read
-    // from pinning to whatever it was when the page first mounted (usually
-    // null, since focusedProfile only exists after ?userId= resolves).
-  }, [focusedProfile]);
+  }, []);
 
   // Keeps online/offline honest while the page stays open (see
   // PRESENCE_REFRESH_INTERVAL_MS's own comment). Only ACCEPTED friends ever
@@ -528,6 +543,7 @@ function FriendsPage() {
     if (!selected) return;
     try {
       await removeFriendRelationship(selected.id);
+      removeFromList(selected.id);
     } catch {
       showToast({
         type: "error",
@@ -540,6 +556,7 @@ function FriendsPage() {
     if (!selected) return;
     try {
       await removeFriendRelationship(selected.id);
+      removeFromList(selected.id);
     } catch {
       showToast({
         type: "error",
