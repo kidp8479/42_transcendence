@@ -110,7 +110,8 @@ export class UserRelationshipsService {
           const requester = await this.userService.findById(requesterId);
           this.notificationService.create(
             addresseeId,
-            requester.username + " wants to be your friend!"
+            requester.username + " wants to be your friend!",
+            `/friends?userId=${requesterId}`
           );
           this.realtimeService.emitToUser(
             addresseeId,
@@ -156,9 +157,9 @@ export class UserRelationshipsService {
           data: {
             requesterId: requesterId,
             addresseeId: addresseeId,
-            status: dto.status
-          }
-        })
+            status: dto.status,
+          },
+        });
       } else {
         throw new NotFoundException(UNKNOWN_USER_ERR_MSG);
       }
@@ -202,7 +203,8 @@ export class UserRelationshipsService {
           const requester = await this.userService.findById(requesterId);
           this.notificationService.create(
             addresseeId,
-            requester.username + " is now your friend!"
+            requester.username + " is now your friend!",
+            `/friends?userId=${requesterId}`
           );
           this.realtimeService.emitToUser(
             addresseeId,
