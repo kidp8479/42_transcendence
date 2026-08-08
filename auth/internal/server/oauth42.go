@@ -29,10 +29,12 @@ type fortyTwoTokenResponse struct {
 }
 
 type fortyTwoProfileResponse struct {
-	ID    json.Number `json:"id"`
-	Login string      `json:"login"`
-	Email string      `json:"email"`
-	Image struct {
+	ID        json.Number `json:"id"`
+	Login     string      `json:"login"`
+	Email     string      `json:"email"`
+	FirstName string      `json:"first_name"`
+	LastName  string      `json:"last_name"`
+	Image     struct {
 		Link string `json:"link"`
 	} `json:"image"`
 	Campus []struct {
@@ -207,13 +209,21 @@ func (s *Server) fetchFortyTwoProfile(ctx context.Context, code, redirectURI str
 	}
 
 	profile := store.FortyTwoProfile{Subject: subject, Email: email, Username: raw.Login, DisplayName: raw.Display}
-	if raw.Image.Link != "" {
-		profile.AvatarURL = &raw.Image.Link
-	}
-	if len(raw.Campus) > 0 && raw.Campus[0].Name != "" {
-		profile.Campus = &raw.Campus[0].Name
+	profile.FirstName = nullableProfileString(raw.FirstName)
+	profile.LastName = nullableProfileString(raw.LastName)
+	profile.AvatarURL = nullableProfileString(raw.Image.Link)
+	if len(raw.Campus) > 0 {
+		profile.Campus = nullableProfileString(raw.Campus[0].Name)
 	}
 	return profile, nil
+}
+
+func nullableProfileString(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func numericSubject(value string) bool {

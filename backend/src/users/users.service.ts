@@ -29,6 +29,8 @@ const SAFE_USER_SELECT = {
   email: true,
   emailVerified: true,
   username: true,
+  firstName: true,
+  lastName: true,
   avatarUrl: true,
   campus: true,
   twoFactorEnabled: true,

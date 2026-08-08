@@ -52,6 +52,8 @@ type User struct {
 	Email         string  `json:"email"`
 	EmailVerified bool    `json:"emailVerified"`
 	Username      string  `json:"username"`
+	FirstName     *string `json:"firstName"`
+	LastName      *string `json:"lastName"`
 	AvatarURL     *string `json:"avatarUrl"`
 	Campus        *string `json:"campus"`
 	// Status controls authentication eligibility and is not profile response data.
@@ -218,6 +220,8 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 			u."email",
 			u."emailVerified",
 			u."username",
+			u."firstName",
+			u."lastName",
 			u."avatarUrl",
 			u."campus",
 			u."status"::text,
@@ -234,6 +238,8 @@ func (s *Store) FindLocalCredential(ctx context.Context, normalizedEmail string)
 		&credential.Email,
 		&credential.EmailVerified,
 		&credential.Username,
+		&credential.FirstName,
+		&credential.LastName,
 		&credential.AvatarURL,
 		&credential.Campus,
 		&credential.Status,
@@ -362,8 +368,8 @@ func (s *Store) RotateRefreshToken(
 			f."id", f."authenticationMethod"::text, f."assuranceLevel",
 			f."authenticatedAt", f."idleExpiresAt", f."absoluteExpiresAt",
 			f."csrfTokenHash", f."revokedAt",
-			u."id", u."email", u."emailVerified", u."username", u."avatarUrl",
-			u."campus", u."status"::text, u."globalRole"::text
+			u."id", u."email", u."emailVerified", u."username", u."firstName", u."lastName",
+			u."avatarUrl", u."campus", u."status"::text, u."globalRole"::text
 		 FROM "AuthRefreshToken" t
 		 JOIN "RefreshTokenFamily" f ON f."id" = t."familyId"
 		 JOIN "User" u ON u."id" = f."userId"
@@ -377,7 +383,7 @@ func (s *Store) RotateRefreshToken(
 		&family.AuthenticatedAt, &family.IdleExpiresAt, &family.AbsoluteExpiresAt,
 		&family.CSRFTokenHash, &revokedAt,
 		&family.User.ID, &family.User.Email, &family.User.EmailVerified,
-		&family.User.Username, &family.User.AvatarURL, &family.User.Campus,
+		&family.User.Username, &family.User.FirstName, &family.User.LastName, &family.User.AvatarURL, &family.User.Campus,
 		&family.User.Status, &family.User.GlobalRole,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -569,8 +575,8 @@ func (s *Store) GetRefreshFamily(ctx context.Context, token, csrfToken string) (
 			f."id", f."authenticationMethod"::text, f."assuranceLevel",
 			f."authenticatedAt", f."idleExpiresAt", f."absoluteExpiresAt",
 			f."csrfTokenHash", f."revokedAt",
-			u."id", u."email", u."emailVerified", u."username", u."avatarUrl",
-			u."campus", u."status"::text, u."globalRole"::text
+			u."id", u."email", u."emailVerified", u."username", u."firstName", u."lastName",
+			u."avatarUrl", u."campus", u."status"::text, u."globalRole"::text
 		 FROM "AuthRefreshToken" t
 		 JOIN "RefreshTokenFamily" f ON f."id" = t."familyId"
 		 JOIN "User" u ON u."id" = f."userId"
@@ -584,7 +590,7 @@ func (s *Store) GetRefreshFamily(ctx context.Context, token, csrfToken string) (
 		&family.AuthenticatedAt, &family.IdleExpiresAt, &family.AbsoluteExpiresAt,
 		&family.CSRFTokenHash, &revokedAt,
 		&family.User.ID, &family.User.Email, &family.User.EmailVerified,
-		&family.User.Username, &family.User.AvatarURL, &family.User.Campus,
+		&family.User.Username, &family.User.FirstName, &family.User.LastName, &family.User.AvatarURL, &family.User.Campus,
 		&family.User.Status, &family.User.GlobalRole,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

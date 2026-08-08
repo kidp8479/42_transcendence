@@ -3,6 +3,8 @@ export interface AuthenticatedUser {
   email: string;
   emailVerified: boolean;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
   avatarUrl: string | null;
   campus: string | null;
 }
@@ -240,6 +242,8 @@ function isAuthSession(value: unknown): value is AuthSession {
     typeof user.email === "string" &&
     typeof user.emailVerified === "boolean" &&
     typeof user.username === "string" &&
+    (user.firstName === null || typeof user.firstName === "string") &&
+    (user.lastName === null || typeof user.lastName === "string") &&
     (user.avatarUrl === null || typeof user.avatarUrl === "string") &&
     (user.campus === null || typeof user.campus === "string")
   );

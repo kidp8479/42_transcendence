@@ -3,9 +3,13 @@ import { apiClient } from "./apiClient";
 export interface User {
   username: string;
   email: string;
+  firstName: string | null;
+  lastName: string | null;
   avatarUrl: string | null;
   campus: string | null;
 }
+
+type UserUpdate = Pick<User, "username">;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -16,17 +20,19 @@ function parseUser(value: unknown): User {
     throw new Error("Users response contains invalid items");
   }
 
-  const { username, email, avatarUrl, campus } = value;
+  const { username, email, firstName, lastName, avatarUrl, campus } = value;
   if (
     typeof username !== "string" ||
     typeof email !== "string" ||
+    (firstName !== null && typeof firstName !== "string") ||
+    (lastName !== null && typeof lastName !== "string") ||
     (avatarUrl !== null && typeof avatarUrl !== "string") ||
     (campus !== null && typeof campus !== "string")
   ) {
     throw new Error("Users response contains invalid items");
   }
 
-  return { username, email, avatarUrl, campus };
+  return { username, email, firstName, lastName, avatarUrl, campus };
 }
 
 export async function getMe(): Promise<User> {
@@ -34,7 +40,7 @@ export async function getMe(): Promise<User> {
 }
 
 // PATCH /users/me
-export async function updateMe(dto: Partial<User>): Promise<User> {
+export async function updateMe(dto: UserUpdate): Promise<User> {
   return apiClient<unknown>(`/users/me`, { method: "PATCH", body: dto }).then(
     parseUser
   );
