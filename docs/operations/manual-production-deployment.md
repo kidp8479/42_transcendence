@@ -322,9 +322,20 @@ file 404.
 curl -I http://tomato.iops.dev/
 curl --fail https://tomato.iops.dev/api/health
 curl --fail https://tomato.iops.dev/auth/health
+curl --fail https://tomato.iops.dev/health
 openssl s_client -connect tomato.iops.dev:443 -servername tomato.iops.dev \
   -showcerts </dev/null
 ```
+
+`/health` is a static Nginx control page, not a frontend route. It remains
+available when the frontend, backend, or authentication container is down and
+probes the two readiness contracts without sending browser credentials. The
+API and authentication readiness probes each require their Vault runtime and
+their active database connection; they return only `{"status":"ok"}` or
+`{"status":"unavailable"}`. This intentionally exposes no version, topology,
+credential, or dependency detail. Run `make check-health-page` locally after
+changing this surface; it temporarily stops the three application containers,
+proves the static page remains reachable, and restores them on exit.
 
 Production and VM development run ModSecurity in blocking mode; school
 evaluation uses DetectionOnly mode. The custom CRS policy permits only the

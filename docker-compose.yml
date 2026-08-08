@@ -37,16 +37,11 @@ services:
       - ./nginx/includes/application-locations.conf.template:/etc/nginx/templates/includes/application-locations.conf.template:ro
       - ./nginx/includes/error-pages.conf.template:/etc/nginx/templates/includes/error-pages.conf.template:ro
       - ./nginx/errors:/usr/share/nginx/html/__edge-errors:ro
+      - ./nginx/status:/usr/share/nginx/html/health:ro
       - ./nginx/modsecurity/10-task-rabbit-config.conf:/etc/modsecurity.d/owasp-crs/plugins/10-task-rabbit-config.conf:ro
       - ./nginx/99-reload-on-certificate-change.sh:/docker-entrypoint.d/99-reload-on-certificate-change.sh:ro
       - vault_nginx_tls:/etc/nginx/ssl:ro
     depends_on:
-      frontend:
-        condition: service_started
-      backend:
-        condition: service_started
-      auth:
-        condition: service_started
       nginx-tls-agent:
         condition: service_healthy
     restart: unless-stopped
