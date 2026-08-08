@@ -3,12 +3,7 @@
 // ids arrives as one comma-separated string (no repeated-key array syntax),
 // split by hand since class-transformer has no built-in for that shape.
 
-import {
-  ArrayMaxSize,
-  ArrayNotEmpty,
-  IsArray,
-  IsUUID,
-} from "class-validator";
+import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsUUID } from "class-validator";
 import { Transform } from "class-transformer";
 
 // Matches the accepted-friends list this is polled for - comfortably above
