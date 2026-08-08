@@ -25,6 +25,7 @@ type testAuthStore struct {
 	family            store.RefreshFamily
 	access            store.AccessState
 	err               error
+	healthErr         error
 	createFamilyCalls int
 	rotateCalls       int
 	revokeCalls       int
@@ -36,6 +37,10 @@ type testAuthStore struct {
 	projectToken      store.CreatedProjectAPIToken
 	projectRequest    store.CreateProjectAPITokenRequest
 	projectPrincipal  store.ProjectAPITokenPrincipal
+}
+
+func (s *testAuthStore) Ping(context.Context) error {
+	return s.healthErr
 }
 
 func (s *testAuthStore) CreateLocalAccount(context.Context, string, string, string) (store.User, error) {
@@ -501,11 +506,26 @@ func TestNormalizeEmail(t *testing.T) {
 }
 
 func TestHandleHealthFailsWhenRuntimeIsUnavailable(t *testing.T) {
-	server := &Server{ready: func() bool { return false }}
+	server := &Server{ready: func() bool { return false }, store: &testAuthStore{}}
 	response := httptest.NewRecorder()
 	server.handleHealth(response, httptest.NewRequest(http.MethodGet, "/auth/health", nil))
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", response.Code)
+	}
+}
+
+func TestHandleHealthFailsWhenDatabaseIsUnavailable(t *testing.T) {
+	server := &Server{
+		ready: func() bool { return true },
+		store: &testAuthStore{healthErr: errors.New("database unavailable")},
+	}
+	response := httptest.NewRecorder()
+	server.handleHealth(response, httptest.NewRequest(http.MethodGet, "/auth/health", nil))
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", response.Code)
+	}
+	if response.Body.String() != "{\"status\":\"unavailable\"}\n" {
+		t.Fatalf("body = %q", response.Body.String())
 	}
 }
 

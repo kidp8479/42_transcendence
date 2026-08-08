@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Task Rabbit system status</title>
+    <link rel="stylesheet" href="/health/status.css" />
+    <script src="/health/status.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <p class="eyebrow">Task Rabbit / operational status</p>
+        <h1>Edge control panel</h1>
+        <p class="lede">
+          This page is served directly by the ingress and remains available
+          when the application is not.
+        </p>
+      </header>
+
+      <section class="overview" aria-labelledby="overview-heading">
+        <div>
+          <p class="eyebrow" id="overview-heading">Current signal</p>
+          <p class="overall-status" id="overall-status" aria-live="polite">
+            Checking services
+          </p>
+        </div>
+        <button type="button" id="refresh-status">Check now</button>
+      </section>
+
+      <section aria-labelledby="services-heading">
+        <div class="section-heading">
+          <p class="eyebrow" id="services-heading">Service readiness</p>
+          <p id="last-checked" aria-live="polite">Awaiting first probe</p>
+        </div>
+        <ul class="services" aria-live="polite">
+          <li class="service service--ready" data-service="edge">
+            <span class="indicator" aria-hidden="true"></span>
+            <div>
+              <h2>HTTPS ingress</h2>
+              <p>Static status surface is reachable.</p>
+            </div>
+            <strong>Ready</strong>
+          </li>
+          <li class="service service--checking" data-service="backend">
+            <span class="indicator" aria-hidden="true"></span>
+            <div>
+              <h2>Application API</h2>
+              <p>Vault runtime and database connection.</p>
+            </div>
+            <strong>Checking</strong>
+          </li>
+          <li class="service service--checking" data-service="auth">
+            <span class="indicator" aria-hidden="true"></span>
+            <div>
+              <h2>Authentication</h2>
+              <p>Vault runtime and database connection.</p>
+            </div>
+            <strong>Checking</strong>
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        <span class="pulse" aria-hidden="true"></span>
+        Readiness probes refresh every 15 seconds.
+      </footer>
+    </main>
+  </body>
+</html>

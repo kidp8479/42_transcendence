@@ -3,6 +3,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { VaultRuntimeService } from "../vault/vault-runtime.service";
 
 const poolDrainTimeoutMs = 30_000;
+const healthCheckTimeoutMs = 2_000;
 
 export type ApplicationDatabaseTransaction = Pick<
   Prisma.TransactionClient,
@@ -98,6 +99,15 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   async executeRaw(query: Prisma.Sql): Promise<number> {
     return this.currentClient().$executeRaw(query);
+  }
+
+  async ping(): Promise<void> {
+    await this.currentClient().$transaction(
+      async (transaction) => {
+        await transaction.$queryRaw(Prisma.sql`SELECT 1`);
+      },
+      { maxWait: healthCheckTimeoutMs, timeout: healthCheckTimeoutMs }
+    );
   }
 
   async transaction<T>(

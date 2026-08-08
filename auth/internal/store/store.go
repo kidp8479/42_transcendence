@@ -127,6 +127,14 @@ func (s *Store) currentPool() *pgxpool.Pool {
 	return s.pool.Load()
 }
 
+func (s *Store) Ping(ctx context.Context) error {
+	pool := s.currentPool()
+	if pool == nil {
+		return errors.New("authentication database pool is unavailable")
+	}
+	return pool.Ping(ctx)
+}
+
 func (s *Store) CreateLocalAccount(
 	ctx context.Context,
 	email string,

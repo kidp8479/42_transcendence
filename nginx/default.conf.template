@@ -20,6 +20,12 @@ map $host $direct_https_host {
     ~^[^.]+\.paris\.42\.school$ $host;
 }
 
+map $host $health_hsts {
+    default "max-age=31536000; includeSubDomains";
+    localhost "";
+    127.0.0.1 "";
+}
+
 server {
     listen 8080 default_server;
     server_name _;

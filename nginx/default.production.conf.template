@@ -17,6 +17,12 @@ map $host $direct_https_host {
     tomato-dev.iops.dev tomato-dev.iops.dev;
 }
 
+map $host $health_hsts {
+    default "";
+    tomato.iops.dev "max-age=31536000; includeSubDomains";
+    tomato-dev.iops.dev "max-age=31536000; includeSubDomains";
+}
+
 server {
     listen 8080 default_server;
     server_name _;
