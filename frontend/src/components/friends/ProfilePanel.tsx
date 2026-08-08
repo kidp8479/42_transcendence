@@ -258,7 +258,7 @@ export const ProfilePanel = memo(function ProfilePanel({
             <InfoRow
               icon={HiOutlineUser}
               label="Name"
-              value={`${friend.firstName} ${friend.lastName}`.trim()}
+              value={`${friend.firstName} ${friend.lastName}`.trim() || friend.username }
             />
             <InfoRow
               icon={HiOutlineEnvelope}
