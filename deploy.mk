@@ -136,6 +136,7 @@ wipe-storage-%: validate-deployment-%
 
 ## run migrations and runtime grants for an isolated deployment
 migrate-deploy-%: validate-deployment-%
+	$(call deployment_compose,$*) --profile tools build migration
 	$(call deployment_compose,$*) --profile tools run --rm migration
 	@env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
 	set -a; . "$$env_file"; set +a; \
