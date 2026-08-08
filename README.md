@@ -12,14 +12,14 @@ reviewed external integrations.
 
 ## Instructions
 
-### Local development
+### Prerequisites
 
-#### Prerequisites
+- **Docker Engine** with the **Compose v2 plugin** (Podman + `podman-compose` also works, auto-detected).
+- **GNU Make**.
+- **OpenSSL** - used on the host to generate local secrets (`.env` values); preinstalled on Linux/macOS, available through WSL2 on Windows.
+- **Git**.
 
-- Docker with Docker Compose v2 (or Podman with `podman-compose` - the Makefile
-  auto-detects which one is available; override with `make COMPOSE=podman-compose ...`
-  if detection picks the wrong one)
-- `make`
+No other host tooling is required. Node, npm, and every language runtime run inside the containers, not on the host.
 
 The default stack is the school-evaluation environment (Compose project
 `transcendence-school`, `.env`). It serves the static frontend and production
@@ -64,36 +64,29 @@ make start-dev
 Afterward, `make up-dev` starts the existing development containers without
 rebuilding, migrating, or seeding.
 
-When the containers are running, trust the local Vault PKI root in your
-operating system or browser, then open
-[https://localhost:8443](https://localhost:8443). Export the root certificate
-with:
+Once it finishes, trust the local TLS certificate so the browser stops warning about it:
 
 ```sh
 make export-local-ca
 ```
 
-Port `8080` redirects to HTTPS on `8443`. The local root certificate is
-development-only; do not install it on a shared or production machine.
+This drops the certificate authority at `.local/task-rabbit-local-ca.crt`. Import it into your OS/browser's trusted root certificate store, then open **https://localhost:8443**.
 
-You do not need to open the frontend container port directly. Docker Compose
-publishes Nginx on local ports `8080` and `8443`; Nginx forwards requests to
-the right service inside Docker.
+Sign in with a seeded demo account (`<username>@42.fr`, password is the current `SEED_PASSWORD` value inside your local `.env` - it's regenerated on every `rere`, there is no fixed shared password) or create your own account.
 
-Local routes:
+### Configuration
 
-- Frontend: [https://localhost:8443/](https://localhost:8443/)
-- Backend API: [https://localhost:8443/api](https://localhost:8443/api)
-- Backend WebSocket: [wss://localhost:8443/ws](wss://localhost:8443/ws)
-- Auth service: [https://localhost:8443/auth](https://localhost:8443/auth)
+Every environment variable the app needs is documented in `.env.example`. `make recreate-env` (called by `rere`) copies it to `.env` and replaces every secret-bearing value with a fresh random one; `.env` itself is git-ignored and never committed. OAuth login (42, Google) is optional - leave `OAUTH_42_CLIENT_ID`/`OAUTH_GOOGLE_CLIENT_ID` blank to keep those buttons hidden, or fill in real provider credentials to enable them.
 
-If [https://localhost:8443](https://localhost:8443) does not load, check that
-the stack is running:
+### Everyday commands
 
-```sh
-make ps
-make logs
-```
+| Command | What it does |
+| --- | --- |
+| `make up` / `make down` | Start or stop the stack without rebuilding. |
+| `make up-build` | Rebuild images and start (after pulling dependency changes). |
+| `make logs` | Follow every service's logs. |
+| `make ps` | Show container status. |
+| `make help` | List every available target. |
 
 If nginx cannot start because port `8080` is already in use, stop the other local service using that port, then run `make start-dev` again.
 
@@ -341,6 +334,9 @@ make re-dev     # reset and rebuild the dev stack
 ```
 
 Use `make fclean` with care: it removes the PostgreSQL Docker volume, so local database data will be deleted.
+
+For an isolated VM or production deployment, see
+[`docs/operations/manual-production-deployment.md`](docs/operations/manual-production-deployment.md).
 
 ## Team Information
 
