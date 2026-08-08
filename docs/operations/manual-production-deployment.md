@@ -117,9 +117,9 @@ Run `make recreate-env-school` to generate the selected runtime file from
 `.env.example` with fresh local secrets and the required school origin and
 issuer. The VM `/srv/transcendence/school/secrets` directory is host
 provisioning and must exist with mode `0700`; the target creates each runtime
-file with restrictive permissions. It intentionally overwrites an existing
-school runtime file; retain any evaluator-specific OAuth credentials before
-running it and restore them afterward.
+file with restrictive permissions. It preserves the existing 42 client
+credential and callback-origin lines so a pre-registered evaluator OAuth
+configuration survives the reset.
 
 ## 4. Runtime Configuration and Origin Policy
 
@@ -153,9 +153,21 @@ AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=
 AUTH_JWT_ISSUER=https://*.paris.42.school:8443/auth
 ```
 
-`make deploy-school`, `make seed-school`, and `make rere-school` reject any
-other values. The empty OAuth-providers callback origin keeps OAuth flows
-disabled for the school profile. `make deploy-dev`, `make seed-dev`, and
+The empty OAuth-providers callback origin keeps OAuth flows disabled. When
+the evaluator hostname is known in advance and a dedicated 42 client has its
+exact callback registered, it may instead be a concrete, one-label school
+origin, for example:
+
+```dotenv
+AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=https://f6r13s1.paris.42.school:8443
+OAUTH_42_CLIENT_ID=...
+OAUTH_42_CLIENT_SECRET=...
+```
+
+The 42 application must register
+`https://f6r13s1.paris.42.school:8443/auth/oauth/42/callback` exactly.
+`make deploy-school`, `make seed-school`, and `make rere-school` reject a
+callback origin outside that one-label HTTPS school-host form. `make deploy-dev`, `make seed-dev`, and
 `make rere-dev` likewise require the exact `tomato-dev.iops.dev` origin,
 issuer, and OAuth-providers callback origin above, without a port. The VM
 development and production runtime files are externally managed:

@@ -80,7 +80,14 @@ recreate-env-%:
 
 ## recreate the school runtime environment with fresh local secrets and the required school origin
 recreate-env-school:
-	@umask 077; sed \
+	@env_file="$(DEPLOY_SCHOOL_ENV_FILE)"; \
+	oauth_42_client_id_line="$$(grep -m 1 '^OAUTH_42_CLIENT_ID=' "$$env_file" || true)"; \
+	oauth_42_client_secret_line="$$(grep -m 1 '^OAUTH_42_CLIENT_SECRET=' "$$env_file" || true)"; \
+	oauth_callback_origin_line="$$(grep -m 1 '^AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=' "$$env_file" || true)"; \
+	test -n "$$oauth_42_client_id_line" || oauth_42_client_id_line='OAUTH_42_CLIENT_ID='; \
+	test -n "$$oauth_42_client_secret_line" || oauth_42_client_secret_line='OAUTH_42_CLIENT_SECRET='; \
+	test -n "$$oauth_callback_origin_line" || oauth_callback_origin_line='AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN='; \
+	umask 077; sed \
 		-e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^AUTH_INTERNAL_TOKEN=.*|AUTH_INTERNAL_TOKEN=$$(openssl rand -hex 32)|" \
 		-e "s|^AUTH_REFRESH_SUCCESSOR_KEY=.*|AUTH_REFRESH_SUCCESSOR_KEY=$$(openssl rand -hex 32)|" \
@@ -89,9 +96,10 @@ recreate-env-school:
 		-e "s|^VAULT_DEV_ROOT_TOKEN=.*|VAULT_DEV_ROOT_TOKEN=$$(openssl rand -hex 32)|" \
 		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^APP_ORIGIN=.*|APP_ORIGIN=https://*.paris.42.school:8443|" \
-		-e "s|^AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=.*|AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=|" \
 		-e "s|^AUTH_JWT_ISSUER=.*|AUTH_JWT_ISSUER=https://*.paris.42.school:8443/auth|" \
-		.env.example > "$(DEPLOY_SCHOOL_ENV_FILE)"
+		.env.example | grep -Ev '^(OAUTH_42_CLIENT_ID|OAUTH_42_CLIENT_SECRET|AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN)=' > "$$env_file.tmp"; \
+	printf '\n%s\n%s\n%s\n' "$$oauth_42_client_id_line" "$$oauth_42_client_secret_line" "$$oauth_callback_origin_line" >> "$$env_file.tmp"; \
+	mv "$$env_file.tmp" "$$env_file"
 
 ## remove an isolated deployment, volumes, orphans, and local images
 fclean-%: validate-deployment-%
@@ -164,7 +172,12 @@ validate-deployment-%:
 			test "$$AUTH_JWT_ISSUER" = "https://tomato-dev.iops.dev/auth" || (echo "AUTH_JWT_ISSUER must be https://tomato-dev.iops.dev/auth for VM development" >&2; exit 1); \
 		else \
 			test "$$APP_ORIGIN" = "https://*.paris.42.school:8443" || (echo "APP_ORIGIN must be https://*.paris.42.school:8443 for school evaluation" >&2; exit 1); \
-			test -z "$$AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN" || (echo "AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN must be empty for school evaluation" >&2; exit 1); \
+			if [ -n "$$AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN" ]; then \
+				if ! printf '%s\n' "$$AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN" | grep -Eq '^https://[A-Za-z0-9-]+\.paris\.42\.school:8443$$'; then \
+					echo "AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN must be an exact one-label school HTTPS origin on port 8443" >&2; \
+					exit 1; \
+				fi; \
+			fi; \
 			test "$$AUTH_JWT_ISSUER" = "https://*.paris.42.school:8443/auth" || (echo "AUTH_JWT_ISSUER must be https://*.paris.42.school:8443/auth for school evaluation" >&2; exit 1); \
 		fi; \
 	fi
