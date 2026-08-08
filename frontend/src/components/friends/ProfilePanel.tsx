@@ -14,7 +14,11 @@ import type { IconType } from "react-icons";
 import { IoArrowBack } from "react-icons/io5";
 import { LuUserCheck, LuUserPlus } from "react-icons/lu";
 import { darkDropdownTheme } from "@/lib/flowbite";
-import { initialsOf, type FriendProfile, type FriendshipStatus } from "@/lib/friendProfile";
+import {
+  initialsOf,
+  type FriendProfile,
+  type FriendshipStatus,
+} from "@/lib/friendProfile";
 
 // Same neutral gray button skin as UserSettingsPage's rowUploadButtonClass.
 const rowUploadButtonClass = `
