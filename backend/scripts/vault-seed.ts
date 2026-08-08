@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { PrismaClient } from "@prisma/client";
+import { seedDatabase } from "../prisma/seed";
 import { VaultClient } from "../src/vault/vault.client";
 import {
   buildDatabaseUrl,
@@ -13,38 +14,27 @@ async function main(): Promise<void> {
     readProtectedIDFile(requiredEnv("VAULT_SECRET_ID_FILE"), "Secret ID"),
   ]);
   await client.login(roleId, secretId);
-  const credentials = await client.issueDatabaseCredentials(
-    requiredEnv("VAULT_DB_ROLE")
-  );
-  await runPrismaSeed(
-    buildDatabaseUrl(
-      requiredEnv("VAULT_DB_HOST"),
-      requiredEnv("VAULT_DB_PORT"),
-      requiredEnv("VAULT_DB_NAME"),
-      credentials
-    )
-  );
-}
-
-function runPrismaSeed(databaseUrl: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const command = spawn("npx", ["prisma", "db", "seed"], {
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-        AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL ?? "http://auth:3001",
+  const [credentials, seedPassword] = await Promise.all([
+    client.issueDatabaseCredentials(requiredEnv("VAULT_DB_ROLE")),
+    client.readSeedPassword(),
+  ]);
+  const prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: buildDatabaseUrl(
+          requiredEnv("VAULT_DB_HOST"),
+          requiredEnv("VAULT_DB_PORT"),
+          requiredEnv("VAULT_DB_NAME"),
+          credentials
+        ),
       },
-    });
-    command.once("error", reject);
-    command.once("exit", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      reject(new Error(`prisma db seed exited with code ${code}`));
-    });
+    },
   });
+  try {
+    await seedDatabase(prisma, seedPassword);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 void main().catch((error: unknown) => {

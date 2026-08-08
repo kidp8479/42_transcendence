@@ -17,7 +17,10 @@ import { registerSeedUser } from "./register-user";
 // Discovery/Kanban content is specific to it (pulled from the real subject,
 // en.subject.pdf v21.1), not the same placeholder categories every other
 // seeded project gets.
-export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
+export async function seedFlagshipProject(
+  prisma: PrismaClient,
+  seedPassword: string
+): Promise<void> {
   const demoTeamUsersData = [
     { username: "marvin", campus: "42 Paris" },
     { username: "arthur", campus: "42 London" },
@@ -29,7 +32,12 @@ export async function seedFlagshipProject(prisma: PrismaClient): Promise<void> {
   const createdDemoUsers: Record<string, User> = {};
   for (const u of demoTeamUsersData) {
     const email = `${u.username}@42.fr`;
-    const userId = await registerSeedUser(prisma, email, u.username);
+    const userId = await registerSeedUser(
+      prisma,
+      email,
+      u.username,
+      seedPassword
+    );
     createdDemoUsers[u.username] = await prisma.user.update({
       where: { id: userId },
       data: { campus: u.campus },

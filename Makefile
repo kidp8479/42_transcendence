@@ -40,12 +40,13 @@ $(ENV_FILE):
 ## overwrite .env with .env.example values and fresh random local secrets
 recreate-env:
 	sed \
-		-e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)|" \
+		-e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^AUTH_INTERNAL_TOKEN=.*|AUTH_INTERNAL_TOKEN=$$(openssl rand -hex 32)|" \
 		-e "s|^AUTH_REFRESH_SUCCESSOR_KEY=.*|AUTH_REFRESH_SUCCESSOR_KEY=$$(openssl rand -hex 32)|" \
 		-e "s|^AUTH_PROJECT_API_TOKEN_PEPPER=.*|AUTH_PROJECT_API_TOKEN_PEPPER=$$(openssl rand -hex 32)|" \
+		-e "s|^SEED_PASSWORD=.*|SEED_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		-e "s|^VAULT_DEV_ROOT_TOKEN=.*|VAULT_DEV_ROOT_TOKEN=$$(openssl rand -hex 32)|" \
-		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD=$$(openssl rand -hex 32)|" \
+		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		.env.example > $(ENV_FILE)
 
 

@@ -2,7 +2,10 @@ import { PrismaClient, User } from "@prisma/client";
 import { registerSeedUser } from "./register-user";
 
 // 1. Users (sorry girls, it's alphabetical order)
-export async function seedUsers(prisma: PrismaClient): Promise<{
+export async function seedUsers(
+  prisma: PrismaClient,
+  seedPassword: string
+): Promise<{
   andrei: User;
   carlos: User;
   christophe: User;
@@ -23,7 +26,12 @@ export async function seedUsers(prisma: PrismaClient): Promise<{
 
   for (const u of usersData) {
     const email = `${u.username}@42.fr`;
-    const userId = await registerSeedUser(prisma, email, u.username);
+    const userId = await registerSeedUser(
+      prisma,
+      email,
+      u.username,
+      seedPassword
+    );
     // register() has no "campus" field (that's a profile detail, not part of
     // local auth) - set it separately with a plain prisma update
     createdUsers[u.username] = await prisma.user.update({
