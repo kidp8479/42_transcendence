@@ -10,10 +10,19 @@
 // only checked where it is written. That is true wherever the component lives,
 // including here, so it never argued for keeping them in the route; having a
 // single source for the destinations does argue for moving them out.)
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { HiOutlineFolder, HiOutlineUserPlus } from "react-icons/hi2";
 import { LockOwnerAvatar } from "@/components/LockOwnerAvatar";
 import { SearchResultRow } from "@/components/search/SearchResultRow";
+import { authSessionResource } from "@/lib/authState";
+import {
+  deriveFriendshipStatus,
+  getUserRelationship,
+  sendFriendRequest,
+  type RelationshipStatus,
+} from "@/lib/friendsApi";
+import { useToast } from "@/hooks/useToast";
 import { PROJECT_STATUS_STYLES } from "@/lib/projectStatusStyles";
 import type {
   SearchProjectResult,
@@ -134,16 +143,73 @@ export function TaskResultLink({ task }: { task: SearchTaskResult }) {
   );
 }
 
-export function UserResultLink({
-  user,
-  isFriend = false,
-}: {
-  user: SearchUserResult;
-  // Nothing sets this yet - there is no Friend model on any branch, so the
-  // API can't say. It exists so the badge is one prop away from working the
-  // day the friends feature lands, alongside the button below.
-  isFriend?: boolean;
-}) {
+// "loading"/"error" render nothing in the control slot - better an empty
+// space for a moment than a button that might be wrong (ex: briefly
+// offering "Add friend" to someone already accepted). Collapses
+// PENDING_INCOMING and BLOCKED into "PENDING" alongside PENDING_OUTGOING:
+// none of the three should offer "Add friend" (a relationship already
+// exists, re-sending would just error), and the row's own Link already
+// opens the full picture in the friends panel for anyone who wants the
+// detail.
+type FriendControlStatus =
+  | "loading"
+  | "error"
+  | "NONE"
+  | "PENDING"
+  | "ACCEPTED";
+
+export function UserResultLink({ user }: { user: SearchUserResult }) {
+  const { showToast } = useToast();
+  const authState = authSessionResource.getState();
+  const currentUserId =
+    authState?.status === "authenticated" ? authState.session.user.id : null;
+
+  const [status, setStatus] = useState<FriendControlStatus>("loading");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    getUserRelationship(user.id)
+      .then((relationships) => {
+        if (cancelled) return;
+        let mine: RelationshipStatus | undefined;
+        let theirs: RelationshipStatus | undefined;
+        for (const relationship of relationships) {
+          if (relationship.requesterId === currentUserId) {
+            mine = relationship.status;
+          } else {
+            theirs = relationship.status;
+          }
+        }
+        const derived = deriveFriendshipStatus(mine, theirs);
+        setStatus(
+          derived === "NONE" || derived === "ACCEPTED" ? derived : "PENDING"
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId, user.id]);
+
+  async function handleAddFriend() {
+    setSending(true);
+    try {
+      await sendFriendRequest(user.id);
+      setStatus("PENDING");
+    } catch {
+      showToast({
+        type: "error",
+        message: "Could not send this friend request.",
+      });
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     // The friend control is a sibling of the link, not a child: a <button>
     // inside an <a> is invalid HTML and swallows its own clicks. Same
@@ -180,18 +246,23 @@ export function UserResultLink({
       </Link>
 
       <div className="absolute inset-y-0 right-4 flex items-center">
-        {isFriend ? (
-          <span className="rounded-full border border-brand-500/30 bg-brand-500/15 px-2 py-0.5 text-[10px] font-semibold text-brand-500">
-            Friend
+        {status === "PENDING" && (
+          <span className="rounded-full border border-surface-border bg-surface-overlay px-2 py-0.5 text-[10px] font-semibold text-text-secondary">
+            Pending
           </span>
-        ) : (
+        )}
+        {status === "NONE" && (
           <button
             type="button"
-            // Disabled rather than silently doing nothing: sending a friend
-            // request has no endpoint yet (no Friend model in schema.prisma),
-            // and a button that swallows clicks reads as a bug.
-            disabled
-            title="Friend requests aren't available yet"
+            onClick={(event) => {
+              // The row underneath is a full-width <Link> - without this the
+              // click would both send the request and navigate away from the
+              // page before the request's toast/state update ever lands.
+              event.preventDefault();
+              event.stopPropagation();
+              void handleAddFriend();
+            }}
+            disabled={sending}
             className="flex items-center gap-1 rounded-md border border-surface-border bg-surface-overlay px-2 py-1 text-[10px] font-semibold text-text-secondary transition-colors hover:border-brand-500 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-surface-border disabled:hover:text-text-secondary"
           >
             <HiOutlineUserPlus className="h-3.5 w-3.5" aria-hidden />

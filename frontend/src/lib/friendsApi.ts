@@ -107,10 +107,7 @@ export async function removeFriendRelationship(userId: string): Promise<void> {
 // has `mine` (their own directional row) and/or `theirs` (the other side's),
 // never one merged object - reconciling the two into a single display status
 // is exactly what create()/update()'s own comments describe (see
-// backend/.../user-relationships.service.ts). Falls back to "NONE" for
-// combinations that shouldn't reach the friends list (ex: only `theirs` is
-// BLOCKED - a block must stay unobservable from the blocked side, same
-// intent as create()'s own duplicate-request handling).
+// backend/.../user-relationships.service.ts).
 export function deriveFriendshipStatus(
   mine: RelationshipStatus | undefined,
   theirs: RelationshipStatus | undefined
@@ -118,13 +115,22 @@ export function deriveFriendshipStatus(
   if (mine === "BLOCKED") {
     return "BLOCKED";
   }
-  if (mine === "ACCEPTED" && theirs === "ACCEPTED") {
+  // A block must stay unobservable from the blocked side (create()'s own
+  // duplicate-request handling already enforces this for a fresh request) -
+  // falling through to "NONE" here would do the opposite: the friend's row
+  // would vanish from the list entirely the moment they blocked me, which is
+  // a bigger tell than anything it's supposed to hide. Treating their row as
+  // still ACCEPTED keeps the relationship looking exactly like it did before
+  // the block, for both people it can legitimately mean (a settled
+  // friendship, or the other side never having answered my request yet).
+  const effectiveTheirs = theirs === "BLOCKED" ? "ACCEPTED" : theirs;
+  if (mine === "ACCEPTED" && effectiveTheirs === "ACCEPTED") {
     return "ACCEPTED";
   }
-  if (mine === "ACCEPTED" && theirs === "PENDING_APPROVAL") {
+  if (mine === "ACCEPTED" && effectiveTheirs === "PENDING_APPROVAL") {
     return "PENDING_OUTGOING";
   }
-  if (mine === "PENDING_APPROVAL" && theirs === "ACCEPTED") {
+  if (mine === "PENDING_APPROVAL" && effectiveTheirs === "ACCEPTED") {
     return "PENDING_INCOMING";
   }
   return "NONE";
