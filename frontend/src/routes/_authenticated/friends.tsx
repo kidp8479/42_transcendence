@@ -13,7 +13,7 @@
 // FriendProfile carries them as empty strings on purpose, see
 // toFriendProfile below.
 import { useEffect, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { Avatar, Button, Dropdown, DropdownItem } from "flowbite-react";
 import {
   HiOutlineAcademicCap,
@@ -226,6 +226,18 @@ function initialsOf(friend: FriendProfile): string {
 function FriendsPage() {
   const { showToast } = useToast();
   const { userId: focusedUserId } = Route.useSearch();
+  // A click on a search result for someone already named in the URL (ex: A
+  // removed B, then searches and clicks B again without ever leaving
+  // /friends?userId=B) commits to the exact same location the router is
+  // already on. TanStack Router's commitLocation skips the history push
+  // entirely in that case (see @tanstack/router-core's isSameUrl/isSameState
+  // check), so focusedUserId below is the same string "B" as before and the
+  // effect that fetches it never re-runs on its own. `loadedAt`, unlike the
+  // location/search objects, is bumped on every completed navigation attempt
+  // - including that same-URL one, since the same-URL branch still calls
+  // this.load() - so it's the one signal that reliably tells "the user
+  // revisited B" apart from "nothing happened".
+  const loadedAt = useRouterState({ select: (state) => state.loadedAt });
   const authState = authSessionResource.getState();
   const currentUserId =
     authState?.status === "authenticated" ? authState.session.user.id : null;
@@ -301,7 +313,7 @@ function FriendsPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast is stable
-  }, [currentUserId, focusedUserId]);
+  }, [currentUserId, focusedUserId, loadedAt]);
 
   // Once the general list load (or a live socket event) catches up and adds
   // this id to `friends` for real, the standalone copy is just dead weight -
