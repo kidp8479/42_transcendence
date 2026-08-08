@@ -17,9 +17,9 @@ function sleep(ms: number): Promise<void> {
 // so the account is actually loggable - auth.register() creates the User row
 // itself, plus the AuthIdentity/PasswordCredential rows the seed has no
 // business writing to directly (argon2id hashing lives in the auth service).
-// AUTH_SERVICE_URL comes from docker-compose env (internal network address,
-// ex: http://auth:3001) - Origin must match APP_ORIGIN or the auth service
-// rejects the request (same check a real browser request goes through).
+// AUTH_SERVICE_URL normally comes from the Compose environment; the internal
+// service address preserves the prior seed-script default. Origin must match
+// APP_ORIGIN or the auth service rejects the request.
 export async function registerSeedUser(
   prisma: PrismaClient,
   email: string,
@@ -32,7 +32,8 @@ export async function registerSeedUser(
   }
   registrationsInCurrentWindow = registrationsInCurrentWindow + 1;
 
-  const res = await fetch(`${process.env.AUTH_SERVICE_URL}/auth/register`, {
+  const authServiceUrl = process.env.AUTH_SERVICE_URL ?? "http://auth:3001";
+  const res = await fetch(`${authServiceUrl}/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
