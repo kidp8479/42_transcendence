@@ -3,7 +3,7 @@ import { friendCountResource } from "@/lib/friendCountState";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { onFriendRequestSent, parseUserRelationship } from "@/lib/friendsApi";
 import { toFriendProfile, type FriendProfile } from "@/lib/friendProfile";
-import { getUserProfile } from "@/lib/usersApi";
+import { getPresence, getUserProfile } from "@/lib/usersApi";
 
 // Presence isn't pushed live over the socket (RealtimeService.isUserOnline
 // reads it fresh per request, nothing broadcasts on connect/disconnect) - the
@@ -149,19 +149,23 @@ export function useFriendsRealtime(
     if (acceptedFriendIds.length === 0) return;
     const ids = acceptedFriendIds.split(",");
     const interval = window.setInterval(() => {
-      Promise.allSettled(ids.map((id) => getUserProfile(id))).then(
-        (settled) => {
+      // One bulk presence lookup instead of a full getUserProfile per
+      // friend (see getPresence's own comment) - each tick used to burn a
+      // full profile fetch (plus its own blocked-by-target DB query) per
+      // friend on screen just to read one boolean.
+      getPresence(ids)
+        .then((presence) => {
           setFriends((previous) =>
-            previous.map((friend) => {
-              const index = ids.indexOf(friend.id);
-              const result = index === -1 ? undefined : settled[index];
-              return result?.status === "fulfilled"
-                ? { ...friend, online: result.value.online }
-                : friend;
-            })
+            previous.map((friend) =>
+              friend.id in presence
+                ? { ...friend, online: presence[friend.id] }
+                : friend
+            )
           );
-        }
-      );
+        })
+        .catch(() => {
+          // best-effort - the next tick will retry
+        });
     }, PRESENCE_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(interval);
   }, [acceptedFriendIds, setFriends]);
