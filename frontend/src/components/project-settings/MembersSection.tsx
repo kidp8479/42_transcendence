@@ -30,7 +30,7 @@ import { useSafeRouterInvalidate } from "@/hooks/useSafeRouterInvalidate";
 // becomes a real product requirement (not currently enforced anywhere).
 interface MembersSectionProps {
   projectId: string;
-  onLeaveProjectSuccess?: () => void;
+  onLeaveProjectSuccess?: () => void | Promise<void>;
 }
 
 export function MembersSection({
@@ -181,6 +181,15 @@ export function MembersSection({
     setIsRemoving(true);
     try {
       await removeMember(projectId, memberToRemove.userId);
+      // The backend excludes the acting user's own sockets from
+      // project:member-removed (see RealtimeService.emitToProject), so this
+      // tab never gets the echo handleMemberRemoved elsewhere relies on -
+      // apply it locally instead of waiting for an event that won't arrive.
+      setMembers((currentMembers) =>
+        currentMembers.filter(
+          (member) => member.userId !== memberToRemove.userId
+        )
+      );
       showToast({
         message: "Member removed",
         type: "success",
@@ -262,11 +271,12 @@ export function MembersSection({
       message: "You left the project.",
       type: "success",
     });
-    // Navigating away right after this unmounts the component before the
-    // "project:member-removed" websocket round-trip reliably invalidates the
-    // sidebar's data for us - invalidate directly so it's already fresh.
+    // Navigate away first, same as AuthenticatedLayout.leaveDeadProject -
+    // invalidating before this unmounts refetches the now-inaccessible
+    // /projects/:id route (the actor is excluded from their own
+    // project:member-removed broadcast, so there's no echo to race here).
+    await onLeaveProjectSuccess?.();
     await safeInvalidateRouter();
-    onLeaveProjectSuccess?.();
   }
 
   function handleRemoveClick(member: ProjectMember) {
