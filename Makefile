@@ -333,12 +333,16 @@ check-auth-stack: check-auth check-prisma check-backend check-frontend
 
 ## verify one-use WebSocket admission, exact Origin, and sid revocation
 check-websocket-e2e:
+	@set -e; \
+	vault_token="$$(sed -n 's/^VAULT_DEV_ROOT_TOKEN=//p' $(ENV_FILE))"; \
+	seed_password="$$($(COMPOSE) exec -T -e VAULT_TOKEN="$$vault_token" vault sh -c 'VAULT_ADDR=http://127.0.0.1:8200 vault kv get -field=password kv/seed/demo-users')"; \
 	$(COMPOSE) exec \
 		-e RUN_WEBSOCKET_E2E=1 \
 		-e WEBSOCKET_E2E_URL=https://nginx:8443 \
 		-e WEBSOCKET_E2E_ORIGIN=https://localhost:8443 \
 		-e WEBSOCKET_E2E_INGRESS_HOST=localhost \
 		-e WEBSOCKET_E2E_TLS_SERVER_NAME=localhost \
+		-e WEBSOCKET_E2E_PASSWORD="$$seed_password" \
 		frontend npm run test:websocket-e2e
 
 ## lint shell scripts (Vault bootstrap, db init, git hooks) with shellcheck
