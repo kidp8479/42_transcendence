@@ -166,13 +166,12 @@ export class UsersService {
   // (an O(1) in-memory check) for every id in one call instead of the poll
   // firing a full getUserProfile per friend just to read one boolean each.
   //
-  // Same block-hiding rule as findById: this is only ever polled for ids the
-  // caller's friends list already shows as ACCEPTED, and
-  // deriveFriendshipStatus on the frontend keeps showing a blocker as a
-  // normal ACCEPTED friend to the person they blocked - so a blocked target
-  // can end up in here. Without checking blockedByTarget too, presence would
-  // leak the one signal deriveFriendshipStatus's ACCEPTED-rewrite was built
-  // to hide.
+  // Not just a block check: nothing upstream restricts targetIds to actual
+  // friends (the controller passes whatever the caller asks for), so this
+  // has to independently verify both directions are ACCEPTED - same rule
+  // findEmail enforces above, batched here to avoid an N+1 across
+  // targetIds. A BLOCKED counterpart falls out of "both ACCEPTED" on its
+  // own, so no separate block check is needed.
   async getPresence(
     ids: string[],
     viewerId: string
@@ -182,21 +181,39 @@ export class UsersService {
       return {};
     }
 
-    const blockedByRows = await this.prisma.userRelationship.findMany({
+    const rows = await this.prisma.userRelationship.findMany({
       where: {
-        requesterId: { in: targetIds },
-        addresseeId: viewerId,
-        status: RelationshipStatus.BLOCKED,
+        OR: [
+          { requesterId: { in: targetIds }, addresseeId: viewerId },
+          { requesterId: viewerId, addresseeId: { in: targetIds } },
+        ],
       },
-      select: { requesterId: true },
+      select: { requesterId: true, addresseeId: true, status: true },
     });
-    const blockedByIds = new Set(blockedByRows.map((row) => row.requesterId));
+
+    const pairs = new Map<
+      string,
+      { mine?: RelationshipStatus; theirs?: RelationshipStatus }
+    >();
+    for (const row of rows) {
+      const otherId =
+        row.requesterId === viewerId ? row.addresseeId : row.requesterId;
+      const entry = pairs.get(otherId) ?? {};
+      if (row.requesterId === viewerId) {
+        entry.mine = row.status;
+      } else {
+        entry.theirs = row.status;
+      }
+      pairs.set(otherId, entry);
+    }
 
     const presence: Record<string, boolean> = {};
     for (const id of targetIds) {
-      presence[id] = blockedByIds.has(id)
-        ? false
-        : this.realtimeService.isUserOnline(id);
+      const pair = pairs.get(id);
+      const areFriends =
+        pair?.mine === RelationshipStatus.ACCEPTED &&
+        pair?.theirs === RelationshipStatus.ACCEPTED;
+      presence[id] = areFriends ? this.realtimeService.isUserOnline(id) : false;
     }
     return presence;
   }
