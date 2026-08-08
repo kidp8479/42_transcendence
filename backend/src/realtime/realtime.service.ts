@@ -9,8 +9,19 @@ export class RealtimeService {
     private readonly fieldLockManager: FieldLockManager
   ) {}
 
-  emitToProject(projectId: string, event: string, payload: unknown): void {
-    this.gateway.server.to(`project:${projectId}`).emit(event, payload);
+  // excludeUserId: skips the actor's own broadcast (they already know via
+  // their HTTP response) - room exclusion, so it covers their other tabs too.
+  emitToProject(
+    projectId: string,
+    event: string,
+    payload: unknown,
+    excludeUserId?: string
+  ): void {
+    const target = this.gateway.server.to(`project:${projectId}`);
+    (excludeUserId ? target.except(`user:${excludeUserId}`) : target).emit(
+      event,
+      payload
+    );
   }
 
   emitToUser(userId: string, event: string, payload: unknown): void {

@@ -3,6 +3,10 @@
 import { Outlet, useLoaderData } from "@tanstack/react-router";
 import { ProjectTabs } from "@/components/navigation/ProjectTabs";
 
+// project:deleted/member-removed (navigate away when it's this project) is
+// handled by AuthenticatedLayout, not here - a second listener here used to
+// race it on the same event and lose. See AuthenticatedLayout.tsx.
+
 export function ProjectLayout() {
   // real data now: fetched by the route's loader (GET /api/projects/:id),
   // see routes/_authenticated/$projectId/route.tsx
