@@ -275,7 +275,8 @@ export class ProjectsService {
     // then throws (DB error, constraint failure), leaving clients desynced
     // from a project that's still actually there.
     await this.prisma.project.delete({ where: { id } });
-    this.realtimeService.emitToProject(id, "project:deleted", { id });
+    // userId: exclude the deleter, see emitToProject's own comment.
+    this.realtimeService.emitToProject(id, "project:deleted", { id }, userId);
   }
 
   async update(id: string, dto: UpdateProjectDto, userId: string) {

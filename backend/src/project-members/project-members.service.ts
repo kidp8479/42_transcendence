@@ -293,10 +293,14 @@ export class ProjectMembersService {
           `You were removed from "${project.name}"`
         );
       }
-      this.realtimeService.emitToProject(projectId, "project:member-removed", {
-        userId,
+      // requestingUserId excluded (see emitToProject). On a kick, the
+      // removed user still gets this - it's their only way to find out.
+      this.realtimeService.emitToProject(
         projectId,
-      });
+        "project:member-removed",
+        { userId, projectId },
+        requestingUserId
+      );
       this.realtimeService.leaveProjectRoom(userId, projectId);
       for (const released of this.realtimeService.releaseFieldLocksForUserInProject(
         userId,
