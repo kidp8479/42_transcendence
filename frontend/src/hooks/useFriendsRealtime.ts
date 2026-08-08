@@ -37,8 +37,10 @@ export function useFriendsRealtime(
     function handleRequestReceived(payload: unknown) {
       if (typeof payload !== "string") return;
       const requesterId = payload;
+      let cancelled = false;
       getUserProfile(requesterId)
         .then((profile) => {
+          if (cancelled) return;
           setFriends((previous) =>
             previous.some((friend) => friend.id === requesterId)
               ? previous
@@ -47,7 +49,11 @@ export function useFriendsRealtime(
         })
         .catch(() => {
           // best-effort - a manual refresh will pick it up
+          if (cancelled) return;
         });
+      return () => {
+        cancelled = true;
+      };
     }
 
     function handleRequestAccepted(payload: unknown) {
@@ -98,8 +104,10 @@ export function useFriendsRealtime(
   // incoming request, since the id may not be known here yet either.
   useEffect(() => {
     return onFriendRequestSent((userId) => {
+      let cancelled = false;
       getUserProfile(userId)
         .then((profile) => {
+          if (cancelled) return;
           setFriends((previous) =>
             previous.some((friend) => friend.id === userId)
               ? previous.map((friend) =>
@@ -117,7 +125,11 @@ export function useFriendsRealtime(
         })
         .catch(() => {
           // best-effort - a manual refresh will pick it up
+          if (cancelled) return;
         });
+      return () => {
+        cancelled = true;
+      };
     });
   }, [setFriends, setFocusedProfile]);
 
