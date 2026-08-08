@@ -33,11 +33,18 @@ export function useFriendsRealtime(
   useEffect(() => {
     if (!currentUserId) return;
     const socket = getRealtimeSocket();
+    // Tied to this effect's own teardown (unmount, or currentUserId
+    // changing - socket.off below), not to each individual event firing:
+    // socket.on never calls a handler's return value, so a `cancelled` flag
+    // declared and returned from inside handleRequestReceived itself would
+    // never actually be set - a fetch it kicks off has no listener left to
+    // apply its result to once this effect re-runs, regardless of which
+    // particular event started it.
+    let cancelled = false;
 
     function handleRequestReceived(payload: unknown) {
       if (typeof payload !== "string") return;
       const requesterId = payload;
-      let cancelled = false;
       getUserProfile(requesterId)
         .then((profile) => {
           if (cancelled) return;
@@ -49,11 +56,7 @@ export function useFriendsRealtime(
         })
         .catch(() => {
           // best-effort - a manual refresh will pick it up
-          if (cancelled) return;
         });
-      return () => {
-        cancelled = true;
-      };
     }
 
     function handleRequestAccepted(payload: unknown) {
@@ -92,6 +95,7 @@ export function useFriendsRealtime(
     socket.on("friends:relationship-removed", handleRelationshipRemoved);
 
     return () => {
+      cancelled = true;
       socket.off("friends:request-received", handleRequestReceived);
       socket.off("friends:request-accepted", handleRequestAccepted);
       socket.off("friends:relationship-removed", handleRelationshipRemoved);
@@ -103,8 +107,13 @@ export function useFriendsRealtime(
   // fetch-then-merge, the same shape handleRequestReceived above uses for an
   // incoming request, since the id may not be known here yet either.
   useEffect(() => {
-    return onFriendRequestSent((userId) => {
-      let cancelled = false;
+    // Same fix as the socket-event effect above: onFriendRequestSent's
+    // listener return value is discarded by its own for...of dispatch loop
+    // (see friendsApi.ts's sendFriendRequest), so a `cancelled` flag
+    // declared inside the listener callback would never actually be set.
+    // Tied to this effect's own teardown instead.
+    let cancelled = false;
+    const unsubscribe = onFriendRequestSent((userId) => {
       getUserProfile(userId)
         .then((profile) => {
           if (cancelled) return;
@@ -125,12 +134,12 @@ export function useFriendsRealtime(
         })
         .catch(() => {
           // best-effort - a manual refresh will pick it up
-          if (cancelled) return;
         });
-      return () => {
-        cancelled = true;
-      };
     });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [setFriends, setFocusedProfile]);
 
   // Only ACCEPTED friends ever show a presence indicator (see FriendRow /
