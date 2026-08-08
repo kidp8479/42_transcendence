@@ -144,6 +144,7 @@ rere-%:
 
 ## inject demo data into an isolated deployment
 seed-%: validate-deployment-%
+	@grep -q "^SEED_PASSWORD=." "$(call deployment_env_file,$*)" || (echo "SEED_PASSWORD must be set for $* seeding" >&2; exit 1)
 	$(call deployment_compose,$*) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
 
 validate-deployment-%:
@@ -151,8 +152,7 @@ validate-deployment-%:
 	@test -f "$(call deployment_env_file,$*)" || (echo "Missing $(call deployment_name,$*) runtime env: $(call deployment_env_file,$*)" >&2; exit 1)
 	@test -f "$(call deployment_compose_file,$*)" || (echo "Missing $(call deployment_name,$*) Compose override: $(call deployment_compose_file,$*)" >&2; exit 1)
 	@env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
-		set -a; . "$$env_file"; set +a; \
-		test -n "$$SEED_PASSWORD" || (echo "SEED_PASSWORD must be set for $* deployment" >&2; exit 1)
+		set -a; . "$$env_file"; set +a
 	@if [ "$*" = "dev" ] || [ "$*" = "school" ]; then \
 		env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
 		set -a; . "$$env_file"; set +a; \
