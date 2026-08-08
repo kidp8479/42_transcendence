@@ -4,56 +4,24 @@
 
 **42 Project Planner** is a Trello-like collaborative project management web app for 42 students to plan and track a school project as a team.
 
-Each project gets its own workspace with a Discovery page (lay out the subject before writing code), a Kanban board (split work into tasks, drag them across statuses), a Calendar (deadlines, meetings, everyone's availability), an Evaluation Checklist (track defense readiness against the subject's requirements), and a Summary dashboard pulling live data from all of the above. Multiple team members work in the same project at the same time - task moves, checklist updates, and calendar changes sync live to everyone connected, and notifications keep people informed of changes made while they were away.
+Each project gets its own workspace with a Discovery page (lay out the subject before writing code), a Kanban board (split work into tasks, drag them across statuses), a Calendar (deadlines, meetings, everyone's availability), an Evaluation Checklist (track defense readiness against the subject's requirements), a group chat, and a Summary dashboard pulling live data from all of the above. Multiple team members work in the same project at the same time - task moves, checklist updates, calendar changes, and chat messages sync live to everyone connected, and notifications keep people informed of changes made while they were away.
 
-Beyond the core project workspace, the app also has user accounts with profiles and avatars, project-level roles and membership, and project-bound API tokens for external integrations.
+Beyond the core project workspace, the app also has user accounts with profiles and avatars, a friends system with online status, project-level roles and membership, workspace-wide search across projects/tasks/members, and project-bound API tokens for external integrations.
 
 ## Instructions
 
 ### Prerequisites
 
-- **Docker Engine** with the **Compose v2 plugin** (Podman + `podman-compose` also works, auto-detected).
-- **GNU Make**.
-- **OpenSSL** - used on the host to generate local secrets (`.env` values); preinstalled on Linux/macOS, available through WSL2 on Windows.
-- **Git**.
-
-No other host tooling is required. Node, npm, and every language runtime run inside the containers, not on the host.
-
-### Quick start
-
-```sh
-git clone <repo-url>
-cd transcendence
-make rere seed
-```
-
-`make rere seed` is the single command that provisions the whole stack: it generates a fresh, random `.env` from `.env.example` (database password, JWT signing keys, Vault tokens, seed password), builds and starts every service (frontend, backend, auth, PostgreSQL, HashiCorp Vault, RustFS, nginx), applies Prisma migrations, and seeds demo projects/tasks/users. It also destroys any existing local database/storage volumes first, so only run it when you want a clean environment (subsequent restarts just need `make up`, no rebuild or reset).
-
-Once it finishes, trust the local TLS certificate so the browser stops warning about it:
-
-```sh
-make export-local-ca
-```
-
-This drops the certificate authority at `.local/task-rabbit-local-ca.crt`. Import it into your OS/browser's trusted root certificate store, then open **https://localhost:8443**.
-
-Sign in with a seeded demo account (`<username>@42.fr`, password is the current `SEED_PASSWORD` value inside your local `.env` - it's regenerated on every `rere`, there is no fixed shared password) or create your own account.
+<!-- software, tools, versions needed on the host before anything else !! not the stack used, there is a dedicated section below -->
 
 ### Configuration
 
-Every environment variable the app needs is documented in `.env.example`. `make recreate-env` (called by `rere`) copies it to `.env` and replaces every secret-bearing value with a fresh random one; `.env` itself is git-ignored and never committed. OAuth login (42, Google) is optional - leave `OAUTH_42_CLIENT_ID`/`OAUTH_GOOGLE_CLIENT_ID` blank to keep those buttons hidden, or fill in real provider credentials to enable them.
+<!-- .env setup: which variables exist, where they come from, what's secret vs safe to commit -->
 
-### Everyday commands
+### Running the project
 
-| Command | What it does |
-| --- | --- |
-| `make up` / `make down` | Start or stop the stack without rebuilding. |
-| `make up-build` | Rebuild images and start (after pulling dependency changes). |
-| `make logs` | Follow every service's logs. |
-| `make ps` | Show container status. |
-| `make help` | List every available target. |
+<!-- step-by-step, from a fresh clone to a working local instance -->
 
-For running an isolated VM or production deployment instead of local development, see [`docs/operations/manual-production-deployment.md`](docs/operations/manual-production-deployment.md).
 
 ## Team Information
 
@@ -119,6 +87,7 @@ A dedicated **Go service**, separate from the NestJS backend. Authentication is 
 
 - **Docker + Docker Compose** - covers the mandatory containerized, single-command deployment requirement. One `docker compose up` starts every service (frontend, backend, auth, database, Vault, storage, nginx).
 - **Nginx** - the single entrypoint (port 8080 locally, [deployed version is](https://tomato.iops.dev/)) in front of every service. The browser only ever talks to nginx, which forwards each request to the right service internally.
+- **ModSecurity/WAF** - nginx runs on the OWASP CoreRuleSet ModSecurity image, blocking common attack patterns (SQLi, XSS, etc.) before a request reaches any service, in blocking mode in production.
 
 ## Database Schema
 
@@ -145,6 +114,10 @@ erDiagram
     PROJECT ||--o{ EVALUATION_CHECKLIST_ITEM : has
     PROJECT ||--o{ PROJECT_API_TOKEN : has
     USER ||--o{ NOTIFICATION : receives
+    PROJECT ||--o{ CHAT_MESSAGE : has
+    USER ||--o{ CHAT_MESSAGE : sends
+    PROJECT ||--o{ CHAT_READ_STATE : has
+    USER ||--o{ CHAT_READ_STATE : tracks
 ```
 
 - **User** - `id`, `email` (unique), `username` (unique), `avatarUrl`, `campus`, `status`. One user can belong to many projects.
@@ -156,6 +129,8 @@ erDiagram
 - **EvaluationChecklistItem** - defense-readiness checklist items, grouped by `section` (`MANDATORY` / `BONUS` / `SUPPLEMENTAL`).
 - **ProjectApiToken** - project-bound public API credentials. Only a `selector` + HMAC of the secret are stored, never the raw token.
 - **Notification** - one row per notification, `userId` + `message` + `isRead`.
+- **ChatMessage** - one project-wide chat channel per project, not per-user DMs. Each message keys off `projectId`, with an optional `userId` (kept if the author is later removed from the project).
+- **ChatReadState** - one row per `(userId, projectId)`, tracking each member's read watermark for that project's chat so unread counts can be computed.
 
 ### Auth subsystem
 
@@ -193,9 +168,10 @@ Nine additional tables back the Go auth service: `AuthIdentity` + `PasswordCrede
 ### Projects
 
 - **Project list + creation** - in-place card that morphs into a create form. *Carlos*
-- **Project membership & roles** - `OWNER` / `ADMIN` / `MEMBER`, shared membership-check used across every feature. *Andrei, Diana*
+- **Project membership & roles** - `OWNER` / `ADMIN` / `MEMBER`, shared membership-check used across every feature. *Andrei, Diana, Christophe*
 - **Project settings** - rename, archive, delete a project; add/remove members; change roles. *Diana*
 - **Project-bound public API tokens** - create/reveal/revoke API keys scoped to one project, with READ / READ_WRITE permission and rate limiting. *Andrei*
+- **Search** - workspace-wide search across projects, tasks, and members, with filters, sorting, and pagination. *Carlos*
 
 ### Core project workspace
 
@@ -211,6 +187,8 @@ Nine additional tables back the Go auth service: `AuthIdentity` + `PasswordCrede
 - **One-time WebSocket ticket admission** - short-lived, single-use tickets for WebSocket auth. *Andrei*
 - **Field locks** - shows who's currently editing a field, so two people can't silently overwrite each other. *Andrei*
 - **Notification system** - in-app notifications on assignment, removal, and completion events across tasks, calendar events, checklist, and project membership. *Pauline*
+- **Group chat** - one messaging channel per project, between its members. *Christophe*
+- **Friends system** - add/remove friends, friends list, online status. *Christophe*
 
 ### Infrastructure
 
@@ -218,65 +196,61 @@ Nine additional tables back the Go auth service: `AuthIdentity` + `PasswordCrede
 - **Docker Compose stack** - single-command local deployment of every service. *Andrei*
 - **HashiCorp Vault** - dynamic, short-lived PostgreSQL credentials instead of a static shared password; Vault-backed migration authoring. *Andrei*
 - **RustFS storage** - S3-compatible object storage for avatars and file uploads. *Christophe*
-
-### In progress
-
-- **Group chat & friends** - basic messaging and a friends list between project members. *Christophe*
-- **Search bar** - workspace-wide search across projects, tasks, and members. *Carlos*
+- **WAF/ModSecurity** - OWASP CoreRuleSet ModSecurity fronting nginx, blocking mode in production. *Andrei*
+- **Health check and status page** - a `/status` page plus health endpoints on nginx, the backend, and the auth service, reporting live service state. *Andrei*
+- **Backend as microservices** - the Go auth service, RustFS, HashiCorp Vault, and PostgreSQL as separate single-responsibility services fronted by the NestJS backend and nginx. *Andrei*
 
 ## Modules
 
 The subject requires 14 points minimum. Bonus points (up to 5, only counted once the 14 mandatory points are validated) come from modules implemented beyond that minimum.
 
-### Mandatory (14 points required, 20 implemented)
+### Mandatory (14 points required, up to 5 more count as bonus once the 14 are validated, 28 implemented in total)
 
 | Module | Type | Pts | Implemented by |
 |---|---|---|---|
 | Use a framework for both the frontend and backend | Web, Major | 2 | whole team |
 | Implement real-time features using WebSockets | Web, Major | 2 | Pauline, Andrei |
+| Allow users to interact with other users (chat, profile, friends) | Web, Major | 2 | Christophe |
 | A public API with a secured API key, rate limiting, and documentation | Web, Major | 2 | Andrei |
-| An organization system | User Management, Major | 2 | Andrei, Diana, Christophe |
-| Advanced permissions system | User Management, Major | 2 | Andrei, Diana, Christophe |
-| Complete accessibility compliance (WCAG 2.1 AA) | Accessibility, Major | 2 | whole team |
-| WAF/ModSecurity + HashiCorp Vault | Cybersecurity, Major | 2 | Andrei |
 | Use an ORM for the database | Web, Minor | 1 | whole team |
-| Real-time collaborative features | Web, Minor | 1 | Pauline, Christophe, Diana |
 | A complete notification system | Web, Minor | 1 | Pauline |
-| User activity analytics and insights dashboard | User Management, Minor | 1 | Pauline |
-| Support for additional browsers | Accessibility, Minor | 1 | whole team |
+| Real-time collaborative features | Web, Minor | 1 | Pauline, Christophe, Diana |
 | Advanced search functionality | Web, Minor | 1 | Carlos |
+| Complete accessibility compliance (WCAG 2.1 AA) | Accessibility, Major | 2 | whole team |
+| Support for additional browsers | Accessibility, Minor | 1 | whole team |
+| Standard user management and authentication | User Management, Major | 2 | Christophe |
+| Implement remote authentication with OAuth 2.0 | User Management, Minor | 1 | Andrei |
+| Advanced permissions system | User Management, Major | 2 | Andrei, Diana, Christophe |
+| An organization system | User Management, Major | 2 | Andrei, Diana, Christophe |
+| User activity analytics and insights dashboard | User Management, Minor | 1 | Pauline |
+| WAF/ModSecurity + HashiCorp Vault | Cybersecurity, Major | 2 | Andrei |
+| Backend as microservices | Devops, Major | 2 | Andrei |
+| Health check and status page | Devops, Minor | 1 | Andrei |
 
 - **Framework (Major)**: React (frontend) and NestJS (backend), both from the app's initial scaffolding.
 - **WebSockets (Major)**: a Socket.io gateway with per-user rooms, powering live updates on Discovery, the Evaluation Checklist, project membership, and Calendar, plus notifications and field locks.
+- **Allow users to interact with other users (Major)**: chat, profile, and friends between project members.
 - **Public API (Major)**: project-bound API tokens (`READ` / `READ_WRITE`), rate-limited writes, Swagger-documented endpoints under `/api/public/v1`.
-- **Organization system (Major)**: a `Project` is this app's organizational unit - create/edit/delete a project, add/remove members, manage roles.
-- **Advanced permissions (Major)**: `OWNER` / `ADMIN` / `MEMBER` roles per project, with different views and actions available depending on role (e.g. only `OWNER`/`ADMIN` can remove members or delete the project).
-- **Accessibility compliance (Major)**: a page-by-page pass across the app has fixed contrast, focus rings, semantic HTML, and ARIA labeling on our pages.
-- **WAF/ModSecurity + HashiCorp Vault (Major)**: OWASP CoreRuleSet ModSecurity image fronting nginx, with a custom rule file for this app, blocking mode in production. HashiCorp Vault issues short-lived, dynamically-generated PostgreSQL credentials to both the Go auth service and the NestJS backend.
 - **ORM (Minor)**: Prisma, used for every table in the schema.
-- **Real-time collaborative features (Minor)**: live sync across Discovery, Kanban, the Evaluation Checklist, and project membership - a change made by one member appears for everyone else connected, without a page refresh.
 - **Notification system (Minor)**: in-app notifications on assignment, removal, and completion events across tasks, calendar events, checklist progress, and project membership.
-- **User activity analytics (Minor)**: the Summary dashboard, pulling live data from every other tab (task status, progress by category, team workload, upcoming events, defense readiness).
-- **Support for additional browsers (Minor)**: confirmed working on Chrome, Brave, Firefox, and Zen Browser.
+- **Real-time collaborative features (Minor)**: live sync across Discovery, Kanban, the Evaluation Checklist, and project membership - a change made by one member appears for everyone else connected, without a page refresh.
 - **Advanced search (Minor)**: scoped cross-project search with filters, sorting, and pagination, available from the header on every page.
-
-### Toward the bonus (in progress, temporary section)
-
-| Module | Type | Pts | Working on it |
-|---|---|---|---|
-| Allow users to interact with other users (chat, profile, friends) | Web, Major | 2 | Christophe |
-| Standard user management and authentication | User Management, Major | 2 | Christophe |
-| Implement remote authentication with OAuth 2.0 | User Management, Minor | 1 | Andrei |
-
-- **Allow users to interact with other users + Allow users to interact with other users (chat, profile, friends)**: group chat is done and merged; the friends/user-profile half of this module is still in progress, needed to validate the module as a whole.
-
-5 more points in progress - comfortable margin against the 5-point bonus cap, in case any single one isn't validated during evaluation.
+- **Accessibility compliance (Major)**: core ARIA attributes (`aria-label`, `aria-live`, `role`, etc. - the standard HTML attributes that tell screen readers what an element is and how to announce it) on interactive components, plus semantic HTML for page structure. Color contrast, text size, labeling, and semantic markup are checked continuously - during development and again in every pull request review, not as a one-off pass.
+- **Support for additional browsers (Minor)**: confirmed working on Chrome, Brave, Firefox, and Zen Browser.
+- **Standard user management and authentication (Major)**: profile info, avatar upload with a default fallback, friends with online status.
+- **OAuth 2.0 (Minor)**: remote login through 42 / Google, hidden until provider credentials are configured.
+- **Advanced permissions (Major)**: `OWNER` / `ADMIN` / `MEMBER` roles per project, with different views and actions available depending on role (e.g. only `OWNER`/`ADMIN` can remove members or delete the project).
+- **Organization system (Major)**: a `Project` is this app's organizational unit - create/edit/delete a project, add/remove members, manage roles.
+- **User activity analytics (Minor)**: the Summary dashboard, pulling live data from every other tab (task status, progress by category, team workload, upcoming events, defense readiness).
+- **WAF/ModSecurity + HashiCorp Vault (Major)**: OWASP CoreRuleSet ModSecurity image fronting nginx, with a custom rule file for this app, blocking mode in production. HashiCorp Vault issues short-lived, dynamically-generated PostgreSQL credentials to both the Go auth service and the NestJS backend.
+- **Health check and status page (Minor)**: a `/status` page plus health endpoints on nginx, the backend, and the auth service, reporting live service state.
+- **Backend as microservices (Major)**: separate services with their own responsibility, talking to each other over the network instead of sharing code - the Go auth service (authentication only), RustFS (file storage), HashiCorp Vault (secrets), and PostgreSQL (data), fronted by the NestJS backend and nginx.
 
 ## Individual Contributions
 
-**Andrei** - Auth foundation (Argon2id, sessions), the JWT + refresh-token-family cutover, one-time WebSocket ticket admission, Vault-backed dynamic database credentials, realtime field locks, and project-bound public API tokens.
+**Andrei** - Auth foundation (Argon2id, sessions), the JWT + refresh-token-family cutover, one-time WebSocket ticket admission, Vault-backed dynamic database credentials, realtime field locks, project-bound public API tokens, the Docker Compose stack, the WAF/ModSecurity hardening, the health check and status page, and splitting the backend into single-responsibility services.
 
-**Carlos** - Footer and legal pages, the project list and creation flow, the Kanban board's initial build, and (in progress) the workspace search bar.
+**Carlos** - Footer and legal pages, the project list and creation flow, the Kanban board's initial build, and the workspace search bar.
 
 **Christophe** - Initial frontend (TanStack Router) and backend (NestJS + Prisma) scaffolding, then the sidebar, RustFS-backed storage, avatar upload and user settings, the Evaluation Checklist, the friend system and the group chat.
 
