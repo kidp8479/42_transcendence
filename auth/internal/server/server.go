@@ -30,6 +30,7 @@ const (
 	registerRequestsPerIP     = 20
 	loginRequestsPerIP        = 10
 	loginRequestsPerAccount   = 5
+	oauthRequestsPerIP        = 20
 	ticketRequestsPerAccount  = 30
 	passwordConcurrency       = 2
 	projectAPITokenDefaultTTL = 90 * 24 * time.Hour
@@ -57,6 +58,7 @@ type Server struct {
 	registerIPLimiter    *middleware.FixedWindowLimiter
 	loginIPLimiter       *middleware.FixedWindowLimiter
 	loginAccountLimiter  *middleware.FixedWindowLimiter
+	oauthIPLimiter       *middleware.FixedWindowLimiter
 	ticketAccountLimiter *middleware.FixedWindowLimiter
 	passwordSlots        chan struct{}
 	decoyPasswordHash    string
@@ -276,6 +278,7 @@ func NewWithOAuthReadiness(
 		registerIPLimiter:    middleware.NewFixedWindowLimiter(registerRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		loginIPLimiter:       middleware.NewFixedWindowLimiter(loginRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		loginAccountLimiter:  middleware.NewFixedWindowLimiter(loginRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
+		oauthIPLimiter:       middleware.NewFixedWindowLimiter(oauthRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		ticketAccountLimiter: middleware.NewFixedWindowLimiter(ticketRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
 		passwordSlots:        make(chan struct{}, passwordConcurrency),
 		decoyPasswordHash:    decoyPasswordHash,

@@ -282,7 +282,7 @@ paths:
           name: provider
           required: true
           schema:
-            enum: [FORTY_TWO, GOOGLE]
+            enum: [FORTY_TWO]
       responses:
         "200":
           description: Returns the provider authorization URL for explicit linking.

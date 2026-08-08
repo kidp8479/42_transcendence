@@ -201,6 +201,7 @@ func newLoginTestServer(authStore authStore, tokens tokenService) *Server {
 		store: authStore, tokens: tokens, passwords: password.NewHasher(),
 		loginIPLimiter:      middleware.NewFixedWindowLimiter(loginRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		loginAccountLimiter: middleware.NewFixedWindowLimiter(loginRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
+		oauthIPLimiter:      middleware.NewFixedWindowLimiter(oauthRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		passwordSlots:       make(chan struct{}, passwordConcurrency),
 	}
 }
@@ -282,6 +283,7 @@ func TestFortyTwoLinkReturnsToUserSettings(t *testing.T) {
 	server.oauth42 = OAuth42Config{ClientID: "id", ClientSecret: "secret", HTTPClient: &queuedOAuthClient{}}
 	request := httptest.NewRequest(http.MethodPost, "/auth/account/link/FORTY_TWO", nil)
 	request.SetPathValue("provider", "FORTY_TWO")
+	request.Header.Set("Origin", server.cfg.AppOrigin)
 	request.Header.Set("Authorization", "Bearer access")
 	response := httptest.NewRecorder()
 
@@ -290,6 +292,30 @@ func TestFortyTwoLinkReturnsToUserSettings(t *testing.T) {
 	if response.Code != http.StatusOK || authStore.oauthCreated.ReturnTo != "/user-settings" ||
 		authStore.oauthCreated.InitiatingUserID == nil || *authStore.oauthCreated.InitiatingUserID != family.User.ID {
 		t.Fatalf("status=%d transaction=%#v", response.Code, authStore.oauthCreated)
+	}
+}
+
+func TestSafeOAuthReturnPath(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"allowed route", "/projects/abc", "/projects/abc"},
+		{"query and fragment stripped", "/user-settings?tab=security#password", "/user-settings"},
+		{"normalizes traversal before prefix check", "/projects/../user-settings", "/user-settings"},
+		{"absolute URL", "https://evil.example/dashboard", "/dashboard"},
+		{"protocol relative URL", "//evil.example/dashboard", "/dashboard"},
+		{"backslash", `/projects\evil`, "/dashboard"},
+		{"control character", "/projects/\n", "/dashboard"},
+		{"prefix boundary attack", "/dashboard-evil", "/dashboard"},
+		{"outside allowed route", "/admin", "/dashboard"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := safeOAuthReturnPath(test.input); got != test.want {
+				t.Fatalf("safeOAuthReturnPath(%q) = %q, want %q", test.input, got, test.want)
+			}
+		})
 	}
 }
 

@@ -35,6 +35,9 @@ type FortyTwoProfile struct {
 }
 
 func (s *Store) CreateOAuthTransaction(ctx context.Context, transaction OAuthTransaction) error {
+	if _, err := s.currentPool().Exec(ctx, `DELETE FROM "OAuthTransaction" WHERE "expiresAt" <= CURRENT_TIMESTAMP`); err != nil {
+		return fmt.Errorf("clean expired OAuth transactions: %w", err)
+	}
 	_, err := s.currentPool().Exec(ctx,
 		`INSERT INTO "OAuthTransaction"
 		 ("id", "provider", "stateHash", "redirectUri", "returnTo", "purpose", "initiatingUserId", "createdAt", "expiresAt")
@@ -100,6 +103,13 @@ func (s *Store) ResolveFortyTwoLogin(ctx context.Context, profile FortyTwoProfil
 	if !found {
 		user, err = createFortyTwoUser(ctx, tx, profile)
 		if err != nil {
+			if errors.Is(err, ErrConflict) {
+				_ = tx.Rollback(ctx)
+				resolved, resolvedFound, lookupErr := findIdentityUserPool(ctx, s, "FORTY_TWO", profile.Subject)
+				if lookupErr == nil && resolvedFound {
+					return resolved, nil
+				}
+			}
 			return User{}, err
 		}
 	}
@@ -214,9 +224,10 @@ func createFortyTwoUser(ctx context.Context, tx pgx.Tx, profile FortyTwoProfile)
 		if errors.Is(err, pgx.ErrNoRows) {
 			continue
 		}
-		if !isUniqueViolation(err) {
-			return User{}, mapWriteError("create 42 user", err)
+		if isUniqueViolation(err) {
+			return User{}, ErrConflict
 		}
+		return User{}, mapWriteError("create 42 user", err)
 	}
 	return User{}, ErrConflict
 }

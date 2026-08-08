@@ -214,7 +214,7 @@ function UserSettingsPage() {
     //   changes.campus = displayedCampus;
     // }
 
-    if (!changes.username) return;
+    if (changes.username === undefined) return;
 
     setSavingChanges(true);
     try {

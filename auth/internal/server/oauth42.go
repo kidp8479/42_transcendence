@@ -44,6 +44,10 @@ type fortyTwoProfileResponse struct {
 }
 
 func (s *Server) handleFortyTwoStart(w http.ResponseWriter, r *http.Request) {
+	if !s.oauthIPLimiter.Allow(clientIP(r), time.Now()) {
+		writeRateLimited(w)
+		return
+	}
 	returnTo := safeOAuthReturnPath(r.URL.Query().Get("returnTo"))
 	url, err := s.createFortyTwoTransaction(r.Context(), returnTo, "LOGIN", nil)
 	if err != nil {
@@ -58,6 +62,10 @@ func (s *Server) handleFortyTwoAvailability(w http.ResponseWriter, _ *http.Reque
 }
 
 func (s *Server) handleAccountLink(w http.ResponseWriter, r *http.Request) {
+	if !s.validOrigin(r.Header.Get("Origin")) {
+		writeError(w, http.StatusForbidden, "Forbidden", "request origin is not allowed")
+		return
+	}
 	if r.PathValue("provider") != "FORTY_TWO" {
 		writeError(w, http.StatusNotFound, "Not Found", "provider not found")
 		return
@@ -142,8 +150,16 @@ func (s *Server) handleFortyTwoCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if transaction.Purpose == "LINK" {
-		if transaction.InitiatingUserID == nil || s.store.LinkFortyTwoIdentity(r.Context(), *transaction.InitiatingUserID, profile) != nil {
+		if transaction.InitiatingUserID == nil {
 			writeError(w, http.StatusConflict, "Conflict", "account link could not be completed")
+			return
+		}
+		if err := s.store.LinkFortyTwoIdentity(r.Context(), *transaction.InitiatingUserID, profile); errors.Is(err, store.ErrConflict) || errors.Is(err, store.ErrNotFound) {
+			s.recordEvent(r, transaction.InitiatingUserID, "IDENTITY_LINK_CONFLICT", "FORTY_TWO", nil)
+			writeError(w, http.StatusConflict, "Conflict", "account link could not be completed")
+			return
+		} else if err != nil {
+			logOAuthFailure(w, err)
 			return
 		}
 		s.recordEvent(r, transaction.InitiatingUserID, "IDENTITY_LINK_SUCCEEDED", "FORTY_TWO", nil)
@@ -152,10 +168,15 @@ func (s *Server) handleFortyTwoCallback(w http.ResponseWriter, r *http.Request) 
 	}
 	user, err := s.store.ResolveFortyTwoLogin(r.Context(), profile)
 	if errors.Is(err, store.ErrConflict) {
+		s.recordEvent(r, nil, "IDENTITY_LOGIN_CONFLICT", "FORTY_TWO", nil)
 		writeError(w, http.StatusConflict, "Conflict", "OAuth login could not be completed")
 		return
 	}
-	if err != nil || user.Status != store.AccountStatusActive {
+	if err != nil {
+		logOAuthFailure(w, err)
+		return
+	}
+	if user.Status != store.AccountStatusActive {
 		writeError(w, http.StatusUnauthorized, "Unauthorized", "OAuth login could not be completed")
 		return
 	}

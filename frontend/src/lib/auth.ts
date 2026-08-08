@@ -80,16 +80,20 @@ export async function register(
 }
 
 export async function isFortyTwoOAuthAvailable(): Promise<boolean> {
-  const response = await fetch("/auth/oauth/42/availability", {
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) {
+  try {
+    const response = await fetch("/auth/oauth/42/availability", {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const payload: unknown = await response.json();
+    return isRecord(payload) && typeof payload.available === "boolean"
+      ? payload.available
+      : false;
+  } catch {
     return false;
   }
-  const payload: unknown = await response.json();
-  return isRecord(payload) && typeof payload.available === "boolean"
-    ? payload.available
-    : false;
 }
 
 export async function logout(csrfToken?: string): Promise<void> {
