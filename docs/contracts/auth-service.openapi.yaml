@@ -130,6 +130,23 @@ paths:
       responses:
         "302":
           description: Redirect to the 42 OAuth authorization endpoint.
+  /oauth/42/availability:
+    get:
+      x-implementation-status: implemented
+      operationId: get42OAuthAvailability
+      description: Reports whether 42 OAuth is fully configured. It does not disclose provider credentials.
+      security: []
+      responses:
+        "200":
+          description: 42 OAuth configuration availability.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available]
+                properties:
+                  available:
+                    type: boolean
   /oauth/42/callback:
     get:
       x-implementation-status: implemented

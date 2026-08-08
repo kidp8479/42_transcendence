@@ -53,6 +53,8 @@ const SAFE_USER_SELECT = {
 const SAFE_PUBLIC_USER_SELECT = {
   id: true,
   username: true,
+  firstName: true,
+  lastName: true,
   avatarUrl: true,
   campus: true,
 } as const;

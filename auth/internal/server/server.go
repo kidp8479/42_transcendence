@@ -287,6 +287,7 @@ func NewWithOAuthReadiness(
 	mux.HandleFunc("GET /auth/health", server.handleHealth)
 	mux.HandleFunc("POST /auth/register", server.handleRegister)
 	mux.HandleFunc("POST /auth/login", server.handleLogin)
+	mux.HandleFunc("GET /auth/oauth/42/availability", server.handleFortyTwoAvailability)
 	mux.HandleFunc("GET /auth/oauth/42/start", server.handleFortyTwoStart)
 	mux.HandleFunc("GET /auth/oauth/42/callback", server.handleFortyTwoCallback)
 	mux.HandleFunc("POST /auth/account/link/{provider}", server.handleAccountLink)

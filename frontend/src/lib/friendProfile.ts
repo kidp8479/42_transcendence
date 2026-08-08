@@ -26,18 +26,17 @@ export interface FriendProfile {
   online: boolean;
 }
 
-// firstName/lastName aren't tracked by the backend yet (TR-61), so every
-// FriendProfile carries them blank; displayedName falls back to username,
-// the only name available today.
 export function toFriendProfile(
   profile: PublicUserProfile,
   status: FriendshipStatus
 ): FriendProfile {
+  const firstName = profile.firstName ?? "";
+  const lastName = profile.lastName ?? "";
   return {
     id: profile.id,
-    firstName: "",
-    lastName: "",
-    displayedName: profile.username,
+    firstName,
+    lastName,
+    displayedName: `${firstName} ${lastName}`.trim() || profile.username,
     username: profile.username,
     campus: profile.campus,
     avatarUrl: profile.avatarUrl,

@@ -224,6 +224,26 @@ func oauthResponse(status int, body string) *http.Response {
 	return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewBufferString(body)), Header: make(http.Header)}
 }
 
+func TestFortyTwoAvailabilityRequiresCompleteConfiguration(t *testing.T) {
+	server := newLoginTestServer(&testAuthStore{}, testTokenService{})
+	request := httptest.NewRequest(http.MethodGet, "/auth/oauth/42/availability", nil)
+
+	unconfigured := httptest.NewRecorder()
+	server.handleFortyTwoAvailability(unconfigured, request)
+	if unconfigured.Code != http.StatusOK || !strings.Contains(unconfigured.Body.String(), `"available":false`) {
+		t.Fatalf("unconfigured availability = %d %s", unconfigured.Code, unconfigured.Body.String())
+	}
+
+	server.oauth42 = OAuth42Config{
+		ClientID: "id", ClientSecret: "secret", HTTPClient: &queuedOAuthClient{},
+	}
+	configured := httptest.NewRecorder()
+	server.handleFortyTwoAvailability(configured, request)
+	if configured.Code != http.StatusOK || !strings.Contains(configured.Body.String(), `"available":true`) {
+		t.Fatalf("configured availability = %d %s", configured.Code, configured.Body.String())
+	}
+}
+
 func TestFortyTwoStartStoresOnlyStateHashAndSafeReturnPath(t *testing.T) {
 	authStore := &testAuthStore{}
 	client := &queuedOAuthClient{}

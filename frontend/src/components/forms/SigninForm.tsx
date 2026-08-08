@@ -15,10 +15,14 @@
  * It does not handle modal visibility, which belongs to ModalProvider.
  */
 import { Alert, Button, Label, TextInput } from "flowbite-react";
-import { useState, type FocusEvent, type FormEvent } from "react";
+import { useEffect, useState, type FocusEvent, type FormEvent } from "react";
 import { HiOutlineExclamationCircle } from "react-icons/hi2";
 import { useNavigate } from "@tanstack/react-router";
-import { AuthRequestError, login } from "../../lib/auth";
+import {
+  AuthRequestError,
+  isFortyTwoOAuthAvailable,
+  login,
+} from "../../lib/auth";
 import { validateAuthForm } from "../../lib/authForm";
 import { authSessionResource } from "../../lib/authState";
 import { darkAlertTheme, darkTextInputTheme } from "../../lib/flowbite";
@@ -33,6 +37,19 @@ export function SigninForm({ onCreateAccount }: SigninFormProps) {
   const { closeModal } = useModal();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [fortyTwoOAuthAvailable, setFortyTwoOAuthAvailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void isFortyTwoOAuthAvailable().then((available) => {
+      if (!cancelled) {
+        setFortyTwoOAuthAvailable(available);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,23 +130,27 @@ export function SigninForm({ onCreateAccount }: SigninFormProps) {
         {submitting ? "Signing in..." : "Sign in"}
       </Button>
 
-      <div className="flex items-center gap-3 text-xs text-text-secondary">
-        <span className="h-px flex-1 bg-surface-border" />
-        or
-        <span className="h-px flex-1 bg-surface-border" />
-      </div>
+      {fortyTwoOAuthAvailable && (
+        <>
+          <div className="flex items-center gap-3 text-xs text-text-secondary">
+            <span className="h-px flex-1 bg-surface-border" />
+            or
+            <span className="h-px flex-1 bg-surface-border" />
+          </div>
 
-      <a
-        href="/auth/oauth/42/start"
-        className="
-          flex w-full items-center justify-center rounded-lg border border-brand-500
-          px-5 py-2.5 text-sm font-medium text-brand-500
-          hover:bg-brand-500/10 focus:outline-none focus:ring-4 focus:ring-green-300
-          dark:focus:ring-green-800
-        "
-      >
-        Continue with 42
-      </a>
+          <a
+            href="/auth/oauth/42/start"
+            className="
+              flex w-full items-center justify-center rounded-lg border border-brand-500
+              px-5 py-2.5 text-sm font-medium text-brand-500
+              hover:bg-brand-500/10 focus:outline-none focus:ring-4 focus:ring-green-300
+              dark:focus:ring-green-800
+            "
+          >
+            Continue with 42
+          </a>
+        </>
+      )}
 
       <p className="text-center text-sm text-text-secondary">
         New here?{" "}

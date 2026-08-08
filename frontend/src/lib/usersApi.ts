@@ -8,6 +8,8 @@ import { ApiError, apiClient } from "./apiClient";
 export interface PublicUserProfile {
   id: string;
   username: string;
+  firstName: string | null;
+  lastName: string | null;
   avatarUrl: string | null;
   campus: string | null;
   // Computed fresh per request from whether the user currently has a live
@@ -56,6 +58,8 @@ export function parsePublicUserProfile(value: unknown): PublicUserProfile {
     !isRecord(value) ||
     typeof value.id !== "string" ||
     typeof value.username !== "string" ||
+    !isNullableString(value.firstName) ||
+    !isNullableString(value.lastName) ||
     !isNullableString(value.avatarUrl) ||
     !isNullableString(value.campus) ||
     typeof value.online !== "boolean"
@@ -66,6 +70,8 @@ export function parsePublicUserProfile(value: unknown): PublicUserProfile {
   return {
     id: value.id,
     username: value.username,
+    firstName: value.firstName,
+    lastName: value.lastName,
     avatarUrl: value.avatarUrl,
     campus: value.campus,
     online: value.online,

@@ -53,6 +53,10 @@ func (s *Server) handleFortyTwoStart(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, url, http.StatusFound)
 }
 
+func (s *Server) handleFortyTwoAvailability(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]bool{"available": s.fortyTwoOAuthAvailable()})
+}
+
 func (s *Server) handleAccountLink(w http.ResponseWriter, r *http.Request) {
 	if r.PathValue("provider") != "FORTY_TWO" {
 		writeError(w, http.StatusNotFound, "Not Found", "provider not found")
@@ -81,7 +85,7 @@ func (s *Server) handleAccountLink(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createFortyTwoTransaction(ctx context.Context, returnTo, purpose string, userID *string) (string, error) {
-	if s.cfg.OAuthProvidersCallbackOrigin == "" || s.oauth42.ClientID == "" || s.oauth42.ClientSecret == "" || s.oauth42.HTTPClient == nil {
+	if !s.fortyTwoOAuthAvailable() {
 		return "", errors.New("42 OAuth is not configured")
 	}
 	state, err := randomOAuthState()
@@ -108,6 +112,13 @@ func (s *Server) createFortyTwoTransaction(ctx context.Context, returnTo, purpos
 	query.Set("state", state)
 	authorizationURL.RawQuery = query.Encode()
 	return authorizationURL.String(), nil
+}
+
+func (s *Server) fortyTwoOAuthAvailable() bool {
+	return s.cfg.OAuthProvidersCallbackOrigin != "" &&
+		s.oauth42.ClientID != "" &&
+		s.oauth42.ClientSecret != "" &&
+		s.oauth42.HTTPClient != nil
 }
 
 func (s *Server) handleFortyTwoCallback(w http.ResponseWriter, r *http.Request) {
