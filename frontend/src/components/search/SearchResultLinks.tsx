@@ -20,7 +20,7 @@ import {
   deriveFriendshipStatus,
   getUserRelationship,
   sendFriendRequest,
-  type RelationshipStatus,
+  splitRelationshipPair,
 } from "@/lib/friendsApi";
 import { useToast } from "@/hooks/useToast";
 import { PROJECT_STATUS_STYLES } from "@/lib/projectStatusStyles";
@@ -179,15 +179,10 @@ export function UserResultLink({ user }: { user: SearchUserResult }) {
     getUserRelationship(user.id)
       .then((relationships) => {
         if (cancelled) return;
-        let mine: RelationshipStatus | undefined;
-        let theirs: RelationshipStatus | undefined;
-        for (const relationship of relationships) {
-          if (relationship.requesterId === currentUserId) {
-            mine = relationship.status;
-          } else {
-            theirs = relationship.status;
-          }
-        }
+        const { mine, theirs } = splitRelationshipPair(
+          relationships,
+          currentUserId
+        );
         const derived = deriveFriendshipStatus(mine, theirs);
         setStatus(
           derived === "NONE" || derived === "ACCEPTED" || derived === "BLOCKED"

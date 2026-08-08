@@ -29,8 +29,8 @@ import {
   groupRelationshipsByOtherUser,
   removeFriendRelationship,
   sendFriendRequest,
+  splitRelationshipPair,
   updateFriendRelationship,
-  type RelationshipStatus,
 } from "@/lib/friendsApi";
 import { getUserProfile } from "@/lib/usersApi";
 
@@ -104,15 +104,7 @@ async function loadFocusedProfile(
     getUserRelationship(targetId),
   ]);
 
-  let mine: RelationshipStatus | undefined;
-  let theirs: RelationshipStatus | undefined;
-  for (const relationship of relationships) {
-    if (relationship.requesterId === currentUserId) {
-      mine = relationship.status;
-    } else {
-      theirs = relationship.status;
-    }
-  }
+  const { mine, theirs } = splitRelationshipPair(relationships, currentUserId);
 
   return toFriendProfile(profile, deriveFriendshipStatus(mine, theirs));
 }
@@ -362,15 +354,10 @@ function FriendsPage() {
       // both directional rows, the same way loadFocusedProfile does, is what
       // tells "we're friends again" apart from "nothing left to unblock".
       const relationships = await getUserRelationship(selected.id);
-      let mine: RelationshipStatus | undefined;
-      let theirs: RelationshipStatus | undefined;
-      for (const relationship of relationships) {
-        if (relationship.requesterId === currentUserId) {
-          mine = relationship.status;
-        } else {
-          theirs = relationship.status;
-        }
-      }
+      const { mine, theirs } = splitRelationshipPair(
+        relationships,
+        currentUserId
+      );
       const derived = deriveFriendshipStatus(mine, theirs);
       if (derived === "NONE") {
         removeFromList(selected.id);
