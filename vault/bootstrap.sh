@@ -138,19 +138,31 @@ if ! vault kv get -format=json kv/auth/project-api-token-pepper >/dev/null 2>&1;
 	quiet vault kv put kv/auth/project-api-token-pepper pepper="$AUTH_PROJECT_API_TOKEN_PEPPER"
 fi
 if ! vault kv get -format=json kv/seed/demo-users >/dev/null 2>&1; then
-	quiet vault kv put kv/seed/demo-users password="$SEED_PASSWORD"
+	seed_secret_json=$(mktemp)
+	jq -n --arg password "$SEED_PASSWORD" '{ password: $password }' >"$seed_secret_json"
+	quiet vault kv put kv/seed/demo-users "@${seed_secret_json}"
+	rm -f "$seed_secret_json"
 fi
 
 step "configuring PostgreSQL database secrets engine"
 # vault_db_admin (created by db/init/01-vault-roles.sql) is a dedicated
 # CREATEROLE management user: not the bootstrap superuser, so `make shell-db`
 # and a future root-credential rotation cannot collide with it.
-quiet vault write database/config/postgresql \
-	plugin_name=postgresql-database-plugin \
-	allowed_roles="auth-runtime,backend-runtime,migration" \
-	connection_url="postgresql://{{username}}:{{password}}@db:5432/${POSTGRES_DB}?sslmode=disable" \
-	username="vault_db_admin" \
-	password="$VAULT_DB_ADMIN_PASSWORD"
+database_config_json=$(mktemp)
+jq -n \
+	--arg allowed_roles "auth-runtime,backend-runtime,migration" \
+	--arg connection_url "postgresql://{{username}}:{{password}}@db:5432/${POSTGRES_DB}?sslmode=disable" \
+	--arg username "vault_db_admin" \
+	--arg password "$VAULT_DB_ADMIN_PASSWORD" \
+	'{
+		plugin_name: "postgresql-database-plugin",
+		allowed_roles: $allowed_roles,
+		connection_url: $connection_url,
+		username: $username,
+		password: $password
+	}' >"$database_config_json"
+quiet vault write database/config/postgresql "@${database_config_json}"
+rm -f "$database_config_json"
 
 step "creating database roles from ${SQL_DIR}"
 create_db_role() {
