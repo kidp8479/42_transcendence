@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -41,7 +42,7 @@ type FortyTwoLoginResolution struct {
 
 func (s *Store) CreateOAuthTransaction(ctx context.Context, transaction OAuthTransaction) error {
 	if _, err := s.currentPool().Exec(ctx, `DELETE FROM "OAuthTransaction" WHERE "expiresAt" <= CURRENT_TIMESTAMP`); err != nil {
-		return fmt.Errorf("clean expired OAuth transactions: %w", err)
+		log.Printf("clean expired OAuth transactions: %v", err)
 	}
 	_, err := s.currentPool().Exec(ctx,
 		`INSERT INTO "OAuthTransaction"
