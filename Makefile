@@ -318,21 +318,32 @@ shell-rustfs:
 # database                                                                     #
 # ---------------------------------------------------------------------------- #
 
+## wait until the Nginx-routed backend health endpoint is available
+wait-backend-health:
+	@attempt=0; \
+	until curl -fkfsS --max-time 2 https://localhost:8443/api/health >/dev/null; do \
+		attempt=$$((attempt + 1)); \
+		if [ "$$attempt" -ge 60 ]; then \
+			echo "Timed out waiting for backend health;" >&2; exit 1; \
+		fi; \
+		sleep 1; \
+	done
+
 ## run Prisma migrations with the short-lived Vault migration lease, then
 ## re-apply table-level grants for the Vault runtime parent roles
-migrate: $(ENV_FILE)
+migrate: $(ENV_FILE) wait-backend-health
 	$(COMPOSE) --profile tools run --rm migration
 	@set -a; . ./$(ENV_FILE); set +a; \
 	$(COMPOSE) exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < db/runtime-grants.sql
 
 ## run migrations and runtime grants in the local development environment
-migrate-dev: $(DEV_ENV_FILE)
+migrate-dev: $(DEV_ENV_FILE) wait-backend-health
 	$(DEV_COMPOSE) --profile tools run --rm migration
 	@set -a; . ./$(DEV_ENV_FILE); set +a; \
 	$(DEV_COMPOSE) exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < db/runtime-grants.sql
 
 ## author a Prisma migration in the local development environment (NAME is required)
-migrate-create-dev: $(DEV_ENV_FILE)
+migrate-create-dev: $(DEV_ENV_FILE) wait-backend-health
 	@test -n "$(NAME)" || (echo "Usage: make migrate-create-dev NAME=lowercase-migration-name" >&2; exit 1)
 	$(DEV_COMPOSE) --profile tools run --rm --user "$$(id -u):$$(id -g)" -e PRISMA_MIGRATION_NAME="$(NAME)" \
 		migration npx tsx scripts/vault-migrate-dev.ts
@@ -659,7 +670,7 @@ help:
         rebuild-frontend rebuild-backend rebuild-auth recreate-auth rebuild-frontend-dev rebuild-backend-dev rebuild-auth-dev \
         logs-dev logs-nginx logs-nginx-dev logs-nginx-tls-agent logs-frontend logs-frontend-dev logs-backend logs-backend-dev logs-auth logs-auth-dev logs-db logs-db-dev \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate migrate-dev migrate-create-dev migrate-fix-permissions prisma-studio install install-dev install-backend seed seed-dev \
+        wait-backend-health migrate migrate-dev migrate-create-dev migrate-fix-permissions prisma-studio install install-dev install-backend seed seed-dev \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
         check-frontend check-backend check-nginx check-tls export-local-ca check-auth check-prisma format-auth check-auth-stack check-shell \
         check-vault-policies check-vault-prisma check-websocket-e2e \
