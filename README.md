@@ -21,26 +21,37 @@ reviewed external integrations.
   if detection picks the wrong one)
 - `make`
 
-The default stack is the school-evaluation environment. It serves the static
-frontend and production service images through direct Compose ingress on ports
-8080 and 8443:
+The default stack is the school-evaluation environment (Compose project
+`transcendence-school`, `.env`). It serves the static frontend and production
+service images through direct Compose ingress on ports 8080 and 8443. Bare
+`make` is the same as `make start`: it builds images, starts the stack,
+runs Prisma migrations, then seeds demo data - but only the first time. The
+seed step records a local `.seed` marker file (ignored by Git) and is skipped
+on every later `make`/`make start` while that marker exists:
 
 ```sh
 make
 ```
 
 The Makefile generates `.env` from `.env.example` with fresh local secrets and
-the required `*.paris.42.school:8443` origin on first use.
+the required `*.paris.42.school:8443` origin on first use (see
+[Environment variables](#environment-variables)). `make up` starts the same
+stack without rebuilding, migrating, or seeding - use it only when the images
+and database are already in place.
 
 For bind-mounted local development with Vite, NestJS, and Air hot reload, use
-the explicit dev profile instead:
+the explicit dev profile instead. It is a fully separate Compose project
+(`transcendence-dev`), with its own env file (`.env.local`) and its own
+one-time seed marker (`.seed.local`):
 
 ```sh
 make start-dev
 ```
 
-It generates and uses `.env.local`, leaving the school runtime environment
-unchanged.
+`make start-dev` builds images, starts the stack, migrates, and seeds once,
+the same way `make start` does for the school profile. `make up-dev` starts
+the existing dev containers without rebuilding, migrating, or seeding. Both
+leave the school runtime environment unchanged.
 
 #### Quick start
 
@@ -51,7 +62,7 @@ make start-dev
 ```
 
 Afterward, `make up-dev` starts the existing development containers without
-forcing a rebuild.
+rebuilding, migrating, or seeding.
 
 When the containers are running, trust the local Vault PKI root in your
 operating system or browser, then open
@@ -203,20 +214,28 @@ make recreate-env
 
 This overwrites the existing `.env` file.
 
-If you need OAuth login during development, fill in the provider credentials in `.env`:
+42 OAuth is available when the configured client credentials and callback
+origin are present. For the default school profile, set a concrete evaluator
+hostname rather than the wildcard application origin:
 
 ```sh
+AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=https://f6r6s6.paris.42.school:8443
 OAUTH_42_CLIENT_ID=
 OAUTH_42_CLIENT_SECRET=
-OAUTH_GOOGLE_CLIENT_ID=
-OAUTH_GOOGLE_CLIENT_SECRET=
 ```
 
-Keep these values private and do not commit `.env`.
+Register this exact redirect URI with 42:
 
-The current auth foundation supports local email/password registration and
-login. The 42 and Google provider callbacks are designed but not implemented
-yet; GitHub variables remain reserved for a possible future provider.
+```text
+https://f6r6s6.paris.42.school:8443/auth/oauth/42/callback
+```
+
+Run `make` after changing the OAuth values so Compose reruns the Vault bootstrap
+job, then run `make recreate-auth` to recreate Auth with the new callback
+origin. Changing credentials directly in Vault only requires an Auth restart;
+changing `AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN` requires recreation. Keep
+these values private and do not commit `.env`. Google and GitHub variables
+remain reserved for future providers.
 
 Architecture and service contracts live in:
 
@@ -226,18 +245,17 @@ Architecture and service contracts live in:
 #### Useful commands
 
 ```sh
-make up              # start the full development stack
-make up-build        # rebuild and start the full development stack
-make install         # reinstall npm packages in running containers (use after pulling package.json changes)
-make down            # stop the stack
-make restart         # restart running containers
-make build           # rebuild images
-make ps              # show container status
-make logs            # follow logs for all services
-make logs-frontend   # follow frontend logs
-make logs-backend    # follow backend logs
-make logs-auth       # follow auth service logs
-make logs-db         # follow database logs
+make                  # build, start, migrate, and seed the school stack once
+make up               # start the existing school stack only
+make start-dev        # build, start, migrate, and seed the bind-mounted dev stack once
+make up-dev           # start the existing dev stack only
+make install-dev      # refresh dev node_modules volumes after package changes
+make down             # stop the school stack
+make down-dev         # stop the dev stack
+make ps               # show school container status
+make logs             # follow school logs
+make logs-dev         # follow dev logs
+make recreate-auth    # recreate school Auth without rebuilding its image
 make lint            # lint frontend and backend
 make format          # format frontend and backend
 make lint-frontend   # lint frontend only
@@ -277,11 +295,14 @@ Run Prisma migrations from inside the backend container:
 make migrate
 ```
 
+For the bind-mounted dev environment, use `make migrate-dev`. To author a new
+development migration, use `make migrate-create-dev NAME=lowercase-name`.
+
 Stop the database and permanently remove its data volume:
 
 ```sh
 make wipe-db
-make up-db
+make up
 make migrate
 ```
 
@@ -291,18 +312,24 @@ Open Prisma Studio without launching a browser in the container:
 make prisma-studio
 ```
 
-Inject demo data into the database (run once after `make migrate`, requires `prisma/seed.ts` to be implemented first):
+Inject demo data into the default school database:
 
 ```sh
 make seed
 ```
+
+It creates `.seed`; `make` skips later seed runs while that marker exists.
+`make wipe-db` and `make fclean` remove it. The dev equivalents are
+`make seed-dev`, `.seed.local`, `make wipe-db-dev`, and `make fclean-dev`.
 
 #### Cleanup
 
 ```sh
 make clean    # stop containers and remove orphans
 make fclean   # also remove volumes and local images
-make re       # full clean rebuild
+make re       # reset and rebuild the school stack
+make fclean-dev # remove dev containers, volumes, and local images
+make re-dev     # reset and rebuild the dev stack
 ```
 
 Use `make fclean` with care: it removes the PostgreSQL Docker volume, so local database data will be deleted.
@@ -365,7 +392,7 @@ permissions, real-time, accessibility, notification, public API, and
 cybersecurity modules. It uses React/NestJS, Prisma, Socket.io, project roles,
 WCAG-focused UI work, project-bound API tokens, ModSecurity, and Vault.
 
-Additional work in progress includes chat, friends, OAuth, and extended search.
+Additional work in progress includes chat, friends, and extended search.
 
 ## Individual Contributions
 

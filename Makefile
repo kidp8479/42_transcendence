@@ -21,11 +21,13 @@ COMPOSE_COMMAND := $(COMPOSE)
 
 SCHOOL_PROJECT ?= transcendence-school
 ENV_FILE ?= .env
+SEED_FILE ?= .seed
 override COMPOSE := $(COMPOSE_COMMAND) --project-name $(SCHOOL_PROJECT) \
 	--env-file $(ENV_FILE) -f docker-compose.yml
 
 DEV_PROJECT ?= transcendence-dev
 DEV_ENV_FILE ?= .env.local
+DEV_SEED_FILE ?= .seed.local
 DEV_COMPOSE = $(COMPOSE_COMMAND) --project-name $(DEV_PROJECT) \
 	--env-file $(DEV_ENV_FILE) -f docker-compose.yml -f ops/compose/dev.yml
 
@@ -127,6 +129,8 @@ start: up-build
 ## build and start the explicit local development stack
 start-dev: $(DEV_ENV_FILE)
 	$(DEV_COMPOSE) up --build -d
+	+$(MAKE) migrate-dev
+	+$(MAKE) seed-dev
 
 ## start the explicit local development stack without forcing a rebuild
 up-dev: $(DEV_ENV_FILE)
@@ -213,6 +217,10 @@ rebuild-backend-dev: $(DEV_ENV_FILE)
 ## rebuild and start only the auth service
 rebuild-auth: $(ENV_FILE)
 	$(COMPOSE) up --build -d auth
+
+## recreate the school auth service without rebuilding its image
+recreate-auth: $(ENV_FILE)
+	$(COMPOSE) up -d --force-recreate auth
 
 ## rebuild and start only the local development auth service
 rebuild-auth-dev: $(DEV_ENV_FILE)
@@ -338,13 +346,21 @@ migrate-fix-permissions: $(ENV_FILE)
 prisma-studio:
 	$(COMPOSE) exec backend npx prisma studio --browser none
 
-## inject demo data using the short-lived Vault migration lease
-seed:
+## record successful demo-data injection for the default school environment
+$(SEED_FILE):
 	$(COMPOSE) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
+	@touch "$(SEED_FILE)"
 
-## inject demo data into the local development environment
-seed-dev:
+## inject demo data once using the short-lived Vault migration lease
+seed: $(ENV_FILE) $(SEED_FILE)
+
+## record successful demo-data injection for the local development environment
+$(DEV_SEED_FILE):
 	$(DEV_COMPOSE) --profile tools run --rm migration npx tsx scripts/vault-seed.ts
+	@touch "$(DEV_SEED_FILE)"
+
+## inject demo data once into the local development environment
+seed-dev: $(DEV_ENV_FILE) $(DEV_SEED_FILE)
 
 ## stop the database and remove its Compose-managed data volume
 # same portable mechanism as ffclean: match containers/volumes by label or
@@ -366,6 +382,7 @@ wipe-db: $(ENV_FILE)
 	done
 	docker volume ls -q --filter label=com.docker.compose.project=$(SCHOOL_PROJECT) \
 		--filter label=com.docker.compose.volume=db_data | xargs -r docker volume rm -f
+	rm -f "$(SEED_FILE)"
 	@echo "Database wiped. Run 'make up' (not just 'make up-db') then 'make migrate' to recreate it."
 
 ## stop the local development database and remove its Compose-managed data volume
@@ -377,6 +394,7 @@ wipe-db-dev: $(DEV_ENV_FILE)
 	done
 	docker volume ls -q --filter label=com.docker.compose.project=$(DEV_PROJECT) \
 		--filter label=com.docker.compose.volume=db_data | xargs -r docker volume rm -f
+	rm -f "$(DEV_SEED_FILE)"
 	@echo "Database wiped. Run 'make up-dev' then 'make migrate-dev' to recreate it."
 
 ## stop RustFS and remove its Compose-managed data volume
@@ -542,10 +560,12 @@ clean:
 ## remove containers, volumes, orphans, and local images
 fclean:
 	$(COMPOSE) down --volumes --remove-orphans --rmi local # preserves pulled external images with explicit tags
+	rm -f "$(SEED_FILE)"
 
 ## remove local development containers, volumes, orphans, and local images
 fclean-dev:
 	$(DEV_COMPOSE) down --volumes --remove-orphans --rmi local # preserves pulled external images with explicit tags
+	rm -f "$(DEV_SEED_FILE)"
 
 ## fully reset and start the default school-evaluation stack
 re: fclean $(ENV_FILE)
@@ -617,7 +637,7 @@ help:
         up-dev start-dev down-dev build-dev fclean-dev re-dev rere-dev ffclean-dev clean-dev-artifacts \
         recreate-env recreate-env-dev wipe-db wipe-storage wipe-db-dev wipe-storage-dev \
         up-db up-frontend up-backend up-auth vault-status \
-        rebuild-frontend rebuild-backend rebuild-auth rebuild-frontend-dev rebuild-backend-dev rebuild-auth-dev \
+        rebuild-frontend rebuild-backend rebuild-auth recreate-auth rebuild-frontend-dev rebuild-backend-dev rebuild-auth-dev \
         logs-dev logs-nginx logs-nginx-dev logs-nginx-tls-agent logs-frontend logs-frontend-dev logs-backend logs-backend-dev logs-auth logs-auth-dev logs-db logs-db-dev \
         shell-frontend shell-backend shell-auth shell-db \
         migrate migrate-dev migrate-create-dev migrate-fix-permissions prisma-studio install install-dev seed seed-dev \
