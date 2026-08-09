@@ -37,6 +37,11 @@ the required `*.paris.42.school:8443` origin on first use (see
 stack without rebuilding, migrating, or seeding - use it only when the images
 and database are already in place.
 
+`*.paris.42.school:8443` is a wildcard, not a literal address - open
+`https://<put-your-hostname-here>.paris.42.school:8443` in the browser,
+using the actual school hostname of the machine running the stack (for
+example `https://f6r6s6.paris.42.school:8443`).
+
 For bind-mounted local development with Vite, NestJS, and Air hot reload, use
 the explicit dev profile instead. It is a fully separate Compose project
 (`transcendence-dev`), with its own env file (`.env.local`) and its own
