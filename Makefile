@@ -557,7 +557,18 @@ ps:
 ## stop and remove containers on the system and remove orphans
 nuke:
 	docker ps -qa | xargs -r docker stop
-	docker ps -qa | xargs -r docker rm
+	@containers="$$(docker ps -qa)"; \
+	while [ -n "$$containers" ]; do \
+		before_count="$$(printf '%s\n' "$$containers" | wc -w)"; \
+		for container in $$containers; do docker rm -f "$$container" >/dev/null 2>&1 || true; done; \
+		containers="$$(docker ps -qa)"; \
+		after_count="$$(printf '%s\n' "$$containers" | wc -w)"; \
+		if [ "$$after_count" -ge "$$before_count" ]; then \
+			echo "Unable to remove all containers; remaining containers may have external dependencies:" >&2; \
+			printf '%s\n' "$$containers" >&2; \
+			exit 1; \
+		fi; \
+	done
 	docker images -qa | xargs -r docker rmi -f
 	docker volume ls -q | xargs -r docker volume rm
 	docker network prune -f
