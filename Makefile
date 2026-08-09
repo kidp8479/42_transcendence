@@ -33,9 +33,9 @@ include deploy.mk
 # env guard                                                                    #
 # ---------------------------------------------------------------------------- #
 
-$(ENV_FILE):
+$(ENV_FILE): .env.example
 	@echo "No .env found. Copying .env.example.."
-	cp .env.example $(ENV_FILE)
+	+$(MAKE) recreate-env
 
 ## overwrite .env with .env.example values and fresh random local secrets
 recreate-env:
@@ -49,7 +49,6 @@ recreate-env:
 		-e "s|^VAULT_DB_ADMIN_PASSWORD=.*|VAULT_DB_ADMIN_PASSWORD='$$(openssl rand 128 | LC_ALL=C tr -dc 'a-zA-Z0-9.$$@!{}' | head -c 16)'|" \
 		.env.example > $(ENV_FILE)
 
-
 # ---------------------------------------------------------------------------- #
 # lifecycle                                                                    #
 # ---------------------------------------------------------------------------- #
@@ -58,20 +57,18 @@ recreate-env:
 up: $(ENV_FILE)
 	$(COMPOSE) up -d
 
+## stop the local development stack
+down:
+	$(COMPOSE) down
+
 ## rebuild images and start the local development stack
 ## run this after pulling changes that add or remove npm dependencies
 up-build: $(ENV_FILE)
 	$(COMPOSE) up --build -d
 
-## reinstall npm dependencies in running containers without rebuilding images
-## use after pulling changes that add or remove npm dependencies (faster than up-build)
-install:
-	$(COMPOSE) exec frontend npm install
-	$(COMPOSE) exec backend npm install
-
-## stop the local development stack
-down:
-	$(COMPOSE) down
+## rebuild images and start the local development stack
+rebuild: up-build
+start: up-build
 
 ## restart the local stack through dependency-aware startup
 restart:
@@ -82,10 +79,25 @@ restart:
 build:
 	$(COMPOSE) build
 
+## reinstall npm dependencies in running containers without rebuilding images
+## use after pulling changes that add or remove npm dependencies (faster than up-build)
+install:
+	$(COMPOSE) exec frontend npm install
+	$(COMPOSE) exec backend npm install
+
+## refresh backend dependencies in its Compose-managed node_modules volume
+install-backend: $(ENV_FILE)
+	$(COMPOSE) run --rm --no-deps backend npm ci
 
 # ---------------------------------------------------------------------------- #
 # individual services                                                          #
 # ---------------------------------------------------------------------------- #
+
+## start only the auth service without forcing a rebuild
+up-auth:     $(ENV_FILE) ; $(COMPOSE) up -d auth
+
+## start only the backend service without forcing a rebuild
+up-backend:  $(ENV_FILE) ; $(COMPOSE) up -d backend
 
 ## start only the database service
 up-db:       $(ENV_FILE) ; $(COMPOSE) up -d db
@@ -93,11 +105,15 @@ up-db:       $(ENV_FILE) ; $(COMPOSE) up -d db
 ## start only the frontend service without forcing a rebuild
 up-frontend: $(ENV_FILE) ; $(COMPOSE) up -d frontend
 
-## start only the backend service without forcing a rebuild
-up-backend:  $(ENV_FILE) ; $(COMPOSE) up -d backend
+## start only the nginx service without forcing a rebuild
+up-nginx:    $(ENV_FILE) ; $(COMPOSE) up -d nginx
 
-## start only the auth service without forcing a rebuild
-up-auth:     $(ENV_FILE) ; $(COMPOSE) up -d auth
+## start only the rustfs service without forcing a rebuild
+up-rustfs:   $(ENV_FILE) ; $(COMPOSE) up -d rustfs
+
+## start only the rustfs service without forcing a rebuild
+up-vault:   $(ENV_FILE) ; $(COMPOSE) up -d vault
+
 
 ## show local Vault status (development mode only)
 vault-status: $(ENV_FILE)
@@ -110,10 +126,6 @@ rebuild-frontend: $(ENV_FILE)
 ## rebuild and start only the backend service
 rebuild-backend: $(ENV_FILE)
 	$(COMPOSE) up --build -d backend
-
-## refresh backend dependencies in its Compose-managed node_modules volume
-install-backend: $(ENV_FILE)
-	$(COMPOSE) run --rm --no-deps backend npm ci
 
 ## rebuild and start only the auth service
 rebuild-auth: $(ENV_FILE)
@@ -252,10 +264,14 @@ wipe-storage: $(ENV_FILE)
 # ---------------------------------------------------------------------------- #
 
 ## format frontend and backend
-format: format-frontend format-backend
+format: format-frontend format-backend format-auth
 
 ## lint frontend and backend
 lint: lint-frontend lint-backend
+
+## format Go authentication service sources
+format-auth:
+	$(COMPOSE) exec auth gofmt -w cmd internal
 
 ## format all frontend files with Prettier
 format-frontend:
@@ -324,10 +340,6 @@ check-auth:
 check-prisma:
 	$(COMPOSE) exec -e DATABASE_URL=postgresql://prisma-validation:prisma-validation@localhost:5432/prisma-validation backend npx prisma validate
 
-## format Go authentication service sources
-format-auth:
-	$(COMPOSE) exec auth gofmt -w cmd internal
-
 ## validate the authentication integration services
 check-auth-stack: check-auth check-prisma check-backend check-frontend
 
@@ -385,7 +397,7 @@ clean:
 
 ## remove containers, volumes, orphans, and local images
 fclean:
-	$(COMPOSE) down --volumes --remove-orphans --rmi local
+	$(COMPOSE) down --volumes --remove-orphans --rmi local # preserves pulled external images with explicit tags
 
 ## fully reset and start the local development stack
 re: fclean
@@ -395,9 +407,7 @@ re: fclean
 rere:
 	+$(MAKE) recreate-env
 	+$(MAKE) fclean
-	+$(MAKE) ffclean
-	+$(MAKE) wipe-db
-	+$(MAKE) wipe-storage
+	+$(MAKE) ffclean   # only needed for host-side build/cache cleanup
 	+$(MAKE) up-build
 	+$(MAKE) migrate
 
@@ -422,8 +432,6 @@ ffclean:
 		sh -c "rm -rf tmp .cache coverage.out"
 	@echo "Local caches and node_modules volumes cleaned. Run 'make up-build' next."
 
-## rebuild images and start the local development stack
-rebuild: up-build
 
 # Magic help adapted: from https://gitlab.com/depressiveRobot/make-help/blob/master/help.mk (MIT License)
 help:
@@ -439,7 +447,7 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST) | sort -u
 	@printf "\n"
 
-.PHONY: all up up-build down restart build logs ps clean fclean re rere ffclean rebuild \
+.PHONY: all up up-build start rebuild down restart build logs ps clean fclean re rere ffclean \
         recreate-env wipe-db wipe-storage \
         up-db up-frontend up-backend up-auth vault-status \
         rebuild-frontend rebuild-backend rebuild-auth \
