@@ -21,24 +21,37 @@ reviewed external integrations.
   if detection picks the wrong one)
 - `make`
 
-The project is designed to run locally in Docker. The development stack starts:
+The default stack is the school-evaluation environment. It serves the static
+frontend and production service images through direct Compose ingress on ports
+8080 and 8443:
 
-- `nginx` as the local HTTPS entrypoint on
-  [https://localhost:8443](https://localhost:8443)
-- `frontend` as a React/Vite dev server
-- `backend` as a NestJS dev server
-- `auth` as a Go service with hot reload via Air
-- `db` as PostgreSQL 16
+```sh
+make
+```
+
+The Makefile generates `.env` from `.env.example` with fresh local secrets and
+the required `*.paris.42.school:8443` origin on first use.
+
+For bind-mounted local development with Vite, NestJS, and Air hot reload, use
+the explicit dev profile instead:
+
+```sh
+make start-dev
+```
+
+It generates and uses `.env.local`, leaving the school runtime environment
+unchanged.
 
 #### Quick start
 
 From the repository root:
 
 ```sh
-make up
+make start-dev
 ```
 
-On the first run, the Makefile copies `.env.example` to `.env` automatically if `.env` does not already exist. If the Docker images do not exist yet, Docker Compose builds them. After that, `make up` starts the existing development containers without forcing a rebuild.
+Afterward, `make up-dev` starts the existing development containers without
+forcing a rebuild.
 
 When the containers are running, trust the local Vault PKI root in your
 operating system or browser, then open
@@ -71,14 +84,14 @@ make ps
 make logs
 ```
 
-If nginx cannot start because port `8080` is already in use, stop the other local service using that port, then run `make up` again.
+If nginx cannot start because port `8080` is already in use, stop the other local service using that port, then run `make start-dev` again.
 
 #### After pulling changes
 
 **If the pull upgrades a major dependency** (e.g. Tailwind v3 to v4, a new bundler plugin), the existing `node_modules` volume inside Docker will be stale and must be rebuilt from scratch:
 
 ```sh
-make up-build
+make start-dev
 ```
 
 This is the safe default after any significant dependency change. It rebuilds the Docker images and reinstalls all packages cleanly.
@@ -86,14 +99,14 @@ This is the safe default after any significant dependency change. It rebuilds th
 **If the pull only adds or removes packages** without a major version change, a faster reinstall is enough:
 
 ```sh
-make install
+make install-dev
 ```
 
 This runs `npm install` inside the running containers without rebuilding the images.
 
-If you are unsure which one to use, `make up-build` is always safe.
+If you are unsure which one to use, `make start-dev` is always safe.
 
-If the pull includes changes to `prisma/schema.prisma`, the Prisma client is regenerated automatically the next time `npm install` runs (via the `postinstall` script), so `make install` or `make up-build` is enough. No manual `prisma generate` needed.
+If the pull includes changes to `prisma/schema.prisma`, the Prisma client is regenerated automatically the next time `npm install` runs (via the `postinstall` script), so `make install-dev` or `make start-dev` is enough. No manual `prisma generate` needed.
 
 #### UI components
 
@@ -104,7 +117,7 @@ The frontend uses [Flowbite React](https://flowbite-react.com/docs/getting-start
 Use Docker Compose as the canonical local stack:
 
 ```sh
-make up
+make start-dev
 ```
 
 The frontend, backend, and auth services mount the local source folders into their containers, so normal source edits should hot reload without rebuilding Docker images.
@@ -112,27 +125,29 @@ The frontend, backend, and auth services mount the local source folders into the
 Use the service logs while developing:
 
 ```sh
-make logs-frontend
-make logs-backend
-make logs-auth
+make logs-frontend-dev
+make logs-backend-dev
+make logs-auth-dev
 ```
 
 Only rebuild when dependencies, Dockerfiles, or container setup changed:
 
 ```sh
-make up-build          # rebuild and start the full stack
-make rebuild-frontend  # rebuild only the frontend service
-make rebuild-backend   # rebuild only the backend service
-make rebuild-auth      # rebuild only the auth service
+make start-dev          # rebuild and start the full stack
+make rebuild-frontend-dev  # rebuild only the frontend service
+make rebuild-backend-dev   # rebuild only the backend service
+make rebuild-auth-dev      # rebuild only the auth service
 ```
 
-`make re` is a full reset. It removes local containers, local images, and Docker volumes before starting again. Use it when you intentionally want a clean rebuild, not for everyday development.
+`make re-dev` is a full reset. It removes local development containers, local
+images, and Docker volumes before starting again. Use it when you intentionally
+want a clean rebuild, not for everyday development.
 
 #### Linting and formatting
 
 Both the frontend and backend use ESLint and Prettier. Three layers are in place:
 
-**On demand** - requires the stack to be running (`make up` first):
+**On demand** - requires the development stack to be running (`make start-dev` first):
 
 ```sh
 make lint          # lint frontend and backend
@@ -150,7 +165,7 @@ make format-backend   # backend only
 make hooks
 ```
 
-After that, every `git commit` formats your files automatically and blocks the commit if ESLint finds errors. Note: the hook requires both the frontend and backend containers to be running - if the stack is stopped, commits will be blocked until you run `make up`.
+After that, every `git commit` formats your files automatically and blocks the commit if ESLint finds errors. Note: the hook requires both the frontend and backend development containers to be running - if the stack is stopped, commits will be blocked until you run `make start-dev`.
 
 **CI** - GitHub Actions runs ESLint and Prettier on every push for both services. Pull requests cannot be merged if either check fails.
 
@@ -168,15 +183,17 @@ npm run dev -- --host 127.0.0.1
 
 Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/).
 
-This is only a frontend convenience loop. The canonical full application still
-runs through `make up` and [https://localhost:8443](https://localhost:8443).
+This is only a frontend convenience loop. The canonical full development
+application still runs through `make start-dev` and
+[https://localhost:8443](https://localhost:8443).
 If the frontend needs the API or WebSocket routes, keep the Docker stack
 running with `VITE_API_URL=/api` and `VITE_WS_URL=/ws` so both target the
 browser's loaded origin.
 
 #### Environment variables
 
-Default local values live in `.env.example`. For normal local development, the generated `.env` works as-is for database and internal service wiring.
+Default values live in `.env.example`. The school profile generates `.env`;
+local development generates `.env.local`.
 
 To discard the current local configuration and recreate it from the template:
 
@@ -193,8 +210,6 @@ OAUTH_42_CLIENT_ID=
 OAUTH_42_CLIENT_SECRET=
 OAUTH_GOOGLE_CLIENT_ID=
 OAUTH_GOOGLE_CLIENT_SECRET=
-OAUTH_GITHUB_CLIENT_ID=
-OAUTH_GITHUB_CLIENT_SECRET=
 ```
 
 Keep these values private and do not commit `.env`.
