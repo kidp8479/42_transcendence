@@ -545,7 +545,7 @@ The subject requires 14 points minimum. Bonus points (up to 5, only counted once
 - **Accessibility compliance (Major)**: core ARIA attributes (`aria-label`, `aria-live`, `role`, etc. - the standard HTML attributes that tell screen readers what an element is and how to announce it) on interactive components, plus semantic HTML for page structure. Color contrast, text size, labeling, and semantic markup are checked continuously - during development and again in every pull request review, not as a one-off pass.
 - **Support for additional browsers (Minor)**: confirmed working on Chrome, Brave, Firefox, and Zen Browser.
 - **Standard user management and authentication (Major)**: profile info, avatar upload with a default fallback, friends with online status.
-- **OAuth 2.0 (Minor)**: remote login through 42 / Google, hidden until provider credentials are configured.
+- **OAuth 2.0 (Minor)**: remote login through 42, hidden until provider credentials are configured.
 - **Advanced permissions (Major)**: `OWNER` / `ADMIN` / `MEMBER` roles per project, with different views and actions available depending on role (e.g. only `OWNER`/`ADMIN` can remove members or delete the project).
 - **Organization system (Major)**: a `Project` is this app's organizational unit - create/edit/delete a project, add/remove members, manage roles.
 - **User activity analytics (Minor)**: the Summary dashboard, pulling live data from every other tab (task status, progress by category, team workload, upcoming events, defense readiness).
