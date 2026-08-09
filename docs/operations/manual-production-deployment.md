@@ -427,7 +427,7 @@ public-origin verification.
 The files in `nginx/` configure the Nginx process inside the
 `docker.io/owasp/modsecurity-crs:4.28.0-nginx-202608050608` image. Compose
 mounts the active templates read-only. Operators do not copy these files to
-the host's `/etc/nginx`; Changing them requires rebuilding or recreating the affected Compose stack
+the host's `/etc/nginx`. Changing them requires rebuilding or recreating the affected Compose stack
 with its matching environment target.
 
 | Repository file | Compose handling and purpose | Operator action |

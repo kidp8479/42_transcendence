@@ -45,22 +45,24 @@ include deploy.mk
 # env guard                                                                    #
 # ---------------------------------------------------------------------------- #
 
-$(ENV_FILE): .env.example
+$(ENV_FILE):
 	@echo "Generating school runtime environment from .env.example."
 	+$(MAKE) recreate-env
 
-$(DEV_ENV_FILE): .env.example
+$(DEV_ENV_FILE):
 	@echo "Generating local development runtime environment from .env.example."
 	+$(MAKE) recreate-env-dev
 
 ## overwrite the school runtime environment with required school origins and fresh secrets
 recreate-env:
 	@env_file="$(ENV_FILE)"; \
-	oauth_42_client_id_line="$$(grep -m 1 '^OAUTH_42_CLIENT_ID=' "$$env_file" || true)"; \
-	oauth_42_client_secret_line="$$(grep -m 1 '^OAUTH_42_CLIENT_SECRET=' "$$env_file" || true)"; \
-	oauth_google_client_id_line="$$(grep -m 1 '^OAUTH_GOOGLE_CLIENT_ID=' "$$env_file" || true)"; \
-	oauth_google_client_secret_line="$$(grep -m 1 '^OAUTH_GOOGLE_CLIENT_SECRET=' "$$env_file" || true)"; \
-	oauth_callback_origin_line="$$(grep -m 1 '^AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=' "$$env_file" || true)"; \
+	if test -f "$$env_file"; then \
+		oauth_42_client_id_line="$$(grep -m 1 '^OAUTH_42_CLIENT_ID=' "$$env_file" || true)"; \
+		oauth_42_client_secret_line="$$(grep -m 1 '^OAUTH_42_CLIENT_SECRET=' "$$env_file" || true)"; \
+		oauth_google_client_id_line="$$(grep -m 1 '^OAUTH_GOOGLE_CLIENT_ID=' "$$env_file" || true)"; \
+		oauth_google_client_secret_line="$$(grep -m 1 '^OAUTH_GOOGLE_CLIENT_SECRET=' "$$env_file" || true)"; \
+		oauth_callback_origin_line="$$(grep -m 1 '^AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN=' "$$env_file" || true)"; \
+	fi; \
 	test -n "$$oauth_42_client_id_line" || oauth_42_client_id_line='OAUTH_42_CLIENT_ID='; \
 	test -n "$$oauth_42_client_secret_line" || oauth_42_client_secret_line='OAUTH_42_CLIENT_SECRET='; \
 	test -n "$$oauth_google_client_id_line" || oauth_google_client_id_line='OAUTH_GOOGLE_CLIENT_ID='; \
@@ -153,11 +155,8 @@ build:
 build-dev:
 	$(DEV_COMPOSE) build
 
-## reinstall npm dependencies in running containers without rebuilding images
-## use after pulling changes that add or remove npm dependencies (faster than up-build)
-install:
-	$(COMPOSE) exec frontend npm install
-	$(COMPOSE) exec backend npm install
+## reinstall local development npm dependencies without rebuilding images
+install: install-dev
 
 ## reinstall local development npm dependencies without rebuilding images
 install-dev:
@@ -190,7 +189,7 @@ up-nginx:    $(ENV_FILE) ; $(COMPOSE) up -d nginx
 ## start only the rustfs service without forcing a rebuild
 up-rustfs:   $(ENV_FILE) ; $(COMPOSE) up -d rustfs
 
-## start only the rustfs service without forcing a rebuild
+## start only the Vault service without forcing a rebuild
 up-vault:   $(ENV_FILE) ; $(COMPOSE) up -d vault
 
 
@@ -567,21 +566,19 @@ fclean-dev:
 	$(DEV_COMPOSE) down --volumes --remove-orphans --rmi local # preserves pulled external images with explicit tags
 	rm -f "$(DEV_SEED_FILE)"
 
-## fully reset and start the default school-evaluation stack
-re: fclean $(ENV_FILE)
-	+$(MAKE) up-build
-	+$(MAKE) migrate
+## fully reset, migrate, and seed the default school-evaluation stack
+re: $(ENV_FILE) fclean
+	+$(MAKE) start
 
 ## fully recreate the default school-evaluation stack
 rere:
 	+$(MAKE) recreate-env
 	+$(MAKE) fclean
-	+$(MAKE) up-build
-	+$(MAKE) migrate
+	+$(MAKE) start
 
-## fully reset and start the local development stack
-re-dev: fclean-dev
-	+$(MAKE) up-dev
+## fully reset, migrate, and seed the local development stack
+re-dev: $(DEV_ENV_FILE) fclean-dev
+	+$(MAKE) start-dev
 
 ## fully recreate the local development stack, dependencies, and database
 rere-dev:
@@ -589,7 +586,6 @@ rere-dev:
 	+$(MAKE) fclean-dev
 	+$(MAKE) clean-dev-artifacts
 	+$(MAKE) start-dev
-	+$(MAKE) migrate-dev
 
 ## remove local development node_modules volumes and host build caches
 ffclean-dev:
@@ -636,11 +632,11 @@ help:
 .PHONY: all up up-build start rebuild down restart build logs ps clean fclean re rere \
         up-dev start-dev down-dev build-dev fclean-dev re-dev rere-dev ffclean-dev clean-dev-artifacts \
         recreate-env recreate-env-dev wipe-db wipe-storage wipe-db-dev wipe-storage-dev \
-        up-db up-frontend up-backend up-auth vault-status \
+        up-db up-frontend up-backend up-auth up-nginx up-rustfs up-vault vault-status \
         rebuild-frontend rebuild-backend rebuild-auth recreate-auth rebuild-frontend-dev rebuild-backend-dev rebuild-auth-dev \
         logs-dev logs-nginx logs-nginx-dev logs-nginx-tls-agent logs-frontend logs-frontend-dev logs-backend logs-backend-dev logs-auth logs-auth-dev logs-db logs-db-dev \
         shell-frontend shell-backend shell-auth shell-db \
-        migrate migrate-dev migrate-create-dev migrate-fix-permissions prisma-studio install install-dev seed seed-dev \
+        migrate migrate-dev migrate-create-dev migrate-fix-permissions prisma-studio install install-dev install-backend seed seed-dev \
         format lint format-frontend lint-frontend format-backend lint-backend hooks \
         check-frontend check-backend check-nginx check-tls export-local-ca check-auth check-prisma format-auth check-auth-stack check-shell \
         check-vault-policies check-vault-prisma check-websocket-e2e \
