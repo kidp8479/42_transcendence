@@ -1,0 +1,5 @@
+# School evaluation ingress is published directly by Compose.
+services:
+  nginx:
+    ports:
+      - "8080:8080"

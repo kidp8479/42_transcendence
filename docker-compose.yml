@@ -19,8 +19,7 @@ services:
   nginx:
     image: docker.io/owasp/modsecurity-crs:4.28.0-nginx-202608050608
     ports:
-      - "8080:8080"
-      - "8443:8443"
+      - "${APP_INGRESS_BIND_ADDRESS:-0.0.0.0}:${APP_INGRESS_PORT:-8443}:8443"
     environment:
       MODSEC_RULE_ENGINE: DetectionOnly
       MODSEC_AUDIT_LOG: /dev/stdout
@@ -29,7 +28,7 @@ services:
       RESOLVER_CONFIG: valid=15s ipv6=off
       FRONTEND_PORT: 80
     volumes:
-      - ./nginx/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
+      - ${NGINX_CONFIG_TEMPLATE:-./nginx/default.conf.template}:/etc/nginx/templates/conf.d/default.conf.template:ro
       - ./nginx/includes/application-locations.conf.template:/etc/nginx/templates/includes/application-locations.conf.template:ro
       - ./nginx/includes/error-pages.conf.template:/etc/nginx/templates/includes/error-pages.conf.template:ro
       - ./nginx/errors:/usr/share/nginx/html/__edge-errors:ro

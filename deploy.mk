@@ -18,12 +18,14 @@ DEPLOY_test_ENV_FILE = $(DEPLOY_TEST_ENV_FILE)
 DEPLOY_test_COMPOSE_FILE = $(DEPLOY_TEST_COMPOSE_FILE)
 DEPLOY_test_PROJECT = $(DEPLOY_TEST_PROJECT)
 DEPLOY_test_SOURCE_MOUNTS := false
+DEPLOY_test_COMPOSE_ENV := APP_INGRESS_PORT=8444 APP_INGRESS_BIND_ADDRESS=127.0.0.1 NGINX_CONFIG_TEMPLATE=./nginx/default.production.conf.template
 
 DEPLOY_prod_NAME := production
 DEPLOY_prod_ENV_FILE = $(DEPLOY_PROD_ENV_FILE)
 DEPLOY_prod_COMPOSE_FILE = $(DEPLOY_PROD_COMPOSE_FILE)
 DEPLOY_prod_PROJECT = $(DEPLOY_PROD_PROJECT)
 DEPLOY_prod_SOURCE_MOUNTS := false
+DEPLOY_prod_COMPOSE_ENV := APP_INGRESS_BIND_ADDRESS=127.0.0.1 NGINX_CONFIG_TEMPLATE=./nginx/default.production.conf.template
 
 deployment_value = $(DEPLOY_$(1)_$(2))
 deployment_name = $(call deployment_value,$(1),NAME)
@@ -31,7 +33,8 @@ deployment_env_file = $(call deployment_value,$(1),ENV_FILE)
 deployment_compose_file = $(call deployment_value,$(1),COMPOSE_FILE)
 deployment_project = $(call deployment_value,$(1),PROJECT)
 deployment_source_mounts = $(call deployment_value,$(1),SOURCE_MOUNTS)
-deployment_compose = $(COMPOSE) --project-name $(call deployment_project,$(1)) \
+deployment_compose_env = $(call deployment_value,$(1),COMPOSE_ENV)
+deployment_compose = $(call deployment_compose_env,$(1)) $(COMPOSE_COMMAND) --project-name $(call deployment_project,$(1)) \
 	--env-file $(call deployment_env_file,$(1)) -f docker-compose.yml \
 	-f $(call deployment_compose_file,$(1))
 
@@ -144,6 +147,7 @@ validate-deployment-%:
 	@if [ "$*" = "prod" ]; then \
 		env_file="$(call deployment_env_file,$*)"; case "$$env_file" in */*) ;; *) env_file="./$$env_file" ;; esac; \
 		set -a; . "$$env_file"; set +a; \
+		test -n "$$APP_INGRESS_PORT" || (echo "APP_INGRESS_PORT must be set for production deployment" >&2; exit 1); \
 		test "$$NODE_ENV" = "production" || (echo "NODE_ENV must be production for production deployment" >&2; exit 1); \
 		test "$$APP_ORIGIN" = "https://tomato.iops.dev" || (echo "APP_ORIGIN must be https://tomato.iops.dev for production deployment" >&2; exit 1); \
 		test "$$AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN" = "https://tomato.iops.dev" || (echo "AUTH_OAUTH_PROVIDERS_CALLBACK_ORIGIN must be https://tomato.iops.dev for production deployment" >&2; exit 1); \

@@ -3,18 +3,39 @@ set -e
 
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 
-if ! make --no-print-directory format; then
-  echo "pre-commit: local development services are unavailable - run 'make start-dev' first"
+format_targets=
+lint_targets=
+
+while IFS= read -r file; do
+  case "$file" in
+    frontend/*)
+      format_targets="$format_targets format-frontend"
+      lint_targets="$lint_targets lint-frontend"
+      ;;
+    backend/*)
+      format_targets="$format_targets format-backend"
+      lint_targets="$lint_targets lint-backend"
+      ;;
+    auth/*)
+      format_targets="$format_targets format-auth"
+      ;;
+  esac
+done <<EOF
+$STAGED_FILES
+EOF
+
+if [ -n "$format_targets" ] && ! make --no-print-directory $format_targets; then
+  echo "pre-commit: local development services are unavailable - run 'make start-dev' before committing application changes"
   exit 1
 fi
 
 # Only restage files that were already staged for this commit, so `npm run
 # format` (which runs over the whole repo) picks up formatting fixes on them
-# without silently sweeping in unrelated unstaged changes sitting elsewhere
-# in the working tree (git add -u used to stage everything, defeating
-# partial/atomic commits).
+# without silently sweeping in unrelated unstaged changes sitting elsewhere.
 if [ -n "$STAGED_FILES" ]; then
   echo "$STAGED_FILES" | xargs -r git add --
 fi
 
-make --no-print-directory lint
+if [ -n "$lint_targets" ]; then
+  make --no-print-directory $lint_targets
+fi

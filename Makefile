@@ -22,8 +22,9 @@ COMPOSE_COMMAND := $(COMPOSE)
 SCHOOL_PROJECT ?= transcendence-school
 ENV_FILE ?= .env
 SEED_FILE ?= .seed
-override COMPOSE := $(COMPOSE_COMMAND) --project-name $(SCHOOL_PROJECT) \
-	--env-file $(ENV_FILE) -f docker-compose.yml
+SCHOOL_COMPOSE = $(COMPOSE_COMMAND) --project-name $(SCHOOL_PROJECT) \
+	--env-file $(ENV_FILE) -f docker-compose.yml -f ops/compose/school.yml
+override COMPOSE := $(SCHOOL_COMPOSE)
 
 DEV_PROJECT ?= transcendence-dev
 DEV_ENV_FILE ?= .env.local
@@ -534,8 +535,9 @@ check-vault-prisma: $(DEV_ENV_FILE)
 
 ## install git pre-commit hook (run once after cloning)
 hooks:
-	cp hooks/pre-commit .git/hooks/pre-commit
-	chmod +x .git/hooks/pre-commit
+	@hook_path="$$(git rev-parse --git-path hooks/pre-commit)"; \
+	cp hooks/pre-commit "$$hook_path"; \
+	chmod +x "$$hook_path"
 	@echo "pre-commit hook installed"
 
 

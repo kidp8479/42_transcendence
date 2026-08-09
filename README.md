@@ -170,13 +170,21 @@ make format-frontend  # frontend only
 make format-backend   # backend only
 ```
 
-**Pre-commit hook** - auto-formats and lints both services before every commit. Run after cloning, and again any time `hooks/pre-commit` itself changes (`.git/hooks/` is not tracked by git, so pulling an update to `hooks/pre-commit` does not update your locally installed copy on its own):
+**Pre-commit hook** - checks only the application areas staged by the commit:
+frontend changes are formatted and linted, backend changes are formatted and
+linted, and Auth changes are formatted. Documentation, Compose, and other
+non-application commits do not require a running development stack. Run after
+cloning, and again any time `hooks/pre-commit` itself changes (`.git/hooks/` is
+not tracked by git, so pulling an update to `hooks/pre-commit` does not update
+your locally installed copy on its own):
 
 ```sh
 make hooks
 ```
 
-After that, every `git commit` formats your files automatically and blocks the commit if ESLint finds errors. Note: the hook requires both the frontend and backend development containers to be running - if the stack is stopped, commits will be blocked until you run `make start-dev`.
+For staged application changes, the hook formats files automatically and blocks
+the commit if ESLint finds errors. Those checks require the matching development
+containers, so run `make start-dev` before committing application changes.
 
 **CI** - GitHub Actions runs ESLint and Prettier on every push for both services. Pull requests cannot be merged if either check fails.
 
