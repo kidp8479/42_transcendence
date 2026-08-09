@@ -587,21 +587,21 @@ nuke:
 	docker volume prune -f
 
 ## stop containers and remove orphans
-clean:
+clean: $(ENV_FILE)
 	$(COMPOSE) down --remove-orphans
 
 ## remove containers, volumes, orphans, and local images
-fclean:
+fclean: $(ENV_FILE)
 	$(COMPOSE) down --volumes --remove-orphans --rmi local # preserves pulled external images with explicit tags
 	rm -f "$(SEED_FILE)"
 
 ## remove local development containers, volumes, orphans, and local images
-fclean-dev:
+fclean-dev: $(DEV_ENV_FILE)
 	$(DEV_COMPOSE) down --volumes --remove-orphans --rmi local # preserves pulled external images with explicit tags
 	rm -f "$(DEV_SEED_FILE)"
 
 ## fully reset, migrate, and seed the default school-evaluation stack
-re: $(ENV_FILE) fclean
+re: fclean
 	+$(MAKE) start
 
 ## fully recreate the default school-evaluation stack
