@@ -34,6 +34,11 @@ type FortyTwoProfile struct {
 	Campus      *string
 }
 
+type FortyTwoLoginResolution struct {
+	User       User
+	AutoLinked bool
+}
+
 func (s *Store) CreateOAuthTransaction(ctx context.Context, transaction OAuthTransaction) error {
 	if _, err := s.currentPool().Exec(ctx, `DELETE FROM "OAuthTransaction" WHERE "expiresAt" <= CURRENT_TIMESTAMP`); err != nil {
 		return fmt.Errorf("clean expired OAuth transactions: %w", err)
@@ -72,34 +77,35 @@ func (s *Store) ConsumeOAuthTransaction(ctx context.Context, stateHash string) (
 	return transaction, nil
 }
 
-func (s *Store) ResolveFortyTwoLogin(ctx context.Context, profile FortyTwoProfile) (User, error) {
+func (s *Store) ResolveFortyTwoLogin(ctx context.Context, profile FortyTwoProfile) (FortyTwoLoginResolution, error) {
 	tx, err := s.currentPool().BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return User{}, fmt.Errorf("begin 42 identity resolution: %w", err)
+		return FortyTwoLoginResolution{}, fmt.Errorf("begin 42 identity resolution: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	user, found, err := findIdentityUser(ctx, tx, "FORTY_TWO", profile.Subject)
 	if err != nil {
-		return User{}, err
+		return FortyTwoLoginResolution{}, err
 	}
 	if found {
 		user, err = enrichFortyTwoUser(ctx, tx, user, profile)
 		if err != nil {
-			return User{}, err
+			return FortyTwoLoginResolution{}, err
 		}
 		if err := updateFortyTwoIdentity(ctx, tx, user.ID, profile); err != nil {
-			return User{}, err
+			return FortyTwoLoginResolution{}, err
 		}
 		if err := tx.Commit(ctx); err != nil {
-			return User{}, fmt.Errorf("commit 42 identity resolution: %w", err)
+			return FortyTwoLoginResolution{}, fmt.Errorf("commit 42 identity resolution: %w", err)
 		}
-		return user, nil
+		return FortyTwoLoginResolution{User: user}, nil
 	}
 	// Automatic email linking deliberately considers LOCAL identities only.
 	user, found, err = findIdentityUser(ctx, tx, "LOCAL", profile.Email)
 	if err != nil {
-		return User{}, err
+		return FortyTwoLoginResolution{}, err
 	}
+	autoLinked := found
 	if !found {
 		user, err = createFortyTwoUser(ctx, tx, profile)
 		if err != nil {
@@ -107,10 +113,10 @@ func (s *Store) ResolveFortyTwoLogin(ctx context.Context, profile FortyTwoProfil
 				_ = tx.Rollback(ctx)
 				resolved, resolvedFound, lookupErr := findIdentityUserPool(ctx, s, "FORTY_TWO", profile.Subject)
 				if lookupErr == nil && resolvedFound {
-					return resolved, nil
+					return FortyTwoLoginResolution{User: resolved}, nil
 				}
 			}
-			return User{}, err
+			return FortyTwoLoginResolution{}, err
 		}
 	}
 	if err := insertFortyTwoIdentity(ctx, tx, user.ID, profile); err != nil {
@@ -120,19 +126,19 @@ func (s *Store) ResolveFortyTwoLogin(ctx context.Context, profile FortyTwoProfil
 			_ = tx.Rollback(ctx)
 			resolved, resolvedFound, lookupErr := findIdentityUserPool(ctx, s, "FORTY_TWO", profile.Subject)
 			if lookupErr == nil && resolvedFound {
-				return resolved, nil
+				return FortyTwoLoginResolution{User: resolved}, nil
 			}
 		}
-		return User{}, err
+		return FortyTwoLoginResolution{}, err
 	}
 	user, err = enrichFortyTwoUser(ctx, tx, user, profile)
 	if err != nil {
-		return User{}, err
+		return FortyTwoLoginResolution{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return User{}, mapWriteError("commit 42 identity resolution", err)
+		return FortyTwoLoginResolution{}, mapWriteError("commit 42 identity resolution", err)
 	}
-	return user, nil
+	return FortyTwoLoginResolution{User: user, AutoLinked: autoLinked}, nil
 }
 
 func (s *Store) LinkFortyTwoIdentity(ctx context.Context, userID string, profile FortyTwoProfile) error {

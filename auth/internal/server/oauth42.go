@@ -166,7 +166,7 @@ func (s *Server) handleFortyTwoCallback(w http.ResponseWriter, r *http.Request) 
 		http.Redirect(w, r, transaction.ReturnTo, http.StatusFound)
 		return
 	}
-	user, err := s.store.ResolveFortyTwoLogin(r.Context(), profile)
+	resolution, err := s.store.ResolveFortyTwoLogin(r.Context(), profile)
 	if errors.Is(err, store.ErrConflict) {
 		s.recordEvent(r, nil, "IDENTITY_LOGIN_CONFLICT", "FORTY_TWO", nil)
 		writeError(w, http.StatusConflict, "Conflict", "OAuth login could not be completed")
@@ -176,17 +176,20 @@ func (s *Server) handleFortyTwoCallback(w http.ResponseWriter, r *http.Request) 
 		logOAuthFailure(w, err)
 		return
 	}
-	if user.Status != store.AccountStatusActive {
+	if resolution.User.Status != store.AccountStatusActive {
 		writeError(w, http.StatusUnauthorized, "Unauthorized", "OAuth login could not be completed")
 		return
 	}
-	session, accessToken, err := s.createLogin(r, user, "FORTY_TWO")
+	session, accessToken, err := s.createLogin(r, resolution.User, "FORTY_TWO")
 	if err != nil {
 		logOAuthFailure(w, err)
 		return
 	}
 	s.setRefreshCookies(w, session)
-	s.recordEvent(r, &user.ID, "LOGIN_SUCCEEDED", "FORTY_TWO", &session.ID)
+	if resolution.AutoLinked {
+		s.recordEvent(r, &resolution.User.ID, "IDENTITY_AUTO_LINKED", "FORTY_TWO", nil)
+	}
+	s.recordEvent(r, &resolution.User.ID, "LOGIN_SUCCEEDED", "FORTY_TWO", &session.ID)
 	// The access JWT remains intentionally out of URLs; the refresh cookie
 	// allows the application to obtain it through its normal refresh flow.
 	_ = accessToken

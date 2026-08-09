@@ -153,9 +153,9 @@ func (s *testAuthStore) ConsumeOAuthTransaction(context.Context, string) (store.
 	return s.oauthTransaction, s.err
 }
 
-func (s *testAuthStore) ResolveFortyTwoLogin(_ context.Context, profile store.FortyTwoProfile) (store.User, error) {
+func (s *testAuthStore) ResolveFortyTwoLogin(_ context.Context, profile store.FortyTwoProfile) (store.FortyTwoLoginResolution, error) {
 	s.oauthProfile = profile
-	return s.credential.User, s.err
+	return store.FortyTwoLoginResolution{User: s.credential.User}, s.err
 }
 
 func (s *testAuthStore) LinkFortyTwoIdentity(_ context.Context, _ string, profile store.FortyTwoProfile) error {

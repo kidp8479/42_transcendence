@@ -82,7 +82,7 @@ type authStore interface {
 	IntrospectProjectAPIToken(context.Context, string) (store.ProjectAPITokenPrincipal, error)
 	CreateOAuthTransaction(context.Context, store.OAuthTransaction) error
 	ConsumeOAuthTransaction(context.Context, string) (store.OAuthTransaction, error)
-	ResolveFortyTwoLogin(context.Context, store.FortyTwoProfile) (store.User, error)
+	ResolveFortyTwoLogin(context.Context, store.FortyTwoProfile) (store.FortyTwoLoginResolution, error)
 	LinkFortyTwoIdentity(context.Context, string, store.FortyTwoProfile) error
 }
 
