@@ -68,17 +68,25 @@ Once it finishes, trust the local TLS certificate so the browser stops warning a
 make export-local-ca
 ```
 
-This drops the certificate authority at `.local/task-rabbit-local-ca.crt`. Import it into your OS/browser's trusted root certificate store, then open **https://localhost:8443**.
+This drops the certificate authority at `.local/task-rabbit-local-ca.crt`. Import it into your OS/browser's trusted root certificate store, then open **https://localhost:8443**. Port `8080` redirects to HTTPS on `8443`. The local root certificate is development-only; do not install it on a shared or production machine.
 
-Sign in with a seeded demo account (`<username>@42.fr`, password is the current `SEED_PASSWORD` value inside your local `.env` - it's regenerated on every `rere`, there is no fixed shared password) or create your own account.
+You do not need to open the frontend container port directly. Docker Compose publishes Nginx on local ports `8080` and `8443`; Nginx forwards requests to the right service inside Docker.
 
-### Configuration
+Local routes:
 
-<!-- .env setup: which variables exist, where they come from, what's secret vs safe to commit -->
+- Frontend: [https://localhost:8443/](https://localhost:8443/)
+- Backend API: [https://localhost:8443/api](https://localhost:8443/api)
+- Backend WebSocket: [wss://localhost:8443/ws](wss://localhost:8443/ws)
+- Auth service: [https://localhost:8443/auth](https://localhost:8443/auth)
 
-### Running the project
+Sign in with a seeded demo account (`<username>@42.fr`, password is the current `SEED_PASSWORD` value inside your local `.env.local` - it's regenerated every time the dev environment is recreated, there is no fixed shared password) or create your own account.
 
-<!-- step-by-step, from a fresh clone to a working local instance -->
+If [https://localhost:8443](https://localhost:8443) does not load, check that the stack is running:
+
+```sh
+make ps
+make logs
+```
 
 If nginx cannot start because port `8080` is already in use, stop the other local service using that port, then run `make start-dev` again.
 
@@ -103,10 +111,6 @@ This runs `npm install` inside the running containers without rebuilding the ima
 If you are unsure which one to use, `make start-dev` is always safe.
 
 If the pull includes changes to `prisma/schema.prisma`, the Prisma client is regenerated automatically the next time `npm install` runs (via the `postinstall` script), so `make install-dev` or `make start-dev` is enough. No manual `prisma generate` needed.
-
-#### UI components
-
-The frontend uses [Flowbite React](https://flowbite-react.com/docs/getting-started/introduction) as the component library and Tailwind CSS v4 for layout and spacing. Before building any new screen, check the style guide at [http://localhost:8080/dont-panic](http://localhost:8080/dont-panic). It shows the color palette, available components, and the conventions the team follows. These are temporary conventions to get everyone started with a shared base. The team can update the palette and style at any time in `frontend/src/index.css`.
 
 #### Daily development flow
 
@@ -266,6 +270,9 @@ make up-db
 make up-frontend
 make up-backend
 make up-auth
+make up-nginx
+make up-rustfs
+make up-vault
 make rebuild-frontend
 make rebuild-backend
 make rebuild-auth
@@ -500,7 +507,7 @@ Nine additional tables back the Go auth service: `AuthIdentity` + `PasswordCrede
 ### Infrastructure
 
 - **App scaffolding & bootstrap** - initial TanStack Router + React frontend and NestJS backend setup that every feature builds on. *Christophe, Pauline, Diana*
-- **Docker Compose stack** - single-command local deployment of every service. *Andrei*
+- **Docker Compose stack** - single-command deployment split into isolated school-evaluation, local dev, VM test, and production profiles, each with its own Compose project, env file, and one-time seed marker. *Andrei*
 - **HashiCorp Vault** - dynamic, short-lived PostgreSQL credentials instead of a static shared password; Vault-backed migration authoring. *Andrei*
 - **RustFS storage** - S3-compatible object storage for avatars and file uploads. *Christophe*
 - **WAF/ModSecurity** - OWASP CoreRuleSet ModSecurity fronting nginx, blocking mode in production. *Andrei*
@@ -559,7 +566,7 @@ The subject requires 14 points minimum. Bonus points (up to 5, only counted once
 
 The team started from close to zero: five people learning a new stack (React, NestJS, Prisma, Socket.io, Docker, Vault) from scratch at the same time, with no prior shared codebase or workflow. The biggest recurring obstacles were environment and setup conflicts (Docker vs Podman across different machines, port clashes, stale `node_modules` volumes after dependency changes), networking inside Docker Compose (getting nginx, the frontend, the backend, and the auth service to talk to each other and to the browser through the right hostnames and ports), and simply coordinating a five-person team on a project this size without stepping on each other's work. None of these were solved by any one person - they were worked through by talking early when something was blocking, pairing on the harder infrastructure pieces, and keeping the Discord channels and sync meetings active enough that nobody stayed stuck alone for long.
 
-**Andrei** - Auth foundation (Argon2id, sessions), the JWT + refresh-token-family cutover, one-time WebSocket ticket admission, Vault-backed dynamic database credentials, realtime field locks, project-bound public API tokens, the Docker Compose stack, the WAF/ModSecurity hardening, the health check and status page, and splitting the backend into single-responsibility services.
+**Andrei** - Auth foundation (Argon2id, sessions), the JWT + refresh-token-family cutover, one-time WebSocket ticket admission, Vault-backed dynamic database credentials, realtime field locks, project-bound public API tokens, the Docker Compose stack (school/dev/test/prod environment split with seed markers), the WAF/ModSecurity hardening, the health check and status page, and splitting the backend into single-responsibility services.
 
 **Carlos** - Footer and legal pages, the project list and creation flow, the Kanban board's initial build, and the workspace search bar.
 
