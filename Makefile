@@ -554,6 +554,16 @@ ps:
 # cleanup                                                                      #
 # ---------------------------------------------------------------------------- #
 
+## stop and remove containers on the system and remove orphans
+nuke:
+	docker ps -qa | xargs -r docker stop
+	docker ps -qa | xargs -r docker rm
+	docker images -qa | xargs -r docker rmi -f
+	docker volume ls -q | xargs -r docker volume rm
+	docker network prune -f
+	docker system prune -af
+	docker volume prune -f
+
 ## stop containers and remove orphans
 clean:
 	$(COMPOSE) down --remove-orphans
@@ -631,7 +641,7 @@ help:
 	{ lastLine = $$0 }' $(MAKEFILE_LIST) | sort -u
 	@printf "\n"
 
-.PHONY: all up up-build start rebuild down restart build logs ps clean fclean re rere \
+.PHONY: all up up-build start rebuild down restart build logs ps nuke clean fclean re rere \
         up-dev start-dev down-dev build-dev fclean-dev re-dev rere-dev ffclean-dev clean-dev-artifacts \
         recreate-env recreate-env-dev wipe-db wipe-storage wipe-db-dev wipe-storage-dev \
         up-db up-frontend up-backend up-auth up-nginx up-rustfs up-vault vault-status \
