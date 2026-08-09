@@ -30,6 +30,7 @@ const (
 	registerRequestsPerIP     = 20
 	loginRequestsPerIP        = 10
 	loginRequestsPerAccount   = 5
+	oauthRequestsPerIP        = 20
 	ticketRequestsPerAccount  = 30
 	passwordConcurrency       = 2
 	projectAPITokenDefaultTTL = 90 * 24 * time.Hour
@@ -57,10 +58,12 @@ type Server struct {
 	registerIPLimiter    *middleware.FixedWindowLimiter
 	loginIPLimiter       *middleware.FixedWindowLimiter
 	loginAccountLimiter  *middleware.FixedWindowLimiter
+	oauthIPLimiter       *middleware.FixedWindowLimiter
 	ticketAccountLimiter *middleware.FixedWindowLimiter
 	passwordSlots        chan struct{}
 	decoyPasswordHash    string
 	ready                func() bool
+	oauth42              OAuth42Config
 }
 
 type authStore interface {
@@ -77,6 +80,20 @@ type authStore interface {
 	RevokeProjectAPIToken(context.Context, string, string, string) (store.ProjectAPIToken, error)
 	DeleteProjectAPIToken(context.Context, string, string, string) error
 	IntrospectProjectAPIToken(context.Context, string) (store.ProjectAPITokenPrincipal, error)
+	CreateOAuthTransaction(context.Context, store.OAuthTransaction) error
+	ConsumeOAuthTransaction(context.Context, string) (store.OAuthTransaction, error)
+	ResolveFortyTwoLogin(context.Context, store.FortyTwoProfile) (store.FortyTwoLoginResolution, error)
+	LinkFortyTwoIdentity(context.Context, string, store.FortyTwoProfile) error
+}
+
+// OAuth42Config keeps provider credentials and transport at the process edge.
+// The transport is injectable so provider exchange/profile handling is testable.
+type OAuth42Config struct {
+	ClientID     string
+	ClientSecret string
+	HTTPClient   interface {
+		Do(*http.Request) (*http.Response, error)
+	}
 }
 
 type webSocketStore interface {
@@ -214,7 +231,7 @@ func New(
 	passwords *password.Hasher,
 	tokens tokenService,
 ) (http.Handler, error) {
-	return NewWithReadiness(cfg, internalToken, authStore, passwords, tokens, func() bool { return true })
+	return NewWithOAuthReadiness(cfg, internalToken, authStore, passwords, tokens, OAuth42Config{}, func() bool { return true })
 }
 
 func NewWithReadiness(
@@ -223,6 +240,18 @@ func NewWithReadiness(
 	authStore *store.Store,
 	passwords *password.Hasher,
 	tokens tokenService,
+	ready func() bool,
+) (http.Handler, error) {
+	return NewWithOAuthReadiness(cfg, internalToken, authStore, passwords, tokens, OAuth42Config{}, ready)
+}
+
+func NewWithOAuthReadiness(
+	cfg config.Config,
+	internalToken string,
+	authStore *store.Store,
+	passwords *password.Hasher,
+	tokens tokenService,
+	oauth42 OAuth42Config,
 	ready func() bool,
 ) (http.Handler, error) {
 	if ready == nil {
@@ -249,16 +278,22 @@ func NewWithReadiness(
 		registerIPLimiter:    middleware.NewFixedWindowLimiter(registerRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		loginIPLimiter:       middleware.NewFixedWindowLimiter(loginRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		loginAccountLimiter:  middleware.NewFixedWindowLimiter(loginRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
+		oauthIPLimiter:       middleware.NewFixedWindowLimiter(oauthRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		ticketAccountLimiter: middleware.NewFixedWindowLimiter(ticketRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
 		passwordSlots:        make(chan struct{}, passwordConcurrency),
 		decoyPasswordHash:    decoyPasswordHash,
 		ready:                ready,
+		oauth42:              oauth42,
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /auth/health", server.handleHealth)
 	mux.HandleFunc("POST /auth/register", server.handleRegister)
 	mux.HandleFunc("POST /auth/login", server.handleLogin)
+	mux.HandleFunc("GET /auth/oauth/42/availability", server.handleFortyTwoAvailability)
+	mux.HandleFunc("GET /auth/oauth/42/start", server.handleFortyTwoStart)
+	mux.HandleFunc("GET /auth/oauth/42/callback", server.handleFortyTwoCallback)
+	mux.HandleFunc("POST /auth/account/link/{provider}", server.handleAccountLink)
 	mux.HandleFunc("POST /auth/refresh", server.handleRefresh)
 	mux.HandleFunc("POST /auth/logout", server.handleLogout)
 	mux.HandleFunc("POST /auth/ws-ticket", server.handleIssueWebSocketTicket)

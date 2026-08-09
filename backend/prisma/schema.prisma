@@ -18,6 +18,8 @@ model User {
   email            String             @unique // filled by the auth team via OAuth
   emailVerified    Boolean            @default(false)
   username         String             @unique
+  firstName        String?
+  lastName         String?
   avatarUrl        String? // if null, the frontend generates an avatar from username initials (CSS only, no DB)
   campus           String? // ex: "42 Paris" - filled via OAuth, can be updated in settings
   twoFactorEnabled Boolean            @default(false) // toggled from the Security section in Settings

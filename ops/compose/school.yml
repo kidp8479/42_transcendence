@@ -1,50 +1,5 @@
+# School evaluation ingress is published directly by Compose.
 services:
   nginx:
-    ports: !override
-      - "0.0.0.0:8080:8080"
-      - "0.0.0.0:8443:8443"
-    environment:
-      MODSEC_RULE_ENGINE: DetectionOnly
-      FRONTEND_PORT: 80
-
-  db:
-    ports: !override []
-
-  vault:
-    ports: !override []
-
-  rustfs:
-    ports: !override []
-    environment:
-      RUSTFS_CONSOLE_ENABLE: "false"
-
-  frontend:
-    build:
-      target: prod
-    volumes: !override []
-
-  backend:
-    build:
-      target: prod
-    volumes: !override
-      - vault_backend_runtime_secret:/run/secrets/vault:ro
-
-  migration:
-    build:
-      target: migration
-    volumes: !override
-      - vault_migration_secret:/run/secrets/vault:ro
-
-  backend-vault-test:
-    build:
-      target: migration
-    volumes: !override
-      - vault_auth_runtime_secret:/run/secrets/auth:ro
-      - vault_backend_runtime_secret:/run/secrets/backend:ro
-      - vault_migration_secret:/run/secrets/migration:ro
-
-  auth:
-    build:
-      target: prod
-    volumes: !override
-      - vault_auth_runtime_secret:/run/secrets/vault:ro
+    ports:
+      - "8080:8080"

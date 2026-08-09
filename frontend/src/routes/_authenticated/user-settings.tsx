@@ -205,7 +205,7 @@ function UserSettingsPage() {
 
   async function handleSaveChanges() {
     if (savingChanges) return;
-    const changes: Partial<typeof user> = {};
+    const changes: { username?: string } = {};
 
     if (displayedName !== user.username) {
       changes.username = displayedName;
@@ -214,15 +214,11 @@ function UserSettingsPage() {
     //   changes.campus = displayedCampus;
     // }
 
-    if (Object.keys(changes).length === 0) return;
+    if (changes.username === undefined) return;
 
     setSavingChanges(true);
     try {
-      const updated = await updateMe({
-        username: changes.username,
-        email: changes.email,
-        campus: changes.campus,
-      });
+      const updated = await updateMe({ username: changes.username });
 
       // safeInvalidateRouter() below only refreshes this page's own `user`
       // (from the route loader). UserMenu reads the display name from
@@ -529,6 +525,40 @@ function UserSettingsPage() {
                   }
                 }}
                 maxLength={DISPLAY_NAME_MAX_LENGTH}
+              />
+            </div>
+
+            <div className={rowClass}>
+              <Label
+                htmlFor="first-name-input"
+                className="font-semibold text-text-primary shrink-0"
+              >
+                First name
+              </Label>
+              <TextInput
+                id="first-name-input"
+                className="w-full sm:w-80"
+                theme={darkSurfaceTextInputTheme}
+                type="text"
+                value={user.firstName ?? ""}
+                disabled
+              />
+            </div>
+
+            <div className={rowClass}>
+              <Label
+                htmlFor="last-name-input"
+                className="font-semibold text-text-primary shrink-0"
+              >
+                Last name
+              </Label>
+              <TextInput
+                id="last-name-input"
+                className="w-full sm:w-80"
+                theme={darkSurfaceTextInputTheme}
+                type="text"
+                value={user.lastName ?? ""}
+                disabled
               />
             </div>
 

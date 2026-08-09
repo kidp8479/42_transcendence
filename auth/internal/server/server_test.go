@@ -1,9 +1,11 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -37,6 +39,11 @@ type testAuthStore struct {
 	projectToken      store.CreatedProjectAPIToken
 	projectRequest    store.CreateProjectAPITokenRequest
 	projectPrincipal  store.ProjectAPITokenPrincipal
+	oauthTransaction  store.OAuthTransaction
+	oauthProfile      store.FortyTwoProfile
+	oauthCreated      store.OAuthTransaction
+	oauthCreateCalls  int
+	oauthConsumeCalls int
 }
 
 func (s *testAuthStore) Ping(context.Context) error {
@@ -135,6 +142,27 @@ func (s *testAuthStore) IntrospectProjectAPIToken(
 	return s.projectPrincipal, s.err
 }
 
+func (s *testAuthStore) CreateOAuthTransaction(_ context.Context, transaction store.OAuthTransaction) error {
+	s.oauthCreated = transaction
+	s.oauthCreateCalls++
+	return s.err
+}
+
+func (s *testAuthStore) ConsumeOAuthTransaction(context.Context, string) (store.OAuthTransaction, error) {
+	s.oauthConsumeCalls++
+	return s.oauthTransaction, s.err
+}
+
+func (s *testAuthStore) ResolveFortyTwoLogin(_ context.Context, profile store.FortyTwoProfile) (store.FortyTwoLoginResolution, error) {
+	s.oauthProfile = profile
+	return store.FortyTwoLoginResolution{User: s.credential.User}, s.err
+}
+
+func (s *testAuthStore) LinkFortyTwoIdentity(_ context.Context, _ string, profile store.FortyTwoProfile) error {
+	s.oauthProfile = profile
+	return s.err
+}
+
 type testTokenService struct {
 	compact string
 	claims  token.Claims
@@ -151,7 +179,7 @@ func (s testTokenService) Validate(context.Context, string) (token.Claims, error
 
 func testConfig() config.Config {
 	return config.Config{
-		AppOrigin:         "http://localhost:5173",
+		AppOrigin: "http://localhost:5173", OAuthProvidersCallbackOrigin: "http://localhost:5173",
 		RefreshCookieName: "tr_refresh", CSRFCookieName: "tr_csrf",
 		RefreshIdleTTL: 7 * 24 * time.Hour, RefreshAbsoluteTTL: 30 * 24 * time.Hour,
 		JWTAccessTTL: 15 * time.Minute,
@@ -173,7 +201,156 @@ func newLoginTestServer(authStore authStore, tokens tokenService) *Server {
 		store: authStore, tokens: tokens, passwords: password.NewHasher(),
 		loginIPLimiter:      middleware.NewFixedWindowLimiter(loginRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		loginAccountLimiter: middleware.NewFixedWindowLimiter(loginRequestsPerAccount, rateLimitWindow, maxRateLimitEntries),
+		oauthIPLimiter:      middleware.NewFixedWindowLimiter(oauthRequestsPerIP, rateLimitWindow, maxRateLimitEntries),
 		passwordSlots:       make(chan struct{}, passwordConcurrency),
+	}
+}
+
+type queuedOAuthClient struct {
+	responses []*http.Response
+	requests  []*http.Request
+}
+
+func (c *queuedOAuthClient) Do(request *http.Request) (*http.Response, error) {
+	c.requests = append(c.requests, request)
+	if len(c.responses) == 0 {
+		return nil, errors.New("unexpected provider request")
+	}
+	response := c.responses[0]
+	c.responses = c.responses[1:]
+	return response, nil
+}
+
+func oauthResponse(status int, body string) *http.Response {
+	return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewBufferString(body)), Header: make(http.Header)}
+}
+
+func TestFortyTwoAvailabilityRequiresCompleteConfiguration(t *testing.T) {
+	server := newLoginTestServer(&testAuthStore{}, testTokenService{})
+	request := httptest.NewRequest(http.MethodGet, "/auth/oauth/42/availability", nil)
+
+	unconfigured := httptest.NewRecorder()
+	server.handleFortyTwoAvailability(unconfigured, request)
+	if unconfigured.Code != http.StatusOK || !strings.Contains(unconfigured.Body.String(), `"available":false`) {
+		t.Fatalf("unconfigured availability = %d %s", unconfigured.Code, unconfigured.Body.String())
+	}
+
+	server.oauth42 = OAuth42Config{
+		ClientID: "id", ClientSecret: "secret", HTTPClient: &queuedOAuthClient{},
+	}
+	configured := httptest.NewRecorder()
+	server.handleFortyTwoAvailability(configured, request)
+	if configured.Code != http.StatusOK || !strings.Contains(configured.Body.String(), `"available":true`) {
+		t.Fatalf("configured availability = %d %s", configured.Code, configured.Body.String())
+	}
+}
+
+func TestFortyTwoStartStoresOnlyStateHashAndSafeReturnPath(t *testing.T) {
+	authStore := &testAuthStore{}
+	client := &queuedOAuthClient{}
+	server := newLoginTestServer(authStore, testTokenService{})
+	server.oauth42 = OAuth42Config{ClientID: "id", ClientSecret: "secret", HTTPClient: client}
+	request := httptest.NewRequest(http.MethodGet, "/auth/oauth/42/start?returnTo=/user-settings", nil)
+	response := httptest.NewRecorder()
+
+	server.handleFortyTwoStart(response, request)
+
+	if response.Code != http.StatusFound || authStore.oauthCreateCalls != 1 {
+		t.Fatalf("status = %d, transaction calls = %d", response.Code, authStore.oauthCreateCalls)
+	}
+	location, err := response.Result().Location()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := location.Query().Get("state")
+	if state == "" || authStore.oauthCreated.StateHash != hashOAuthState(state) || authStore.oauthCreated.StateHash == state {
+		t.Fatal("OAuth state was not stored exclusively as a SHA-256 hash")
+	}
+	if authStore.oauthCreated.ReturnTo != "/user-settings" ||
+		authStore.oauthCreated.RedirectURI != "http://localhost:5173/auth/oauth/42/callback" ||
+		location.Query().Get("scope") != "public" {
+		t.Fatalf("unexpected OAuth transaction or authorization URL: %#v, %s", authStore.oauthCreated, location)
+	}
+}
+
+func TestFortyTwoLinkReturnsToUserSettings(t *testing.T) {
+	family := testFamily()
+	authStore := &testAuthStore{access: store.AccessState{RefreshFamily: family, GlobalRole: family.User.GlobalRole}}
+	server := newLoginTestServer(authStore, testTokenService{claims: token.Claims{
+		Subject: family.User.ID, SessionID: family.ID, AuthenticationMethod: family.AuthenticationMethod,
+		AssuranceLevel: assuranceName(family.AssuranceLevel), AuthenticationTime: family.AuthenticatedAt,
+	}})
+	server.oauth42 = OAuth42Config{ClientID: "id", ClientSecret: "secret", HTTPClient: &queuedOAuthClient{}}
+	request := httptest.NewRequest(http.MethodPost, "/auth/account/link/FORTY_TWO", nil)
+	request.SetPathValue("provider", "FORTY_TWO")
+	request.Header.Set("Origin", server.cfg.AppOrigin)
+	request.Header.Set("Authorization", "Bearer access")
+	response := httptest.NewRecorder()
+
+	server.handleAccountLink(response, request)
+
+	if response.Code != http.StatusOK || authStore.oauthCreated.ReturnTo != "/user-settings" ||
+		authStore.oauthCreated.InitiatingUserID == nil || *authStore.oauthCreated.InitiatingUserID != family.User.ID {
+		t.Fatalf("status=%d transaction=%#v", response.Code, authStore.oauthCreated)
+	}
+}
+
+func TestSafeOAuthReturnPath(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"allowed route", "/projects/abc", "/projects/abc"},
+		{"query and fragment stripped", "/user-settings?tab=security#password", "/user-settings"},
+		{"normalizes traversal before prefix check", "/projects/../user-settings", "/user-settings"},
+		{"absolute URL", "https://evil.example/dashboard", "/dashboard"},
+		{"protocol relative URL", "//evil.example/dashboard", "/dashboard"},
+		{"backslash", `/projects\evil`, "/dashboard"},
+		{"control character", "/projects/\n", "/dashboard"},
+		{"prefix boundary attack", "/dashboard-evil", "/dashboard"},
+		{"outside allowed route", "/admin", "/dashboard"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := safeOAuthReturnPath(test.input); got != test.want {
+				t.Fatalf("safeOAuthReturnPath(%q) = %q, want %q", test.input, got, test.want)
+			}
+		})
+	}
+}
+
+func TestFortyTwoCallbackConsumesThenUsesNumericProfile(t *testing.T) {
+	user := store.User{ID: "user-id", Status: store.AccountStatusActive, GlobalRole: "USER"}
+	authStore := &testAuthStore{
+		credential: store.LocalCredential{User: user},
+		created: store.CreatedRefreshSession{RefreshFamily: store.RefreshFamily{
+			ID: "family-id", User: user, AuthenticationMethod: "FORTY_TWO", AuthenticatedAt: testNow,
+			IdleExpiresAt: testNow.Add(time.Hour), AbsoluteExpiresAt: testNow.Add(24 * time.Hour),
+		}, RefreshToken: "refresh", CSRFToken: "csrf"},
+		oauthTransaction: store.OAuthTransaction{Provider: "FORTY_TWO", Purpose: "LOGIN", ReturnTo: "/dashboard", RedirectURI: "http://localhost:5173/auth/oauth/42/callback"},
+	}
+	client := &queuedOAuthClient{responses: []*http.Response{
+		oauthResponse(http.StatusOK, `{"access_token":"provider-token"}`),
+		oauthResponse(http.StatusOK, `{"id":42,"login":"forty-two","email":"student@example.test","first_name":"Student","last_name":"Example","image":{"link":"https://cdn.example.test/avatar.png"},"campus":[{"name":"42 London"}],"displayname":"Student"}`),
+	}}
+	server := newLoginTestServer(authStore, testTokenService{compact: "access"})
+	server.oauth42 = OAuth42Config{ClientID: "id", ClientSecret: "secret", HTTPClient: client}
+	request := httptest.NewRequest(http.MethodGet, "/auth/oauth/42/callback?code=code&state=state", nil)
+	response := httptest.NewRecorder()
+
+	server.handleFortyTwoCallback(response, request)
+
+	if response.Code != http.StatusFound || authStore.oauthConsumeCalls != 1 || authStore.oauthProfile.Subject != "42" {
+		t.Fatalf("status=%d consumes=%d profile=%#v", response.Code, authStore.oauthConsumeCalls, authStore.oauthProfile)
+	}
+	if authStore.oauthProfile.FirstName == nil || *authStore.oauthProfile.FirstName != "Student" ||
+		authStore.oauthProfile.LastName == nil || *authStore.oauthProfile.LastName != "Example" ||
+		authStore.oauthProfile.AvatarURL == nil || *authStore.oauthProfile.AvatarURL != "https://cdn.example.test/avatar.png" ||
+		authStore.oauthProfile.Campus == nil || *authStore.oauthProfile.Campus != "42 London" {
+		t.Fatalf("profile enrichment fields = %#v", authStore.oauthProfile)
+	}
+	if len(client.requests) != 2 || client.requests[1].Header.Get("Authorization") != "Bearer provider-token" {
+		t.Fatalf("provider calls were not a server-side token exchange and profile request")
 	}
 }
 

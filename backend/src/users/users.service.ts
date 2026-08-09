@@ -34,6 +34,8 @@ const SAFE_USER_SELECT = {
   email: true,
   emailVerified: true,
   username: true,
+  firstName: true,
+  lastName: true,
   avatarUrl: true,
   campus: true,
   twoFactorEnabled: true,
@@ -51,6 +53,8 @@ const SAFE_USER_SELECT = {
 const SAFE_PUBLIC_USER_SELECT = {
   id: true,
   username: true,
+  firstName: true,
+  lastName: true,
   avatarUrl: true,
   campus: true,
 } as const;

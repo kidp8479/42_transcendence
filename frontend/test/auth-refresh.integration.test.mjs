@@ -142,6 +142,8 @@ function session(accessToken) {
       email: "user@example.com",
       emailVerified: true,
       username: "rabbit",
+      firstName: null,
+      lastName: null,
       avatarUrl: null,
       campus: null,
     },

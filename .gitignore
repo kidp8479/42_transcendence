@@ -41,6 +41,8 @@ desktop.ini
 .env
 .env.*
 !.env.example
+.seed
+.seed.local
 *.pem
 *.key
 *.crt

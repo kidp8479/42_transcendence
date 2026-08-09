@@ -117,15 +117,39 @@ paths:
           $ref: "#/components/responses/ServiceUnavailable"
   /oauth/42/start:
     get:
-      x-implementation-status: planned
+      x-implementation-status: implemented
       operationId: start42Login
       security: []
+      parameters:
+        - in: query
+          name: returnTo
+          required: false
+          schema:
+            type: string
+          description: Safe application path (/dashboard, /projects, /profile, /settings, or /user-settings); invalid values fall back to /dashboard.
       responses:
         "302":
           description: Redirect to the 42 OAuth authorization endpoint.
+  /oauth/42/availability:
+    get:
+      x-implementation-status: implemented
+      operationId: get42OAuthAvailability
+      description: Reports whether 42 OAuth is fully configured. It does not disclose provider credentials.
+      security: []
+      responses:
+        "200":
+          description: 42 OAuth configuration availability.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available]
+                properties:
+                  available:
+                    type: boolean
   /oauth/42/callback:
     get:
-      x-implementation-status: planned
+      x-implementation-status: implemented
       operationId: complete42Login
       description: Completes either login or an authenticated explicit-link transaction, as recorded by OAuthTransaction.
       security: []
@@ -248,7 +272,7 @@ paths:
           $ref: "#/components/responses/BadRequest"
   /account/link/{provider}:
     post:
-      x-implementation-status: planned
+      x-implementation-status: implemented
       operationId: startAccountLink
       description: The normal provider callback completes the link using the OAuthTransaction purpose.
       security:
@@ -258,10 +282,18 @@ paths:
           name: provider
           required: true
           schema:
-            enum: [FORTY_TWO, GOOGLE]
+            enum: [FORTY_TWO]
       responses:
         "200":
           description: Returns the provider authorization URL for explicit linking.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authorizationUrl]
+                properties:
+                  authorizationUrl:
+                    type: string
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
