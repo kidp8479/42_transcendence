@@ -34,6 +34,7 @@ desktop.ini
 !.github/copilot-instructions.md
 !docs/architecture/authentication-authorization.md
 !docs/operations/manual-production-deployment.md
+!docs/SCREENSHOTS.md
 
 # ============================================================
 # Environment & secrets
