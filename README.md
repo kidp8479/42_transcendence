@@ -1,5 +1,7 @@
 *This project has been created as part of the 42 curriculum by cade-jes, cgajean, diade-so, pafroidu, abelov.*
 
+![ft_transcendence Cover](cover-transcendence.png)
+
 ## Description
 
 **42 Project Planner** is a Trello-like collaborative project management web app for 42 students to plan and track a school project as a team.
@@ -7,6 +9,18 @@
 Each project gets its own workspace with a Discovery page (lay out the subject before writing code), a Kanban board (split work into tasks, drag them across statuses), a Calendar (deadlines, meetings, everyone's availability), an Evaluation Checklist (track defense readiness against the subject's requirements), a group chat, and a Summary dashboard pulling live data from all of the above. Multiple team members work in the same project at the same time - task moves, checklist updates, calendar changes, and chat messages sync live to everyone connected, and notifications keep people informed of changes made while they were away.
 
 Beyond the core project workspace, the app also has user accounts with profiles and avatars, a friends system with online status, project-level roles and membership, workspace-wide search across projects/tasks/members, and project-bound API tokens for external integrations.
+
+## Screenshots
+
+![Landing page](docs/screenshots/01-landing.png)
+
+![Kanban board](docs/screenshots/05-kanban.png)
+
+![Discovery](docs/screenshots/07-discovery.png)
+
+![Chat](docs/screenshots/16-chat-zaphod-reply.png)
+
+More screenshots (calendar, evaluation checklist, project settings, friends, profiles) in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 
 ## Instructions
 
@@ -598,3 +612,7 @@ The team started from close to zero: five people learning a new stack (React, Ne
 ### AI usage
 
 Claude + Copilot were used across the project to accelerate bootstrapping and scaffolding, as a Socratic tutor when learning a new concept or tool, to help track down bugs, and as a safety net during PR review. Used deliberately and reviewed by a team member, not as a substitute for understanding the code.
+
+---
+
+![ft_transcendence Badge](badge-transcendence.png)
